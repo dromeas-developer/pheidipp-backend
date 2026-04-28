@@ -1,0 +1,13 @@
+#!/bin/bash
+
+# Wrapper script for Alembic commands
+
+# Check if Alembic is installed
+if ! command -v alembic &> /dev/null
+then
+    echo "Error: Alembic is not installed"
+    exit 1
+fi
+
+# Execute Alembic command with all arguments
+alembic "$@"

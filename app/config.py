@@ -1,10 +1,10 @@
-from pydantic import Field
+from pydantic import Field, AnyUrl
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic.networks import PostgresDsn
+from urllib.parse import urlparse
 
 
 class Settings(BaseSettings):
-    POSTGRES_DSN: PostgresDsn = Field(..., validation_alias="DATABASE_URL")
+    DATABASE_URL: str = Field(..., alias="DATABASE_URL")
     APP_HOST: str = Field(default="0.0.0.0", env="APP_HOST")
     APP_PORT: int = Field(default=8000, ge=1024, le=65535, env="APP_PORT")
     DEBUG_MODE: bool = Field(default=False, env="DEBUG")
@@ -15,5 +15,25 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", extra="allow")
 
-
 settings = Settings()
+
+def get_postgres_url(sync: bool = False) -> str:
+    import socket
+    url = settings.DATABASE_URL
+    
+    if sync:
+        url = url.replace("postgresql+asyncpg", "postgresql+psycopg2")
+    
+    if "db" in url:
+        try:
+            s = socket.socket()
+            s.settimeout(2)
+            result = s.connect_ex(('db', 5432))
+            s.close()
+            if result == 0:
+                return url
+        except Exception:
+            pass
+        return url.replace("db", "localhost")
+    
+    return url

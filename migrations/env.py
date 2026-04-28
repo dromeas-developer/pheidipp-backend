@@ -1,11 +1,14 @@
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config
+from sqlalchemy import create_engine
 from sqlalchemy import pool
 
 from alembic import context
 
 from app.db.base import Base
+from app.config import get_postgres_url, settings
+
+from app.models import Athlete, AthleteProfile
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -38,7 +41,6 @@ def run_migrations_offline() -> None:
     """
     url = config.get_main_option("sqlalchemy.url")
     if not url:
-        from app.config import settings
         url = str(settings.POSTGRES_DSN).replace("postgresql+asyncpg", "postgresql+psycopg2")
     context.configure(
         url=url,
@@ -50,6 +52,7 @@ def run_migrations_offline() -> None:
     with context.begin_transaction():
         context.run_migrations()
 
+
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode.
 
@@ -57,11 +60,7 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
+    connectable = create_engine(get_postgres_url(sync=True), poolclass=pool.NullPool)
 
     with connectable.connect() as connection:
         context.configure(
@@ -70,6 +69,7 @@ def run_migrations_online() -> None:
 
         with context.begin_transaction():
             context.run_migrations()
+
 
 if context.is_offline_mode():
     run_migrations_offline()

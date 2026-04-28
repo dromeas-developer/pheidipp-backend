@@ -6,3 +6,8 @@ sqlalchemy>=2.0.0
 asyncpg
 alembic
 psycopg2-binary
+pydantic[email]>=2.0.0
+loguru>=0.7.0
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+httpx>=0.24.0

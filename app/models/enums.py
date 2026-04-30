@@ -268,6 +268,26 @@ class CountryCode(str, enum.Enum):
     ZW = "ZW"
 
 
+class ActivityType(str, enum.Enum):
+    RUNNING = "running"
+    CYCLING = "cycling"
+    SWIMMING = "swimming"
+    YOGA = "yoga"
+    STRENGTH = "strength"
+    CROSS_TRAINING = "cross_training"
+    WALKING = "walking"
+    OTHER = "other"
+
+
+class PerceivedEffort(str, enum.Enum):
+    VERY_EASY = "very_easy"
+    EASY = "easy"
+    MODERATE = "moderate"
+    HARD = "hard"
+    VERY_HARD = "very_hard"
+    MAXIMUM = "maximum"
+
+
 class LanguageCode(str, enum.Enum):
     aa = "aa"
     ab = "ab"

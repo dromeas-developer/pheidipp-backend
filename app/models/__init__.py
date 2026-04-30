@@ -1,3 +1,4 @@
+from app.models.activity import Activity, ActivityType, PerceivedEffort
 from app.models.enums import (
     AthleteStatus,
     Gender,
@@ -9,6 +10,9 @@ from app.models.enums import (
 from app.models.athlete import Athlete, AthleteProfile
 
 __all__ = [
+    "Activity",
+    "ActivityType",
+    "PerceivedEffort",
     "AthleteStatus",
     "Gender",
     "UnitPreference",

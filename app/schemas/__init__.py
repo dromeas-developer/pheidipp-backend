@@ -1,3 +1,11 @@
+from app.schemas.activity import (
+    ActivityBase,
+    ActivityCreate,
+    ActivityUpdate,
+    ActivityResponse,
+    ActivityListParams,
+    ActivityListResponse,
+)
 from app.schemas.athlete import (
     AthleteBase,
     AthleteCreate,
@@ -11,6 +19,12 @@ from app.schemas.athlete import (
 )
 
 __all__ = [
+    "ActivityBase",
+    "ActivityCreate",
+    "ActivityUpdate",
+    "ActivityResponse",
+    "ActivityListParams",
+    "ActivityListResponse",
     "AthleteBase",
     "AthleteCreate",
     "AthleteUpdate",

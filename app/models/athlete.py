@@ -1,6 +1,6 @@
 import uuid
 from datetime import date, datetime
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import (
     UUID,
@@ -23,6 +23,9 @@ from app.models.enums import (
     LanguageCode,
     UnitPreference,
 )
+
+if TYPE_CHECKING:
+    from app.models.activity import Activity
 
 
 class Athlete(Base):
@@ -60,6 +63,9 @@ class Athlete(Base):
     profile: Mapped[Optional["AthleteProfile"]] = relationship(
         back_populates="athlete",
         uselist=False,
+    )
+    activities: Mapped[list["Activity"]] = relationship(
+        back_populates="athlete",
     )
 
 

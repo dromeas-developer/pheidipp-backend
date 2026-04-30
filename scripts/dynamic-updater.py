@@ -12,8 +12,15 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+# scripts/ is inside backend/ — ROOT is backend/
 ROOT = Path(__file__).resolve().parent.parent
-OUT = ROOT / ".opencode/instructions/dynamic.md"
+
+# Ensure backend/ is on sys.path so `from app.x import y` works
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+# .opencode/ lives at the project root (parent of backend/)
+OUT = ROOT / ".opencode/instructions/dynamic-context.md"
 
 
 def alembic_head() -> str:
@@ -32,7 +39,11 @@ def alembic_head() -> str:
 
 def schema() -> str:
     try:
-        from app.db.base import Base 
+        from app.db.base import Base  # corrected import path
+
+        # Import all models so they register with Base.metadata
+        import app.models  # noqa: F401 — side effect: registers all models
+
         lines = []
         for name, table in sorted(Base.metadata.tables.items()):
             lines.append(f"\n**{name}**")
@@ -47,7 +58,12 @@ def schema() -> str:
                     flags.append("NOT NULL")
                 flag = f" `[{', '.join(flags)}]`" if flags else ""
                 lines.append(f"  - `{col.name}` {col.type}{flag}")
+
+        if not lines:
+            return "  (no tables found — check app/models/__init__.py imports)"
+
         return "\n".join(lines)
+
     except Exception as e:
         return f"⚠️ Could not introspect schema: {e}"
 
@@ -84,7 +100,6 @@ def api_endpoints() -> str:
         try:
             tree = ast.parse(f.read_text())
             for node in ast.walk(tree):
-                # ← fix: catches both sync and async routes
                 if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                     for decorator in node.decorator_list:
                         if hasattr(decorator, "func"):
@@ -97,7 +112,8 @@ def api_endpoints() -> str:
                                     except Exception:
                                         pass
                                 endpoints.append(
-                                    f"  - {method.upper()} {path} → `{f.relative_to(ROOT)}:{node.name}`"
+                                    f"  - {method.upper()} {path} → "
+                                    f"`{f.relative_to(ROOT)}:{node.name}`"
                                 )
         except Exception:
             continue
@@ -188,8 +204,7 @@ def generate() -> str:
 def main():
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(generate())
-    print(f"✓ Generated {OUT.relative_to(ROOT)}")
-
+    print(f"✓ Generated {OUT.relative_to(ROOT)}")  # ← ROOT not PROJECT_ROOT
 
 if __name__ == "__main__":
     main()

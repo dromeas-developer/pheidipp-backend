@@ -1,0 +1,37 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  // Always-on context injected into every session before any message.
+  // Order matters — stack-truth first (stable rules), dynamic last (live state).
+  "instructions": [
+    "AGENTS.md",
+    ".opencode/instructions/stack-truth.md",
+    ".opencode/instructions/dynamic.md"
+  ],
+
+  // Only show the providers and models you actually use.
+  // Prevents OpenRouter/Mistral full catalog from flooding /models.
+  "enabled_providers": [
+    "opencode",
+    "litellm-proxy",
+    "cloudflare"
+  ],
+
+  // MCP server — semantic codebase search, symbol lookup, and architectural context.
+  // PROJECT_PATH tells the server which directory to index.
+  // Update PROJECT_PATH if you move the project or work on a different sub-project.
+  "mcp": {
+    "pheidipp-codebase-context": {
+      "type": "local",
+      "command": [
+        "/home/ruimendes/projects/mcp-server/.venv/bin/python",
+        "/home/ruimendes/projects/mcp-server/server.py"
+      ],
+      "environment": {
+        "PYTHONPATH": "/home/ruimendes/projects/mcp-server",
+        "PROJECT_PATH": "/home/ruimendes/projects/pheidipp/backend"
+      },
+      "enabled": true
+    }
+  }
+}

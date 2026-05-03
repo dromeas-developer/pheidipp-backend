@@ -170,6 +170,24 @@ def recent_migrations() -> str:
         lines.append(f"  - `{rev}` — {msg}")
     return "\n".join(lines) or "  (none)"
 
+def relationships() -> str:
+    try:
+        from app.db.base import Base
+        import app.models  # noqa
+
+        lines = []
+        for name, table in sorted(Base.metadata.tables.items()):
+            fks = [
+                f"  - `{col.name}` → `{next(iter(col.foreign_keys)).target_fullname}`"
+                for col in table.columns
+                if col.foreign_keys
+            ]
+            if fks:
+                lines.append(f"\n**{name}**")
+                lines.extend(fks)
+        return "\n".join(lines) or "  (none)"
+    except Exception as e:
+        return f"⚠️ {e}"
 
 def generate() -> str:
     return f"""\
@@ -186,6 +204,9 @@ def generate() -> str:
 
 ## Database Schema
 {schema()}
+
+## Foreign Keys & Relationships
+{relationships()}
 
 ## API Endpoints
 {api_endpoints()}

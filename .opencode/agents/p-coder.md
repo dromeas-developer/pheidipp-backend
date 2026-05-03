@@ -19,17 +19,17 @@ tools:
   skill:      true
  
   # MCP tools — file access
-  "mcp:pheidipp-codebase-context_get_files":    true
-  "mcp:pheidipp-codebase-context_find_files":   true
-  "mcp:pheidipp-codebase-context_grep_files":   true
+  "pheidipp-codebase-context_get_files":    true
+  "pheidipp-codebase-context_find_files":   true
+  "pheidipp-codebase-context_grep_files":   true
  
   # MCP tools — search
-  "mcp:pheidipp-codebase-context_search_codebase":        true
-  "mcp:pheidipp-codebase-context_search_symbols":         true
-  "mcp:pheidipp-codebase-context_get_architecture_context": true
+  "pheidipp-codebase-context_search_codebase":        true
+  "pheidipp-codebase-context_search_symbols":         true
+  "pheidipp-codebase-context_get_architecture_context": true
  
   # MCP tools — maintenance (disabled during coding tasks)
-  "mcp:pheidipp-codebase-context_reindex":      false
+  "pheidipp-codebase-context_reindex":      false
 ---
 
 # Pheidipp — Senior Backend Engineer

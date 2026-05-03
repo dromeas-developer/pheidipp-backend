@@ -54,12 +54,28 @@ Rules:
 - Worker triggered via Redis
 
 ## Timescale / Hypertables
-- activity_samples (ts: timestamp)
-- fitness_metrics (ts: metric_date)
 
-Implication:
-- Time-series data must follow hypertable pattern
-- Do NOT design standard tables for time-series data
+### Rule
+Any table storing daily or time-series samples MUST be a TimescaleDB
+hypertable. Standard tables are forbidden for time-series data.
+
+### Currently implemented hypertables
+(none yet — will be added as features are built)
+
+### Planned hypertables (to be created when implementing these features)
+- `activity_samples` (ts: `timestamp`) — per-second activity data
+- `athlete_wellness` (ts: `metric_date`) — daily wellness metrics
+- `athlete_fitness` (ts: `metric_date`) — daily fitness/form metrics
+
+### Standard tables (not hypertables)
+- `athlete_physiology` — versioned records with date ranges, not time-series
+
+### Migration pattern for hypertables
+Always in this exact sequence inside `upgrade()`:
+1. `op.execute("CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;")`
+2. `op.execute("CREATE EXTENSION IF NOT EXISTS vector;")`
+3. `op.create_table(...)` — table creation
+4. `op.execute("SELECT create_hypertable('table', 'ts_col', if_not_exists => TRUE);")`
 
 ## Configuration
 - Environment variables only

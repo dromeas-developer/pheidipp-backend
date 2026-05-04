@@ -78,10 +78,7 @@ def modules() -> str:
         d = ROOT / "app" / layer
         if not d.exists():
             continue
-        files = [
-            f.name for f in sorted(d.glob("*.py"))
-            if f.name != "__init__.py"
-        ]
+        files = [f.name for f in sorted(d.glob("*.py"))]
         if files:
             output.append(f"\n**app/{layer}/**")
             for f in files[:20]:

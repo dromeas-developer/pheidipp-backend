@@ -3,6 +3,7 @@ from app.config import settings
 from app.api.routes.health import health_router
 from app.api.routes.athletes import router as athletes_router
 from app.api.routes.activities import router as activities_router
+from app.api.routes.wellness import router as wellness_router
 from contextlib import asynccontextmanager
 
 
@@ -18,3 +19,4 @@ app = FastAPI(lifespan=lifespan, openapi_url="/openapi.json", docs_url="/docs")
 app.include_router(health_router)
 app.include_router(athletes_router)
 app.include_router(activities_router)
+app.include_router(wellness_router)

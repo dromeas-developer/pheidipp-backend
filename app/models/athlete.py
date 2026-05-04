@@ -26,6 +26,7 @@ from app.models.enums import (
 
 if TYPE_CHECKING:
     from app.models.activity import Activity
+    from app.models.wellness import AthleteWellness
 
 
 class Athlete(Base):
@@ -66,6 +67,10 @@ class Athlete(Base):
     )
     activities: Mapped[list["Activity"]] = relationship(
         back_populates="athlete",
+    )
+    wellness_metrics: Mapped[list["AthleteWellness"]] = relationship(
+        back_populates="athlete",
+        cascade="all, delete-orphan",
     )
 
 

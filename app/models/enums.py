@@ -472,6 +472,14 @@ class LanguageCode(str, enum.Enum):
     zu = "zu"
 
 
+class WellnessSource(str, enum.Enum):
+    MANUAL = "manual"
+    GARMIN = "garmin"
+    WHOOP = "whoop"
+    OURA = "oura"
+    POLAR = "polar"
+
+
 class Timezone(str, enum.Enum):
     Africa_Abidjan = "Africa/Abidjan"
     Africa_Accra = "Africa/Accra"

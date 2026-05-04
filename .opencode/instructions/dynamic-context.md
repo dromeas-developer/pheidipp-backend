@@ -1,12 +1,13 @@
-<!-- auto-generated 2026-05-02 00:12 — do not edit manually -->
+<!-- auto-generated 2026-05-03 23:42 — do not edit manually -->
 <!-- run `make context` or `python scripts/update_context.py` to refresh -->
 
 # Dynamic Project Context
 
 ## Alembic Head
-`unknown`
+`34434d79ba41 (head)`
 
 ## Recent Migrations
+  - `34434d79` — add athlete wellness hypertable
   - `29c40204` — add activities table
   - `122ca2b8` — add athlete and profile tables
   - `c39b83c0` — initial schema
@@ -51,6 +52,23 @@
   - `created_at` DATETIME `[NOT NULL]`
   - `updated_at` DATETIME `[NOT NULL]`
 
+**athlete_wellness**
+  - `id` UUID `[PK]`
+  - `athlete_id` UUID `[FK→athletes.id, NOT NULL]`
+  - `metric_date` DATE `[NOT NULL]`
+  - `sleep_total` INTEGER
+  - `sleep_light` INTEGER
+  - `sleep_deep` INTEGER
+  - `sleep_rem` INTEGER
+  - `sleep_awake` INTEGER
+  - `resting_hr` INTEGER
+  - `hrv` INTEGER
+  - `weight` FLOAT
+  - `source` VARCHAR(20) `[NOT NULL]`
+  - `timezone` VARCHAR(100) `[NOT NULL]`
+  - `created_at` DATETIME `[NOT NULL]`
+  - `updated_at` DATETIME `[NOT NULL]`
+
 **athletes**
   - `id` UUID `[PK]`
   - `email` VARCHAR(255) `[NOT NULL]`
@@ -67,12 +85,20 @@
 **athlete_profiles**
   - `athlete_id` → `athletes.id`
 
+**athlete_wellness**
+  - `athlete_id` → `athletes.id`
+
 ## API Endpoints
   - POST / → `app/api/routes/athletes.py:create_athlete`
   - GET /{athlete_id} → `app/api/routes/athletes.py:get_athlete`
   - PATCH /{athlete_id} → `app/api/routes/athletes.py:update_athlete`
   - PUT /{athlete_id}/profile → `app/api/routes/athletes.py:upsert_profile`
   - GET /{athlete_id}/profile → `app/api/routes/athletes.py:get_profile`
+  - POST / → `app/api/routes/wellness.py:create_wellness`
+  - GET /{wellness_id} → `app/api/routes/wellness.py:get_wellness`
+  - GET /athletes/{athlete_id}/wellness → `app/api/routes/wellness.py:list_athlete_wellness`
+  - PATCH /{wellness_id} → `app/api/routes/wellness.py:update_wellness`
+  - DELETE /{wellness_id} → `app/api/routes/wellness.py:delete_wellness`
   - GET /live → `app/api/routes/health.py:live`
   - GET /ready → `app/api/routes/health.py:ready`
   - POST / → `app/api/routes/activities.py:create_activity`
@@ -84,29 +110,45 @@
 ## Modules
 
 **app/api/**
+  - `__init__.py`
   - `utils.py`
 
 **app/models/**
+  - `__init__.py`
   - `activity.py`
   - `athlete.py`
   - `enums.py`
+  - `wellness.py`
 
 **app/schemas/**
+  - `__init__.py`
   - `activity.py`
   - `athlete.py`
+  - `wellness.py`
 
 **app/services/**
+  - `__init__.py`
   - `activity_service.py`
   - `athlete_service.py`
   - `base_service.py`
   - `health_service.py`
+  - `wellness_service.py`
 
 **app/repositories/**
+  - `__init__.py`
   - `activity_repository.py`
   - `athlete_repository.py`
   - `base_repository.py`
+  - `wellness_repository.py`
+
+**app/worker/**
+  - `__init__.py`
+
+**app/agents/**
+  - `__init__.py`
 
 **app/core/**
+  - `__init__.py`
   - `security.py`
 
 ## Background Jobs (ARQ)

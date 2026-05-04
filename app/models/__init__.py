@@ -6,8 +6,10 @@ from app.models.enums import (
     CountryCode,
     LanguageCode,
     Timezone,
+    WellnessSource,
 )
 from app.models.athlete import Athlete, AthleteProfile
+from app.models.wellness import AthleteWellness
 
 __all__ = [
     "Activity",
@@ -19,6 +21,8 @@ __all__ = [
     "CountryCode",
     "LanguageCode",
     "Timezone",
+    "WellnessSource",
     "Athlete",
     "AthleteProfile",
+    "AthleteWellness",
 ]

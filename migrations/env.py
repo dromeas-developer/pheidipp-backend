@@ -8,7 +8,7 @@ from alembic import context
 from app.db.base import Base
 from app.config import get_postgres_url, settings
 
-from app.models import Athlete, AthleteProfile
+from app.models import Athlete, AthleteProfile, AthleteWellness
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

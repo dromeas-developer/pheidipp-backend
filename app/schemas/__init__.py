@@ -17,6 +17,14 @@ from app.schemas.athlete import (
     AthleteProfileResponse,
     AthleteWithProfileResponse,
 )
+from app.schemas.wellness import (
+    WellnessBase,
+    WellnessCreate,
+    WellnessUpdate,
+    WellnessResponse,
+    WellnessListParams,
+    WellnessListResponse,
+)
 
 __all__ = [
     "ActivityBase",
@@ -34,4 +42,10 @@ __all__ = [
     "AthleteProfileUpdate",
     "AthleteProfileResponse",
     "AthleteWithProfileResponse",
+    "WellnessBase",
+    "WellnessCreate",
+    "WellnessUpdate",
+    "WellnessResponse",
+    "WellnessListParams",
+    "WellnessListResponse",
 ]

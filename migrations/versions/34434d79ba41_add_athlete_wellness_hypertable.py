@@ -38,7 +38,7 @@ def upgrade() -> None:
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['athlete_id'], ['athletes.id'], ondelete='CASCADE'),
-    sa.PrimaryKeyConstraint('id'),
+    sa.PrimaryKeyConstraint('athlete_id', 'metric_date'),
     sa.UniqueConstraint('athlete_id', 'metric_date', name='uq_athlete_wellness_date')
     )
     op.create_index(op.f('ix_athlete_wellness_athlete_id'), 'athlete_wellness', ['athlete_id'], unique=False)

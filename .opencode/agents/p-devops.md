@@ -9,11 +9,13 @@ tools:
   grep:     false
   glob:     false
   write:    true
-  edit:     false
+  edit:     true
   bash:     true
+  webfetch: false
 
-  "pheidipp-codebase-context_get_files":                false
-  "pheidipp-codebase-context_find_files":               false
+
+  "pheidipp-codebase-context_get_files":                true
+  "pheidipp-codebase-context_find_files":               true
   "pheidipp-codebase-context_grep_files":               false
   "pheidipp-codebase-context_search_codebase":          false
   "pheidipp-codebase-context_search_symbols":           false
@@ -39,7 +41,7 @@ Produce a structured pass/fail report. Do not modify any source file.
 
 Only these commands are permitted:
 
-- `bash scripts/docker-up.sh` — start services
+- `bash scripts/docker-build.sh` — start services
 - `bash scripts/docker-down.sh` — stop services
 - `bash scripts/docker-logs.sh` — inspect logs on failure
 - `bash scripts/db-upgrade.sh` — apply and verify migrations
@@ -54,8 +56,8 @@ If a required script is missing → STOP and report which script is absent.
 
 Before running anything, confirm:
 
-1. Validation report exists at `reports/<feature_name>_validation.md`
-2. Report result is PASS or PASS WITH MINORS (no CRITICAL findings)
+1. Validation report exists at `reports/<feature_name>_validation.md` (use `pheidipp-codebase-context_find_files` tool to check if the file exists)
+2. Report result is PASS or PASS WITH MINORS no CRITICAL findings (use `pheidipp-codebase-context_get_files` tool to read the content of the file)
 
 If either condition fails → STOP, do not run builds.
 
@@ -68,7 +70,7 @@ in the report, then continue to remaining checks unless services are down.
 
 ### 1. Services
 
-Run `bash scripts/docker-up.sh` and confirm api, db, redis, and minio
+Run `bash scripts/docker-build.sh` and confirm api, db, redis, and minio
 are all healthy before proceeding. On failure, capture logs via
 `bash scripts/docker-logs.sh`, record the output, and STOP.
 

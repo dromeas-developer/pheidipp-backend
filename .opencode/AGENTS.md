@@ -55,19 +55,29 @@ Only call tools to fill genuine gaps that cannot be inferred from context.
 
 ---
 
-## Tool Budget (Per Task)
+## Tool Usage — Batch and Justify
 
-You have a budget of **2 tool calls maximum** for any single task.
+Use as many tool calls as the task genuinely requires — no artificial cap.
+The constraint is discipline, not count.
 
-- Each MCP call counts as 1 regardless of how many inputs are batched
+Before every tool call, ask: **could this be batched into a call I'm already making?**
+
+- Identify ALL required inputs before calling any tool
+- Call MCP tools ONCE per type with the full input set
+- NEVER call tools in loops or sequentially when batching is possible
+
+Examples of correct batching:
+- `get_files` with 8 paths = 1 call ✅
 - `search_symbols` with 5 symbols = 1 call ✅
-- `get_files` with 3 paths = 1 call ✅
-- `search_symbols` + `get_files` = 2 calls (budget exhausted) ✅
-- `get_architecture_context` + `get_files` + `search_codebase` = 3 calls ❌
+- Four sequential `find_files` calls for paths already listed in context = ❌
 
-If you cannot complete the task within 2 calls:
-→ Produce output from context with explicit assumptions noted
-→ Do NOT make a third tool call
+Planning agents (p-architect, p-prompt-engineer, p-technical-advisor):
+→ Prefer zero tool calls — context usually contains everything needed.
+→ 3–4 calls is the expected ceiling for a planning task.
+
+Implementation agents (p-coder):
+→ Tool calls are expected — reading files, verifying edits, running scripts.
+→ Still batch aggressively; never read the same file twice unless it was just edited.
 
 ---
 

@@ -1,4 +1,4 @@
-<!-- auto-generated 2026-05-04 22:41 — do not edit manually -->
+<!-- auto-generated 2026-05-06 15:30 — do not edit manually -->
 <!-- run `make context` or `python scripts/update_context.py` to refresh -->
 
 # Dynamic Project Context

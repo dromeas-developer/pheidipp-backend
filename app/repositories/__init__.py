@@ -4,6 +4,7 @@ from app.repositories.athlete_repository import (
     AthleteProfileRepository,
 )
 from app.repositories.activity_repository import ActivityRepository
+from app.repositories.physiology_repository import PhysiologyRepository
 from app.repositories.wellness_repository import WellnessRepository
 
 __all__ = [
@@ -11,5 +12,6 @@ __all__ = [
     "AthleteRepository",
     "AthleteProfileRepository",
     "ActivityRepository",
+    "PhysiologyRepository",
     "WellnessRepository",
 ]

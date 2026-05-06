@@ -1,16 +1,16 @@
 ---
-model: litellm-proxy/cloudflare/kimi-k2.6
-temperature: 0.2
+model: litellm-proxy/cloudflare/kimi-k2.6-reasoning
 permission:
   task:
     "*": "deny"
 tools:
   read: false
-  edit: true
-  write: true
+  edit: false
+  write: false
   bash: false
   grep: false
   glob: false
+  webfetch: false
   # MCP tools — file access
   "pheidipp-codebase-context_get_files":          true
   "pheidipp-codebase-context_find_files":         true
@@ -18,6 +18,9 @@ tools:
   # MCP tools — search
   "pheidipp-codebase-context_search_codebase":    true
   "pheidipp-codebase-context_search_symbols":     true
+  # MCP tools — write
+  "pheidipp-codebase-context_write_plan":         true
+
   "pheidipp-codebase-context_get_architecture_context": false
   # MCP tools — maintenance (disabled during coding tasks)
   "pheidipp-codebase-context_reindex":      false
@@ -85,36 +88,24 @@ to write a precise action — not to discover what exists.
 
 ---
 
-## Tool Policy — Strict Justification Required
+## Tool Usage
 
-Every tool call must be justified before it is made.
-Ask yourself: **"Can I write this step precisely without this call?"**
-If yes → do not call.
+Before every call ask: **"Can I write this step precisely without it?"**
+If yes → skip it.
 
-**Preferred order:**
-1. **Zero calls** — produce plan from context alone (best outcome)
-2. **Targeted call** — one specific gap that cannot be inferred from context
-3. **Additional call** — only if a second genuine gap exists after the first
+**Call tools when:**
+- You need the contents of a specific file to write a precise action
+- A function signature cannot be inferred from dynamic.md
 
-**Before every call, state internally:**
-- What specific information is missing
-- Why it cannot be inferred from dynamic.md or stack-truth.md
-- Which tool retrieves exactly that information
+**Batching rules (non-negotiable):**
+- One `get_files` call with all paths needed
+- One `search_symbols` call with all symbols needed
+- Never call the same tool twice
+- Never call tools sequentially
 
-**Never call `get_architecture_context`** — dynamic.md covers everything
-it returns. Calling it wastes a call on information already available.
-
-**Never make exploratory calls** — calls to confirm what you already know,
-to discover file structure, or to read files whose contents you can infer
-from context are forbidden. Each call must resolve a concrete gap that
-would otherwise produce an ambiguous or incorrect action.
-
-**Always batch** — if multiple gaps exist, resolve them in one call.
-Never call the same tool twice. Never call tools sequentially.
-
-If a gap remains after tools are exhausted:
-→ State the assumption explicitly at the top of the plan
-→ Continue — do NOT make another call
+**Tool selection:**
+- Prefer `search_symbols` over `get_files` for signatures
+- Never call `get_architecture_context` — dynamic.md already covers it
 
 ---
 
@@ -133,7 +124,9 @@ If a gap remains after tools are exhausted:
 - For each file **ALWAYS CHECK** stack-truth and dynamic-context to confirm the correct path/directory
 - A layer group contains as many steps as there are files to touch in that layer
 - Group steps by layer: models → schemas → repositories → services → api
-- Prefer MODIFY over CREATE
+- New domain entities ALWAYS get new files — never extend existing ones
+- When in doubt: CREATE a new file, do not MODIFY an existing one
+- Only MODIFY files that explicitly need wiring (relationships, __init__.py, main.py)
 - Smallest viable implementation
 - No ambiguity in any action
 - No deferred decisions — if auth pattern, registration file, or naming is uncertain, resolve it from context before writing the step, not after
@@ -187,8 +180,6 @@ Each layer group contains one step per file — never combine files.
 
 When you finish the plan:
 1. Define a meaningful `feature_name` in snake_case
-2. Use the `write` tool to save the plan to `plans/<feature_name>.md`
-   - you can ALWAYS use the `write` tool
-   - the `write` tool during the handoff phase does NOT count as a tool call
+2. Use the `pheidipp-codebase-context_write_plan` tool to save the plan
 3. Confirm the file was saved
 4. STOP — do not begin implementation

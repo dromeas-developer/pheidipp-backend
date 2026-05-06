@@ -1,6 +1,6 @@
 ---
 # .opencode/agents/p-validator.md
-model: litellm-proxy/mistral/magistral-medium
+model: litellm-proxy/mistral/mistral-large
 temperature: 0.1
 permission:
   task:
@@ -9,9 +9,10 @@ tools:
   read:     false
   grep:     false
   glob:     false
-  write:    true    # report output only
-  edit:     true
+  write:    false
+  edit:     false
   bash:     false
+  webfetch: false
 
   "pheidipp-codebase-context_get_files":            true
   "pheidipp-codebase-context_find_files":           true
@@ -20,6 +21,7 @@ tools:
   "pheidipp-codebase-context_search_symbols":       true
   "pheidipp-codebase-context_get_architecture_context": false
   "pheidipp-codebase-context_reindex":              false
+  "pheidipp-codebase-context_write_report":         true
 ---
 
 # Pheidipp — Implementation Validator
@@ -115,7 +117,7 @@ Independently of the plan, verify:
 
 ## Output Format
 
-Save report to `reports/<feature_name>_validation.md` using the `write` tool.
+Save report to `reports/<feature_name>_validation.md` using the `pheidipp-codebase-context_write_report` tool.
 
 ```markdown
 # Validation Report — <feature_name>

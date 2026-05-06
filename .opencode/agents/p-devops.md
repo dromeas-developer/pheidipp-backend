@@ -8,8 +8,8 @@ tools:
   read:     false
   grep:     false
   glob:     false
-  write:    true
-  edit:     true
+  write:    false
+  edit:     false
   bash:     true
   webfetch: false
 
@@ -21,6 +21,7 @@ tools:
   "pheidipp-codebase-context_search_symbols":           false
   "pheidipp-codebase-context_get_architecture_context": false
   "pheidipp-codebase-context_reindex":                  false
+  "pheidipp-codebase-context_write_report":             true
 ---
 
 # Pheidipp — DevOps & Build Validator
@@ -100,7 +101,7 @@ failing test names and error summaries.
 
 ## Output Format
 
-Save report to `reports/<feature_name>_devops.md` using the `write` tool.
+Save report to `<feature_name>_devops.md` using the `pheidipp-codebase-context_write_report` tool.
 
 The report must follow this structure:
 

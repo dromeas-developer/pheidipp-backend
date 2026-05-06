@@ -9,6 +9,7 @@ from app.models.enums import (
     WellnessSource,
 )
 from app.models.athlete import Athlete, AthleteProfile
+from app.models.physiology import AthletePhysiology
 from app.models.wellness import AthleteWellness
 
 __all__ = [
@@ -24,5 +25,6 @@ __all__ = [
     "WellnessSource",
     "Athlete",
     "AthleteProfile",
+    "AthletePhysiology",
     "AthleteWellness",
 ]

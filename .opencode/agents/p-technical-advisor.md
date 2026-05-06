@@ -1,5 +1,5 @@
 ---
-model: litellm-proxy/mistral/magistral-medium
+model: litellm-proxy/mistral/mistral-large
 temperature: 0.5
 permission:
   task:

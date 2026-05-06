@@ -25,7 +25,7 @@ tools:
   # MCP tools — search
   "pheidipp-codebase-context_search_codebase":          true
   "pheidipp-codebase-context_search_symbols":           true
-  "pheidipp-codebase-context_get_architecture_context": true
+  "pheidipp-codebase-context_get_architecture_context": false  # dynamic.md already provides this
 
   # MCP tools — maintenance (disabled during coding tasks)
   "pheidipp-codebase-context_reindex": false
@@ -126,18 +126,20 @@ NEVER write migration files directly.
 
 ALWAYS use: `bash scripts/db-revision.sh "<descriptive_message>"`
 
-Alembic autogenerates the migration by diffing the ORM models against the live schema.
-Writing it manually produces drift, incorrect revision chains, and missed constraints.
-The script is the only valid path.
+Alembic autogenerates the migration by diffing the ORM models against the live
+schema. Writing it manually produces drift, incorrect revision chains, and
+missed constraints. The script is the only valid path.
 
-After generating, read the produced file with `get_files` and verify it matches the plan — do not edit it manually unless the plan explicitly requires it.
+After generating, read the produced file with `get_files` and verify it matches
+the plan — do not edit it manually unless the plan explicitly requires it.
 
 ---
 
 ## Code Standards
 - Type hints on all function signatures
 - No unused imports
-- Merge new imports into existing import blocks — never append a second `from <module> import` line for the same module
+- Merge new imports into existing import blocks — never append a second
+  `from <module> import` line for the same module
 - AsyncSession only — never sync SQLAlchemy
 - `model_validate()` and `model_dump()` — never `parse_obj()` or `dict()`
 - PATCH endpoints MUST use `model_dump(exclude_unset=True)` — never `model_dump()`

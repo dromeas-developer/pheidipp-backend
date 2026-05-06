@@ -1,12 +1,13 @@
-<!-- auto-generated 2026-05-06 15:30 — do not edit manually -->
+<!-- auto-generated 2026-05-06 16:26 — do not edit manually -->
 <!-- run `make context` or `python scripts/update_context.py` to refresh -->
 
 # Dynamic Project Context
 
 ## Alembic Head
-`34434d79ba41 (head)`
+`34434d79ba41`
 
 ## Recent Migrations
+  - `e2b4c9f9` — add athlete physiology table
   - `34434d79` — add athlete wellness hypertable
   - `29c40204` — add activities table
   - `122ca2b8` — add athlete and profile tables
@@ -35,6 +36,20 @@
   - `elevation_loss_meters` FLOAT
   - `calories` INTEGER
   - `source` VARCHAR(50)
+  - `created_at` DATETIME `[NOT NULL]`
+  - `updated_at` DATETIME `[NOT NULL]`
+
+**athlete_physiology**
+  - `id` UUID `[PK]`
+  - `athlete_id` UUID `[FK→athletes.id, NOT NULL]`
+  - `ftp` INTEGER
+  - `lt1` INTEGER
+  - `lt2` INTEGER
+  - `vo2_max` FLOAT
+  - `max_hr` INTEGER
+  - `source` VARCHAR(20) `[NOT NULL]`
+  - `effective_from` DATE `[NOT NULL]`
+  - `effective_to` DATE
   - `created_at` DATETIME `[NOT NULL]`
   - `updated_at` DATETIME `[NOT NULL]`
 
@@ -82,6 +97,9 @@
 **activities**
   - `athlete_id` → `athletes.id`
 
+**athlete_physiology**
+  - `athlete_id` → `athletes.id`
+
 **athlete_profiles**
   - `athlete_id` → `athletes.id`
 
@@ -89,6 +107,12 @@
   - `athlete_id` → `athletes.id`
 
 ## API Endpoints
+  - POST / → `app/api/routes/physiology.py:create_physiology`
+  - GET / → `app/api/routes/physiology.py:list_physiology`
+  - GET /{physiology_id} → `app/api/routes/physiology.py:get_physiology`
+  - GET /effective/{target_date} → `app/api/routes/physiology.py:get_effective_physiology`
+  - PATCH /{physiology_id} → `app/api/routes/physiology.py:update_physiology`
+  - DELETE /{physiology_id} → `app/api/routes/physiology.py:delete_physiology`
   - POST / → `app/api/routes/athletes.py:create_athlete`
   - GET /{athlete_id} → `app/api/routes/athletes.py:get_athlete`
   - PATCH /{athlete_id} → `app/api/routes/athletes.py:update_athlete`
@@ -118,12 +142,14 @@
   - `activity.py`
   - `athlete.py`
   - `enums.py`
+  - `physiology.py`
   - `wellness.py`
 
 **app/schemas/**
   - `__init__.py`
   - `activity.py`
   - `athlete.py`
+  - `physiology.py`
   - `wellness.py`
 
 **app/services/**
@@ -132,6 +158,7 @@
   - `athlete_service.py`
   - `base_service.py`
   - `health_service.py`
+  - `physiology_service.py`
   - `wellness_service.py`
 
 **app/repositories/**
@@ -139,6 +166,7 @@
   - `activity_repository.py`
   - `athlete_repository.py`
   - `base_repository.py`
+  - `physiology_repository.py`
   - `wellness_repository.py`
 
 **app/worker/**

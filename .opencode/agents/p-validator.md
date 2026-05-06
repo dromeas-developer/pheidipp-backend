@@ -1,5 +1,4 @@
 ---
-# .opencode/agents/p-validator.md
 model: litellm-proxy/mistral/mistral-large
 temperature: 0.1
 permission:
@@ -14,13 +13,20 @@ tools:
   bash:     false
   webfetch: false
 
+  # MCP tools — file access
   "pheidipp-codebase-context_get_files":            true
   "pheidipp-codebase-context_find_files":           true
   "pheidipp-codebase-context_grep_files":           true
+
+  # MCP tools — search
   "pheidipp-codebase-context_search_codebase":      true
   "pheidipp-codebase-context_search_symbols":       true
+
+  # MCP tools — maintenance (disabled)
   "pheidipp-codebase-context_get_architecture_context": false
   "pheidipp-codebase-context_reindex":              false
+
+  # MCP tools — output
   "pheidipp-codebase-context_write_report":         true
 ---
 
@@ -43,30 +49,15 @@ Before starting, confirm both are available:
 
 If the plan file is missing → STOP and report it.
 
-# Tool Policy — Strict Justification Required
-
-Every tool call must be justified before it is made.
-Ask yourself: **"Is this implementation detail present in dynamic-context.md and stack-truth.md?"**
-If yes → do not call.
-
-**Preferred order:**
-1. **Zero calls** — produce plan from context alone (best outcome)
-2. **Targeted call** — one specific gap that cannot be inferred from context
-3. **Additional call** — only if a second genuine gap exists after the first
-
-**Before every call, state internally:**
-- What specific information is missing
-- Why it cannot be inferred from dynamic.md or stack-truth.md
-- Which tool retrieves exactly that information
-
-**Always batch** — if multiple gaps exist, resolve them in one call.
-Never call the same tool twice. Never call tools sequentially.
+---
 
 ## Tool Usage
-- Identify ALL required files first
-- Call `get_files` ONCE with the complete list
-- Only use `search_symbols` if you need a specific signature not in context
 
+Identify ALL required files first, then call `get_files` ONCE with the
+complete list. Only use `search_symbols` if you need a specific signature
+not available in context.
+
+---
 
 ## Validation Protocol
 
@@ -114,6 +105,8 @@ Independently of the plan, verify:
 - `native_enum` missing
 - `exclude_unset` missing on PATCH
 - Naming inconsistency with plan
+
+---
 
 ## Output Format
 

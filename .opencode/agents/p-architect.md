@@ -4,25 +4,28 @@ permission:
   task:
     "*": "deny"
 tools:
-  read: false
-  edit: false
-  write: false
-  bash: false
-  grep: false
-  glob: false
+  read:     false
+  edit:     false
+  write:    false
+  bash:     false
+  grep:     false
+  glob:     false
   webfetch: false
+
   # MCP tools — file access
   "pheidipp-codebase-context_get_files":          true
   "pheidipp-codebase-context_find_files":         true
   "pheidipp-codebase-context_grep_files":         true
+
   # MCP tools — search
   "pheidipp-codebase-context_search_codebase":    true
   "pheidipp-codebase-context_search_symbols":     true
-  # MCP tools — write
+
+  # MCP tools — output
   "pheidipp-codebase-context_write_plan":         true
 
+  # MCP tools — maintenance (disabled)
   "pheidipp-codebase-context_get_architecture_context": false
-  # MCP tools — maintenance (disabled during coding tasks)
   "pheidipp-codebase-context_reindex":      false
 ---
 
@@ -86,35 +89,14 @@ The following is injected before this conversation — do NOT fetch it again:
 Only call tools when you need the *contents* of a specific file
 to write a precise action — not to discover what exists.
 
----
-
-## Tool Usage
-
 Before every call ask: **"Can I write this step precisely without it?"**
 If yes → skip it.
 
-**Call tools when:**
+Call tools when:
 - You need the contents of a specific file to write a precise action
 - A function signature cannot be inferred from dynamic.md
 
-**Batching rules (non-negotiable):**
-- One `get_files` call with all paths needed
-- One `search_symbols` call with all symbols needed
-- Never call the same tool twice
-- Never call tools sequentially
-
-**Tool selection:**
-- Prefer `search_symbols` over `get_files` for signatures
-- Never call `get_architecture_context` — dynamic.md already covers it
-
----
-
-## Truncation Policy
-
-`get_files` may return truncated content for large files. This is expected.
-- Truncated content is sufficient for planning
-- Do NOT make follow-up calls to retrieve more of the same file
-- If a signature is missing from truncated content → use `search_symbols`
+Prefer `search_symbols` over `get_files` for signatures — it is cheaper.
 
 ---
 

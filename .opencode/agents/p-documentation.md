@@ -2,19 +2,25 @@
 model: litellm-proxy/mistral/mistral-large
 temperature: 0.2
 tools:
-  read:  false   # → get_files
-  grep:  false   # → grep_files
-  glob:  false   # → find_files
-  write: true
-  edit:  true
-  bash:  false
+  read:     false   # → get_files
+  grep:     false   # → grep_files
+  glob:     false   # → find_files
+  write:    true
+  edit:     true
+  bash:     false
   webfetch: false
+
+  # MCP tools — file access
   "pheidipp-codebase-context_get_files":   true
   "pheidipp-codebase-context_find_files":  true
   "pheidipp-codebase-context_grep_files":  true
-  "pheidipp-codebase-context_search_symbols": true
-  "pheidipp-codebase-context_search_codebase": false
+
+  # MCP tools — search
+  "pheidipp-codebase-context_search_symbols":           true
+  "pheidipp-codebase-context_search_codebase":          false
   "pheidipp-codebase-context_get_architecture_context": false
+
+  # MCP tools — maintenance (disabled)
   "pheidipp-codebase-context_reindex": false
 ---
 
@@ -49,10 +55,8 @@ Assume this context is correct and current.
 
 ## Tool Usage
 - If documentation can be produced from injected context alone → do NOT use tools
-- If specific implementation details are required:
-  - Identify ALL required files up front
-  - Call `read` ONCE with the complete list — never sequentially
-- Never re-fetch information already in context
+- If specific implementation details are required, identify ALL required files
+  up front and call `get_files` ONCE with the complete list — never sequentially
 
 ---
 
@@ -215,17 +219,17 @@ File naming: `architecture/<topic>.md`
 
 These patterns are **never** acceptable in any document type:
 
-1. **Duplicating stack-truth rules** — if a rule lives in `stack-truth.md`, reference it, do not copy it. Example: "All DB access uses AsyncSession" belongs in ADR-002 → referenced, not repeated in every service doc.
+1. **Duplicating stack-truth rules** — if a rule lives in `stack-truth.md`, reference it, do not copy it.
 
 2. **Tutorial-style compliance sections** — do not walk through each layer with a code example per layer. One compliant snippet, one non-compliant snippet, nothing more.
 
-3. **Context that lives elsewhere** — do not explain why FastAPI is async, why TimescaleDB was chosen for volume, or what Pheidipp's domain is. These live in `product-vision.md` and the relevant ADR.
+3. **Context that lives elsewhere** — do not explain why FastAPI is async, why TimescaleDB was chosen for volume, or what Pheidipp's domain is.
 
 4. **Speculative enforcement** — do not document linting rules, CI checks, or code review processes that do not yet exist. If enforcement is manual, state "Code review" only.
 
-5. **Verbose prose around obvious consequences** — "This makes the system easier to understand" is not a consequence worth documenting. Document surprising or non-obvious tradeoffs only.
+5. **Verbose prose around obvious consequences** — document surprising or non-obvious tradeoffs only.
 
-6. **Repeating the Rules section in Rationale** — they are different things. Rules say what. Rationale says why this what over another what.
+6. **Repeating the Rules section in Rationale** — Rules say what. Rationale says why this what over another what.
 
 ---
 

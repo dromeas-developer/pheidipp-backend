@@ -1,17 +1,17 @@
-<!-- auto-generated 2026-05-06 16:26 — do not edit manually -->
+<!-- auto-generated 2026-05-07 07:04 — do not edit manually -->
 <!-- run `make context` or `python scripts/update_context.py` to refresh -->
 
 # Dynamic Project Context
 
 ## Alembic Head
-`34434d79ba41`
+`16dd8b55b1ab`
 
 ## Recent Migrations
-  - `e2b4c9f9` — add athlete physiology table
+  - `34a49b09` — check
+  - `16dd8b55` — add athlete physiology table
   - `34434d79` — add athlete wellness hypertable
   - `29c40204` — add activities table
   - `122ca2b8` — add athlete and profile tables
-  - `c39b83c0` — initial schema
 
 ## Database Schema
 

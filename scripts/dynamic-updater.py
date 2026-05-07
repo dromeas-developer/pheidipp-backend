@@ -151,7 +151,7 @@ def agents() -> str:
 
 
 def recent_migrations() -> str:
-    versions_dir = ROOT / "migrations" / "versions"
+    versions_dir = ROOT / "alembic" / "versions"
     if not versions_dir.exists():
         return "  (none)"
     files = sorted(

@@ -9,11 +9,11 @@ description: Use when creating, reviewing, or applying Alembic database migratio
 Migrations use sync engine (psycopg2). App uses async engine (asyncpg). Never mix. The project uses `get_postgres_url(sync=True)` from `app/core/config.py` which:
 - Swaps asyncpg → psycopg2 automatically
 - Handles db/localhost hostname based on Docker detection
-- Must be used in `migrations/env.py` — never hardcode the URL
+- Must be used in `alembic/env.py` — never hardcode the URL
 
 ## Required env.py Pattern
 ```python
-# migrations/env.py — must have both of these
+# alembic/env.py — must have both of these
 from app.core.config import get_postgres_url
 from app.db.base import Base
 import app.models  # noqa: F401 — registers all models with Base.metadata

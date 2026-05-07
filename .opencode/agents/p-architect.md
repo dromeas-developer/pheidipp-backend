@@ -58,13 +58,14 @@ Actions describe *what* to do in precise English. The coder writes the code.
 
 **Violation example (forbidden):**
 ```python
-class WellnessSource(str, enum.Enum):
-    MANUAL = "manual"
+class Color(str, enum.Enum):
+    RED = "red"
+    GREEN = "green"
+    ...
 ```
 
 **Correct form:**
-- Add `WellnessSource` string enum to `app/models/enums.py` with values:
-  `manual`, `garmin`, `whoop`, `oura`, `polar`
+- Add `Color` string enum to `<path_to_enum_file>` with values: `red`, `green`, `blue`
 
 ---
 
@@ -109,9 +110,38 @@ Prefer `search_symbols` over `get_files` for signatures — it is cheaper.
 - New domain entities ALWAYS get new files — never extend existing ones
 - When in doubt: CREATE a new file, do not MODIFY an existing one
 - Only MODIFY files that explicitly need wiring (relationships, __init__.py, main.py)
+- Every new file created in `schemas/`, `repositories/`, or `services/` MUST have a corresponding MODIFY step for that layer's `__init__.py` — these are never optional
 - Smallest viable implementation
 - No ambiguity in any action
 - No deferred decisions — if auth pattern, registration file, or naming is uncertain, resolve it from context before writing the step, not after
+
+---
+
+## Migration Step Rules
+
+Migration is always the last step. Specify only what autogenerate cannot produce.
+
+**upgrade() structure:**
+1. Extensions — only if this migration introduces the first hypertable or first
+   vector column; omit otherwise (extensions already exist):
+   - `op.execute("CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;")`
+   - `op.execute("CREATE EXTENSION IF NOT EXISTS vector;")`
+2. `op.create_table('table_name', ...)` — describe as "with all columns matching
+   the ORM model", never list individual column DDL
+3. `op.create_index(...)` for any explicit indexes
+4. `op.execute("SELECT create_hypertable(...)")` — only for planned hypertables
+   (see stack-truth)
+
+**downgrade() must:**
+- Drop hypertable via `drop_hypertable` before dropping the table
+- Drop indexes before dropping the table
+- Drop the table
+- Never drop extensions
+
+**Never include:**
+- Individual column definitions or constraint DDL — autogenerate handles these
+- `PrimaryKeyConstraint`, `ForeignKeyConstraint`, or `UniqueConstraint` DDL
+- `bash scripts/db-upgrade.sh` — applying migrations is p-devops's responsibility
 
 ---
 

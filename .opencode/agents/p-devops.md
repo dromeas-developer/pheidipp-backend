@@ -1,6 +1,5 @@
 ---
-model: litellm-proxy/mistral/mistral-large
-temperature: 0.1
+model: litellm-proxy/mistral/mistral-medium-enginneer
 permission:
   task:
     "*": "deny"

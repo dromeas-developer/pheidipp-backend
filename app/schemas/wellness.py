@@ -2,7 +2,7 @@ import uuid
 from datetime import date, datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import ConfigDict, BaseModel, Field
 
 from app.models.enums import WellnessSource
 
@@ -44,6 +44,8 @@ class WellnessResponse(WellnessBase):
     athlete_id: uuid.UUID
     created_at: datetime
     updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class WellnessListParams(BaseModel):

@@ -188,10 +188,7 @@ def relationships() -> str:
 
 def generate() -> str:
     return f"""\
-<!-- auto-generated {datetime.now():%Y-%m-%d %H:%M} — do not edit manually -->
-<!-- run `make context` or `python scripts/update_context.py` to refresh -->
-
-# Dynamic Project Context
+# dynamic-context
 
 ## Alembic Head
 `{alembic_head()}`

@@ -44,7 +44,7 @@ conforms to stack-truth rules. Produce a structured report. Do not fix anything.
 ## Inputs Required
 Before starting, confirm both are available:
 1. Plan file at `plans/<feature_name>.md`
-2. dynamic-context.md is current (ask user to run `make context` if uncertain)
+2. dynamic-context is current (ask user to run `make context` if uncertain)
 
 If the plan file is missing → STOP and report it.
 

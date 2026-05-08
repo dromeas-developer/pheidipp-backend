@@ -81,10 +81,10 @@ The following is injected before this conversation — do NOT fetch it again:
 
 | What | Where | Do not call |
 |---|---|---|
-| File tree + modules + `__init__` files | dynamic.md | find_files, get_architecture_context |
-| Database schema | dynamic.md | get_files on model files |
-| API endpoints | dynamic.md | get_files on route files |
-| Layer rules | stack-truth.md | get_architecture_context |
+| File tree + modules + `__init__` files | dynamic-context | find_files, get_architecture_context |
+| Database schema | dynamic-context | get_files on model files |
+| API endpoints | dynamic-context | get_files on route files |
+| Layer rules | stack-truth | get_architecture_context |
 
 **You already know which files exist and what the schema looks like.**
 Only call tools when you need the *contents* of a specific file
@@ -95,7 +95,7 @@ If yes → skip it.
 
 Call tools when:
 - You need the contents of a specific file to write a precise action
-- A function signature cannot be inferred from dynamic.md
+- A function signature cannot be inferred from dynamic-context
 
 Prefer `search_symbols` over `get_files` for signatures — it is cheaper.
 

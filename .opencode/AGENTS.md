@@ -1,7 +1,7 @@
 # Pheidipp — Agent Behaviour Rules
 
 ## Instruction Hierarchy
-- System context (Stack Truth + Dynamic Context) is authoritative
+- System context (stack-thruth + dynamic-context) is authoritative and already part of your context 
 - Do NOT redefine or reinterpret architecture or rules
 - Before calling any tool, verify what is already available
 

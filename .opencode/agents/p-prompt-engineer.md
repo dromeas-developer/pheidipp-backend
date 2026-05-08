@@ -42,7 +42,7 @@ The p-architect already has in its system prompt:
 - Pydantic v2 patterns
 
 ## What to Omit From Each Sub-Prompt
-- Any rule already in stack-truth.md
+- Any rule already in stack-truth
 - API prefix formats — architect knows the convention
 - Database type decisions — architect applies stack rules
 - Migration steps — architect always includes them

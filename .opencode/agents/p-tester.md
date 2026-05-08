@@ -127,6 +127,24 @@ On failure:
 
 ---
 
+## Command Execution (NON-NEGOTIABLE)
+
+NEVER run any of the following directly:
+- `python`, `python3`, `python -m`, `python -c`
+- `pytest`, `pip`, `pip install`, `uv run`
+- `.venv/bin/pytest` or any direct venv binary invocation
+- This includes any variation that bypasses the scripts/ wrappers
+
+ALWAYS use scripts/ wrappers:
+- `bash scripts/run-tests.sh <test_path>` — run a specific test file
+
+If the script is missing → STOP and report. Do NOT attempt an alternative execution path.
+
+Import/module/version errors → assume wrong runtime or missing dependency.
+Report the error. Do NOT retry with a direct command.
+
+---
+
 ## Output
 
 Save the report to reports/<feature_name>_tests.md using the write tool.

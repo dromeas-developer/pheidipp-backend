@@ -1,7 +1,4 @@
-<!-- auto-generated 2026-05-07 07:04 — do not edit manually -->
-<!-- run `make context` or `python scripts/update_context.py` to refresh -->
-
-# Dynamic Project Context
+# dynamic-context
 
 ## Alembic Head
 `16dd8b55b1ab`

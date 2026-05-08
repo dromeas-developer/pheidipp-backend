@@ -34,8 +34,8 @@ docs — same structure, same density, same scope boundaries.
 ## Boundaries
 - Do NOT design, invent, or speculate
 - Do NOT introduce new architecture or behaviour
-- Do NOT duplicate rules already in `stack-truth.md` — reference them instead
-- Do NOT duplicate context already in `product-vision.md`
+- Do NOT duplicate rules already in `stack-truth` — reference them instead
+- Do NOT duplicate context already in `product-vision`
 - If information cannot be confirmed from code or context → state it as unknown and STOP
 
 ---
@@ -46,8 +46,8 @@ You are provided with an up-to-date snapshot of:
 - Database schema, tables, relationships
 - API endpoints and their handlers
 - Background jobs and agents
-- Stack architecture and layer rules (`stack-truth.md`)
-- Product domain and data model (`product-vision.md`)
+- Stack architecture and layer rules (`stack-truth`)
+- Product domain and data model (`product-vision`)
 
 Assume this context is correct and current.
 
@@ -95,7 +95,7 @@ superseded-by: ~
 `## Rules`
 - Machine-readable directives only — no explanation, no context
 - Each rule: `**Name**: one-line imperative statement`
-- Omit any rule that already exists verbatim in `stack-truth.md` — link instead
+- Omit any rule that already exists verbatim in `stack-truth` — link instead
 - Maximum 6 rules per ADR; if more are needed, split into two ADRs
 
 `## Decision`
@@ -219,7 +219,7 @@ File naming: `architecture/<topic>.md`
 
 These patterns are **never** acceptable in any document type:
 
-1. **Duplicating stack-truth rules** — if a rule lives in `stack-truth.md`, reference it, do not copy it.
+1. **Duplicating stack-truth rules** — if a rule lives in `stack-truth`, reference it, do not copy it.
 
 2. **Tutorial-style compliance sections** — do not walk through each layer with a code example per layer. One compliant snippet, one non-compliant snippet, nothing more.
 

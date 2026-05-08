@@ -1,4 +1,4 @@
-# Stack Truth
+# stack-truth
 
 ## Runtime
 Python 3.11+, FastAPI, SQLAlchemy 2.0 (async), Pydantic v2
@@ -52,6 +52,11 @@ Rules:
 Rules:
 - Frontend → API only
 - Worker triggered via Redis
+
+## List Endpoints (Non-Negotiable)
+- list_* service methods MUST return `tuple[list[Model], int]` — items and total count together
+- Route handlers MUST NOT call repositories directly for any reason, including counts
+- Route handlers MUST NOT execute SQLAlchemy queries directly
 
 ## Timescale / Hypertables
 - Any table storing daily or per-second time-series samples MUST be a TimescaleDB hypertable. Standard tables are forbidden for time-series data.

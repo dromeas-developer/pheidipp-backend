@@ -3,7 +3,7 @@ from uuid import UUID
 from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 from app.db.base import Base
 from app.models.activity import Activity, ActivityType
@@ -40,3 +40,9 @@ class ActivityRepository(BaseRepository[Activity]):
 
         result = await self.session.execute(query)
         return list(result.scalars().all())
+
+    async def count_by_athlete(self, athlete_id: UUID) -> int:
+        result = await self.session.execute(
+            select(func.count()).where(self.model.athlete_id == athlete_id)
+        )
+        return result.scalar_one()

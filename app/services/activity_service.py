@@ -102,3 +102,6 @@ class ActivityService:
         self.activity_repo.session.delete(activity)
         await self.activity_repo.session.commit()
         return True
+
+    async def count_by_athlete(self, athlete_id: UUID) -> int:
+        return await self.activity_repo.count_by_athlete(athlete_id)

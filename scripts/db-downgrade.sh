@@ -5,4 +5,4 @@ source scripts/common.sh
 ensure_project_root
 ensure_venv
 
-scripts/alembic.sh upgrade head
+scripts/alembic.sh downgrade -1

@@ -1,0 +1,86 @@
+from typing import List, Optional
+from uuid import UUID
+from datetime import date
+
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func
+
+from app.db.base import Base
+from app.models.fitness import AthleteFitness
+from app.repositories.base_repository import BaseRepository
+
+
+class FitnessRepository(BaseRepository[AthleteFitness]):
+    def __init__(self, session: AsyncSession):
+        super().__init__(session, AthleteFitness)
+
+    async def get_by_id(self, fitness_id: UUID) -> Optional[AthleteFitness]:
+        """Get fitness by primary key (id)."""
+        return await super().get_by_id(fitness_id)
+    
+    async def update_by_id(self, fitness_id: UUID, **kwargs) -> Optional[AthleteFitness]:
+        """Update fitness by primary key (id)."""
+        return await super().update(fitness_id, **kwargs)
+
+    async def get_by_athlete_date(
+        self, athlete_id: UUID, metric_date: date
+    ) -> Optional[AthleteFitness]:
+        """Get fitness by composite key (athlete_id, metric_date)."""
+        result = await self.session.execute(
+            select(self.model)
+            .where(self.model.athlete_id == athlete_id)
+            .where(self.model.metric_date == metric_date)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_by_athlete(
+        self,
+        athlete_id: UUID,
+        skip: int = 0,
+        limit: int = 50,
+        date_from: Optional[date] = None,
+        date_to: Optional[date] = None,
+    ) -> List[AthleteFitness]:
+        query = select(self.model).where(self.model.athlete_id == athlete_id)
+
+        if date_from is not None:
+            query = query.where(self.model.metric_date >= date_from)
+
+        if date_to is not None:
+            query = query.where(self.model.metric_date <= date_to)
+
+        query = query.order_by(self.model.metric_date.desc())
+        query = query.offset(skip).limit(limit)
+
+        result = await self.session.execute(query)
+        return list(result.scalars().all())
+
+    async def update(
+        self, athlete_id: UUID, metric_date: date, **kwargs
+    ) -> Optional[AthleteFitness]:
+        """Update fitness record by composite key (athlete_id, metric_date)."""
+        existing = await self.get_by_athlete_date(athlete_id, metric_date)
+        if existing:
+            for key, value in kwargs.items():
+                setattr(existing, key, value)
+            await self.session.commit()
+            await self.session.refresh(existing)
+            return existing
+        return None
+
+    async def delete_by_composite_key(
+        self, athlete_id: UUID, metric_date: date
+    ) -> bool:
+        """Delete fitness record by composite key (athlete_id, metric_date)."""
+        existing = await self.get_by_athlete_date(athlete_id, metric_date)
+        if not existing:
+            return False
+        self.session.delete(existing)
+        await self.session.commit()
+        return True
+
+    async def count_by_athlete(self, athlete_id: UUID) -> int:
+        result = await self.session.execute(
+            select(func.count()).where(self.model.athlete_id == athlete_id)
+        )
+        return result.scalar_one()

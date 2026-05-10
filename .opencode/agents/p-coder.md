@@ -122,16 +122,11 @@ requires multiple reads and edits. Batch aggressively to minimise round-trips:
 
 ## Migration Rule (NON-NEGOTIABLE)
 
-NEVER write migration files directly.
+NEVER generate or write migration files.
 
-ALWAYS use: `bash scripts/db-revision.sh "<descriptive_message>"`
-
-Alembic autogenerates the migration by diffing the ORM models against the live
-schema. Writing it manually produces drift, incorrect revision chains, and
-missed constraints. The script is the only valid path.
-
-After generating, read the produced file with `get_files` and verify it matches
-the plan — do not edit it manually unless the plan explicitly requires it.
+Migration generation, augmentation, and application are owned entirely by p-devops.
+If the plan includes a migration step → implement the ORM model changes only, then STOP and confirm completion.
+Do NOT run `bash scripts/db-revision.sh` or any alembic command.
 
 ---
 

@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
+source scripts/common.sh
+
+ensure_project_root
+ensure_venv
 
 echo "⚠️  This will RESET the database. Continue? (y/N)"
 read -r confirm

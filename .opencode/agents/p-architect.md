@@ -122,26 +122,27 @@ Prefer `search_symbols` over `get_files` for signatures — it is cheaper.
 Migration is always the last step. Specify only what autogenerate cannot produce.
 
 **upgrade() structure:**
-1. Extensions — only if this migration introduces the first hypertable or first
-   vector column; omit otherwise (extensions already exist):
-   - `op.execute("CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;")`
-   - `op.execute("CREATE EXTENSION IF NOT EXISTS vector;")`
-2. `op.create_table('table_name', ...)` — describe as "with all columns matching
+1. `op.create_table('table_name', ...)` — describe as "with all columns matching
    the ORM model", never list individual column DDL
-3. `op.create_index(...)` for any explicit indexes
-4. `op.execute("SELECT create_hypertable(...)")` — only for planned hypertables
-   (see stack-truth)
+2. `op.create_index(...)` for any explicit indexes
 
 **downgrade() must:**
-- Drop hypertable via `drop_hypertable` before dropping the table
 - Drop indexes before dropping the table
 - Drop the table
-- Never drop extensions
+
+**For hypertable migrations — specify these additional actions:**
+- Note that TimescaleDB extension calls and `create_hypertable` are added
+  by p-devops after autogeneration — do NOT include them in the plan steps
+- Only flag that the table requires a hypertable in the migration objective:
+  "This table is a TimescaleDB hypertable — p-devops will augment the
+  generated migration with extension calls and create_hypertable"
 
 **Never include:**
 - Individual column definitions or constraint DDL — autogenerate handles these
 - `PrimaryKeyConstraint`, `ForeignKeyConstraint`, or `UniqueConstraint` DDL
-- `bash scripts/db-upgrade.sh` — applying migrations is p-devops's responsibility
+- TimescaleDB extension calls or `create_hypertable` — owned by p-devops
+- `bash scripts/db-revision.sh` — migration generation is owned by p-devops
+
 
 ---
 

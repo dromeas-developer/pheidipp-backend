@@ -1,5 +1,5 @@
 ---
-model: litellm-proxy/mistral/mistral-medium-enginneer
+model: litellm-proxy/mistral/mistral-medium-engineer
 permission:
   task:
     "*": "deny"
@@ -136,9 +136,12 @@ Plan: plans/<feature_name>.md
 
 ## Routing
 
-→ CRITICAL findings: send to **p-architect** with this report
-→ MINOR findings: send to **p-coder** with this report
-→ No findings: proceed to **p-devops**
+| Finding Type | Route To |
+|---|---|
+| CRITICAL (plan mismatch) | p-architect + this report |
+| CRITICAL (migration incomplete/incorrect) | p-devops + this report |
+| MINOR (code issues) | p-coder + this report |
+| No findings | p-devops |
 ```
 
 Confirm the report was saved, then STOP.

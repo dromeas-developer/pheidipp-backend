@@ -1,5 +1,5 @@
 ---
-model: litellm-proxy/mistral/mistral-medium-enginneer
+model: litellm-proxy/mistral/mistral-medium-engineer
 temperature: 0.2
 tools:
   read:     false   # → get_files

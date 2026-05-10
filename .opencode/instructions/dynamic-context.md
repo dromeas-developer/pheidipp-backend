@@ -1,14 +1,14 @@
 # dynamic-context
 
 ## Alembic Head
-`16dd8b55b1ab`
+`76e28f218e05 (head)`
 
 ## Recent Migrations
+  - `76e28f21` — add athlete fitness table
   - `34a49b09` — check
   - `16dd8b55` — add athlete physiology table
   - `34434d79` — add athlete wellness hypertable
   - `29c40204` — add activities table
-  - `122ca2b8` — add athlete and profile tables
 
 ## Database Schema
 
@@ -33,6 +33,18 @@
   - `elevation_loss_meters` FLOAT
   - `calories` INTEGER
   - `source` VARCHAR(50)
+  - `created_at` DATETIME `[NOT NULL]`
+  - `updated_at` DATETIME `[NOT NULL]`
+
+**athlete_fitness**
+  - `id` UUID `[PK]`
+  - `athlete_id` UUID `[FK→athletes.id, NOT NULL]`
+  - `metric_date` DATE `[NOT NULL]`
+  - `tss` FLOAT
+  - `atl` FLOAT
+  - `ctl` FLOAT
+  - `tsb` FLOAT
+  - `source` VARCHAR(20) `[NOT NULL]`
   - `created_at` DATETIME `[NOT NULL]`
   - `updated_at` DATETIME `[NOT NULL]`
 
@@ -94,6 +106,9 @@
 **activities**
   - `athlete_id` → `athletes.id`
 
+**athlete_fitness**
+  - `athlete_id` → `athletes.id`
+
 **athlete_physiology**
   - `athlete_id` → `athletes.id`
 
@@ -110,6 +125,11 @@
   - GET /effective/{target_date} → `app/api/routes/physiology.py:get_effective_physiology`
   - PATCH /{physiology_id} → `app/api/routes/physiology.py:update_physiology`
   - DELETE /{physiology_id} → `app/api/routes/physiology.py:delete_physiology`
+  - POST / → `app/api/routes/fitness.py:create_fitness`
+  - GET /{fitness_id} → `app/api/routes/fitness.py:get_fitness`
+  - GET /athletes/{athlete_id}/fitness → `app/api/routes/fitness.py:list_athlete_fitness`
+  - PATCH /{fitness_id} → `app/api/routes/fitness.py:update_fitness`
+  - DELETE /{fitness_id} → `app/api/routes/fitness.py:delete_fitness`
   - POST / → `app/api/routes/athletes.py:create_athlete`
   - GET /{athlete_id} → `app/api/routes/athletes.py:get_athlete`
   - PATCH /{athlete_id} → `app/api/routes/athletes.py:update_athlete`
@@ -139,6 +159,7 @@
   - `activity.py`
   - `athlete.py`
   - `enums.py`
+  - `fitness.py`
   - `physiology.py`
   - `wellness.py`
 
@@ -146,6 +167,7 @@
   - `__init__.py`
   - `activity.py`
   - `athlete.py`
+  - `fitness.py`
   - `physiology.py`
   - `wellness.py`
 
@@ -154,6 +176,7 @@
   - `activity_service.py`
   - `athlete_service.py`
   - `base_service.py`
+  - `fitness_service.py`
   - `health_service.py`
   - `physiology_service.py`
   - `wellness_service.py`
@@ -163,6 +186,7 @@
   - `activity_repository.py`
   - `athlete_repository.py`
   - `base_repository.py`
+  - `fitness_repository.py`
   - `physiology_repository.py`
   - `wellness_repository.py`
 

@@ -1,5 +1,5 @@
 ---
-model: litellm-proxy/mistral/mistral-medium-enginneer
+model: litellm-proxy/mistral/mistral-medium-engineer
 permission:
   task:
     "*": "deny"
@@ -7,8 +7,8 @@ tools:
   read:     false
   grep:     false
   glob:     false
-  write:    false
-  edit:     false
+  write:    true
+  edit:     true
   bash:     true
   webfetch: false
 
@@ -30,7 +30,8 @@ Run build, migration, and test checks after a completed implementation.
 Produce a structured pass/fail report. Do not modify any source file.
 
 ## Boundaries
-- Do NOT modify any source file
+- NEVER modify application source files (models, services, repositories, routes)
+- Migration files in alembic/versions/ MAY be created and edited
 - Do NOT run alembic, python, pytest, or pip directly
 - Do NOT proceed if p-validator has CRITICAL findings — report this and STOP
 - ALWAYS use scripts/ wrappers
@@ -74,14 +75,45 @@ Run `bash scripts/docker-build.sh` and confirm api, db, redis, and minio
 are all healthy before proceeding. On failure, capture logs via
 `bash scripts/docker-logs.sh`, record the output, and STOP.
 
-### 2. Migration Apply
+### 2 Migration Generation
+
+Run only if the feature introduces new or modified ORM models.
+
+**Step 1 — Generate:**
+Run `bash scripts/db-revision.sh "<feature_name>"`.
+Open the generated file and verify it is not empty — if empty, models
+are not registered in `alembic/env.py`. STOP and report.
+
+**Step 2 — Augment (hypertable features only):**
+If the plan flags a hypertable requirement, manually add to the
+generated migration in this exact sequence inside `upgrade()`:
+1. `op.execute("CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;")`
+   — before `op.create_table`
+2. `op.execute("CREATE EXTENSION IF NOT EXISTS vector;")`
+   — before `op.create_table`
+3. `op.execute("SELECT create_hypertable('table_name', 'time_column', if_not_exists => TRUE);")`
+   — after `op.create_table`
+
+Add to `downgrade()` before `op.drop_table`:
+- `op.execute("SELECT drop_hypertable('table_name');")`
+
+**Step 3 — Verify:**
+Read the augmented file and confirm the sequence is correct before
+proceeding to `db-upgrade.sh`. Never apply an unverified migration.
+
+**Note:** p-devops has `write` and `edit` disabled — use the
+`pheidipp-codebase-context_get_files` tool to read the generated file
+and report what augmentation is needed, then request the user to apply
+it, or confirm it was applied correctly before upgrading.
+
+### 3. Migration Apply
 
 Run `bash scripts/db-upgrade.sh`.
 
 Expected: clean upgrade with no errors. Failure indicates a migration
 conflict, missing extension, or hypertable error.
 
-### 3. Pending Changes Check
+### 4. Pending Changes Check
 
 Run `bash scripts/db-revision.sh "check"`.
 
@@ -89,7 +121,7 @@ Expected: no new migration generated. If a new migration file is produced,
 this is a CRITICAL finding — the ORM model and applied migrations are out
 of sync.
 
-### 4. Test Suite
+### 5. Test Suite
 
 Run `bash scripts/run-tests.sh`.
 

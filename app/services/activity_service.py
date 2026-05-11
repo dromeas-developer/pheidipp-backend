@@ -96,12 +96,7 @@ class ActivityService:
         return await self.activity_repo.update(activity_id, **update_data)
 
     async def delete_activity(self, activity_id: UUID) -> bool:
-        activity = await self.get_activity(activity_id)
-        if not activity:
-            return False
-        self.activity_repo.session.delete(activity)
-        await self.activity_repo.session.commit()
-        return True
+        return await self.activity_repo.delete(activity_id)
 
     async def count_by_athlete(self, athlete_id: UUID) -> int:
         return await self.activity_repo.count_by_athlete(athlete_id)

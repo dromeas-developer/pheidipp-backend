@@ -5,7 +5,7 @@ import uuid
 import pytest
 
 from app.models.athlete import Athlete, AthleteProfile
-from app.models.enums import AthleteStatus, Gender, CountryCode, Timezone, LanguageCode, UnitPreference
+from app.models.enums import AthleteStatus, Gender, UnitPreference
 from app.repositories.athlete_repository import AthleteRepository, AthleteProfileRepository
 
 
@@ -40,9 +40,9 @@ def sample_profile_data():
         "last_name": "Doe",
         "display_name": "johndoe",
         "gender": Gender.MALE,
-        "country_code": CountryCode.AU,
-        "timezone": Timezone.America_New_York,
-        "language_code": LanguageCode.en,
+        "country_code": "AU",
+        "timezone": "America/New_York",
+        "language_code": "en",
         "unit_preference": UnitPreference.METRIC,
     }
 

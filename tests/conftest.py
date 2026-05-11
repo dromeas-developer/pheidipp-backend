@@ -43,33 +43,39 @@ def test_db_engine(test_db_connection_url):
     from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
     from sqlalchemy.pool import NullPool
 
+    # Use synchronous URL for Alembic (it requires psycopg2)
+    sync_url = test_db_connection_url.replace("postgresql+asyncpg", "postgresql+psycopg2")
+
+    # Run Alembic migrations using Python API to match production schema
+    from alembic.config import Config
+    from alembic import command
+
+    def run_alembic_migrations(db_url: str):
+        """Run Alembic migrations using Python API."""
+        alembic_cfg = Config("alembic.ini")
+        alembic_cfg.set_main_option("sqlalchemy.url", db_url)
+        command.upgrade(alembic_cfg, "head")
+
+    # Run migrations synchronously before creating async engine
+    run_alembic_migrations(sync_url)
+
     engine: AsyncEngine = create_async_engine(
         test_db_connection_url,
         echo=False,
         poolclass=NullPool,  # Each session gets a fresh connection
     )
 
-    # Import Base to ensure models are registered
-    from app.db.base import Base
+    yield engine
 
-    # Create all tables once per session
-    async def _init_db():
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
+    async def _dispose():
+        await engine.dispose()
 
-    # Get or create an event loop for the session
+    # Get or create an event loop for cleanup
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-
-    loop.run_until_complete(_init_db())
-
-    yield engine
-
-    async def _dispose():
-        await engine.dispose()
 
     loop.run_until_complete(_dispose())
 

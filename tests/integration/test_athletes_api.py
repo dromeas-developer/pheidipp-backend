@@ -164,7 +164,7 @@ class TestModels:
         """Test creating AthleteProfile model."""
         from datetime import date, datetime
         from app.models.athlete import AthleteProfile
-        from app.models.enums import Gender, CountryCode, Timezone, LanguageCode, UnitPreference
+        from app.models.enums import Gender, UnitPreference
 
         profile = AthleteProfile(
             athlete_id=uuid.uuid4(),
@@ -173,9 +173,9 @@ class TestModels:
             display_name="johndoe",
             date_of_birth=date(1990, 1, 1),
             gender=Gender.MALE,
-            country_code=CountryCode.AU,
-            timezone=Timezone.America_New_York,
-            language_code=LanguageCode.en,
+            country_code="AU",
+            timezone="America/New_York",
+            language_code="en",
             unit_preference=UnitPreference.METRIC,
         )
         assert profile.first_name == "John"

@@ -18,9 +18,6 @@ from app.db.base import Base
 from app.models.enums import (
     AthleteStatus,
     Gender,
-    CountryCode,
-    Timezone,
-    LanguageCode,
     UnitPreference,
 )
 
@@ -98,15 +95,9 @@ class AthleteProfile(Base):
     gender: Mapped[Optional[Gender]] = mapped_column(
         SAEnum(Gender, native_enum=False, length=20)
     )
-    country_code: Mapped[Optional[CountryCode]] = mapped_column(
-        SAEnum(CountryCode, native_enum=False, length=5)
-    )
-    timezone: Mapped[Optional[Timezone]] = mapped_column(
-        SAEnum(Timezone, native_enum=False, length=50)
-    )
-    language_code: Mapped[Optional[LanguageCode]] = mapped_column(
-        SAEnum(LanguageCode, native_enum=False, length=5)
-    )
+    country_code: Mapped[Optional[str]] = mapped_column(String(2))
+    timezone: Mapped[Optional[str]] = mapped_column(String(100))
+    language_code: Mapped[Optional[str]] = mapped_column(String(5))
     unit_preference: Mapped[UnitPreference] = mapped_column(
         SAEnum(UnitPreference, native_enum=False, length=20),
         default=UnitPreference.METRIC,

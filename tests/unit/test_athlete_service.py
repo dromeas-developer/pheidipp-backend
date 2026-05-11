@@ -8,15 +8,14 @@ import pytest
 
 from app.core.security import hash_password, verify_password
 from app.models.athlete import Athlete, AthleteProfile
-from app.models.enums import AthleteStatus, Gender, CountryCode, Timezone, LanguageCode, UnitPreference
+from app.models.enums import AthleteStatus, Gender, UnitPreference
 from app.schemas.athlete import AthleteCreate, AthleteUpdate, AthleteProfileUpdate
 from app.services.athlete_service import AthleteService
 
 
-# Use valid enum values from CountryCode
-# Note: US does not exist in the enum - using AU (Australia) instead
-TEST_COUNTRY_CODE = CountryCode.AU
-TEST_TIMEZONE = Timezone.America_New_York
+# Use valid ISO country code strings
+TEST_COUNTRY_CODE = "AU"
+TEST_TIMEZONE = "America/New_York"
 
 
 @pytest.fixture
@@ -213,7 +212,7 @@ async def test_get_athlete_with_profile(athlete_service, athlete_repo_mock):
         gender=Gender.MALE,
         country_code=TEST_COUNTRY_CODE,
         timezone=TEST_TIMEZONE,
-        language_code=LanguageCode.en,
+        language_code="en",
         unit_preference=UnitPreference.METRIC,
         created_at=datetime(2024, 1, 1, 0, 0, 0),
         updated_at=datetime(2024, 1, 1, 0, 0, 0),
@@ -351,7 +350,7 @@ async def test_get_profile(athlete_service, profile_repo_mock):
         gender=Gender.MALE,
         country_code=TEST_COUNTRY_CODE,
         timezone=TEST_TIMEZONE,
-        language_code=LanguageCode.en,
+        language_code="en",
         unit_preference=UnitPreference.METRIC,
         created_at=datetime(2024, 1, 1, 0, 0, 0),
         updated_at=datetime(2024, 1, 1, 0, 0, 0),
@@ -403,7 +402,7 @@ async def test_upsert_profile_create(athlete_service, profile_repo_mock):
             gender=Gender.MALE,
             country_code=TEST_COUNTRY_CODE,
             timezone=TEST_TIMEZONE,
-            language_code=LanguageCode.en,
+            language_code="en",
             unit_preference=UnitPreference.METRIC,
             created_at=datetime(2024, 1, 1, 0, 0, 0),
             updated_at=datetime(2024, 1, 1, 0, 0, 0),
@@ -433,7 +432,7 @@ async def test_upsert_profile_update(athlete_service, profile_repo_mock):
         gender=Gender.MALE,
         country_code=TEST_COUNTRY_CODE,
         timezone=TEST_TIMEZONE,
-        language_code=LanguageCode.en,
+        language_code="en",
         unit_preference=UnitPreference.METRIC,
         created_at=datetime(2024, 1, 1, 0, 0, 0),
         updated_at=datetime(2024, 1, 1, 0, 0, 0),
@@ -450,7 +449,7 @@ async def test_upsert_profile_update(athlete_service, profile_repo_mock):
             gender=Gender.MALE,
             country_code=TEST_COUNTRY_CODE,
             timezone=TEST_TIMEZONE,
-            language_code=LanguageCode.en,
+            language_code="en",
             unit_preference=UnitPreference.METRIC,
             created_at=datetime(2024, 1, 1, 0, 0, 0),
             updated_at=datetime(2024, 1, 2, 0, 0, 0),

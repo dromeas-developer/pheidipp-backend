@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.enums import ActivityType, PerceivedEffort
 
@@ -25,6 +25,8 @@ class ActivityBase(BaseModel):
     elevation_loss_meters: Optional[float] = None
     calories: Optional[int] = None
     source: Optional[str] = None
+    planned_workout_id: Optional[uuid.UUID] = None
+    notes: Optional[str] = None
 
 
 class ActivityCreate(ActivityBase):
@@ -49,6 +51,8 @@ class ActivityUpdate(BaseModel):
     elevation_loss_meters: Optional[float] = None
     calories: Optional[int] = None
     source: Optional[str] = None
+    planned_workout_id: Optional[uuid.UUID] = None
+    notes: Optional[str] = None
 
 
 class ActivityResponse(ActivityBase):
@@ -65,8 +69,8 @@ class ActivityListParams(BaseModel):
     activity_type: Optional[ActivityType] = None
     date_from: Optional[datetime] = None
     date_to: Optional[datetime] = None
-    limit: int = 50
-    offset: int = 0
+    limit: int = Field(default=50, ge=1, le=1000)
+    offset: int = Field(default=0, ge=0)
 
 
 class ActivityListResponse(BaseModel):

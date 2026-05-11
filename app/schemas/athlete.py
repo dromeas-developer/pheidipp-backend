@@ -7,9 +7,6 @@ from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from app.models.enums import (
     AthleteStatus,
     Gender,
-    CountryCode,
-    Timezone,
-    LanguageCode,
     UnitPreference,
 )
 
@@ -42,9 +39,9 @@ class AthleteProfileBase(BaseModel):
     display_name: Optional[str] = Field(default=None, max_length=100)
     date_of_birth: Optional[date] = None
     gender: Optional[Gender] = None
-    country_code: Optional[CountryCode] = None
-    timezone: Optional[Timezone] = None
-    language_code: Optional[LanguageCode] = None
+    country_code: Optional[str] = Field(default=None, max_length=2)
+    timezone: Optional[str] = Field(default=None, max_length=100)
+    language_code: Optional[str] = Field(default=None, max_length=5)
     unit_preference: Optional[UnitPreference] = UnitPreference.METRIC
 
 
@@ -58,9 +55,9 @@ class AthleteProfileUpdate(BaseModel):
     display_name: Optional[str] = None
     date_of_birth: Optional[date] = None
     gender: Optional[Gender] = None
-    country_code: Optional[CountryCode] = None
-    timezone: Optional[Timezone] = None
-    language_code: Optional[LanguageCode] = None
+    country_code: Optional[str] = Field(default=None, max_length=2)
+    timezone: Optional[str] = Field(default=None, max_length=100)
+    language_code: Optional[str] = Field(default=None, max_length=5)
     unit_preference: Optional[UnitPreference] = None
 
 

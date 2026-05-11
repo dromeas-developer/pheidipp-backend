@@ -45,22 +45,6 @@ async def get_activity(
     return ActivityResponse.model_validate(activity)
 
 
-@router.get("/athletes/{athlete_id}/activities", response_model=ActivityListResponse)
-async def list_athlete_activities(
-    athlete_id: UUID,
-    params: ActivityListParams = Depends(),
-    service: ActivityService = Depends(get_activity_service),
-):
-    activities = await service.list_athlete_activities(athlete_id, params)
-
-    total = await service.count_by_athlete(athlete_id)
-
-    return ActivityListResponse(
-        items=[ActivityResponse.model_validate(a) for a in activities],
-        total=total,
-    )
-
-
 @router.patch("/{activity_id}", response_model=ActivityResponse)
 async def update_activity(
     activity_id: UUID,

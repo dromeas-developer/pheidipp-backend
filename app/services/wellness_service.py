@@ -73,11 +73,11 @@ class WellnessService:
                     f"Wellness record already exists for athlete {existing.athlete_id} on {new_date}"
                 )
 
-        return await self.wellness_repo.update_by_id(wellness_id, **update_data)
+        return await self.wellness_repo.update(wellness_id, **update_data)
 
     async def delete_wellness(self, wellness_id: UUID) -> bool:
         """Delete wellness by wellness_id (primary key)."""
-        return await self.wellness_repo.delete_by_id(wellness_id)
+        return await self.wellness_repo.delete(wellness_id)
 
     async def count_by_athlete(self, athlete_id: UUID) -> int:
         return await self.wellness_repo.count_by_athlete(athlete_id)

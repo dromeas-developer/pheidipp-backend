@@ -14,14 +14,6 @@ class FitnessRepository(BaseRepository[AthleteFitness]):
     def __init__(self, session: AsyncSession):
         super().__init__(session, AthleteFitness)
 
-    async def get_by_id(self, fitness_id: UUID) -> Optional[AthleteFitness]:
-        """Get fitness by primary key (id)."""
-        return await super().get_by_id(fitness_id)
-    
-    async def update_by_id(self, fitness_id: UUID, **kwargs) -> Optional[AthleteFitness]:
-        """Update fitness by primary key (id)."""
-        return await super().update(fitness_id, **kwargs)
-
     async def get_by_athlete_date(
         self, athlete_id: UUID, metric_date: date
     ) -> Optional[AthleteFitness]:
@@ -55,7 +47,7 @@ class FitnessRepository(BaseRepository[AthleteFitness]):
         result = await self.session.execute(query)
         return list(result.scalars().all())
 
-    async def update(
+    async def update_by_athlete_date(
         self, athlete_id: UUID, metric_date: date, **kwargs
     ) -> Optional[AthleteFitness]:
         """Update fitness record by composite key (athlete_id, metric_date)."""
@@ -75,7 +67,7 @@ class FitnessRepository(BaseRepository[AthleteFitness]):
         existing = await self.get_by_athlete_date(athlete_id, metric_date)
         if not existing:
             return False
-        self.session.delete(existing)
+        await self.session.delete(existing)
         await self.session.commit()
         return True
 

@@ -73,15 +73,11 @@ class FitnessService:
                         f"Fitness record already exists for athlete {existing.athlete_id} on {new_date}"
                     )
 
-        return await self.fitness_repo.update_by_id(fitness_id, **update_data)
+        return await self.fitness_repo.update(fitness_id, **update_data)
 
     async def delete_fitness(self, fitness_id: UUID) -> bool:
         """Delete fitness by primary key (id)."""
-        existing = await self.fitness_repo.get_by_id(fitness_id)
-        if not existing:
-            return False
-        await self.fitness_repo.delete(fitness_id)
-        return True
+        return await self.fitness_repo.delete(fitness_id)
 
     async def count_by_athlete(self, athlete_id: UUID) -> int:
         return await self.fitness_repo.count_by_athlete(athlete_id)

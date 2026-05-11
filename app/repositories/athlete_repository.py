@@ -28,3 +28,21 @@ class AthleteProfileRepository(BaseRepository[AthleteProfile]):
             select(self.model).where(self.model.athlete_id == athlete_id)
         )
         return result.scalar_one_or_none()
+
+    async def update_by_athlete_id(self, athlete_id: uuid.UUID, **kwargs) -> AthleteProfile | None:
+        profile = await self.get_by_athlete_id(athlete_id)
+        if profile:
+            for key, value in kwargs.items():
+                setattr(profile, key, value)
+            await self.session.commit()
+            await self.session.refresh(profile)
+            return profile
+        return None
+
+    async def delete_by_athlete_id(self, athlete_id: uuid.UUID) -> bool:
+        profile = await self.get_by_athlete_id(athlete_id)
+        if profile:
+            await self.session.delete(profile)
+            await self.session.commit()
+            return True
+        return False

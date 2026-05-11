@@ -48,22 +48,6 @@ async def get_fitness(
     return FitnessResponse.model_validate(fitness)
 
 
-@router.get("/athletes/{athlete_id}/fitness", response_model=FitnessListResponse)
-async def list_athlete_fitness(
-    athlete_id: UUID,
-    params: FitnessListParams = Depends(),
-    service: FitnessService = Depends(get_fitness_service),
-):
-    fitness_records = await service.list_athlete_fitness(athlete_id, params)
-
-    total = await service.count_by_athlete(athlete_id)
-
-    return FitnessListResponse(
-        items=[FitnessResponse.model_validate(f) for f in fitness_records],
-        total=total,
-    )
-
-
 @router.patch("/{fitness_id}", response_model=FitnessResponse)
 async def update_fitness(
     fitness_id: UUID,

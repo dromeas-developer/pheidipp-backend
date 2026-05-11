@@ -48,15 +48,16 @@ class PhysiologyRepository(BaseRepository[AthletePhysiology]):
         effective_to: Optional[date],
         exclude_id: Optional[uuid.UUID] = None,
     ) -> bool:
-        stmt = (
-            select(self.model.id)
-            .where(
-                self.model.athlete_id == athlete_id,
-                self.model.effective_from <= effective_to,
-                (self.model.effective_to.is_(None))
-                | (self.model.effective_to >= effective_from),
-            )
-        )
+        conditions = [
+            self.model.athlete_id == athlete_id,
+            # Existing record overlaps if its end is after (or open-ended relative to) new start
+            (self.model.effective_to.is_(None)) | (self.model.effective_to >= effective_from),
+        ]
+        # Only constrain by new record's end if it isn't open-ended
+        if effective_to is not None:
+            conditions.append(self.model.effective_from <= effective_to)
+
+        stmt = select(self.model.id).where(*conditions)
         if exclude_id:
             stmt = stmt.where(self.model.id != exclude_id)
 

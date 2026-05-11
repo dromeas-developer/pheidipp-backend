@@ -14,20 +14,6 @@ class WellnessRepository(BaseRepository[AthleteWellness]):
     def __init__(self, session: AsyncSession):
         super().__init__(session, AthleteWellness)
 
-    async def get_by_id(self, wellness_id: UUID) -> Optional[AthleteWellness]:
-        return await super().get_by_id(wellness_id)
-
-    async def update_by_id(self, wellness_id: UUID, **kwargs) -> Optional[AthleteWellness]:
-        return await super().update(wellness_id, **kwargs)
-
-    async def delete_by_id(self, wellness_id: UUID) -> bool:
-        existing = await self.get_by_id(wellness_id)
-        if not existing:
-            return False
-        self.session.delete(existing)
-        await self.session.commit()
-        return True
-
     async def get_by_athlete_date(
         self, athlete_id: UUID, metric_date: date
     ) -> Optional[AthleteWellness]:
@@ -60,7 +46,7 @@ class WellnessRepository(BaseRepository[AthleteWellness]):
         result = await self.session.execute(query)
         return list(result.scalars().all())
 
-    async def update(
+    async def update_by_athlete_date(
         self, athlete_id: UUID, metric_date: date, **kwargs
     ) -> Optional[AthleteWellness]:
         """Update wellness record by composite key (athlete_id, metric_date)."""
@@ -80,7 +66,7 @@ class WellnessRepository(BaseRepository[AthleteWellness]):
         existing = await self.get_by_athlete_date(athlete_id, metric_date)
         if not existing:
             return False
-        self.session.delete(existing)
+        await self.session.delete(existing)
         await self.session.commit()
         return True
 

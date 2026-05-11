@@ -1,5 +1,5 @@
 ---
-model: litellm-proxy/ollama/qwen3-coder-next
+model: opencode/minimax-m2.5-free
 temperature: 0.1
 permission:
   task:

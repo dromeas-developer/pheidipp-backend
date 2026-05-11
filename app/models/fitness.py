@@ -17,7 +17,7 @@ from sqlalchemy import UniqueConstraint as UC
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
-from app.models.enums import WellnessSource
+from app.models.enums import DataSource
 
 if TYPE_CHECKING:
     from app.models.athlete import Athlete
@@ -45,8 +45,8 @@ class AthleteFitness(Base):
     atl: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     ctl: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     tsb: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    source: Mapped[WellnessSource] = mapped_column(
-        SAEnum(WellnessSource, native_enum=False, length=20),
+    source: Mapped[DataSource] = mapped_column(
+        SAEnum(DataSource, native_enum=False, length=20),
         nullable=False,
     )
     created_at: Mapped[datetime] = mapped_column(

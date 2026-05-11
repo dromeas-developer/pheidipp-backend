@@ -1,6 +1,6 @@
 ---
-model: litellm-proxy/mistral/mistral-medium-engineer
-temperature: 0.3
+model: litellm-proxy/openrouter/gpt-oss-120b
+temperature: 0.2
 permission:
   task:
     "*": "deny"

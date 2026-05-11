@@ -18,7 +18,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import Index
 
 from app.db.base import Base
-from app.models.enums import WellnessSource
+from app.models.enums import DataSource
 
 if TYPE_CHECKING:
     from app.models.athlete import Athlete
@@ -42,10 +42,10 @@ class AthletePhysiology(Base):
     lt2: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     vo2_max: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     max_hr: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    source: Mapped[WellnessSource] = mapped_column(
-        SAEnum(WellnessSource, native_enum=False, length=20),
+    source: Mapped[DataSource] = mapped_column(
+        SAEnum(DataSource, native_enum=False, length=20),
         nullable=False,
-        default=WellnessSource.MANUAL,
+        default=DataSource.MANUAL,
     )
     effective_from: Mapped[date] = mapped_column(
         Date,

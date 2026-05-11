@@ -4,7 +4,7 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.enums import WellnessSource
+from app.models.enums import DataSource
 
 
 class FitnessBase(BaseModel):
@@ -13,7 +13,7 @@ class FitnessBase(BaseModel):
     atl: Optional[float] = None
     ctl: Optional[float] = None
     tsb: Optional[float] = None
-    source: WellnessSource
+    source: DataSource = DataSource.MANUAL
 
 
 class FitnessCreate(FitnessBase):
@@ -26,7 +26,7 @@ class FitnessUpdate(FitnessBase):
     atl: Optional[float] = None
     ctl: Optional[float] = None
     tsb: Optional[float] = None
-    source: Optional[WellnessSource] = None
+    source: Optional[DataSource] = None
 
 
 class FitnessResponse(FitnessBase):

@@ -49,22 +49,6 @@ async def get_wellness(
     return WellnessResponse.model_validate(wellness)
 
 
-@router.get("/athletes/{athlete_id}/wellness", response_model=WellnessListResponse)
-async def list_athlete_wellness(
-    athlete_id: UUID,
-    params: WellnessListParams = Depends(),
-    service: WellnessService = Depends(get_wellness_service),
-):
-    wellness_records = await service.list_athlete_wellness(athlete_id, params)
-
-    total = await service.count_by_athlete(athlete_id)
-
-    return WellnessListResponse(
-        items=[WellnessResponse.model_validate(w) for w in wellness_records],
-        total=total,
-    )
-
-
 @router.patch("/{wellness_id}", response_model=WellnessResponse)
 async def update_wellness(
     wellness_id: UUID,

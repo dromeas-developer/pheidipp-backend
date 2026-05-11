@@ -46,7 +46,7 @@ class BaseRepository(Generic[ModelType]):
     async def delete(self, id: Union[int, UUID]) -> bool:
         instance = await self.get_by_id(id)
         if instance:
-            self.session.delete(instance)
+            await self.session.delete(instance)
             await self.session.commit()
             return True
         return False

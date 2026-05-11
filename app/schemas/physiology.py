@@ -4,7 +4,7 @@ from typing import Optional
 
 from pydantic import ConfigDict, BaseModel
 
-from app.models.enums import WellnessSource
+from app.models.enums import DataSource
 
 
 class AthletePhysiologyBase(BaseModel):
@@ -13,7 +13,7 @@ class AthletePhysiologyBase(BaseModel):
     lt2: Optional[int] = None
     vo2_max: Optional[float] = None
     max_hr: Optional[int] = None
-    source: WellnessSource = WellnessSource.MANUAL
+    source: DataSource = DataSource.MANUAL
     effective_from: date
     effective_to: Optional[date] = None
 
@@ -28,7 +28,7 @@ class AthletePhysiologyUpdate(BaseModel):
     lt2: Optional[int] = None
     vo2_max: Optional[float] = None
     max_hr: Optional[int] = None
-    source: Optional[WellnessSource] = None
+    source: Optional[DataSource] = None
     effective_from: Optional[date] = None
     effective_to: Optional[date] = None
 

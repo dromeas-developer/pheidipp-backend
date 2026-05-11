@@ -1,3 +1,5 @@
+from unittest import result
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -27,7 +29,7 @@ class AthleteService:
 
     async def create_athlete(self, data: AthleteCreate) -> Athlete:
         athlete_data = data.model_dump(exclude_unset=True)
-        if "password" in athlete_data:
+        if athlete_data.get("password"):
             athlete_data["hashed_password"] = hash_password(athlete_data["password"])
             del athlete_data["password"]
         return await self.athlete_repo.create(**athlete_data)
@@ -57,7 +59,10 @@ class AthleteService:
         existing_profile = await self.profile_repo.get_by_athlete_id(athlete_id)
         profile_data = data.model_dump(exclude_unset=True)
         if existing_profile:
-            return await self.profile_repo.update(existing_profile.athlete_id, **profile_data)
+            result = await self.profile_repo.update_by_athlete_id(athlete_id, **profile_data)
+            if result is None:
+                raise RuntimeError(f"Profile unexpectedly missing for athlete {athlete_id}")
+            return result
         else:
             profile_data["athlete_id"] = athlete_id
             return await self.profile_repo.create(**profile_data)

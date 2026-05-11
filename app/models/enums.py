@@ -480,6 +480,16 @@ class WellnessSource(str, enum.Enum):
     POLAR = "polar"
 
 
+class DataSource(str, enum.Enum):
+    MANUAL = "manual"
+    LAB_TEST = "lab_test"
+    ESTIMATED = "estimated"
+    GARMIN = "garmin"
+    COROS = "coros"
+    POLAR = "polar"
+    INTERVALS_ICU = "intervals_icu"
+
+
 class Timezone(str, enum.Enum):
     Africa_Abidjan = "Africa/Abidjan"
     Africa_Accra = "Africa/Accra"

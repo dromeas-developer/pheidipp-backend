@@ -1,5 +1,6 @@
 ---
-model: litellm-proxy/mistral/mistral-medium-engineer
+model: opencode/minimax-m2.5-free
+temperature: 0.15
 permission:
   task:
     "*": "deny"

@@ -20,6 +20,103 @@ from app.main import app
 
 
 # ============================================================================
+# Test Database Fixtures (PostgreSQL via docker-compose)
+# ============================================================================
+
+
+@pytest.fixture(scope="session")
+def test_db_connection_url():
+    """Get the PostgreSQL connection URL for tests."""
+    import os
+
+    # Use test_pheidipp database for isolation from development data
+    return os.getenv(
+        "TEST_DATABASE_URL",
+        "postgresql+asyncpg://postgres:postgres@db:5432/test_pheidipp"
+    )
+
+
+@pytest.fixture(scope="session")
+def test_db_engine(test_db_connection_url):
+    """Create an async SQLAlchemy engine for the test database."""
+    import asyncio
+    from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+    from sqlalchemy.pool import NullPool
+
+    engine: AsyncEngine = create_async_engine(
+        test_db_connection_url,
+        echo=False,
+        poolclass=NullPool,  # Each session gets a fresh connection
+    )
+
+    # Import Base to ensure models are registered
+    from app.db.base import Base
+
+    # Create all tables once per session
+    async def _init_db():
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+
+    # Get or create an event loop for the session
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+    loop.run_until_complete(_init_db())
+
+    yield engine
+
+    async def _dispose():
+        await engine.dispose()
+
+    loop.run_until_complete(_dispose())
+
+
+@pytest.fixture
+async def test_db_session(test_db_engine):
+    """Create an async session for each test."""
+    from sqlalchemy.ext.asyncio import AsyncSession
+    from sqlalchemy.orm import sessionmaker
+
+    session_factory = sessionmaker(
+        test_db_engine, class_=AsyncSession, expire_on_commit=False
+    )
+
+    session = session_factory()
+    try:
+        yield session
+    finally:
+        await session.close()
+
+
+@pytest.fixture(autouse=True)
+async def clean_db_tables(test_db_engine):
+    """Clean all test tables before each test for isolation within the test DB."""
+    from app.db.base import Base
+    from sqlalchemy import delete
+    from sqlalchemy.ext.asyncio import AsyncSession
+    from sqlalchemy.orm import sessionmaker
+
+    # Get all table objects from Base.metadata
+    tables = list(Base.metadata.tables.values())
+
+    # Create a fresh session for cleanup
+    session_factory = sessionmaker(
+        test_db_engine, class_=AsyncSession, expire_on_commit=False
+    )
+
+    async with session_factory() as session:
+        # Delete all data from each table in reverse dependency order
+        for table in reversed(tables):
+            await session.execute(delete(table))
+        await session.commit()
+
+    yield
+
+
+# ============================================================================
 # Fixtures for FastAPI Application
 # ============================================================================
 

@@ -1,14 +1,14 @@
 # dynamic-context
 
 ## Alembic Head
-`76e28f218e05 (head)`
+`25743a77ba54 (head)`
 
 ## Recent Migrations
+  - `25743a77` — add planned workout id and notes to 
+  - `b6c3c84a` — alter athlete profile country language
+  - `7107ac5c` — alter athlete profile timezone
   - `76e28f21` — add athlete fitness table
-  - `34a49b09` — check
   - `16dd8b55` — add athlete physiology table
-  - `34434d79` — add athlete wellness hypertable
-  - `29c40204` — add activities table
 
 ## Database Schema
 
@@ -33,6 +33,8 @@
   - `elevation_loss_meters` FLOAT
   - `calories` INTEGER
   - `source` VARCHAR(50)
+  - `planned_workout_id` UUID
+  - `notes` TEXT
   - `created_at` DATETIME `[NOT NULL]`
   - `updated_at` DATETIME `[NOT NULL]`
 
@@ -69,8 +71,8 @@
   - `display_name` VARCHAR(100)
   - `date_of_birth` DATE
   - `gender` VARCHAR(20)
-  - `country_code` VARCHAR(5)
-  - `timezone` VARCHAR(50)
+  - `country_code` VARCHAR(2)
+  - `timezone` VARCHAR(100)
   - `language_code` VARCHAR(5)
   - `unit_preference` VARCHAR(20) `[NOT NULL]`
   - `created_at` DATETIME `[NOT NULL]`
@@ -127,7 +129,6 @@
   - DELETE /{physiology_id} → `app/api/routes/physiology.py:delete_physiology`
   - POST / → `app/api/routes/fitness.py:create_fitness`
   - GET /{fitness_id} → `app/api/routes/fitness.py:get_fitness`
-  - GET /athletes/{athlete_id}/fitness → `app/api/routes/fitness.py:list_athlete_fitness`
   - PATCH /{fitness_id} → `app/api/routes/fitness.py:update_fitness`
   - DELETE /{fitness_id} → `app/api/routes/fitness.py:delete_fitness`
   - POST / → `app/api/routes/athletes.py:create_athlete`
@@ -135,16 +136,17 @@
   - PATCH /{athlete_id} → `app/api/routes/athletes.py:update_athlete`
   - PUT /{athlete_id}/profile → `app/api/routes/athletes.py:upsert_profile`
   - GET /{athlete_id}/profile → `app/api/routes/athletes.py:get_profile`
+  - GET /{athlete_id}/activities → `app/api/routes/athletes.py:list_athlete_activities`
+  - GET /{athlete_id}/wellness → `app/api/routes/athletes.py:list_athlete_wellness`
+  - GET /{athlete_id}/fitness → `app/api/routes/athletes.py:list_athlete_fitness`
   - POST / → `app/api/routes/wellness.py:create_wellness`
   - GET /{wellness_id} → `app/api/routes/wellness.py:get_wellness`
-  - GET /athletes/{athlete_id}/wellness → `app/api/routes/wellness.py:list_athlete_wellness`
   - PATCH /{wellness_id} → `app/api/routes/wellness.py:update_wellness`
   - DELETE /{wellness_id} → `app/api/routes/wellness.py:delete_wellness`
   - GET /live → `app/api/routes/health.py:live`
   - GET /ready → `app/api/routes/health.py:ready`
   - POST / → `app/api/routes/activities.py:create_activity`
   - GET /{activity_id} → `app/api/routes/activities.py:get_activity`
-  - GET /athletes/{athlete_id}/activities → `app/api/routes/activities.py:list_athlete_activities`
   - PATCH /{activity_id} → `app/api/routes/activities.py:update_activity`
   - DELETE /{activity_id} → `app/api/routes/activities.py:delete_activity`
 

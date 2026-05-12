@@ -56,3 +56,62 @@ class DataSource(str, enum.Enum):
     COROS = "coros"
     POLAR = "polar"
     INTERVALS_ICU = "intervals_icu"
+
+
+class GoalType(str, enum.Enum):
+    RACE = "race"
+    FITNESS_IMPROVEMENT = "fitness_improvement"
+    MAINTENANCE = "maintenance"
+    RECOVERY = "recovery"
+
+
+class GoalEventType(str, enum.Enum):
+    K5 = "5k"
+    K10 = "10k"
+    HALF_MARATHON = "half_marathon"
+    MARATHON = "marathon"
+    ULTRA = "ultra"
+    CUSTOM = "custom"
+
+
+class SportBackground(str, enum.Enum):
+    RUNNING_PRIMARY = "running_primary"
+    CYCLING_CROSSOVER = "cycling_crossover"
+    SWIMMING_CROSSOVER = "swimming_crossover"
+    MULTI_SPORT = "multi_sport"
+    OTHER = "other"
+
+
+class TrainingTimeOfDay(str, enum.Enum):
+    MORNING = "morning"
+    AFTERNOON = "afternoon"
+    MIXED = "mixed"
+
+
+class GpsSource(str, enum.Enum):
+    NONE = "none"
+    PHONE = "phone"
+    WATCH = "watch"
+
+
+class HrSource(str, enum.Enum):
+    NONE = "none"
+    WRIST_OPTICAL = "wrist_optical"
+    CHEST_STRAP = "chest_strap"
+
+
+class PowerSource(str, enum.Enum):
+    NONE = "none"
+    RUNNING_POWER = "running_power"
+
+
+class PrimaryTrainingPlatform(str, enum.Enum):
+    UNKNOWN = "unknown"
+    GARMIN_CONNECT = "garmin_connect"
+    COROS = "coros"
+    POLAR_FLOW = "polar_flow"
+    SUUNTO = "suunto"
+    INTERVALS_ICU = "intervals_icu"
+    STRAVA = "strava"
+    TRAININGPEAKS = "trainingpeaks"
+    OTHER = "other"

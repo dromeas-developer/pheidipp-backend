@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     from app.models.physiology import AthletePhysiology
     from app.models.wellness import AthleteWellness
     from app.models.fitness import AthleteFitness
+    from app.models.training_preferences import TrainingPreferences
 
 
 class Athlete(Base):
@@ -76,6 +77,10 @@ class Athlete(Base):
         cascade="all, delete-orphan",
     )
     fitness_metrics: Mapped[list["AthleteFitness"]] = relationship(
+        back_populates="athlete",
+        cascade="all, delete-orphan",
+    )
+    training_preferences_versions: Mapped[list["TrainingPreferences"]] = relationship(
         back_populates="athlete",
         cascade="all, delete-orphan",
     )

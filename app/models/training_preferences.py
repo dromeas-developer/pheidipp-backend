@@ -9,6 +9,7 @@ from sqlalchemy import (
     Date,
     Float,
     Integer,
+    Boolean,
     ForeignKey,
     text,
     func,
@@ -70,7 +71,7 @@ class TrainingPreferences(Base):
     sport_background: Mapped[Optional[SportBackground]] = mapped_column(
         SAEnum(SportBackground, native_enum=False, length=20),
     )
-    recent_injury: Mapped[Optional[bool]]
+    recent_injury: Mapped[Optional[bool]] = mapped_column(Boolean)
     weekly_schedule: Mapped[Optional[dict]] = mapped_column(JSONB)
     gps_source: Mapped[Optional[GpsSource]] = mapped_column(
         SAEnum(GpsSource, native_enum=False, length=20),

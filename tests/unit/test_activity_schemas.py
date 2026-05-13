@@ -254,3 +254,110 @@ def test_activity_list_response_valid():
     assert response.total == 1
     assert len(response.items) == 1
     assert response.items[0].title == "Morning Run"
+
+
+# ============================================================================
+# ActivityListParams Validation Tests
+# ============================================================================
+
+
+def test_activity_list_params_rejects_invalid_limit():
+    """Verify invalid pagination limits fail."""
+    # Test limit above maximum (1000)
+    with pytest.raises(ValidationError) as exc_info:
+        ActivityListParams.model_validate({
+            "limit": 1001,
+        })
+    assert "limit" in str(exc_info.value)
+
+    # Test limit below minimum (1)
+    with pytest.raises(ValidationError) as exc_info:
+        ActivityListParams.model_validate({
+            "limit": 0,
+        })
+    assert "limit" in str(exc_info.value)
+
+    # Test negative limit
+    with pytest.raises(ValidationError) as exc_info:
+        ActivityListParams.model_validate({
+            "limit": -1,
+        })
+    assert "limit" in str(exc_info.value)
+
+
+def test_activity_list_params_rejects_negative_offset():
+    """Verify negative offsets fail."""
+    with pytest.raises(ValidationError) as exc_info:
+        ActivityListParams.model_validate({
+            "offset": -1,
+        })
+    assert "offset" in str(exc_info.value)
+
+    with pytest.raises(ValidationError) as exc_info:
+        ActivityListParams.model_validate({
+            "offset": -100,
+        })
+    assert "offset" in str(exc_info.value)
+
+
+def test_activity_list_params_accepts_valid_boundaries():
+    """Verify valid boundary values are accepted."""
+    # Test minimum valid limit
+    params = ActivityListParams.model_validate({"limit": 1})
+    assert params.limit == 1
+
+    # Test maximum valid limit
+    params = ActivityListParams.model_validate({"limit": 1000})
+    assert params.limit == 1000
+
+    # Test minimum valid offset
+    params = ActivityListParams.model_validate({"offset": 0})
+    assert params.offset == 0
+
+
+# ============================================================================
+# ActivityCreate Validation Tests
+# ============================================================================
+
+
+def test_activity_create_requires_mandatory_fields():
+    """Verify required activity fields are enforced."""
+    # Test missing athlete_id
+    with pytest.raises(ValidationError) as exc_info:
+        ActivityCreate.model_validate({
+            "activity_type": "running",
+            "title": "Morning Run",
+        })
+    assert "athlete_id" in str(exc_info.value)
+
+    # Test with empty athlete_id
+    with pytest.raises(ValidationError) as exc_info:
+        ActivityCreate.model_validate({
+            "athlete_id": None,
+            "activity_type": "running",
+        })
+    assert "athlete_id" in str(exc_info.value)
+
+
+def test_activity_create_with_valid_athlete_id():
+    """Verify ActivityCreate accepts valid athlete_id."""
+    data = {
+        "athlete_id": uuid.uuid4(),
+        "activity_type": "running",
+        "title": "Morning Run",
+    }
+
+    activity = ActivityCreate.model_validate(data)
+    assert activity.athlete_id == data["athlete_id"]
+    assert activity.activity_type == ActivityType.RUNNING
+    assert activity.title == "Morning Run"
+
+
+def test_activity_create_rejects_invalid_activity_type():
+    """Verify invalid activity_type enum fails validation."""
+    with pytest.raises(ValidationError) as exc_info:
+        ActivityCreate.model_validate({
+            "athlete_id": uuid.uuid4(),
+            "activity_type": "invalid_activity",
+        })
+    assert "activity_type" in str(exc_info.value)

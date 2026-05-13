@@ -36,21 +36,6 @@ async def get_training_preferences(
     return TrainingPreferencesResponse.model_validate(pref)
 
 
-@router.patch("/{pref_id}", response_model=TrainingPreferencesResponse)
-async def update_training_preferences(
-    pref_id: UUID,
-    payload: TrainingPreferencesUpdate,
-    service: TrainingPreferencesService = Depends(get_service),
-):
-    pref = await service.update(pref_id, payload)
-    if not pref:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Training preferences not found",
-        )
-    return TrainingPreferencesResponse.model_validate(pref)
-
-
 @router.delete("/{pref_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_training_preferences(
     pref_id: UUID,

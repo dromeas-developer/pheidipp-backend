@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Optional
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -98,5 +99,16 @@ class ActivityService:
     async def delete_activity(self, activity_id: UUID) -> bool:
         return await self.activity_repo.delete(activity_id)
 
-    async def count_by_athlete(self, athlete_id: UUID) -> int:
-        return await self.activity_repo.count_by_athlete(athlete_id)
+    async def count_by_athlete(
+        self,
+        athlete_id: UUID,
+        activity_type: Optional[ActivityType] = None,
+        date_from: Optional[datetime] = None,
+        date_to: Optional[datetime] = None,
+    ) -> int:
+        return await self.activity_repo.count_by_athlete(
+            athlete_id,
+            activity_type=activity_type,
+            date_from=date_from,
+            date_to=date_to,
+        )

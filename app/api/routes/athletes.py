@@ -154,7 +154,12 @@ async def list_athlete_activities(
     service: ActivityService = Depends(get_activity_service),
 ):
     activities = await service.list_athlete_activities(athlete_id, params)
-    total = await service.count_by_athlete(athlete_id)
+    total = await service.count_by_athlete(
+        athlete_id,
+        activity_type=params.activity_type,
+        date_from=params.date_from,
+        date_to=params.date_to,
+    )
     return ActivityListResponse(
         items=[ActivityResponse.model_validate(a) for a in activities],
         total=total,
@@ -189,7 +194,7 @@ async def list_athlete_fitness(
     )
 
 
-@router.post("/{athlete_id}/training-preferences", response_model=TrainingPreferencesResponse)
+@router.post("/{athlete_id}/training-preferences", response_model=TrainingPreferencesResponse, status_code=201)
 async def create_training_preferences(
     athlete_id: UUID,
     payload: TrainingPreferencesCreate,

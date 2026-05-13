@@ -17,6 +17,25 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from app.main import app
+from app.db import session as db_session
+
+
+# ============================================================================
+# Override get_db to use test engine
+# ============================================================================
+
+def override_get_db(test_engine):
+    """Override get_db to use the test engine."""
+    from sqlalchemy.ext.asyncio import AsyncSession
+    from sqlalchemy.orm import sessionmaker
+
+    async def _get_db():
+        session_factory = sessionmaker(
+            test_engine, class_=AsyncSession, expire_on_commit=False
+        )
+        async with session_factory() as session:
+            yield session
+    return _get_db
 
 
 # ============================================================================
@@ -65,7 +84,21 @@ def test_db_engine(test_db_connection_url):
         poolclass=NullPool,  # Each session gets a fresh connection
     )
 
+    # Override the get_db dependency in the app to use the test engine
+    from app.api.routes import athletes, activities, physiology, wellness, training_preferences, fitness, health
+    from app.db.session import get_db
+
+    # Override get_db for all route modules
+    for route_module in [athletes, activities, physiology, wellness, training_preferences, fitness, health]:
+        route_module.get_db = override_get_db(engine)
+
+    # Also override in the main app's dependency overrides
+    app.dependency_overrides[get_db] = override_get_db(engine)
+
     yield engine
+
+    # Clean up dependency overrides
+    app.dependency_overrides.clear()
 
     async def _dispose():
         await engine.dispose()
@@ -90,11 +123,11 @@ async def test_db_session(test_db_engine):
         test_db_engine, class_=AsyncSession, expire_on_commit=False
     )
 
-    session = session_factory()
-    try:
-        yield session
-    finally:
-        await session.close()
+    async with session_factory() as session:
+        try:
+            yield session
+        finally:
+            await session.close()
 
 
 @pytest.fixture(autouse=True)
@@ -119,7 +152,14 @@ async def clean_db_tables(test_db_engine):
             await session.execute(delete(table))
         await session.commit()
 
+    # Yield to allow test to run
     yield
+
+    # Cleanup after test as well
+    async with session_factory() as session:
+        for table in reversed(tables):
+            await session.execute(delete(table))
+        await session.commit()
 
 
 # ============================================================================
@@ -136,7 +176,8 @@ def app_fixture() -> FastAPI:
 @pytest.fixture
 async def client(app: FastAPI) -> AsyncClient:
     """Fixture to create an httpx AsyncClient for testing."""
-    async with AsyncClient(app=app, base_url="http://testserver") as client:
+    from httpx import ASGITransport
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as client:
         yield client
 
 

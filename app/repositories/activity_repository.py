@@ -41,8 +41,23 @@ class ActivityRepository(BaseRepository[Activity]):
         result = await self.session.execute(query)
         return list(result.scalars().all())
 
-    async def count_by_athlete(self, athlete_id: UUID) -> int:
-        result = await self.session.execute(
-            select(func.count()).where(self.model.athlete_id == athlete_id)
-        )
+    async def count_by_athlete(
+        self,
+        athlete_id: UUID,
+        activity_type: Optional[ActivityType] = None,
+        date_from: Optional[datetime] = None,
+        date_to: Optional[datetime] = None,
+    ) -> int:
+        query = select(func.count()).where(self.model.athlete_id == athlete_id)
+
+        if activity_type is not None:
+            query = query.where(self.model.activity_type == activity_type)
+
+        if date_from is not None:
+            query = query.where(self.model.started_at >= date_from)
+
+        if date_to is not None:
+            query = query.where(self.model.started_at <= date_to)
+
+        result = await self.session.execute(query)
         return result.scalar_one()

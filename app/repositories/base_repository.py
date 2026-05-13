@@ -24,7 +24,7 @@ class BaseRepository(Generic[ModelType]):
         self, id: Union[int, UUID]
     ) -> Optional[ModelType]:
         result = await self.session.execute(
-            select(self.model).where(self.model.id == id)
+            select(self.model).where(getattr(self.model, "id") == id)
         )
         return result.scalar_one_or_none()
 

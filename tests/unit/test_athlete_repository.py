@@ -4,9 +4,11 @@ import uuid
 
 import pytest
 
-from app.models.athlete import Athlete, AthleteProfile
+from app.models.athlete import Athlete
+from app.models.athlete_profile import AthleteProfile
 from app.models.enums import AthleteStatus, Gender, UnitPreference
-from app.repositories.athlete_repository import AthleteRepository, AthleteProfileRepository
+from app.repositories.athlete_repository import AthleteRepository
+from app.repositories.athlete_profile_repository import AthleteProfileRepository
 
 
 @pytest.fixture

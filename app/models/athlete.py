@@ -1,13 +1,11 @@
 import uuid
-from datetime import date, datetime
+from datetime import  datetime
 from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import (
     UUID,
     String,
     DateTime,
-    Date,
-    ForeignKey,
     Enum as SAEnum,
     text,
     func,
@@ -15,17 +13,17 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
-from app.models.enums import (
-    AthleteStatus,
-    Gender,
-    UnitPreference,
-)
+from app.models.enums import AthleteStatus
 
 if TYPE_CHECKING:
+    from app.models.athlete_profile import AthleteProfile
     from app.models.activity import Activity
     from app.models.physiology import AthletePhysiology
     from app.models.wellness import AthleteWellness
     from app.models.fitness import AthleteFitness
+    from app.models.athlete_preferences import AthletePreferences
+    from app.models.training_block import TrainingBlock
+
 
 
 class Athlete(Base):
@@ -59,10 +57,10 @@ class Athlete(Base):
         server_default=func.now(),
         onupdate=func.now(),
     )
-
     profile: Mapped[Optional["AthleteProfile"]] = relationship(
         back_populates="athlete",
         uselist=False,
+        cascade="all, delete-orphan",
     )
     activities: Mapped[list["Activity"]] = relationship(
         back_populates="athlete",
@@ -79,36 +77,13 @@ class Athlete(Base):
         back_populates="athlete",
         cascade="all, delete-orphan",
     )
-    
-class AthleteProfile(Base):
-    __tablename__ = "athlete_profiles"
-
-    athlete_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("athletes.id", ondelete="CASCADE"),
-        primary_key=True,
+    preferences: Mapped[Optional["AthletePreferences"]] = relationship(
+        back_populates="athlete",
+        uselist=False,
+        cascade="all, delete-orphan",
     )
-    first_name: Mapped[Optional[str]] = mapped_column(String(100))
-    last_name: Mapped[Optional[str]] = mapped_column(String(100))
-    display_name: Mapped[Optional[str]] = mapped_column(String(100))
-    date_of_birth: Mapped[Optional[date]] = mapped_column(Date)
-    gender: Mapped[Optional[Gender]] = mapped_column(
-        SAEnum(Gender, native_enum=False, length=20)
+    training_blocks: Mapped[list["TrainingBlock"]] = relationship(
+        back_populates="athlete",
+        cascade="all, delete-orphan",
+        order_by="TrainingBlock.created_at.desc()",
     )
-    country_code: Mapped[Optional[str]] = mapped_column(String(2))
-    timezone: Mapped[Optional[str]] = mapped_column(String(100))
-    language_code: Mapped[Optional[str]] = mapped_column(String(5))
-    unit_preference: Mapped[UnitPreference] = mapped_column(
-        SAEnum(UnitPreference, native_enum=False, length=20),
-        default=UnitPreference.METRIC,
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        onupdate=func.now(),
-    )
-
-    athlete: Mapped["Athlete"] = relationship(back_populates="profile")

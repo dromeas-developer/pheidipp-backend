@@ -17,6 +17,8 @@ from app.schemas.athlete import (
     AthleteCreate,
     AthleteUpdate,
     AthleteResponse,
+)
+from app.schemas.athlete_profile import (
     AthleteProfileBase,
     AthleteProfileCreate,
     AthleteProfileUpdate,

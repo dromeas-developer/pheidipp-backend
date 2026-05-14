@@ -5,7 +5,6 @@ from datetime import date
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
-from app.db.base import Base
 from app.models.fitness import AthleteFitness
 from app.repositories.base_repository import BaseRepository
 

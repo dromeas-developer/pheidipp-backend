@@ -3,15 +3,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 
 from app.db.session import get_db
-from app.repositories.athlete_repository import (
-    AthleteRepository,
-    AthleteProfileRepository,
-)
+from app.repositories.athlete_repository import AthleteRepository
 from app.services.athlete_service import AthleteService
 from app.schemas.athlete import (
     AthleteCreate,
     AthleteUpdate,
     AthleteResponse,
+)
+from app.repositories.athlete_profile_repository import AthleteProfileRepository
+from app.services.athlete_profile_service import AthleteProfileService
+from app.schemas.athlete_profile import (
     AthleteProfileUpdate,
     AthleteProfileResponse,
     AthleteWithProfileResponse,
@@ -37,7 +38,12 @@ from app.schemas.fitness import (
     FitnessListResponse,
     FitnessResponse,
 )
-
+from app.repositories.athlete_preferences_repository import AthletePreferencesRepository
+from app.services.athlete_preferences_service import AthletePreferencesService
+from app.schemas.athlete_preferences import AthletePreferencesResponse
+from app.repositories.training_block_repository import TrainingBlockRepository
+from app.services.training_block_service import TrainingBlockService
+from app.schemas.training_block import TrainingBlockResponse
 
 router = APIRouter(prefix="/athletes", tags=["athletes"])
 
@@ -48,8 +54,7 @@ async def create_athlete(
     db: AsyncSession = Depends(get_db),
 ):
     athlete_repo = AthleteRepository(db)
-    profile_repo = AthleteProfileRepository(db)
-    service = AthleteService(athlete_repo, profile_repo)
+    service = AthleteService(athlete_repo)
     athlete = await service.create_athlete(payload)
     return AthleteResponse.model_validate(athlete)
 
@@ -60,8 +65,7 @@ async def get_athlete(
     db: AsyncSession = Depends(get_db),
 ):
     athlete_repo = AthleteRepository(db)
-    profile_repo = AthleteProfileRepository(db)
-    service = AthleteService(athlete_repo, profile_repo)
+    service = AthleteService(athlete_repo)
     athlete = await service.get_athlete_with_profile(athlete_id)
     if not athlete:
         raise HTTPException(status_code=404, detail="Athlete not found")
@@ -75,8 +79,7 @@ async def update_athlete(
     db: AsyncSession = Depends(get_db),
 ):
     athlete_repo = AthleteRepository(db)
-    profile_repo = AthleteProfileRepository(db)
-    service = AthleteService(athlete_repo, profile_repo)
+    service = AthleteService(athlete_repo)
     athlete = await service.update_athlete(athlete_id, payload)
     if not athlete:
         raise HTTPException(status_code=404, detail="Athlete not found")
@@ -89,9 +92,8 @@ async def upsert_profile(
     payload: AthleteProfileUpdate,
     db: AsyncSession = Depends(get_db),
 ):
-    athlete_repo = AthleteRepository(db)
     profile_repo = AthleteProfileRepository(db)
-    service = AthleteService(athlete_repo, profile_repo)
+    service = AthleteProfileService(profile_repo)
     profile = await service.upsert_profile(athlete_id, payload)
     return AthleteProfileResponse.model_validate(profile)
 
@@ -103,7 +105,7 @@ async def get_profile(
 ):
     athlete_repo = AthleteRepository(db)
     profile_repo = AthleteProfileRepository(db)
-    service = AthleteService(athlete_repo, profile_repo)
+    service = AthleteProfileService(profile_repo)
     profile = await service.get_profile(athlete_id)
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
@@ -179,3 +181,68 @@ async def list_athlete_fitness(
         items=[FitnessResponse.model_validate(f) for f in fitness_records],
         total=total,
     )
+
+
+def get_athlete_preferences_service(
+    db: AsyncSession = Depends(get_db),
+) -> AthletePreferencesService:
+    return AthletePreferencesService(AthletePreferencesRepository(db))
+
+
+@router.get(
+    "/{athlete_id}/preferences",
+    response_model=AthletePreferencesResponse,
+    summary="Get athlete preferences",
+)
+async def get_athlete_preferences(
+    athlete_id: UUID,
+    service: AthletePreferencesService = Depends(get_athlete_preferences_service),
+):
+    result = await service.get_by_athlete(athlete_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="No preferences found. Complete onboarding first.")
+    return result
+
+
+def get_training_block_service(
+    db: AsyncSession = Depends(get_db),
+) -> TrainingBlockService:
+    return TrainingBlockService(TrainingBlockRepository(db))
+
+
+@router.get(
+    "/{athlete_id}/training-blocks",
+    response_model=list[TrainingBlockResponse],
+    summary="List all training blocks",
+)
+async def list_training_blocks(
+    athlete_id: UUID,
+    service: TrainingBlockService = Depends(get_training_block_service),
+):
+    """Returns all blocks ordered by created_at DESC (active, completed, abandoned).
+    Returns an empty list if none exist."""
+    return await service.list_by_athlete(athlete_id)
+
+
+@router.get(
+    "/{athlete_id}/training-blocks/active",
+    response_model=TrainingBlockResponse,
+    summary="Get the current active training block",
+)
+async def get_active_training_block(
+    athlete_id: UUID,
+    service: TrainingBlockService = Depends(get_training_block_service),
+):
+    """
+    Returns the current active training block or 404.
+
+    Route ordering note: this endpoint must be registered before any future
+    /{athlete_id}/training-blocks/{block_id} route to prevent FastAPI matching
+    the literal string "active" as a block_id path parameter. Block-id endpoints
+    live on the separate /training-blocks router so this is not currently an
+    issue, but preserve the convention as the codebase grows.
+    """
+    result = await service.get_active_by_athlete(athlete_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="No active training block found for this athlete.")
+    return result

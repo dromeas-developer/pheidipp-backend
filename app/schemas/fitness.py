@@ -21,12 +21,7 @@ class FitnessCreate(FitnessBase):
 
 
 class FitnessUpdate(FitnessBase):
-    metric_date: Optional[date] = None
-    tss: Optional[float] = None
-    atl: Optional[float] = None
-    ctl: Optional[float] = None
-    tsb: Optional[float] = None
-    source: Optional[DataSource] = None
+    pass
 
 
 class FitnessResponse(FitnessBase):

@@ -7,10 +7,12 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from app.core.security import hash_password, verify_password
-from app.models.athlete import Athlete, AthleteProfile
+from app.models.athlete import Athlete
+from app.models.athlete_profile import AthleteProfile
 from app.models.enums import AthleteStatus, Gender, UnitPreference
-from app.schemas.athlete import AthleteCreate, AthleteUpdate, AthleteProfileUpdate
+from app.schemas.athlete import AthleteCreate, AthleteUpdate
 from app.services.athlete_service import AthleteService
+from app.services.athlete_profile_service import AthleteProfileService
 
 
 # Use valid ISO country code strings
@@ -30,19 +32,9 @@ def athlete_repo_mock():
 
 
 @pytest.fixture
-def profile_repo_mock():
-    """Fixture for mocking AthleteProfileRepository."""
-    mock = MagicMock()
-    mock.get_by_athlete_id = AsyncMock()
-    mock.create = AsyncMock()
-    mock.update = AsyncMock()
-    return mock
-
-
-@pytest.fixture
-def athlete_service(athlete_repo_mock, profile_repo_mock):
-    """Fixture for AthleteService with mocked repositories."""
-    return AthleteService(athlete_repo_mock, profile_repo_mock)
+def athlete_service(athlete_repo_mock):
+    """Fixture for AthleteService with mocked repository."""
+    return AthleteService(athlete_repo_mock)
 
 
 # ============================================================================
@@ -333,12 +325,28 @@ async def test_update_athlete_not_found(athlete_service, athlete_repo_mock):
 
 
 # ============================================================================
-# get_profile Tests
+# AthleteProfileService Tests
 # ============================================================================
 
 
+@pytest.fixture
+def profile_repo_mock():
+    """Fixture for mocking AthleteProfileRepository."""
+    mock = MagicMock()
+    mock.get_by_athlete_id = AsyncMock()
+    mock.create = AsyncMock()
+    mock.update_by_athlete_id = AsyncMock()
+    return mock
+
+
+@pytest.fixture
+def profile_service(profile_repo_mock):
+    """Fixture for AthleteProfileService with mocked repository."""
+    return AthleteProfileService(profile_repo_mock)
+
+
 @pytest.mark.asyncio
-async def test_get_profile(athlete_service, profile_repo_mock):
+async def test_get_profile(profile_service, profile_repo_mock):
     """Test successful profile retrieval."""
     athlete_id = uuid.uuid4()
     profile = AthleteProfile(
@@ -358,33 +366,30 @@ async def test_get_profile(athlete_service, profile_repo_mock):
 
     profile_repo_mock.get_by_athlete_id = AsyncMock(return_value=profile)
 
-    result = await athlete_service.get_profile(athlete_id)
+    result = await profile_service.get_profile(athlete_id)
 
     assert result == profile
     profile_repo_mock.get_by_athlete_id.assert_called_once_with(athlete_id)
 
 
 @pytest.mark.asyncio
-async def test_get_profile_not_found(athlete_service, profile_repo_mock):
+async def test_get_profile_not_found(profile_service, profile_repo_mock):
     """Test profile retrieval when profile does not exist."""
     athlete_id = uuid.uuid4()
 
     profile_repo_mock.get_by_athlete_id = AsyncMock(return_value=None)
 
-    result = await athlete_service.get_profile(athlete_id)
+    result = await profile_service.get_profile(athlete_id)
 
     assert result is None
     profile_repo_mock.get_by_athlete_id.assert_called_once_with(athlete_id)
 
 
-# ============================================================================
-# upsert_profile Tests
-# ============================================================================
-
-
 @pytest.mark.asyncio
-async def test_upsert_profile_create(athlete_service, profile_repo_mock):
+async def test_upsert_profile_create(profile_service, profile_repo_mock):
     """Test profile creation when profile does not exist."""
+    from app.schemas.athlete_profile import AthleteProfileUpdate
+
     athlete_id = uuid.uuid4()
     profile_data = AthleteProfileUpdate(
         first_name="John",
@@ -409,7 +414,7 @@ async def test_upsert_profile_create(athlete_service, profile_repo_mock):
         )
     )
 
-    result = await athlete_service.upsert_profile(athlete_id, profile_data)
+    result = await profile_service.upsert_profile(athlete_id, profile_data)
 
     assert result is not None
     assert result.athlete_id == athlete_id
@@ -420,8 +425,10 @@ async def test_upsert_profile_create(athlete_service, profile_repo_mock):
 
 
 @pytest.mark.asyncio
-async def test_upsert_profile_update(athlete_service, profile_repo_mock):
+async def test_upsert_profile_update(profile_service, profile_repo_mock):
     """Test profile update when profile exists."""
+    from app.schemas.athlete_profile import AthleteProfileUpdate
+
     athlete_id = uuid.uuid4()
     existing_profile = AthleteProfile(
         athlete_id=athlete_id,
@@ -460,7 +467,7 @@ async def test_upsert_profile_update(athlete_service, profile_repo_mock):
         first_name="John",
         last_name="Doe",
     )
-    result = await athlete_service.upsert_profile(athlete_id, profile_data)
+    result = await profile_service.upsert_profile(athlete_id, profile_data)
 
     assert result is not None
     assert result.athlete_id == athlete_id
@@ -470,3 +477,5 @@ async def test_upsert_profile_update(athlete_service, profile_repo_mock):
     profile_repo_mock.update_by_athlete_id.assert_called_once_with(
         athlete_id, first_name="John", last_name="Doe"
     )
+
+

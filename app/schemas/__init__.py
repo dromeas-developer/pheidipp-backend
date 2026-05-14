@@ -11,6 +11,8 @@ from app.schemas.athlete import (
     AthleteCreate,
     AthleteUpdate,
     AthleteResponse,
+)
+from app.schemas.athlete_profile import (
     AthleteProfileBase,
     AthleteProfileCreate,
     AthleteProfileUpdate,
@@ -39,7 +41,16 @@ from app.schemas.fitness import (
     FitnessListParams,
     FitnessListResponse,
 )
-
+from app.schemas.athlete_preferences import (
+    AthletePreferencesCreate,
+    AthletePreferencesUpdate,
+    AthletePreferencesResponse,
+)
+from app.schemas.training_block import (
+    TrainingBlockCreate,
+    TrainingBlockUpdate,
+    TrainingBlockResponse,
+)
 
 __all__ = [
     "ActivityBase",
@@ -73,4 +84,10 @@ __all__ = [
     "FitnessResponse",
     "FitnessListParams",
     "FitnessListResponse",
+    "AthletePreferencesCreate",
+    "AthletePreferencesUpdate",
+    "AthletePreferencesResponse",
+    "TrainingBlockCreate",
+    "TrainingBlockUpdate",
+    "TrainingBlockResponse",
     ]

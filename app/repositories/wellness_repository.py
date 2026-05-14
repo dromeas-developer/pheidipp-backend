@@ -1,11 +1,10 @@
 from typing import List, Optional
 from uuid import UUID
-from datetime import date, datetime
+from datetime import date
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
-from app.db.base import Base
 from app.models.wellness import AthleteWellness
 from app.repositories.base_repository import BaseRepository
 

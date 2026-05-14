@@ -7,7 +7,6 @@ from sqlalchemy import select, func
 
 from app.db.base import Base
 from app.models.activity import Activity, ActivityType
-from app.models.enums import PerceivedEffort
 from app.repositories.base_repository import BaseRepository
 
 

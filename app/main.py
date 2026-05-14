@@ -6,6 +6,8 @@ from app.api.routes.activities import router as activities_router
 from app.api.routes.physiology import router as physiology_router
 from app.api.routes.wellness import router as wellness_router
 from app.api.routes.fitness import router as fitness_router
+from app.api.routes.training_blocks import router as training_blocks_router 
+from app.api.routes.athlete_preferences import router as athlete_preferences_router
 from contextlib import asynccontextmanager
 
 
@@ -24,3 +26,5 @@ app.include_router(activities_router)
 app.include_router(physiology_router)
 app.include_router(wellness_router)
 app.include_router(fitness_router)
+app.include_router(training_blocks_router)
+app.include_router(athlete_preferences_router)

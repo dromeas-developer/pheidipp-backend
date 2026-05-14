@@ -7,7 +7,8 @@ import uuid
 
 import pytest
 
-from app.schemas.athlete import AthleteCreate, AthleteUpdate, AthleteProfileUpdate
+from app.schemas.athlete import AthleteCreate, AthleteUpdate
+from app.schemas.athlete_profile import AthleteProfileUpdate
 
 
 # ============================================================================
@@ -163,7 +164,7 @@ class TestModels:
     def test_athlete_profile_model_fields(self):
         """Test creating AthleteProfile model."""
         from datetime import date, datetime
-        from app.models.athlete import AthleteProfile
+        from app.models.athlete_profile import AthleteProfile
         from app.models.enums import Gender, UnitPreference
 
         profile = AthleteProfile(
@@ -210,7 +211,7 @@ class TestResponseSchemas:
     def test_athlete_with_profile_response(self):
         """Test AthleteWithProfileResponse with nested profile."""
         from datetime import datetime, date
-        from app.schemas.athlete import AthleteWithProfileResponse
+        from app.schemas.athlete_profile import AthleteWithProfileResponse
 
         data = {
             "id": str(uuid.uuid4()),

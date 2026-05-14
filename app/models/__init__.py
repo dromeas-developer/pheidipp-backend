@@ -14,10 +14,13 @@ from app.models.enums import (
     PowerSource,
     PrimaryTrainingPlatform,
 )
-from app.models.athlete import Athlete, AthleteProfile
+from app.models.athlete import Athlete
+from app.models.athlete_profile import AthleteProfile
 from app.models.physiology import AthletePhysiology
 from app.models.wellness import AthleteWellness
 from app.models.fitness import AthleteFitness
+from app.models.athlete_preferences import AthletePreferences
+from app.models.training_block import TrainingBlock
 
 
 __all__ = [
@@ -42,4 +45,6 @@ __all__ = [
     "AthletePhysiology",
     "AthleteWellness",
     "AthleteFitness",
+    "AthletePreferences",
+    "TrainingBlock",
     ]

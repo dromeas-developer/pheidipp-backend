@@ -3,7 +3,8 @@
 import uuid
 from datetime import date, datetime
 
-from app.models.athlete import Athlete, AthleteProfile
+from app.models.athlete import Athlete
+from app.models.athlete_profile import AthleteProfile
 from app.models.enums import (
     AthleteStatus,
     Gender,

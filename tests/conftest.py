@@ -85,11 +85,11 @@ def test_db_engine(test_db_connection_url):
     )
 
     # Override the get_db dependency in the app to use the test engine
-    from app.api.routes import athletes, activities, physiology, wellness, training_preferences, fitness, health
+    from app.api.routes import athletes, activities, physiology, wellness, fitness, health
     from app.db.session import get_db
 
     # Override get_db for all route modules
-    for route_module in [athletes, activities, physiology, wellness, training_preferences, fitness, health]:
+    for route_module in [athletes, activities, physiology, wellness, fitness, health]:
         route_module.get_db = override_get_db(engine)
 
     # Also override in the main app's dependency overrides

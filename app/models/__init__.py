@@ -5,6 +5,7 @@ from app.models.enums import (
     UnitPreference,
     WellnessSource,
     GoalType,
+    GoalStatus,
     GoalEventType,
     SportBackground,
     TrainingTimeOfDay,
@@ -17,7 +18,7 @@ from app.models.athlete import Athlete, AthleteProfile
 from app.models.physiology import AthletePhysiology
 from app.models.wellness import AthleteWellness
 from app.models.fitness import AthleteFitness
-from app.models.training_preferences import TrainingPreferences
+
 
 __all__ = [
     "Activity",
@@ -28,6 +29,7 @@ __all__ = [
     "UnitPreference",
     "WellnessSource",
     "GoalType",
+    "GoalStatus",
     "GoalEventType",
     "SportBackground",
     "TrainingTimeOfDay",
@@ -40,5 +42,4 @@ __all__ = [
     "AthletePhysiology",
     "AthleteWellness",
     "AthleteFitness",
-    "TrainingPreferences",
-]
+    ]

@@ -39,11 +39,7 @@ from app.schemas.fitness import (
     FitnessListParams,
     FitnessListResponse,
 )
-from app.schemas.training_preferences import (
-    TrainingPreferencesCreate,
-    TrainingPreferencesUpdate,
-    TrainingPreferencesResponse,
-)
+
 
 __all__ = [
     "ActivityBase",
@@ -77,7 +73,4 @@ __all__ = [
     "FitnessResponse",
     "FitnessListParams",
     "FitnessListResponse",
-    "TrainingPreferencesCreate",
-    "TrainingPreferencesUpdate",
-    "TrainingPreferencesResponse",
-]
+    ]

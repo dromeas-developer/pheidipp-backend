@@ -66,12 +66,18 @@ class GoalType(str, enum.Enum):
 
 
 class GoalEventType(str, enum.Enum):
-    K5 = "5k"
-    K10 = "10k"
+    FIVE_K = "5k"
+    TEN_K = "10k"
     HALF_MARATHON = "half_marathon"
     MARATHON = "marathon"
     ULTRA = "ultra"
     CUSTOM = "custom"
+
+
+class GoalStatus(str, enum.Enum):
+    ACTIVE = "active"
+    COMPLETED = "completed"
+    ABANDONED = "abandoned"
 
 
 class SportBackground(str, enum.Enum):

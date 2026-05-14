@@ -37,13 +37,7 @@ from app.schemas.fitness import (
     FitnessListResponse,
     FitnessResponse,
 )
-from app.services.training_preferences_service import TrainingPreferencesService
-from app.repositories.training_preferences_repository import TrainingPreferencesRepository
-from app.schemas.training_preferences import (
-    TrainingPreferencesCreate,
-    TrainingPreferencesUpdate,
-    TrainingPreferencesResponse,
-)
+
 
 router = APIRouter(prefix="/athletes", tags=["athletes"])
 
@@ -140,13 +134,6 @@ async def get_fitness_service(
     return FitnessService(fitness_repo, athlete_repo)
 
 
-async def get_training_preferences_service(
-    db: AsyncSession = Depends(get_db),
-) -> TrainingPreferencesService:
-    repo = TrainingPreferencesRepository(db)
-    return TrainingPreferencesService(repo)
-
-
 @router.get("/{athlete_id}/activities", response_model=ActivityListResponse)
 async def list_athlete_activities(
     athlete_id: UUID,
@@ -192,35 +179,3 @@ async def list_athlete_fitness(
         items=[FitnessResponse.model_validate(f) for f in fitness_records],
         total=total,
     )
-
-
-@router.post("/{athlete_id}/training-preferences", response_model=TrainingPreferencesResponse, status_code=201)
-async def create_training_preferences(
-    athlete_id: UUID,
-    payload: TrainingPreferencesCreate,
-    service: TrainingPreferencesService = Depends(get_training_preferences_service),
-):
-    data = payload.model_dump(exclude_unset=True)
-    data["athlete_id"] = athlete_id
-    pref = await service.create(TrainingPreferencesCreate(**data))
-    return TrainingPreferencesResponse.model_validate(pref)
-
-
-@router.get("/{athlete_id}/training-preferences", response_model=list[TrainingPreferencesResponse])
-async def list_athlete_training_preferences(
-    athlete_id: UUID,
-    service: TrainingPreferencesService = Depends(get_training_preferences_service),
-):
-    prefs = await service.list_by_athlete(athlete_id)
-    return [TrainingPreferencesResponse.model_validate(p) for p in prefs]
-
-
-@router.get("/{athlete_id}/training-preferences/active", response_model=TrainingPreferencesResponse)
-async def get_active_training_preferences(
-    athlete_id: UUID,
-    service: TrainingPreferencesService = Depends(get_training_preferences_service),
-):
-    pref = await service.get_active_by_athlete(athlete_id)
-    if not pref:
-        raise HTTPException(status_code=404, detail="Active training preferences not found")
-    return TrainingPreferencesResponse.model_validate(pref)

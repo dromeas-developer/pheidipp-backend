@@ -10,13 +10,12 @@ from sqlalchemy.exc import IntegrityError
 from app.models.activity import Activity
 from app.models.athlete import Athlete
 from app.models.physiology import AthletePhysiology
-from app.models.training_preferences import TrainingPreferences
 from app.models.enums import ActivityType, DataSource
+
 
 from tests.factories.activity_factory import make_activity
 from tests.factories.athlete_factory import make_athlete
 from tests.factories.physiology_factory import make_athlete_physiology
-from tests.factories.training_preferences_factory import make_training_preferences
 
 
 class TestActivityModelForeignKeys:
@@ -101,83 +100,6 @@ class TestActivityModelForeignKeys:
         )
         activities_after = list(result.scalars().all())
         assert len(activities_after) == 0
-
-
-class TestTrainingPreferencesVersioning:
-    """Tests for TrainingPreferences versioning behavior."""
-
-    @pytest.mark.asyncio
-    async def test_training_preferences_versioning_preserves_history(self, test_db_session):
-        """Verify new preferences create new rows instead of overwrites.
-
-        This test verifies that:
-        1. Creating multiple preferences for the same athlete creates separate rows
-        2. All historical versions are preserved
-        3. Each version has a distinct created_at timestamp
-        """
-        # Create an athlete
-        athlete = make_athlete()
-        test_db_session.add(athlete)
-        await test_db_session.commit()
-        await test_db_session.refresh(athlete)
-
-        # Create first version of training preferences
-        prefs_v1 = make_training_preferences(
-            athlete_id=athlete.id,
-            goal_type="race",
-            weekly_volume_hours=5.0,
-            created_at=datetime(2024, 1, 1, 10, 0, 0),
-        )
-        test_db_session.add(prefs_v1)
-        await test_db_session.commit()
-        await test_db_session.refresh(prefs_v1)
-
-        # Verify first version exists
-        result = await test_db_session.execute(
-            select(TrainingPreferences).where(TrainingPreferences.athlete_id == athlete.id)
-        )
-        prefs_list = list(result.scalars().all())
-        assert len(prefs_list) == 1
-        assert prefs_list[0].goal_type == "race"
-        assert prefs_list[0].weekly_volume_hours == 5.0
-
-        # Create second version of training preferences (simulating an update)
-        prefs_v2 = make_training_preferences(
-            athlete_id=athlete.id,
-            goal_type="race",
-            weekly_volume_hours=10.0,  # Increased volume
-            created_at=datetime(2024, 6, 1, 10, 0, 0),  # Later timestamp
-        )
-        test_db_session.add(prefs_v2)
-        await test_db_session.commit()
-        await test_db_session.refresh(prefs_v2)
-
-        # Verify both versions exist (history preserved)
-        result = await test_db_session.execute(
-            select(TrainingPreferences).where(TrainingPreferences.athlete_id == athlete.id)
-        )
-        prefs_list = list(result.scalars().all())
-        assert len(prefs_list) == 2, "Expected 2 versions but got {}".format(len(prefs_list))
-
-        # Verify both versions have different created_at timestamps
-        created_times = [p.created_at for p in prefs_list]
-        assert created_times[0] != created_times[1], "Versions should have different timestamps"
-
-        # Verify we can retrieve both versions
-        v1 = next(p for p in prefs_list if p.weekly_volume_hours == 5.0)
-        v2 = next(p for p in prefs_list if p.weekly_volume_hours == 10.0)
-        assert v1.id != v2.id, "Versions should have different IDs"
-
-        # Test: Deleting athlete cascades to all preference versions
-        await test_db_session.delete(athlete)
-        await test_db_session.commit()
-
-        result = await test_db_session.execute(
-            select(TrainingPreferences).where(TrainingPreferences.athlete_id == athlete.id)
-        )
-        prefs_after = list(result.scalars().all())
-        assert len(prefs_after) == 0, "All preference versions should be cascade deleted"
-
 
 class TestPhysiologyRecordsOrdering:
     """Tests for AthletePhysiology ordering by effective_date."""

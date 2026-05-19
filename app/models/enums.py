@@ -121,3 +121,23 @@ class PrimaryTrainingPlatform(str, enum.Enum):
     STRAVA = "strava"
     TRAININGPEAKS = "trainingpeaks"
     OTHER = "other"
+
+
+class TwinTrigger(str, enum.Enum):
+    QUESTIONNAIRE = "questionnaire"
+    CALIBRATION = "calibration"
+    WELLNESS_UPDATE = "wellness_update"
+
+
+class ConfidenceLevel(str, enum.Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+class DataTier(str, enum.Enum):
+    TIER1 = "tier1"
+    TIER2 = "tier2"
+    TIER3 = "tier3"
+    TIER4 = "tier4"
+    TIER5 = "tier5"

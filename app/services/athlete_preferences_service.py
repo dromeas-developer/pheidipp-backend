@@ -2,6 +2,7 @@ import uuid
 from app.repositories.athlete_preferences_repository import AthletePreferencesRepository
 from app.schemas.athlete_preferences import AthletePreferencesCreate, AthletePreferencesUpdate
 from app.models.athlete_preferences import AthletePreferences
+from app.core.unit_of_work import UnitOfWork
 
 
 class AthletePreferencesService:
@@ -26,4 +27,14 @@ class AthletePreferencesService:
         return await self.repo.update(
             preferences_id, **data.model_dump(exclude_unset=True)
         )
+
+    async def create_for_athlete_uow(
+        self, athlete_id: uuid.UUID, data: AthletePreferencesCreate, uow: UnitOfWork
+    ) -> AthletePreferences:
+        payload = data.model_dump(exclude_unset=True)
+        payload["athlete_id"] = athlete_id
+        obj = AthletePreferences(**payload)
+        uow.preferences.session.add(obj)
+        await uow.preferences.session.flush()
+        return obj
     

@@ -31,6 +31,12 @@ from tests.factories.training_block_factory import (
     make_training_block_full,
     make_training_block_batch,
 )
+from tests.factories.twin_state_factory import (
+    make_twin_state,
+    make_twin_state_full,
+    make_twin_state_batch,
+    make_twin_state_create_schema,
+)
 from tests.factories.wellness_factory import (
     make_athlete_wellness,
     make_athlete_wellness_full,
@@ -66,6 +72,11 @@ __all__ = [
     "make_training_block",
     "make_training_block_full",
     "make_training_block_batch",
+    # Twin State
+    "make_twin_state",
+    "make_twin_state_full",
+    "make_twin_state_batch",
+    "make_twin_state_create_schema",
     # Wellness
     "make_athlete_wellness",
     "make_athlete_wellness_full",

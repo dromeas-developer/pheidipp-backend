@@ -4,6 +4,7 @@ from app.repositories.training_block_repository import TrainingBlockRepository
 from app.schemas.training_block import TrainingBlockCreate, TrainingBlockUpdate
 from app.models.training_block import TrainingBlock
 from app.models.enums import GoalStatus
+from app.core.unit_of_work import UnitOfWork
 
 
 class TrainingBlockService:
@@ -51,4 +52,21 @@ class TrainingBlockService:
 
     async def abandon_block(self, block_id: uuid.UUID) -> TrainingBlock | None:
         return await self.repo.update(block_id, status=GoalStatus.ABANDONED)
+
+    async def create_for_athlete_uow(
+        self, athlete_id: uuid.UUID, data: TrainingBlockCreate, uow: UnitOfWork
+    ) -> TrainingBlock:
+        existing = await uow.blocks.get_active_by_athlete(athlete_id)
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Active training block already exists",
+            )
+        payload = data.model_dump(exclude_unset=True)
+        payload["athlete_id"] = athlete_id
+        payload["status"] = GoalStatus.ACTIVE
+        obj = TrainingBlock(**payload)
+        uow.blocks.session.add(obj)
+        await uow.blocks.session.flush()
+        return obj
     

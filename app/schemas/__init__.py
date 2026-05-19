@@ -56,6 +56,11 @@ from app.schemas.onboarding import (
     OnboardingResponse,
     OnboardingStatusResponse,
 )
+from app.schemas.twin_state import (
+    TwinStateBase,
+    TwinStateCreate,
+    TwinStateResponse,
+)
 
 __all__ = [
     "ActivityBase",
@@ -98,4 +103,7 @@ __all__ = [
     "OnboardingRequest",
     "OnboardingResponse",
     "OnboardingStatusResponse",
+    "TwinStateBase",
+    "TwinStateCreate",
+    "TwinStateResponse",
     ]

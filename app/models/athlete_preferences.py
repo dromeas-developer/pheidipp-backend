@@ -26,6 +26,7 @@ from app.models.enums import (
 
 if TYPE_CHECKING:
     from app.models.athlete import Athlete
+    from app.models.twin_state import TwinState
 
 
 class AthletePreferences(Base):
@@ -87,6 +88,9 @@ class AthletePreferences(Base):
     )
 
     athlete: Mapped["Athlete"] = relationship(back_populates="preferences")
+    twin_states: Mapped[list["TwinState"]] = relationship(
+        back_populates="preferences",
+    )
 
     __table_args__ = (
         CheckConstraint(

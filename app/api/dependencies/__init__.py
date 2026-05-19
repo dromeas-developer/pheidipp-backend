@@ -7,6 +7,9 @@ from app.api.dependencies.services import (
     get_physiology_service,
     get_training_block_service,
     get_wellness_service,
+    get_twin_state_service,
+    get_twin_initialisation_service,
+    get_onboarding_service,
 )
 
 __all__ = [
@@ -18,4 +21,7 @@ __all__ = [
     "get_physiology_service",
     "get_training_block_service",
     "get_wellness_service",
+    "get_twin_state_service",
+    "get_twin_initialisation_service",
+    "get_onboarding_service",
 ]

@@ -45,20 +45,28 @@ def make_athlete_preferences_full(athlete_id: uuid.UUID | None = None, **overrid
         "available_days_count": 5,
     }
 
+    # Extract known fields from overrides to avoid conflicts
+    known_fields = {
+        "id", "athlete_id", "sport_background", "years_structured_training",
+        "training_time_of_day", "weekly_schedule", "gps_source", "hr_source",
+        "power_source", "primary_training_platform", "created_at", "updated_at"
+    }
+    filtered_overrides = {k: v for k, v in overrides.items() if k not in known_fields}
+
     return AthletePreferences(
-        id=uuid.uuid4(),
+        id=overrides.get("id", uuid.uuid4()),
         athlete_id=athlete_id,
-        sport_background=SportBackground.RUNNING_PRIMARY,
-        years_structured_training=5.0,
-        training_time_of_day=TrainingTimeOfDay.MORNING,
-        weekly_schedule=weekly_schedule,
-        gps_source=GpsSource.WATCH,
-        hr_source=HrSource.CHEST_STRAP,
-        power_source=PowerSource.RUNNING_POWER,
-        primary_training_platform=PrimaryTrainingPlatform.GARMIN_CONNECT,
-        created_at=datetime(2024, 1, 1, 0, 0, 0),
-        updated_at=datetime(2024, 1, 1, 0, 0, 0),
-        **overrides,
+        sport_background=overrides.get("sport_background", SportBackground.RUNNING_PRIMARY),
+        years_structured_training=overrides.get("years_structured_training", 5.0),
+        training_time_of_day=overrides.get("training_time_of_day", TrainingTimeOfDay.MORNING),
+        weekly_schedule=overrides.get("weekly_schedule", weekly_schedule),
+        gps_source=overrides.get("gps_source", GpsSource.WATCH),
+        hr_source=overrides.get("hr_source", HrSource.CHEST_STRAP),
+        power_source=overrides.get("power_source", PowerSource.RUNNING_POWER),
+        primary_training_platform=overrides.get("primary_training_platform", PrimaryTrainingPlatform.GARMIN_CONNECT),
+        created_at=overrides.get("created_at", datetime(2024, 1, 1, 0, 0, 0)),
+        updated_at=overrides.get("updated_at", datetime(2024, 1, 1, 0, 0, 0)),
+        **filtered_overrides,
     )
 
 

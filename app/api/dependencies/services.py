@@ -9,6 +9,7 @@ from app.repositories.athlete_repository import AthleteRepository
 from app.repositories.fitness_repository import FitnessRepository
 from app.repositories.physiology_repository import PhysiologyRepository
 from app.repositories.training_block_repository import TrainingBlockRepository
+from app.repositories.twin_state_repository import TwinStateRepository
 from app.repositories.wellness_repository import WellnessRepository
 from app.services.activity_service import ActivityService
 from app.services.athlete_profile_service import AthleteProfileService
@@ -18,6 +19,9 @@ from app.services.fitness_service import FitnessService
 from app.services.physiology_service import PhysiologyService
 from app.services.training_block_service import TrainingBlockService
 from app.services.wellness_service import WellnessService
+from app.services.twin_state_service import TwinStateService
+from app.services.twin_initialisation_service import TwinInitialisationService
+from app.services.onboarding_service import OnboardingService
 
 
 async def get_activity_service(
@@ -77,3 +81,23 @@ async def get_physiology_service(
     physiology_repo = PhysiologyRepository(db)
     athlete_repo = AthleteRepository(db)
     return PhysiologyService(physiology_repo=physiology_repo, athlete_repo=athlete_repo)
+
+
+def get_twin_state_service() -> TwinStateService:
+    return TwinStateService()
+
+
+def get_twin_initialisation_service() -> TwinInitialisationService:
+    return TwinInitialisationService()
+
+
+async def get_onboarding_service(
+    db: AsyncSession = Depends(get_db),
+) -> OnboardingService:
+    athlete_service = AthleteService(
+        AthleteRepository(db), AthleteProfileRepository(db)
+    )
+    ap_service = AthletePreferencesService(AthletePreferencesRepository(db))
+    tb_service = TrainingBlockService(TrainingBlockRepository(db))
+    twin_init_service = TwinInitialisationService()
+    return OnboardingService(athlete_service, ap_service, tb_service, twin_init_service)

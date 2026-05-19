@@ -24,7 +24,11 @@ def make_training_block(athlete_id: uuid.UUID | None = None, **overrides) -> Tra
     )
 
 
-def make_training_block_full(athlete_id: uuid.UUID | None = None, **overrides) -> TrainingBlock:
+def make_training_block_full(
+    athlete_id: uuid.UUID | None = None,
+    weekly_volume_hours: float = 10.0,
+    **overrides,
+) -> TrainingBlock:
     """Create a TrainingBlock instance with all fields populated."""
     if athlete_id is None:
         athlete_id = uuid.uuid4()
@@ -38,7 +42,7 @@ def make_training_block_full(athlete_id: uuid.UUID | None = None, **overrides) -
         goal_event_date=date(2024, 4, 15),
         goal_description="Prepare for Boston Marathon with a structured 16-week plan",
         custom_distance_km=42.195,
-        weekly_volume_hours=10.0,
+        weekly_volume_hours=weekly_volume_hours,
         weekly_volume_km=80.0,
         fitness_level=3,
         recent_injury=False,

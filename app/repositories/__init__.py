@@ -7,6 +7,7 @@ from app.repositories.wellness_repository import WellnessRepository
 from app.repositories.fitness_repository import FitnessRepository
 from app.repositories.training_block_repository import TrainingBlockRepository
 from app.repositories.athlete_preferences_repository import AthletePreferencesRepository
+from app.repositories.twin_state_repository import TwinStateRepository
 
 
 __all__ = [
@@ -18,5 +19,6 @@ __all__ = [
     "WellnessRepository",
     "FitnessRepository",
     "TrainingBlockRepository",
-    "AthletePreferencesRepository"
+    "AthletePreferencesRepository",
+    "TwinStateRepository",
     ]

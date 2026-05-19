@@ -5,6 +5,7 @@ from app.schemas.athlete_preferences import (
     AthletePreferencesResponse,
 )
 from app.schemas.training_block import TrainingBlockCreate, TrainingBlockResponse
+from app.schemas.twin_state import TwinStateResponse
 
 
 class OnboardingRequest(BaseModel):
@@ -24,7 +25,7 @@ class OnboardingResponse(BaseModel):
     onboarding_complete: bool
     preferences: AthletePreferencesResponse
     training_block: TrainingBlockResponse
-    twin_state: Optional[dict] = None  # replaced with TwinStateResponse in Phase 1c
+    twin_state: Optional[TwinStateResponse] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -38,6 +39,6 @@ class OnboardingStatusResponse(BaseModel):
     onboarding_complete: bool
     preferences: Optional[AthletePreferencesResponse] = None
     training_block: Optional[TrainingBlockResponse] = None
-    twin_state: Optional[dict] = None  # replaced with TwinStateResponse in Phase 1c
+    twin_state: Optional[TwinStateResponse] = None
 
     model_config = ConfigDict(from_attributes=True)

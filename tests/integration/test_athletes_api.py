@@ -735,8 +735,8 @@ class TestOnboardAthleteEndpoint:
         assert response.status_code == 422
 
     @pytest.mark.asyncio
-    async def test_onboard_athlete_response_includes_twin_state_null(self, client: AsyncClient):
-        """Test onboarding response includes twin_state: null."""
+    async def test_onboard_athlete_response_includes_twin_state(self, client: AsyncClient):
+        """Test onboarding response includes populated twin_state."""
         # Create athlete
         create_payload = {
             "email": f"test_{uuid.uuid4().hex[:8]}@example.com",
@@ -788,7 +788,11 @@ class TestOnboardAthleteEndpoint:
         assert response.status_code == 201
         data = response.json()
         assert "twin_state" in data
-        assert data["twin_state"] is None
+        # TwinState is now populated after onboarding
+        assert data["twin_state"] is not None
+        assert data["twin_state"]["athlete_id"] == athlete_id
+        assert "computation_summary" in data["twin_state"]
+        assert "computation_metadata" in data["twin_state"]
 
     @pytest.mark.asyncio
     async def test_onboard_athlete_valid_weekly_schedule_returns_201(self, client: AsyncClient):
@@ -1059,8 +1063,8 @@ class TestGetOnboardingStatusEndpoint:
         assert data["training_block"]["goal_type"] == "race"
 
     @pytest.mark.asyncio
-    async def test_get_onboarding_status_returns_twin_state_null(self, client: AsyncClient):
-        """Test returns twin_state: null in status response."""
+    async def test_get_onboarding_status_returns_twin_state(self, client: AsyncClient):
+        """Test returns populated twin_state in status response."""
         # Create athlete
         create_payload = {
             "email": f"test_{uuid.uuid4().hex[:8]}@example.com",
@@ -1114,4 +1118,8 @@ class TestGetOnboardingStatusEndpoint:
         assert response.status_code == 200
         data = response.json()
         assert "twin_state" in data
-        assert data["twin_state"] is None
+        # TwinState is now populated after onboarding
+        assert data["twin_state"] is not None
+        assert data["twin_state"]["athlete_id"] == athlete_id
+        assert "computation_summary" in data["twin_state"]
+        assert "computation_metadata" in data["twin_state"]

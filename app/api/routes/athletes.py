@@ -10,8 +10,11 @@ from app.api.dependencies import (
     get_fitness_service,
     get_training_block_service,
     get_wellness_service,
+    get_onboarding_service,
+    get_twin_state_service,
 )
 from app.db.session import get_db
+from app.core.unit_of_work import UnitOfWork
 from app.services.athlete_service import AthleteService
 from app.schemas.athlete import (
     AthleteCreate,
@@ -52,6 +55,9 @@ from app.schemas.onboarding import (
     OnboardingResponse,
     OnboardingStatusResponse,
 )
+from app.schemas.twin_state import TwinStateResponse
+from app.services.onboarding_service import OnboardingService
+from app.services.twin_state_service import TwinStateService
 
 router = APIRouter(prefix="/athletes", tags=["athletes"])
 
@@ -222,15 +228,15 @@ ONBOARDABLE_STATUSES = {AthleteStatus.ACTIVE}
 async def onboard_athlete(
     athlete_id: UUID,
     payload: OnboardingRequest,
-    db: AsyncSession = Depends(get_db),
     athlete_service: AthleteService = Depends(get_athlete_service),
-    ap_service: AthletePreferencesService = Depends(get_athlete_preferences_service),
-    tb_service: TrainingBlockService = Depends(get_training_block_service),
+    onboarding_service: OnboardingService = Depends(get_onboarding_service),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Transitions the athlete into a trainable state by atomically creating:
       - AthletePreferences (stable config)
       - TrainingBlock (first active goal cycle — origin of twin lineage)
+      - TwinState (digital twin initial state)
       - onboarding_complete flag
 
     Pre-flight validation (outside transaction):
@@ -239,8 +245,7 @@ async def onboard_athlete(
       409  Onboarding already complete
 
     Inside transaction:
-      409  Concurrent duplicate request detected (idempotency recheck)
-      409  Active training block already exists
+      409  Active training block already exists (handled by service)
 
     Returns 422 if WeeklySchedule validation fails (Pydantic, before any DB write).
     """
@@ -285,44 +290,33 @@ async def onboard_athlete(
 
     # ── Atomic transaction ────────────────────────────────────────────────────
 
-    # Idempotency recheck — guard against concurrent duplicate requests
-    # that passed pre-flight before either committed
-    fresh = await athlete_service.get_athlete(athlete_id)
-    if fresh.onboarding_complete:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Onboarding already complete",
+    async with UnitOfWork(db) as uow:
+        # Idempotency recheck inside transaction — re-verify onboarding not yet complete
+        athlete = await uow.athletes.get_by_id(athlete_id)
+        if not athlete:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Athlete not found",
+            )
+        if athlete.onboarding_complete:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Onboarding already complete. "
+                    "Use PATCH /athlete-preferences/{id} to update preferences, "
+                    "or close the current training block before starting a new one."
+                ),
+            )
+
+        preferences, training_block, twin_state = (
+            await onboarding_service.complete_onboarding(athlete_id, payload, uow)
         )
-
-    preferences = await ap_service.create_for_athlete(
-        athlete_id, payload.preferences
-    )
-
-    # Creates the first ACTIVE training block — origin of twin lineage.
-    # TrainingBlockService raises 409 if an active block already exists.
-    training_block = await tb_service.create_for_athlete(
-        athlete_id, payload.training_block
-    )
-
-    await athlete_service.set_onboarding_complete(athlete_id)
-
-    # ── Phase 1c insertion point ──────────────────────────────────────────
-    # Replace stub with (inside this transaction):
-    # twin_state = await twin_service.initialise(
-    #     athlete_id=athlete_id,
-    #     preferences=preferences,
-    #     training_block=training_block,
-    #     profile=profile,
-    # )
-    twin_state = None
-
-    await db.commit()
 
     return OnboardingResponse(
         onboarding_complete=True,
         preferences=AthletePreferencesResponse.model_validate(preferences),
         training_block=TrainingBlockResponse.model_validate(training_block),
-        twin_state=twin_state,
+        twin_state=TwinStateResponse.model_validate(twin_state),
     )
 
 
@@ -336,6 +330,8 @@ async def get_onboarding_status(
     athlete_service: AthleteService = Depends(get_athlete_service),
     ap_service: AthletePreferencesService = Depends(get_athlete_preferences_service),
     tb_service: TrainingBlockService = Depends(get_training_block_service),
+    twin_service: TwinStateService = Depends(get_twin_state_service),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Returns onboarding status, current preferences, and active training block.
@@ -353,6 +349,12 @@ async def get_onboarding_status(
     preferences = await ap_service.get_by_athlete(athlete_id)
     training_block = await tb_service.get_active_by_athlete(athlete_id)
 
+    # Get current twin state
+    twin_state = None
+    if athlete.onboarding_complete:
+        async with UnitOfWork(db) as uow:
+            twin_state = await twin_service.get_current_twin_state(athlete_id, uow)
+
     return OnboardingStatusResponse(
         onboarding_complete=athlete.onboarding_complete,
         preferences=(
@@ -363,5 +365,5 @@ async def get_onboarding_status(
             TrainingBlockResponse.model_validate(training_block)
             if training_block else None
         ),
-        twin_state=None,  # Phase 1c
+        twin_state=twin_state,
     )

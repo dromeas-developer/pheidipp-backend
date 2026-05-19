@@ -5,6 +5,7 @@ from sqlalchemy.orm import selectinload
 import uuid
 
 from app.core.security import hash_password
+from app.core.unit_of_work import UnitOfWork
 from app.models.athlete import Athlete
 from app.models.athlete_profile import AthleteProfile
 from app.repositories.athlete_repository import AthleteRepository
@@ -60,4 +61,18 @@ class AthleteService:
         return await self.athlete_repo.update(
             athlete_id, onboarding_complete=True
         )
+
+    async def set_onboarding_complete_uow(
+        self, athlete_id: uuid.UUID, uow: UnitOfWork
+    ) -> None:
+        athlete = await uow.athletes.get_by_id(athlete_id)
+        if athlete is None:
+            raise ValueError(f"Athlete {athlete_id} not found")
+        athlete.onboarding_complete = True
+        await uow.athletes.session.flush()
+
+    async def get_profile_uow(
+        self, athlete_id: uuid.UUID, uow: UnitOfWork
+    ) -> AthleteProfile | None:
+        return await uow.profiles.get_by_athlete_id(athlete_id)
     

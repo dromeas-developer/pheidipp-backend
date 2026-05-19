@@ -6,6 +6,7 @@ from sqlalchemy import (
     UUID,
     String,
     DateTime,
+    Boolean,
     Enum as SAEnum,
     text,
     func,
@@ -47,6 +48,13 @@ class Athlete(Base):
     status: Mapped[AthleteStatus] = mapped_column(
         SAEnum(AthleteStatus, native_enum=False, length=20),
         default=AthleteStatus.ONBOARDING,
+        nullable=False,
+    )
+    onboarding_complete: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default=text("false"),
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

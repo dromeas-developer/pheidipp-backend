@@ -1,49 +1,57 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 
+from app.api.dependencies import (
+    get_activity_service,
+    get_athlete_preferences_service,
+    get_athlete_profile_service,
+    get_athlete_service,
+    get_fitness_service,
+    get_training_block_service,
+    get_wellness_service,
+)
 from app.db.session import get_db
-from app.repositories.athlete_repository import AthleteRepository
 from app.services.athlete_service import AthleteService
 from app.schemas.athlete import (
     AthleteCreate,
     AthleteUpdate,
     AthleteResponse,
 )
-from app.repositories.athlete_profile_repository import AthleteProfileRepository
 from app.services.athlete_profile_service import AthleteProfileService
+from app.models.enums import AthleteStatus
 from app.schemas.athlete_profile import (
     AthleteProfileUpdate,
     AthleteProfileResponse,
     AthleteWithProfileResponse,
 )
 from app.services.activity_service import ActivityService
-from app.repositories.activity_repository import ActivityRepository
 from app.schemas.activity import (
     ActivityListParams,
     ActivityListResponse,
     ActivityResponse,
 )
 from app.services.wellness_service import WellnessService
-from app.repositories.wellness_repository import WellnessRepository
 from app.schemas.wellness import (
     WellnessListParams,
     WellnessListResponse,
     WellnessResponse,
 )
 from app.services.fitness_service import FitnessService
-from app.repositories.fitness_repository import FitnessRepository
 from app.schemas.fitness import (
     FitnessListParams,
     FitnessListResponse,
     FitnessResponse,
 )
-from app.repositories.athlete_preferences_repository import AthletePreferencesRepository
 from app.services.athlete_preferences_service import AthletePreferencesService
 from app.schemas.athlete_preferences import AthletePreferencesResponse
-from app.repositories.training_block_repository import TrainingBlockRepository
 from app.services.training_block_service import TrainingBlockService
 from app.schemas.training_block import TrainingBlockResponse
+from app.schemas.onboarding import (
+    OnboardingRequest,
+    OnboardingResponse,
+    OnboardingStatusResponse,
+)
 
 router = APIRouter(prefix="/athletes", tags=["athletes"])
 
@@ -51,10 +59,8 @@ router = APIRouter(prefix="/athletes", tags=["athletes"])
 @router.post("/", response_model=AthleteResponse)
 async def create_athlete(
     payload: AthleteCreate,
-    db: AsyncSession = Depends(get_db),
+    service: AthleteService = Depends(get_athlete_service),
 ):
-    athlete_repo = AthleteRepository(db)
-    service = AthleteService(athlete_repo)
     athlete = await service.create_athlete(payload)
     return AthleteResponse.model_validate(athlete)
 
@@ -62,10 +68,8 @@ async def create_athlete(
 @router.get("/{athlete_id}", response_model=AthleteWithProfileResponse)
 async def get_athlete(
     athlete_id: UUID,
-    db: AsyncSession = Depends(get_db),
+    service: AthleteService = Depends(get_athlete_service),
 ):
-    athlete_repo = AthleteRepository(db)
-    service = AthleteService(athlete_repo)
     athlete = await service.get_athlete_with_profile(athlete_id)
     if not athlete:
         raise HTTPException(status_code=404, detail="Athlete not found")
@@ -76,10 +80,8 @@ async def get_athlete(
 async def update_athlete(
     athlete_id: UUID,
     payload: AthleteUpdate,
-    db: AsyncSession = Depends(get_db),
+    service: AthleteService = Depends(get_athlete_service),
 ):
-    athlete_repo = AthleteRepository(db)
-    service = AthleteService(athlete_repo)
     athlete = await service.update_athlete(athlete_id, payload)
     if not athlete:
         raise HTTPException(status_code=404, detail="Athlete not found")
@@ -90,10 +92,8 @@ async def update_athlete(
 async def upsert_profile(
     athlete_id: UUID,
     payload: AthleteProfileUpdate,
-    db: AsyncSession = Depends(get_db),
+    service: AthleteProfileService = Depends(get_athlete_profile_service),
 ):
-    profile_repo = AthleteProfileRepository(db)
-    service = AthleteProfileService(profile_repo)
     profile = await service.upsert_profile(athlete_id, payload)
     return AthleteProfileResponse.model_validate(profile)
 
@@ -101,39 +101,12 @@ async def upsert_profile(
 @router.get("/{athlete_id}/profile", response_model=AthleteProfileResponse)
 async def get_profile(
     athlete_id: UUID,
-    db: AsyncSession = Depends(get_db),
+    service: AthleteProfileService = Depends(get_athlete_profile_service),
 ):
-    athlete_repo = AthleteRepository(db)
-    profile_repo = AthleteProfileRepository(db)
-    service = AthleteProfileService(profile_repo)
     profile = await service.get_profile(athlete_id)
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
     return AthleteProfileResponse.model_validate(profile)
-
-
-async def get_activity_service(
-    db: AsyncSession = Depends(get_db),
-) -> ActivityService:
-    activity_repo = ActivityRepository(db)
-    athlete_repo = AthleteRepository(db)
-    return ActivityService(activity_repo, athlete_repo)
-
-
-async def get_wellness_service(
-    db: AsyncSession = Depends(get_db),
-) -> WellnessService:
-    wellness_repo = WellnessRepository(db)
-    athlete_repo = AthleteRepository(db)
-    return WellnessService(wellness_repo, athlete_repo)
-
-
-async def get_fitness_service(
-    db: AsyncSession = Depends(get_db),
-) -> FitnessService:
-    fitness_repo = FitnessRepository(db)
-    athlete_repo = AthleteRepository(db)
-    return FitnessService(fitness_repo, athlete_repo)
 
 
 @router.get("/{athlete_id}/activities", response_model=ActivityListResponse)
@@ -183,12 +156,6 @@ async def list_athlete_fitness(
     )
 
 
-def get_athlete_preferences_service(
-    db: AsyncSession = Depends(get_db),
-) -> AthletePreferencesService:
-    return AthletePreferencesService(AthletePreferencesRepository(db))
-
-
 @router.get(
     "/{athlete_id}/preferences",
     response_model=AthletePreferencesResponse,
@@ -202,12 +169,6 @@ async def get_athlete_preferences(
     if not result:
         raise HTTPException(status_code=404, detail="No preferences found. Complete onboarding first.")
     return result
-
-
-def get_training_block_service(
-    db: AsyncSession = Depends(get_db),
-) -> TrainingBlockService:
-    return TrainingBlockService(TrainingBlockRepository(db))
 
 
 @router.get(
@@ -246,3 +207,161 @@ async def get_active_training_block(
     if not result:
         raise HTTPException(status_code=404, detail="No active training block found for this athlete.")
     return result
+
+
+# Valid athlete statuses for onboarding — adjust to match AthleteStatus enum values
+ONBOARDABLE_STATUSES = {AthleteStatus.ACTIVE}
+
+
+@router.post(
+    "/{athlete_id}/onboarding",
+    response_model=OnboardingResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Complete athlete onboarding",
+)
+async def onboard_athlete(
+    athlete_id: UUID,
+    payload: OnboardingRequest,
+    db: AsyncSession = Depends(get_db),
+    athlete_service: AthleteService = Depends(get_athlete_service),
+    ap_service: AthletePreferencesService = Depends(get_athlete_preferences_service),
+    tb_service: TrainingBlockService = Depends(get_training_block_service),
+):
+    """
+    Transitions the athlete into a trainable state by atomically creating:
+      - AthletePreferences (stable config)
+      - TrainingBlock (first active goal cycle — origin of twin lineage)
+      - onboarding_complete flag
+
+    Pre-flight validation (outside transaction):
+      404  Athlete not found
+      422  AthleteProfile missing or athlete status not valid for onboarding
+      409  Onboarding already complete
+
+    Inside transaction:
+      409  Concurrent duplicate request detected (idempotency recheck)
+      409  Active training block already exists
+
+    Returns 422 if WeeklySchedule validation fails (Pydantic, before any DB write).
+    """
+
+    # ── Pre-flight validation (outside transaction) ───────────────────────────
+
+    athlete = await athlete_service.get_athlete(athlete_id)
+    if not athlete:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Athlete not found",
+        )
+
+    # Profile must exist — Phase 1c needs date_of_birth for threshold estimates
+    profile = await athlete_service.get_profile(athlete_id)
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Athlete profile is incomplete. "
+                "Create a profile with at least date_of_birth before onboarding."
+            ),
+        )
+
+    # Status must permit onboarding
+    if athlete.status not in ONBOARDABLE_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Athlete status '{athlete.status}' does not permit onboarding.",
+        )
+
+    # State conflict — repeat onboarding attempt
+    if athlete.onboarding_complete:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Onboarding already complete. "
+                "Use PATCH /athlete-preferences/{id} to update preferences, "
+                "or close the current training block before starting a new one."
+            ),
+        )
+
+    # ── Atomic transaction ────────────────────────────────────────────────────
+
+    # Idempotency recheck — guard against concurrent duplicate requests
+    # that passed pre-flight before either committed
+    fresh = await athlete_service.get_athlete(athlete_id)
+    if fresh.onboarding_complete:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Onboarding already complete",
+        )
+
+    preferences = await ap_service.create_for_athlete(
+        athlete_id, payload.preferences
+    )
+
+    # Creates the first ACTIVE training block — origin of twin lineage.
+    # TrainingBlockService raises 409 if an active block already exists.
+    training_block = await tb_service.create_for_athlete(
+        athlete_id, payload.training_block
+    )
+
+    await athlete_service.set_onboarding_complete(athlete_id)
+
+    # ── Phase 1c insertion point ──────────────────────────────────────────
+    # Replace stub with (inside this transaction):
+    # twin_state = await twin_service.initialise(
+    #     athlete_id=athlete_id,
+    #     preferences=preferences,
+    #     training_block=training_block,
+    #     profile=profile,
+    # )
+    twin_state = None
+
+    await db.commit()
+
+    return OnboardingResponse(
+        onboarding_complete=True,
+        preferences=AthletePreferencesResponse.model_validate(preferences),
+        training_block=TrainingBlockResponse.model_validate(training_block),
+        twin_state=twin_state,
+    )
+
+
+@router.get(
+    "/{athlete_id}/onboarding",
+    response_model=OnboardingStatusResponse,
+    summary="Get athlete onboarding status",
+)
+async def get_onboarding_status(
+    athlete_id: UUID,
+    athlete_service: AthleteService = Depends(get_athlete_service),
+    ap_service: AthletePreferencesService = Depends(get_athlete_preferences_service),
+    tb_service: TrainingBlockService = Depends(get_training_block_service),
+):
+    """
+    Returns onboarding status, current preferences, and active training block.
+    Always returns 200 — an incomplete onboarding is a valid, not an error state.
+    Returns 404 only if the athlete does not exist.
+    """
+
+    athlete = await athlete_service.get_athlete(athlete_id)
+    if not athlete:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Athlete not found",
+        )
+
+    preferences = await ap_service.get_by_athlete(athlete_id)
+    training_block = await tb_service.get_active_by_athlete(athlete_id)
+
+    return OnboardingStatusResponse(
+        onboarding_complete=athlete.onboarding_complete,
+        preferences=(
+            AthletePreferencesResponse.model_validate(preferences)
+            if preferences else None
+        ),
+        training_block=(
+            TrainingBlockResponse.model_validate(training_block)
+            if training_block else None
+        ),
+        twin_state=None,  # Phase 1c
+    )

@@ -20,8 +20,13 @@ class FitnessCreate(FitnessBase):
     athlete_id: uuid.UUID
 
 
-class FitnessUpdate(FitnessBase):
-    pass
+class FitnessUpdate(BaseModel):
+    metric_date: Optional[date] = None
+    tss: Optional[float] = None
+    atl: Optional[float] = None
+    ctl: Optional[float] = None
+    tsb: Optional[float] = None
+    source: DataSource = DataSource.MANUAL
 
 
 class FitnessResponse(FitnessBase):

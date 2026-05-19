@@ -1,9 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 from datetime import date
 
-from app.db.session import get_db
+from app.api.dependencies import get_wellness_service
 from app.schemas.wellness import (
     WellnessCreate,
     WellnessListParams,
@@ -12,18 +11,8 @@ from app.schemas.wellness import (
     WellnessUpdate,
 )
 from app.services.wellness_service import WellnessService
-from app.repositories.wellness_repository import WellnessRepository
-from app.repositories.athlete_repository import AthleteRepository
 
 router = APIRouter(prefix="/wellness", tags=["wellness"])
-
-
-async def get_wellness_service(
-    db: AsyncSession = Depends(get_db),
-) -> WellnessService:
-    wellness_repo = WellnessRepository(db)
-    athlete_repo = AthleteRepository(db)
-    return WellnessService(wellness_repo, athlete_repo)
 
 
 @router.post("/", response_model=WellnessResponse, status_code=status.HTTP_201_CREATED)

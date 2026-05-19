@@ -95,6 +95,11 @@ def test_db_engine(test_db_connection_url):
     # Also override in the main app's dependency overrides
     app.dependency_overrides[get_db] = override_get_db(engine)
 
+    # Note: Service dependency factories (get_activity_service, get_athlete_service, etc.)
+    # are NOT overridden here. They internally call get_db, which is overridden above.
+    # This is the correct approach - the service factories create services that use
+    # the overridden get_db, so they will use the test database.
+
     yield engine
 
     # Clean up dependency overrides
@@ -147,19 +152,20 @@ async def clean_db_tables(test_db_engine):
     )
 
     async with session_factory() as session:
-        # Delete all data from each table in reverse dependency order
-        for table in reversed(tables):
-            await session.execute(delete(table))
-        await session.commit()
+        # Use explicit transaction for cleanup
+        async with session.begin():
+            # Delete all data from each table in reverse dependency order
+            for table in reversed(tables):
+                await session.execute(delete(table))
 
     # Yield to allow test to run
     yield
 
-    # Cleanup after test as well
+    # Cleanup after test as well - use explicit transaction
     async with session_factory() as session:
-        for table in reversed(tables):
-            await session.execute(delete(table))
-        await session.commit()
+        async with session.begin():
+            for table in reversed(tables):
+                await session.execute(delete(table))
 
 
 # ============================================================================

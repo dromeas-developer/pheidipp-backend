@@ -1,9 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, Depends, HTTPException, status
 from uuid import UUID
 
-from app.db.session import get_db
-from app.repositories.athlete_repository import AthleteRepository
+from app.api.dependencies import get_activity_service
 from app.schemas.activity import (
     ActivityCreate,
     ActivityListParams,
@@ -12,25 +10,19 @@ from app.schemas.activity import (
     ActivityUpdate,
 )
 from app.services.activity_service import ActivityService
-from app.repositories.activity_repository import ActivityRepository
 
 router = APIRouter(prefix="/activities", tags=["activities"])
 
 
-async def get_activity_service(
-    db: AsyncSession = Depends(get_db),
-) -> ActivityService:
-    activity_repo = ActivityRepository(db)
-    athlete_repo = AthleteRepository(db)
-    return ActivityService(activity_repo, athlete_repo)
-
-
-@router.post("/", response_model=ActivityResponse)
+@router.post("/", response_model=ActivityResponse, status_code=status.HTTP_201_CREATED)
 async def create_activity(
     payload: ActivityCreate,
     service: ActivityService = Depends(get_activity_service),
 ):
-    activity = await service.create_activity(payload)
+    try:
+        activity = await service.create_activity(payload)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     return ActivityResponse.model_validate(activity)
 
 
@@ -51,9 +43,12 @@ async def update_activity(
     payload: ActivityUpdate,
     service: ActivityService = Depends(get_activity_service),
 ):
-    activity = await service.update_activity(activity_id, payload)
+    try:
+        activity = await service.update_activity(activity_id, payload)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     if not activity:
-        raise HTTPException(status_code=404, detail="Activity not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Activity not found")
     return ActivityResponse.model_validate(activity)
 
 

@@ -49,7 +49,7 @@ class TestActivityEndpoints:
 
         response = await client.post("/activities/", json=payload)
 
-        assert response.status_code == 200
+        assert response.status_code == 201  # Created
         data = response.json()
         assert "id" in data
         assert data["athlete_id"] == str(athlete.id)

@@ -479,3 +479,45 @@ async def test_upsert_profile_update(profile_service, profile_repo_mock):
     )
 
 
+# ============================================================================
+# set_onboarding_complete Tests
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_set_onboarding_complete(athlete_service, athlete_repo_mock):
+    """Test successful setting of onboarding_complete flag."""
+    athlete_id = uuid.uuid4()
+
+    async def mock_update(athlete_id, **kwargs):
+        return Athlete(
+            id=athlete_id,
+            email="test@example.com",
+            status=AthleteStatus.ACTIVE,
+            onboarding_complete=kwargs.get("onboarding_complete", False),
+            created_at=datetime(2024, 1, 1, 0, 0, 0),
+            updated_at=datetime(2024, 1, 2, 0, 0, 0),
+        )
+
+    athlete_repo_mock.update = AsyncMock(side_effect=mock_update)
+
+    result = await athlete_service.set_onboarding_complete(athlete_id)
+
+    assert result is not None
+    assert result.onboarding_complete is True
+    athlete_repo_mock.update.assert_called_once_with(athlete_id, onboarding_complete=True)
+
+
+@pytest.mark.asyncio
+async def test_set_onboarding_complete_not_found(athlete_service, athlete_repo_mock):
+    """Test setting onboarding_complete when athlete does not exist."""
+    athlete_id = uuid.uuid4()
+
+    athlete_repo_mock.update = AsyncMock(return_value=None)
+
+    result = await athlete_service.set_onboarding_complete(athlete_id)
+
+    assert result is None
+    athlete_repo_mock.update.assert_called_once_with(athlete_id, onboarding_complete=True)
+
+

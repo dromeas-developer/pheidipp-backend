@@ -1,10 +1,14 @@
+from __future__ import annotations
+
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 import uuid
 
 from app.core.security import hash_password
 from app.models.athlete import Athlete
+from app.models.athlete_profile import AthleteProfile
 from app.repositories.athlete_repository import AthleteRepository
+from app.repositories.athlete_profile_repository import AthleteProfileRepository
 from app.schemas.athlete import (
     AthleteCreate,
     AthleteUpdate,
@@ -15,8 +19,10 @@ class AthleteService:
     def __init__(
         self,
         athlete_repo: AthleteRepository,
+        profile_repo: AthleteProfileRepository | None = None,
         ):
         self.athlete_repo = athlete_repo
+        self.profile_repo = profile_repo
 
     async def create_athlete(self, data: AthleteCreate) -> Athlete:
         athlete_data = data.model_dump(exclude_unset=True)
@@ -27,6 +33,11 @@ class AthleteService:
 
     async def get_athlete(self, athlete_id: uuid.UUID) -> Athlete | None:
         return await self.athlete_repo.get_by_id(athlete_id)
+
+    async def get_profile(self, athlete_id: uuid.UUID) -> AthleteProfile | None:
+        if self.profile_repo:
+            return await self.profile_repo.get_by_athlete_id(athlete_id)
+        return None
 
     async def get_athlete_with_profile(self, athlete_id: uuid.UUID) -> Athlete | None:
         result = await self.athlete_repo.session.execute(
@@ -42,4 +53,11 @@ class AthleteService:
             update_data["hashed_password"] = hash_password(update_data["password"])
             del update_data["password"]
         return await self.athlete_repo.update(athlete_id, **update_data)
+
+    async def set_onboarding_complete(
+        self, athlete_id: uuid.UUID
+    ) -> Athlete | None:
+        return await self.athlete_repo.update(
+            athlete_id, onboarding_complete=True
+        )
     

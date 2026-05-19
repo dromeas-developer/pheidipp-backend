@@ -23,6 +23,7 @@ class AthleteUpdate(BaseModel):
 class AthleteResponse(AthleteBase):
     id: uuid.UUID
     status: AthleteStatus
+    onboarding_complete: bool
     created_at: datetime
     updated_at: datetime
 

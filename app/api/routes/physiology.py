@@ -2,11 +2,8 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import UUID4
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.session import get_db
-from app.repositories.athlete_repository import AthleteRepository
-from app.repositories.physiology_repository import PhysiologyRepository
+from app.api.dependencies import get_physiology_service
 from app.schemas.physiology import (
     AthletePhysiologyCreate,
     AthletePhysiologyResponse,
@@ -18,14 +15,6 @@ router = APIRouter(
     prefix="/athletes/{athlete_id}/physiology",
     tags=["physiology"],
 )
-
-
-async def get_physiology_service(
-    db: AsyncSession = Depends(get_db),
-) -> PhysiologyService:
-    physiology_repo = PhysiologyRepository(db)
-    athlete_repo = AthleteRepository(db)
-    return PhysiologyService(physiology_repo=physiology_repo, athlete_repo=athlete_repo)
 
 
 @router.post("/", response_model=AthletePhysiologyResponse)

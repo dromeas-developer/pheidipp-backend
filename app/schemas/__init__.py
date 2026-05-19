@@ -51,6 +51,11 @@ from app.schemas.training_block import (
     TrainingBlockUpdate,
     TrainingBlockResponse,
 )
+from app.schemas.onboarding import (
+    OnboardingRequest,
+    OnboardingResponse,
+    OnboardingStatusResponse,
+)
 
 __all__ = [
     "ActivityBase",
@@ -90,4 +95,7 @@ __all__ = [
     "TrainingBlockCreate",
     "TrainingBlockUpdate",
     "TrainingBlockResponse",
+    "OnboardingRequest",
+    "OnboardingResponse",
+    "OnboardingStatusResponse",
     ]

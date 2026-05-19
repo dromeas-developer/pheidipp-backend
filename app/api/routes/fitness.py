@@ -1,8 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 
-from app.db.session import get_db
+from app.api.dependencies import get_fitness_service
 from app.schemas.fitness import (
     FitnessCreate,
     FitnessListParams,
@@ -11,18 +10,8 @@ from app.schemas.fitness import (
     FitnessUpdate,
 )
 from app.services.fitness_service import FitnessService
-from app.repositories.fitness_repository import FitnessRepository
-from app.repositories.athlete_repository import AthleteRepository
 
 router = APIRouter(prefix="/fitness", tags=["fitness"])
-
-
-async def get_fitness_service(
-    db: AsyncSession = Depends(get_db),
-) -> FitnessService:
-    fitness_repo = FitnessRepository(db)
-    athlete_repo = AthleteRepository(db)
-    return FitnessService(fitness_repo, athlete_repo)
 
 
 @router.post("/", response_model=FitnessResponse, status_code=status.HTTP_201_CREATED)

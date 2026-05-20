@@ -163,6 +163,8 @@ class TwinInitialisationService:
             SportBackground.SWIMMING_CROSSOVER: 0.2,
             SportBackground.OTHER: 0.5,
         }
+        if sport_background is None:
+            return 0.5
         return mapping.get(sport_background, 0.5)
 
     @staticmethod

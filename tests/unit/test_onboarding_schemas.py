@@ -262,3 +262,41 @@ def test_onboarding_status_response_onboarded():
     assert response.preferences is not None
     assert response.training_block is not None
     assert response.twin_state is None
+
+
+class TestFirstMessageReadyField:
+    """Tests for first_message_ready field in OnboardingStatusResponse."""
+
+    def test_first_message_ready_defaults_to_false(self):
+        """Verify OnboardingStatusResponse has first_message_ready field defaulting to False."""
+        data = {
+            "onboarding_complete": False,
+            "preferences": None,
+            "training_block": None,
+            "twin_state": None,
+        }
+        response = OnboardingStatusResponse.model_validate(data)
+        assert response.first_message_ready is False
+
+    def test_first_message_ready_accepts_true(self):
+        """Verify OnboardingStatusResponse accepts first_message_ready=True."""
+        data = {
+            "onboarding_complete": True,
+            "preferences": {
+                "id": str(uuid.uuid4()),
+                "athlete_id": str(uuid.uuid4()),
+                "created_at": "2024-01-01T00:00:00",
+                "updated_at": "2024-01-01T00:00:00",
+            },
+            "training_block": {
+                "id": str(uuid.uuid4()),
+                "athlete_id": str(uuid.uuid4()),
+                "status": "active",
+                "created_at": "2024-01-01T00:00:00",
+                "updated_at": "2024-01-01T00:00:00",
+            },
+            "twin_state": None,
+            "first_message_ready": True,
+        }
+        response = OnboardingStatusResponse.model_validate(data)
+        assert response.first_message_ready is True

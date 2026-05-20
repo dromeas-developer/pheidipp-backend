@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import (
     String,
@@ -17,6 +17,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 from app.models.enums import ActivityType, PerceivedEffort
+
+if TYPE_CHECKING:
+    from app.models.athlete import Athlete
 
 
 class Activity(Base):

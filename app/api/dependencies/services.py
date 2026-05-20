@@ -22,6 +22,7 @@ from app.services.wellness_service import WellnessService
 from app.services.twin_state_service import TwinStateService
 from app.services.twin_initialisation_service import TwinInitialisationService
 from app.services.onboarding_service import OnboardingService
+from app.services.coach_message_service import CoachMessageService
 
 
 async def get_activity_service(
@@ -101,3 +102,9 @@ async def get_onboarding_service(
     tb_service = TrainingBlockService(TrainingBlockRepository(db))
     twin_init_service = TwinInitialisationService()
     return OnboardingService(athlete_service, ap_service, tb_service, twin_init_service)
+
+
+def get_coach_message_service(
+    db: AsyncSession = Depends(get_db),
+) -> CoachMessageService:
+    return CoachMessageService()

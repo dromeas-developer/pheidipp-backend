@@ -141,3 +141,23 @@ class DataTier(str, enum.Enum):
     TIER3 = "tier3"
     TIER4 = "tier4"
     TIER5 = "tier5"
+
+
+class MessageType(str, enum.Enum):
+    FIRST_MESSAGE = "first_message"
+    DAILY_BRIEFING = "daily_briefing"
+    POST_WORKOUT = "post_workout"
+    WEEKLY_REVIEW = "weekly_review"
+    RECOVERY_ALERT = "recovery_alert"
+    PHASE_TRANSITION = "phase_transition"
+
+
+class GenerationOutcome(str, enum.Enum):
+    SUCCESS = "success"
+    TIMEOUT = "timeout"
+    PROVIDER_ERROR = "provider_error"
+    RATE_LIMITED = "rate_limited"
+    SAFETY_REFUSAL = "safety_refusal"
+    MALFORMED = "malformed"
+    MISSING_DATA = "missing_data"
+    INTERNAL_ERROR = "internal_error"

@@ -6,6 +6,7 @@ from app.repositories.athlete_preferences_repository import AthletePreferencesRe
 from app.repositories.training_block_repository import TrainingBlockRepository
 from app.repositories.twin_state_repository import TwinStateRepository
 from app.repositories.athlete_profile_repository import AthleteProfileRepository
+from app.repositories.coach_message_repository import CoachMessageRepository
 
 
 class UnitOfWork:
@@ -24,6 +25,7 @@ class UnitOfWork:
             "blocks": TrainingBlockRepository(self.session),
             "twin_states": TwinStateRepository(self.session),
             "profiles": AthleteProfileRepository(self.session),
+            "coach_messages": CoachMessageRepository(self.session),
         }
         return self
 

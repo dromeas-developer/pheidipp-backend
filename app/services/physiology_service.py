@@ -39,15 +39,14 @@ class PhysiologyService:
             )
 
     async def create(
-        self, athlete_id: uuid.UUID, data: AthletePhysiologyCreate
+        self, data: AthletePhysiologyCreate
     ) -> AthletePhysiology:
         await self._validate(
-            athlete_id,
+            data.athlete_id,
             data.effective_from,
             data.effective_to,
         )
         payload = data.model_dump()
-        payload["athlete_id"] = athlete_id
         return await self.physiology_repo.create(**payload)
 
     async def list_by_athlete(

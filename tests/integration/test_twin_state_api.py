@@ -478,7 +478,7 @@ class TestOnboardingStatusWithTwinState:
         await activate_athlete_via_api(client, athlete_id)
         # Don't complete onboarding
 
-        response = await client.get(f"/athletes/{athlete_id}/onboarding")
+        response = await client.get(f"/athletes/{athlete_id}/onboarding/status")
 
         assert response.status_code == 200
         data = response.json()
@@ -493,7 +493,7 @@ class TestOnboardingStatusWithTwinState:
         await activate_athlete_via_api(client, athlete_id)
         await complete_onboarding_via_api(client, athlete_id)
 
-        response = await client.get(f"/athletes/{athlete_id}/onboarding")
+        response = await client.get(f"/athletes/{athlete_id}/onboarding/status")
 
         assert response.status_code == 200
         data = response.json()

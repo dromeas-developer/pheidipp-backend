@@ -19,7 +19,7 @@ class AthletePhysiologyBase(BaseModel):
 
 
 class AthletePhysiologyCreate(AthletePhysiologyBase):
-    pass
+    athlete_id: uuid.UUID
 
 
 class AthletePhysiologyUpdate(BaseModel):

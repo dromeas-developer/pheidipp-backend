@@ -40,5 +40,6 @@ class OnboardingStatusResponse(BaseModel):
     preferences: Optional[AthletePreferencesResponse] = None
     training_block: Optional[TrainingBlockResponse] = None
     twin_state: Optional[TwinStateResponse] = None
+    first_message_ready: bool = False
 
     model_config = ConfigDict(from_attributes=True)

@@ -89,7 +89,8 @@ def test_db_engine(test_db_connection_url):
     from app.db.session import get_db
 
     # Override get_db for all route modules
-    for route_module in [athletes, activities, physiology, wellness, fitness, health, twin_state]:
+    from app.api.routes import coach_messages
+    for route_module in [athletes, activities, physiology, wellness, fitness, health, twin_state, coach_messages]:
         route_module.get_db = override_get_db(engine)
 
     # Also override in the main app's dependency overrides
@@ -287,3 +288,33 @@ def mock_minio():
     """Mock fixture for MinIO."""
     from unittest.mock import AsyncMock
     return AsyncMock()
+
+
+# ============================================================================
+# LLM Mock Fixtures
+# ============================================================================
+
+
+@pytest.fixture
+def mock_litellm_client():
+    """Mock fixture for LLM client - returns a mock with chat.completions.create as an AsyncMock."""
+    from unittest.mock import AsyncMock, MagicMock
+
+    client = MagicMock()
+    client.chat.completions.create = AsyncMock()
+    return client
+
+
+@pytest.fixture
+def mock_litellm_success_response():
+    """Mock fixture returning a mock response object for successful LLM calls."""
+    from unittest.mock import MagicMock
+
+    response = MagicMock()
+    response.choices = [MagicMock()]
+    response.choices[0].message.content = "First paragraph.\n\nSecond paragraph.\n\nThird paragraph."
+    response.choices[0].finish_reason = "stop"
+    response.usage = MagicMock()
+    response.usage.prompt_tokens = 100
+    response.usage.completion_tokens = 200
+    return response

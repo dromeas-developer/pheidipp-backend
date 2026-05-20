@@ -35,14 +35,16 @@ def make_twin_state(
     structural_capacity_score = overrides.pop("structural_capacity_score", 0.7)
     fitness_time_constant = overrides.pop("fitness_time_constant", 42.0)
     fatigue_time_constant = overrides.pop("fatigue_time_constant", 7.0)
+    confidence_level = overrides.pop("confidence_level", ConfidenceLevel.LOW)
+    data_tier = overrides.pop("data_tier", DataTier.TIER1)
 
     return TwinState(
         id=uuid.uuid4(),
         athlete_id=athlete_id,
         athlete_preferences_id=athlete_preferences_id,
         trigger=TwinTrigger.QUESTIONNAIRE,
-        confidence_level=ConfidenceLevel.LOW,
-        data_tier=DataTier.TIER1,
+        confidence_level=confidence_level,
+        data_tier=data_tier,
         fitness_score=fitness_score,
         fatigue_score=fatigue_score,
         max_hr_estimate=max_hr_estimate,
@@ -156,13 +158,15 @@ def make_twin_state_create_schema(
     structural_capacity_score = overrides.pop("structural_capacity_score", 0.7)
     fitness_time_constant = overrides.pop("fitness_time_constant", 42.0)
     fatigue_time_constant = overrides.pop("fatigue_time_constant", 7.0)
+    confidence_level = overrides.pop("confidence_level", ConfidenceLevel.LOW)
+    data_tier = overrides.pop("data_tier", DataTier.TIER1)
 
     return TwinStateCreate(
         athlete_id=athlete_id,
         athlete_preferences_id=athlete_preferences_id,
         trigger=TwinTrigger.QUESTIONNAIRE,
-        confidence_level=ConfidenceLevel.LOW,
-        data_tier=DataTier.TIER1,
+        confidence_level=confidence_level,
+        data_tier=data_tier,
         fitness_score=fitness_score,
         fatigue_score=fatigue_score,
         max_hr_estimate=max_hr_estimate,

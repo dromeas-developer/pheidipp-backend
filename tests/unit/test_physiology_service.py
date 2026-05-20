@@ -55,6 +55,7 @@ async def test_create_physiology_record_without_overlap(service, physiology_repo
     physiology_repo_mock.has_overlap = AsyncMock(return_value=False)
 
     create_data = AthletePhysiologyCreate(
+        athlete_id=athlete_id,
         ftp=280,
         lt1=220,
         lt2=250,
@@ -82,7 +83,7 @@ async def test_create_physiology_record_without_overlap(service, physiology_repo
 
     physiology_repo_mock.create = AsyncMock(return_value=created_physiology)
 
-    result = await service.create(athlete_id, create_data)
+    result = await service.create(create_data)
 
     assert result.id == physiology_id
     assert result.athlete_id == athlete_id
@@ -112,6 +113,7 @@ async def test_create_physiology_record_detects_overlap(service, physiology_repo
     physiology_repo_mock.has_overlap = AsyncMock(return_value=True)
 
     create_data = AthletePhysiologyCreate(
+        athlete_id=athlete_id,
         ftp=280,
         lt1=220,
         lt2=250,
@@ -121,7 +123,7 @@ async def test_create_physiology_record_detects_overlap(service, physiology_repo
     )
 
     with pytest.raises(ValueError, match="Date range overlaps with an existing physiology record"):
-        await service.create(athlete_id, create_data)
+        await service.create(create_data)
 
     physiology_repo_mock.has_overlap.assert_called_once_with(
         athlete_id,
@@ -140,13 +142,14 @@ async def test_create_physiology_raises_error_for_missing_athlete(service, physi
     athlete_repo_mock.get_by_id = AsyncMock(return_value=None)
 
     create_data = AthletePhysiologyCreate(
+        athlete_id=athlete_id,
         ftp=280,
         source=DataSource.MANUAL,
         effective_from=date(2024, 1, 1),
     )
 
     with pytest.raises(ValueError, match="Athlete not found"):
-        await service.create(athlete_id, create_data)
+        await service.create(create_data)
 
     physiology_repo_mock.create.assert_not_called()
 
@@ -159,6 +162,7 @@ async def test_create_physiology_raises_error_for_invalid_date_range(service, ph
     athlete_repo_mock.get_by_id = AsyncMock(return_value=True)
 
     create_data = AthletePhysiologyCreate(
+        athlete_id=athlete_id,
         ftp=280,
         source=DataSource.MANUAL,
         effective_from=date(2024, 6, 30),
@@ -166,7 +170,7 @@ async def test_create_physiology_raises_error_for_invalid_date_range(service, ph
     )
 
     with pytest.raises(ValueError, match="effective_from must be <= effective_to"):
-        await service.create(athlete_id, create_data)
+        await service.create(create_data)
 
     physiology_repo_mock.create.assert_not_called()
 

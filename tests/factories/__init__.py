@@ -16,6 +16,11 @@ from tests.factories.athlete_preferences_factory import (
     make_athlete_preferences_full,
     make_athlete_preferences_batch,
 )
+from tests.factories.coach_message_factory import (
+    make_coach_message,
+    make_coach_message_full,
+    make_coach_message_batch,
+)
 from tests.factories.fitness_factory import (
     make_athlete_fitness,
     make_athlete_fitness_full,
@@ -60,6 +65,10 @@ __all__ = [
     "make_athlete_preferences",
     "make_athlete_preferences_full",
     "make_athlete_preferences_batch",
+    # Coach Message
+    "make_coach_message",
+    "make_coach_message_full",
+    "make_coach_message_batch",
     # Fitness
     "make_athlete_fitness",
     "make_athlete_fitness_full",

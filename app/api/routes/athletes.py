@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 
@@ -8,11 +8,14 @@ from app.api.dependencies import (
     get_athlete_profile_service,
     get_athlete_service,
     get_fitness_service,
+    get_physiology_service,
     get_training_block_service,
     get_wellness_service,
     get_onboarding_service,
     get_twin_state_service,
+    get_coach_message_service,
 )
+from app.tasks.first_message_task import generate_first_coach_message
 from app.db.session import get_db
 from app.core.unit_of_work import UnitOfWork
 from app.services.athlete_service import AthleteService
@@ -41,11 +44,13 @@ from app.schemas.wellness import (
     WellnessResponse,
 )
 from app.services.fitness_service import FitnessService
+from app.services.physiology_service import PhysiologyService
 from app.schemas.fitness import (
     FitnessListParams,
     FitnessListResponse,
     FitnessResponse,
 )
+from app.schemas.physiology import AthletePhysiologyResponse
 from app.services.athlete_preferences_service import AthletePreferencesService
 from app.schemas.athlete_preferences import AthletePreferencesResponse
 from app.services.training_block_service import TrainingBlockService
@@ -58,6 +63,7 @@ from app.schemas.onboarding import (
 from app.schemas.twin_state import TwinStateResponse
 from app.services.onboarding_service import OnboardingService
 from app.services.twin_state_service import TwinStateService
+from app.services.coach_message_service import CoachMessageService
 
 router = APIRouter(prefix="/athletes", tags=["athletes"])
 
@@ -162,6 +168,42 @@ async def list_athlete_fitness(
     )
 
 
+@router.get("/{athlete_id}/physiology", response_model=list[AthletePhysiologyResponse])
+async def list_athlete_physiology(
+    athlete_id: UUID,
+    skip: int = 0,
+    limit: int = 50,
+    service: PhysiologyService = Depends(get_physiology_service),
+) -> list[AthletePhysiologyResponse]:
+    try:
+        results = await service.list_by_athlete(athlete_id, skip=skip, limit=limit)
+        return [AthletePhysiologyResponse.model_validate(r) for r in results]
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get("/{athlete_id}/physiology/effective", response_model=AthletePhysiologyResponse)
+async def get_effective_physiology(
+    athlete_id: UUID,
+    target_date: str,
+    service: PhysiologyService = Depends(get_physiology_service),
+) -> AthletePhysiologyResponse:
+    from datetime import date
+
+    try:
+        target = date.fromisoformat(target_date)
+    except ValueError:
+        raise HTTPException(
+            status_code=400, detail="Invalid date format, use YYYY-MM-DD"
+        )
+    result = await service.get_effective(athlete_id, target)
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="No effective record"
+        )
+    return AthletePhysiologyResponse.model_validate(result)
+
+
 @router.get(
     "/{athlete_id}/preferences",
     response_model=AthletePreferencesResponse,
@@ -228,6 +270,7 @@ ONBOARDABLE_STATUSES = {AthleteStatus.ACTIVE}
 async def onboard_athlete(
     athlete_id: UUID,
     payload: OnboardingRequest,
+    background_tasks: BackgroundTasks,
     athlete_service: AthleteService = Depends(get_athlete_service),
     onboarding_service: OnboardingService = Depends(get_onboarding_service),
     db: AsyncSession = Depends(get_db),
@@ -312,16 +355,21 @@ async def onboard_athlete(
             await onboarding_service.complete_onboarding(athlete_id, payload, uow)
         )
 
-    return OnboardingResponse(
+    response = OnboardingResponse(
         onboarding_complete=True,
         preferences=AthletePreferencesResponse.model_validate(preferences),
         training_block=TrainingBlockResponse.model_validate(training_block),
         twin_state=TwinStateResponse.model_validate(twin_state),
     )
 
+    # Trigger first message generation after transaction commits
+    background_tasks.add_task(generate_first_coach_message, athlete_id)
+
+    return response
+
 
 @router.get(
-    "/{athlete_id}/onboarding",
+    "/{athlete_id}/onboarding/status",
     response_model=OnboardingStatusResponse,
     summary="Get athlete onboarding status",
 )
@@ -331,6 +379,7 @@ async def get_onboarding_status(
     ap_service: AthletePreferencesService = Depends(get_athlete_preferences_service),
     tb_service: TrainingBlockService = Depends(get_training_block_service),
     twin_service: TwinStateService = Depends(get_twin_state_service),
+    coach_message_service: CoachMessageService = Depends(get_coach_message_service),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -351,9 +400,11 @@ async def get_onboarding_status(
 
     # Get current twin state
     twin_state = None
+    first_message_ready = False
     if athlete.onboarding_complete:
         async with UnitOfWork(db) as uow:
             twin_state = await twin_service.get_current_twin_state(athlete_id, uow)
+            first_message_ready = await coach_message_service.has_first_message(athlete_id, uow)
 
     return OnboardingStatusResponse(
         onboarding_complete=athlete.onboarding_complete,
@@ -366,4 +417,5 @@ async def get_onboarding_status(
             if training_block else None
         ),
         twin_state=twin_state,
+        first_message_ready=first_message_ready,
     )

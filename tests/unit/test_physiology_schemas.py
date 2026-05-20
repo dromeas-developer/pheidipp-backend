@@ -90,6 +90,7 @@ def test_athlete_physiology_base_invalid_date_order():
 def test_athlete_physiology_create_valid():
     """Test AthletePhysiologyCreate with valid data."""
     data = {
+        "athlete_id": uuid.uuid4(),
         "ftp": 280,
         "lt1": 220,
         "lt2": 250,
@@ -99,7 +100,7 @@ def test_athlete_physiology_create_valid():
         "effective_from": date(2024, 1, 1),
         "effective_to": date(2024, 12, 31),
     }
-    
+
     physiology = AthletePhysiologyCreate.model_validate(data)
     assert physiology.ftp == 280
     assert physiology.source == WellnessSource.MANUAL

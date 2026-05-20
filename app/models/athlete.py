@@ -25,6 +25,7 @@ if TYPE_CHECKING:
     from app.models.athlete_preferences import AthletePreferences
     from app.models.training_block import TrainingBlock
     from app.models.twin_state import TwinState
+    from app.models.coach_message import CoachMessage
 
 
 
@@ -100,4 +101,9 @@ class Athlete(Base):
         back_populates="athlete",
         cascade="all, delete-orphan",
         order_by="TwinState.created_at.desc()",
+    )
+    coach_messages: Mapped[list["CoachMessage"]] = relationship(
+        back_populates="athlete",
+        cascade="all, delete-orphan",
+        order_by="CoachMessage.created_at.desc()",
     )

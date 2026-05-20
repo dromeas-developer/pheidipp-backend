@@ -61,6 +61,10 @@ from app.schemas.twin_state import (
     TwinStateCreate,
     TwinStateResponse,
 )
+from app.schemas.coach_message import (
+    CoachMessageResponse,
+    CoachMessageListResponse,
+)
 
 __all__ = [
     "ActivityBase",
@@ -106,4 +110,6 @@ __all__ = [
     "TwinStateBase",
     "TwinStateCreate",
     "TwinStateResponse",
+    "CoachMessageResponse",
+    "CoachMessageListResponse",
     ]

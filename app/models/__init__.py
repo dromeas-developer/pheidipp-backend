@@ -16,6 +16,8 @@ from app.models.enums import (
     TwinTrigger,
     ConfidenceLevel,
     DataTier,
+    MessageType,
+    GenerationOutcome,
 )
 from app.models.athlete import Athlete
 from app.models.athlete_profile import AthleteProfile
@@ -25,6 +27,7 @@ from app.models.fitness import AthleteFitness
 from app.models.athlete_preferences import AthletePreferences
 from app.models.training_block import TrainingBlock
 from app.models.twin_state import TwinState
+from app.models.coach_message import CoachMessage
 
 
 __all__ = [
@@ -47,6 +50,8 @@ __all__ = [
     "TwinTrigger",
     "ConfidenceLevel",
     "DataTier",
+    "MessageType",
+    "GenerationOutcome",
     "Athlete",
     "AthleteProfile",
     "AthletePhysiology",
@@ -55,4 +60,5 @@ __all__ = [
     "AthletePreferences",
     "TrainingBlock",
     "TwinState",
+    "CoachMessage",
     ]

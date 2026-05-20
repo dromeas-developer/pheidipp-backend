@@ -907,7 +907,7 @@ class TestOnboardAthleteEndpoint:
 
 
 class TestGetOnboardingStatusEndpoint:
-    """Tests for GET /athletes/{athlete_id}/onboarding endpoint."""
+    """Tests for GET /athletes/{athlete_id}/onboarding/status endpoint."""
 
     @pytest.mark.asyncio
     async def test_get_onboarding_status_not_onboarded(self, client: AsyncClient):
@@ -920,7 +920,7 @@ class TestGetOnboardingStatusEndpoint:
         create_response = await client.post("/athletes/", json=create_payload)
         athlete_id = create_response.json()["id"]
 
-        response = await client.get(f"/athletes/{athlete_id}/onboarding")
+        response = await client.get(f"/athletes/{athlete_id}/onboarding/status")
 
         assert response.status_code == 200
         data = response.json()
@@ -982,7 +982,7 @@ class TestGetOnboardingStatusEndpoint:
         await client.post(f"/athletes/{athlete_id}/onboarding", json=onboarding_payload)
 
         # Get onboarding status
-        response = await client.get(f"/athletes/{athlete_id}/onboarding")
+        response = await client.get(f"/athletes/{athlete_id}/onboarding/status")
 
         assert response.status_code == 200
         data = response.json()
@@ -994,7 +994,7 @@ class TestGetOnboardingStatusEndpoint:
     async def test_get_onboarding_status_404_for_nonexistent_athlete(self, client: AsyncClient):
         """Test getting onboarding status for nonexistent athlete returns 404."""
         fake_id = str(uuid.uuid4())
-        response = await client.get(f"/athletes/{fake_id}/onboarding")
+        response = await client.get(f"/athletes/{fake_id}/onboarding/status")
 
         assert response.status_code == 404
 
@@ -1052,7 +1052,7 @@ class TestGetOnboardingStatusEndpoint:
         await client.post(f"/athletes/{athlete_id}/onboarding", json=onboarding_payload)
 
         # Get onboarding status
-        response = await client.get(f"/athletes/{athlete_id}/onboarding")
+        response = await client.get(f"/athletes/{athlete_id}/onboarding/status")
 
         assert response.status_code == 200
         data = response.json()
@@ -1113,7 +1113,7 @@ class TestGetOnboardingStatusEndpoint:
         await client.post(f"/athletes/{athlete_id}/onboarding", json=onboarding_payload)
 
         # Get onboarding status
-        response = await client.get(f"/athletes/{athlete_id}/onboarding")
+        response = await client.get(f"/athletes/{athlete_id}/onboarding/status")
 
         assert response.status_code == 200
         data = response.json()

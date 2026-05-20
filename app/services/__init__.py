@@ -8,6 +8,11 @@ from app.services.athlete_preferences_service import AthletePreferencesService
 from app.services.twin_state_service import TwinStateService
 from app.services.twin_initialisation_service import TwinInitialisationService
 from app.services.onboarding_service import OnboardingService
+from app.services.coach_message_service import CoachMessageService
+from app.services.first_message_brief_builder import (
+    FirstMessageBriefBuilder,
+    ContextBudget,
+)
 
 
 __all__ = [
@@ -21,4 +26,7 @@ __all__ = [
     "TwinStateService",
     "TwinInitialisationService",
     "OnboardingService",
+    "CoachMessageService",
+    "FirstMessageBriefBuilder",
+    "ContextBudget",
     ]

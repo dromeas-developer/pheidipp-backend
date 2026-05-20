@@ -81,8 +81,8 @@ class TestUnitOfWorkRepositories:
     """Tests for UnitOfWork repository access."""
 
     @pytest.mark.asyncio
-    async def test_exposes_all_five_repositories(self, mock_session_not_in_transaction):
-        """Verify UnitOfWork exposes all five repositories via attribute access."""
+    async def test_exposes_all_six_repositories(self, mock_session_not_in_transaction):
+        """Verify UnitOfWork exposes all six repositories via attribute access."""
         uow = UnitOfWork(mock_session_not_in_transaction)
         async with uow as u:
             assert hasattr(u, "athletes")
@@ -90,6 +90,7 @@ class TestUnitOfWorkRepositories:
             assert hasattr(u, "blocks")
             assert hasattr(u, "twin_states")
             assert hasattr(u, "profiles")
+            assert hasattr(u, "coach_messages")
 
     @pytest.mark.asyncio
     async def test_accessing_repository_outside_async_with_raises_runtime_error(
@@ -127,3 +128,4 @@ class TestUnitOfWorkRepositories:
             assert u.blocks.session is mock_session_not_in_transaction
             assert u.twin_states.session is mock_session_not_in_transaction
             assert u.profiles.session is mock_session_not_in_transaction
+            assert u.coach_messages.session is mock_session_not_in_transaction

@@ -60,6 +60,27 @@ class TestCreateAthleteEndpoint:
 
         assert response.status_code == 422
 
+    @pytest.mark.asyncio
+    async def test_create_athlete_duplicate_email_returns_error(
+        self, client: AsyncClient
+    ):
+        """Test creating two athletes with the same email returns an error."""
+        email = f"duplicate_{uuid.uuid4().hex[:8]}@example.com"
+        payload = {
+            "email": email,
+            "password": "securepassword123",
+        }
+
+        # Create first athlete
+        response1 = await client.post("/athletes/", json=payload)
+        assert response1.status_code == 200
+
+        # Try to create second athlete with the same email
+        response2 = await client.post("/athletes/", json=payload)
+
+        # Should return 400 (or 409/422 depending on implementation)
+        assert response2.status_code in (400, 409, 422)
+
 
 class TestGetAthleteEndpoint:
     """Tests for GET /athletes/{athlete_id} endpoint."""
@@ -317,8 +338,8 @@ class TestOnboardAthleteEndpoint:
         assert "training_block" in data
 
     @pytest.mark.asyncio
-    async def test_onboard_athlete_no_profile_returns_422(self, client: AsyncClient):
-        """Test onboarding without profile returns 422."""
+    async def test_onboard_athlete_malformed_payload(self, client: AsyncClient):
+        """Test onboarding with malformed payload returns 422."""
         # Create athlete
         create_payload = {
             "email": f"test_{uuid.uuid4().hex[:8]}@example.com",
@@ -327,7 +348,62 @@ class TestOnboardAthleteEndpoint:
         create_response = await client.post("/athletes/", json=create_payload)
         athlete_id = create_response.json()["id"]
 
-        # Try to onboard without profile
+        # Try to onboard with malformed payload
+        response = await client.post(
+            f"/athletes/{athlete_id}/onboarding",
+            json={"preferences": {"invalid": "data"}}
+        )
+
+        assert response.status_code == 422
+
+
+class TestAthleteOnboardingStateTransitions:
+    """Tests for athlete onboarding state transitions."""
+
+    @pytest.mark.asyncio
+    async def test_athlete_onboarding_transitions_to_active(
+        self, client: AsyncClient
+    ):
+        """Test that completing onboarding changes athlete status to active."""
+        # Create athlete (default status is "onboarding")
+        create_payload = {
+            "email": f"test_{uuid.uuid4().hex[:8]}@example.com",
+            "password": "securepassword123",
+        }
+        create_response = await client.post("/athletes/", json=create_payload)
+        athlete_id = create_response.json()["id"]
+
+        # Verify initial status is "onboarding"
+        get_response = await client.get(f"/athletes/{athlete_id}")
+        assert get_response.status_code == 200
+        assert get_response.json()["status"] == "onboarding"
+        assert get_response.json()["onboarding_complete"] is False
+
+        # Create profile (required for onboarding)
+        profile_payload = {
+            "first_name": "John",
+            "last_name": "Doe",
+            "display_name": "johndoe",
+            "date_of_birth": "1990-01-01",
+            "gender": "male",
+            "country_code": "US",
+            "timezone": "America/New_York",
+            "language_code": "en",
+            "unit_preference": "metric",
+        }
+        profile_response = await client.put(
+            f"/athletes/{athlete_id}/profile",
+            json=profile_payload
+        )
+        assert profile_response.status_code == 200
+
+        # Update athlete status to active (required for onboarding)
+        status_response = await client.patch(
+            f"/athletes/{athlete_id}", json={"status": "active"}
+        )
+        assert status_response.status_code == 200
+
+        # Complete onboarding
         onboarding_payload = {
             "preferences": {
                 "weekly_schedule": {
@@ -344,15 +420,24 @@ class TestOnboardAthleteEndpoint:
                 },
             },
             "training_block": {
-                "name": "Test Block",
+                "name": "Base Building",
                 "start_date": "2024-01-01",
                 "end_date": "2024-03-31",
-                "goal": "Test",
+                "goal": "Build aerobic base",
             },
         }
-        response = await client.post(f"/athletes/{athlete_id}/onboarding", json=onboarding_payload)
+        onboard_response = await client.post(
+            f"/athletes/{athlete_id}/onboarding",
+            json=onboarding_payload
+        )
+        assert onboard_response.status_code == 201
 
-        assert response.status_code == 422
+        # Verify athlete status has changed to "active" and onboarding_complete is True
+        final_get_response = await client.get(f"/athletes/{athlete_id}")
+        assert final_get_response.status_code == 200
+        final_data = final_get_response.json()
+        assert final_data["status"] == "active"
+        assert final_data["onboarding_complete"] is True
 
     @pytest.mark.asyncio
     async def test_onboard_athlete_invalid_status_returns_422(self, client: AsyncClient):

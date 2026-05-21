@@ -65,6 +65,23 @@ from app.schemas.coach_message import (
     CoachMessageResponse,
     CoachMessageListResponse,
 )
+from app.schemas.plan_generation import (
+    MethodologyProfile,
+    SessionAssignment,
+    WeekPlan,
+    PlanBlueprint,
+    PhaseArcPhase,
+    PhaseArc,
+    ConstraintViolation,
+    ValidationResult,
+)
+from app.schemas.training_plan import (
+    TrainingPlanBase,
+    PlannedSessionBase,
+    TrainingPlanResponse,
+    TrainingPlanListItem,
+    TrainingPlanListResponse,
+)
 
 __all__ = [
     "ActivityBase",
@@ -112,4 +129,17 @@ __all__ = [
     "TwinStateResponse",
     "CoachMessageResponse",
     "CoachMessageListResponse",
+    "MethodologyProfile",
+    "SessionAssignment",
+    "WeekPlan",
+    "PlanBlueprint",
+    "PhaseArcPhase",
+    "PhaseArc",
+    "ConstraintViolation",
+    "ValidationResult",
+    "TrainingPlanBase",
+    "PlannedSessionBase",
+    "TrainingPlanResponse",
+    "TrainingPlanListItem",
+    "TrainingPlanListResponse",
     ]

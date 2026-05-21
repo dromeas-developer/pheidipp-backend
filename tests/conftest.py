@@ -7,6 +7,7 @@ from typing import Any
 import pytest
 from fastapi import FastAPI
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
 
 # Add the project root to the Python path
 import sys
@@ -18,6 +19,9 @@ sys.path.insert(0, str(project_root))
 
 from app.main import app
 from app.db import session as db_session
+from app.models.athlete import Athlete
+from app.models.enums import AthleteStatus
+from app.repositories.athlete_repository import AthleteRepository
 
 
 # ============================================================================
@@ -89,8 +93,8 @@ def test_db_engine(test_db_connection_url):
     from app.db.session import get_db
 
     # Override get_db for all route modules
-    from app.api.routes import coach_messages
-    for route_module in [athletes, activities, physiology, wellness, fitness, health, twin_state, coach_messages]:
+    from app.api.routes import coach_messages, training_plans
+    for route_module in [athletes, activities, physiology, wellness, fitness, health, twin_state, coach_messages, training_plans]:
         route_module.get_db = override_get_db(engine)
 
     # Also override in the main app's dependency overrides
@@ -167,6 +171,23 @@ async def clean_db_tables(test_db_engine):
         async with session.begin():
             for table in reversed(tables):
                 await session.execute(delete(table))
+
+
+# ============================================================================
+# Shared Test Data Fixtures
+# ============================================================================
+
+
+@pytest.fixture
+async def test_athlete(test_db_session: AsyncSession) -> Athlete:
+    """Create a test athlete in the database."""
+    repo = AthleteRepository(test_db_session)
+    athlete = await repo.create(
+        email=f"test_athlete_{uuid.uuid4().hex[:8]}@example.com",
+        hashed_password=None,
+        status=AthleteStatus.ACTIVE,
+    )
+    return athlete
 
 
 # ============================================================================

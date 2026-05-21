@@ -13,6 +13,15 @@ from app.services.first_message_brief_builder import (
     FirstMessageBriefBuilder,
     ContextBudget,
 )
+from app.services.phase_arc_computer import PhaseArcComputer
+from app.services.methodology_profile_builder import MethodologyProfileBuilder
+from app.services.plan_generation_brief_builder import (
+    PlanGenerationBriefBuilder,
+    PlanGenerationBrief,
+)
+from app.services.plan_constraint_validator import PlanConstraintValidator
+from app.services.plan_repair_engine import PlanRepairEngine
+from app.services.training_plan_service import TrainingPlanService
 
 
 __all__ = [
@@ -29,4 +38,11 @@ __all__ = [
     "CoachMessageService",
     "FirstMessageBriefBuilder",
     "ContextBudget",
+    "PhaseArcComputer",
+    "MethodologyProfileBuilder",
+    "PlanGenerationBriefBuilder",
+    "PlanGenerationBrief",
+    "PlanConstraintValidator",
+    "PlanRepairEngine",
+    "TrainingPlanService",
     ]

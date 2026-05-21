@@ -343,3 +343,121 @@ class TestListAthleteFitnessEndpoint:
         data = response.json()
         assert data["items"] == []
         assert data["total"] == 0
+
+
+class TestCreateFitnessInvalidPayload:
+    """Tests for invalid payload handling on POST /fitness/ endpoint."""
+
+    @pytest.mark.asyncio
+    async def test_create_fitness_missing_required_fields_returns_422(
+        self, client: AsyncClient
+    ):
+        """Test creating a fitness record with missing required fields returns 422."""
+        # Payload missing athlete_id and metric_date (both required)
+        payload = {
+            "tss": 75.5,
+        }
+
+        response = await client.post("/fitness/", json=payload)
+
+        assert response.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_create_fitness_invalid_date_format_returns_422(
+        self, client: AsyncClient, athlete_in_db: Athlete
+    ):
+        """Test creating a fitness record with invalid metric_date format returns 422."""
+        payload = {
+            "athlete_id": str(athlete_in_db.id),
+            "metric_date": "not-a-date",
+            "tss": 75.5,
+        }
+
+        response = await client.post("/fitness/", json=payload)
+
+        assert response.status_code == 422
+
+
+class TestFitnessAthleteIsolation:
+    """Tests for athlete data isolation on fitness endpoints."""
+
+    @pytest.mark.asyncio
+    async def test_athlete_b_cannot_see_athlete_a_fitness_records(
+        self, test_db_session: AsyncSession, client: AsyncClient
+    ):
+        """Test that athlete B cannot see athlete A's fitness records via list endpoint."""
+        athlete_repo = AthleteRepository(test_db_session)
+
+        # Create two athletes
+        athlete_a = await athlete_repo.create(
+            id=uuid.uuid4(),
+            email=f"test_{uuid.uuid4().hex[:8]}@example.com",
+            hashed_password=None,
+            status=AthleteStatus.ACTIVE,
+        )
+        athlete_b = await athlete_repo.create(
+            id=uuid.uuid4(),
+            email=f"test_{uuid.uuid4().hex[:8]}@example.com",
+            hashed_password=None,
+            status=AthleteStatus.ACTIVE,
+        )
+
+        # Create fitness records for athlete A
+        for i in range(3):
+            payload = {
+                "athlete_id": str(athlete_a.id),
+                "metric_date": f"2024-01-0{i+1}",
+                "tss": 75.5 + i * 10,
+            }
+            response = await client.post("/fitness/", json=payload)
+            assert response.status_code == 201
+
+        # List fitness records for athlete B - should be empty
+        response = await client.get(f"/athletes/{athlete_b.id}/fitness")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["items"]) == 0
+        assert data["total"] == 0
+
+    @pytest.mark.asyncio
+    async def test_athlete_b_list_does_not_include_athlete_a_records(
+        self, test_db_session: AsyncSession, client: AsyncClient
+    ):
+        """Test that athlete B's fitness list does not contain athlete A's specific record IDs."""
+        athlete_repo = AthleteRepository(test_db_session)
+
+        # Create two athletes
+        athlete_a = await athlete_repo.create(
+            id=uuid.uuid4(),
+            email=f"test_{uuid.uuid4().hex[:8]}@example.com",
+            hashed_password=None,
+            status=AthleteStatus.ACTIVE,
+        )
+        athlete_b = await athlete_repo.create(
+            id=uuid.uuid4(),
+            email=f"test_{uuid.uuid4().hex[:8]}@example.com",
+            hashed_password=None,
+            status=AthleteStatus.ACTIVE,
+        )
+
+        # Create fitness records for athlete A
+        fitness_ids_athlete_a = []
+        for i in range(2):
+            payload = {
+                "athlete_id": str(athlete_a.id),
+                "metric_date": f"2024-01-0{i+1}",
+                "tss": 75.5,
+            }
+            response = await client.post("/fitness/", json=payload)
+            assert response.status_code == 201
+            fitness_ids_athlete_a.append(response.json()["id"])
+
+        # List fitness records for athlete B - should not include athlete A's IDs
+        response = await client.get(f"/athletes/{athlete_b.id}/fitness")
+
+        assert response.status_code == 200
+        data = response.json()
+
+        for item in data["items"]:
+            assert item["id"] not in fitness_ids_athlete_a

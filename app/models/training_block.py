@@ -23,6 +23,7 @@ from app.models.enums import GoalType, GoalEventType, GoalStatus
 
 if TYPE_CHECKING:
     from app.models.athlete import Athlete
+    from app.models.training_plan import TrainingPlan
 
 
 class TrainingBlock(Base):
@@ -72,6 +73,10 @@ class TrainingBlock(Base):
     )
 
     athlete: Mapped["Athlete"] = relationship(back_populates="training_blocks")
+    training_plans: Mapped[list["TrainingPlan"]] = relationship(
+        back_populates="training_block",
+        cascade="all, delete-orphan",
+    )
 
     __table_args__ = (
         # DB-level domain invariants

@@ -12,6 +12,7 @@ from app.api.dependencies.services import (
     get_athlete_preferences_service,
     get_training_block_service,
     get_physiology_service,
+    get_training_plan_service,
 )
 
 
@@ -176,3 +177,38 @@ class TestRouteFilesNoDirectRepositoryImports:
         # Check that no repository classes are imported
         repo_names = [name for name in dir(physiology_module) if "Repository" in name]
         assert len(repo_names) == 0, f"Found repository imports in physiology.py: {repo_names}"
+
+
+class TestTrainingPlanServiceDependencyFactory:
+    """Tests for the TrainingPlanService dependency factory."""
+
+    def test_get_training_plan_service_returns_training_plan_service_instance(self):
+        """Test get_training_plan_service returns TrainingPlanService instance."""
+        from app.services.training_plan_service import TrainingPlanService
+
+        with patch("app.api.dependencies.services.get_db") as mock_get_db:
+            mock_session = MagicMock()
+            mock_get_db.return_value = mock_session
+
+            service = get_training_plan_service()
+
+            assert isinstance(service, TrainingPlanService)
+
+    def test_get_training_plan_service_has_all_dependencies_instantiated(self):
+        """Test the service has all dependencies instantiated (repos, computers, builders, validator, repair_engine, agent)."""
+        from app.services.training_plan_service import TrainingPlanService
+
+        with patch("app.api.dependencies.services.get_db") as mock_get_db:
+            mock_session = MagicMock()
+            mock_get_db.return_value = mock_session
+
+            service = get_training_plan_service()
+
+            assert service.training_plan_repo is not None
+            assert service.planned_session_repo is not None
+            assert service.phase_arc_computer is not None
+            assert service.brief_builder is not None
+            assert service.methodology_profile_builder is not None
+            assert service.validator is not None
+            assert service.repair_engine is not None
+            assert service.agent is not None

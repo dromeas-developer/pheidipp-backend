@@ -9,6 +9,8 @@ from app.repositories.training_block_repository import TrainingBlockRepository
 from app.repositories.athlete_preferences_repository import AthletePreferencesRepository
 from app.repositories.twin_state_repository import TwinStateRepository
 from app.repositories.coach_message_repository import CoachMessageRepository
+from app.repositories.training_plan_repository import TrainingPlanRepository
+from app.repositories.planned_session_repository import PlannedSessionRepository
 
 
 __all__ = [
@@ -23,4 +25,6 @@ __all__ = [
     "AthletePreferencesRepository",
     "TwinStateRepository",
     "CoachMessageRepository",
+    "TrainingPlanRepository",
+    "PlannedSessionRepository",
     ]

@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = Field(default="INFO", env="LOG_LEVEL")
     LITELLM_API_KEY: str = Field(default="", env="LITELLM_API_KEY")
     LITELLM_BASE_URL: str = Field(default="http://litellm:4000/v1", env="LITELLM_BASE_URL")
-    LLM_MODEL: str = Field(default="claude-sonnet-4-6", env="LLM_MODEL")
+    LLM_MODEL: str = Field(default="cohere/command-a-plus", env="LLM_MODEL")
 
     model_config = SettingsConfigDict(env_file=".env", extra="allow")
 

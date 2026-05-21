@@ -129,3 +129,23 @@ class TestUnitOfWorkRepositories:
             assert u.twin_states.session is mock_session_not_in_transaction
             assert u.profiles.session is mock_session_not_in_transaction
             assert u.coach_messages.session is mock_session_not_in_transaction
+            assert u.training_plans.session is mock_session_not_in_transaction
+            assert u.planned_sessions.session is mock_session_not_in_transaction
+
+    @pytest.mark.asyncio
+    async def test_exposes_training_plans_repository(self, mock_session_not_in_transaction):
+        """Verify UnitOfWork exposes training_plans repository."""
+        uow = UnitOfWork(mock_session_not_in_transaction)
+        async with uow:
+            assert hasattr(uow, "training_plans")
+            from app.repositories.training_plan_repository import TrainingPlanRepository
+            assert isinstance(uow.training_plans, TrainingPlanRepository)
+
+    @pytest.mark.asyncio
+    async def test_exposes_planned_sessions_repository(self, mock_session_not_in_transaction):
+        """Verify UnitOfWork exposes planned_sessions repository."""
+        uow = UnitOfWork(mock_session_not_in_transaction)
+        async with uow:
+            assert hasattr(uow, "planned_sessions")
+            from app.repositories.planned_session_repository import PlannedSessionRepository
+            assert isinstance(uow.planned_sessions, PlannedSessionRepository)

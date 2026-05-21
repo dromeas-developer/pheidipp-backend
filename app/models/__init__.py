@@ -18,6 +18,11 @@ from app.models.enums import (
     DataTier,
     MessageType,
     GenerationOutcome,
+    TrainingPlanStatus,
+    TrainingPhase,
+    SessionType,
+    PhysiologicalIntent,
+    MethodologyTrait,
 )
 from app.models.athlete import Athlete
 from app.models.athlete_profile import AthleteProfile
@@ -28,6 +33,8 @@ from app.models.athlete_preferences import AthletePreferences
 from app.models.training_block import TrainingBlock
 from app.models.twin_state import TwinState
 from app.models.coach_message import CoachMessage
+from app.models.training_plan import TrainingPlan
+from app.models.planned_session import PlannedSession
 
 
 __all__ = [
@@ -52,6 +59,11 @@ __all__ = [
     "DataTier",
     "MessageType",
     "GenerationOutcome",
+    "TrainingPlanStatus",
+    "TrainingPhase",
+    "SessionType",
+    "PhysiologicalIntent",
+    "MethodologyTrait",
     "Athlete",
     "AthleteProfile",
     "AthletePhysiology",
@@ -61,4 +73,6 @@ __all__ = [
     "TrainingBlock",
     "TwinState",
     "CoachMessage",
+    "TrainingPlan",
+    "PlannedSession",
     ]

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
+from sqlalchemy.exc import IntegrityError
 import uuid
 
 from app.core.security import hash_password
@@ -30,7 +31,12 @@ class AthleteService:
         if athlete_data.get("password"):
             athlete_data["hashed_password"] = hash_password(athlete_data["password"])
             del athlete_data["password"]
-        return await self.athlete_repo.create(**athlete_data)
+        try:
+            return await self.athlete_repo.create(**athlete_data)
+        except IntegrityError as e:
+            if "ix_athletes_email" in str(e) or "email" in str(e).lower():
+                raise ValueError("An athlete with this email already exists") from e
+            raise
 
     async def get_athlete(self, athlete_id: uuid.UUID) -> Athlete | None:
         return await self.athlete_repo.get_by_id(athlete_id)

@@ -17,7 +17,7 @@ router = APIRouter(
 )
 
 
-@router.post("/", response_model=AthletePhysiologyResponse)
+@router.post("/", response_model=AthletePhysiologyResponse, status_code=status.HTTP_201_CREATED)
 async def create_physiology(
     payload: AthletePhysiologyCreate,
     service: PhysiologyService = Depends(get_physiology_service),

@@ -161,3 +161,61 @@ class GenerationOutcome(str, enum.Enum):
     MALFORMED = "malformed"
     MISSING_DATA = "missing_data"
     INTERNAL_ERROR = "internal_error"
+
+
+class TrainingPlanStatus(str, enum.Enum):
+    ACTIVE = "active"
+    ARCHIVED = "archived"
+
+
+class TrainingPhase(str, enum.Enum):
+    BASE = "base"
+    BUILD = "build"
+    PEAK = "peak"
+    TAPER = "taper"
+    RACE = "race"
+    RECOVERY = "recovery"
+
+
+class SessionType(str, enum.Enum):
+    REST = "rest"
+    RECOVERY_RUN = "recovery_run"
+    EASY_RUN = "easy_run"
+    LONG_RUN = "long_run"
+    MEDIUM_LONG_RUN = "medium_long_run"
+    STEADY_STATE = "steady_state"
+    TEMPO = "tempo"
+    THRESHOLD = "threshold"
+    VO2MAX = "vo2max"
+    HILL_REPEATS = "hill_repeats"
+    FARTLEK = "fartlek"
+    RACE_SPECIFIC = "race_specific"
+    STRIDES = "strides"
+    DRILLS_MOBILITY = "drills_mobility"
+    CROSS_TRAINING = "cross_training"
+    TEST_SESSION = "test_session"
+    OPTIONAL_RUN = "optional_run"
+
+
+class PhysiologicalIntent(str, enum.Enum):
+    LOW_AEROBIC = "low_aerobic"
+    HIGH_AEROBIC = "high_aerobic"
+    THRESHOLD = "threshold"
+    VO2MAX = "vo2max"
+    RACE_SPECIFIC = "race_specific"
+    NEUROMUSCULAR = "neuromuscular"
+    RECOVERY_SUPPORT = "recovery_support"
+    CALIBRATION = "calibration"
+
+
+class MethodologyTrait(str, enum.Enum):
+    HIGH_AEROBIC_VOLUME = "HIGH_AEROBIC_VOLUME"
+    LOW_INTENSITY_DOMINANT = "LOW_INTENSITY_DOMINANT"
+    THRESHOLD_DENSITY = "THRESHOLD_DENSITY"
+    HIGH_INTENSITY_SPARSE = "HIGH_INTENSITY_SPARSE"
+    HIGH_FREQUENCY = "HIGH_FREQUENCY"
+    STRUCTURAL_DURABILITY = "STRUCTURAL_DURABILITY"
+    RACE_SPECIFICITY = "RACE_SPECIFICITY"
+    VARIETY_EMPHASIS = "VARIETY_EMPHASIS"
+    NEUROMUSCULAR_SUPPORT = "NEUROMUSCULAR_SUPPORT"
+    CONSERVATIVE_PROGRESSION = "CONSERVATIVE_PROGRESSION"

@@ -16,6 +16,7 @@ from app.api.dependencies import (
     get_coach_message_service,
 )
 from app.tasks.first_message_task import generate_first_coach_message
+from app.tasks.plan_generation_task import generate_training_plan
 from app.db.session import get_db
 from app.core.unit_of_work import UnitOfWork
 from app.services.athlete_service import AthleteService
@@ -73,7 +74,10 @@ async def create_athlete(
     payload: AthleteCreate,
     service: AthleteService = Depends(get_athlete_service),
 ):
-    athlete = await service.create_athlete(payload)
+    try:
+        athlete = await service.create_athlete(payload)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     return AthleteResponse.model_validate(athlete)
 
 
@@ -364,6 +368,7 @@ async def onboard_athlete(
 
     # Trigger first message generation after transaction commits
     background_tasks.add_task(generate_first_coach_message, athlete_id)
+    background_tasks.add_task(generate_training_plan, athlete_id)
 
     return response
 

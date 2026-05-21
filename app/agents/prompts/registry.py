@@ -41,8 +41,10 @@ class PromptRegistry:
 
 
 CURRENT_VERSIONS: dict[str, str] = {
-    "first_message": "v1"
+    "first_message": "v1",
+    "plan_generation": "v1"
 }
 
 # Import to trigger registration
 from app.agents.prompts import first_message_v1  # noqa: E402, F401
+from app.agents.prompts import plan_generation_v1  # noqa: E402, F401

@@ -11,6 +11,8 @@ from app.repositories.physiology_repository import PhysiologyRepository
 from app.repositories.training_block_repository import TrainingBlockRepository
 from app.repositories.twin_state_repository import TwinStateRepository
 from app.repositories.wellness_repository import WellnessRepository
+from app.repositories.training_plan_repository import TrainingPlanRepository
+from app.repositories.planned_session_repository import PlannedSessionRepository
 from app.services.activity_service import ActivityService
 from app.services.athlete_profile_service import AthleteProfileService
 from app.services.athlete_preferences_service import AthletePreferencesService
@@ -23,6 +25,13 @@ from app.services.twin_state_service import TwinStateService
 from app.services.twin_initialisation_service import TwinInitialisationService
 from app.services.onboarding_service import OnboardingService
 from app.services.coach_message_service import CoachMessageService
+from app.services.phase_arc_computer import PhaseArcComputer
+from app.services.plan_generation_brief_builder import PlanGenerationBriefBuilder
+from app.services.methodology_profile_builder import MethodologyProfileBuilder
+from app.services.plan_constraint_validator import PlanConstraintValidator
+from app.services.plan_repair_engine import PlanRepairEngine
+from app.services.training_plan_service import TrainingPlanService
+from app.agents.plan_generation_agent import PlanGenerationAgent
 
 
 async def get_activity_service(
@@ -108,3 +117,26 @@ def get_coach_message_service(
     db: AsyncSession = Depends(get_db),
 ) -> CoachMessageService:
     return CoachMessageService()
+
+
+def get_training_plan_service(
+    db: AsyncSession = Depends(get_db),
+) -> TrainingPlanService:
+    plan_repo = TrainingPlanRepository(db)
+    session_repo = PlannedSessionRepository(db)
+    phase_arc_computer = PhaseArcComputer()
+    brief_builder = PlanGenerationBriefBuilder()
+    methodology_builder = MethodologyProfileBuilder()
+    validator = PlanConstraintValidator()
+    repair_engine = PlanRepairEngine()
+    agent = PlanGenerationAgent()
+    return TrainingPlanService(
+        training_plan_repo=plan_repo,
+        planned_session_repo=session_repo,
+        phase_arc_computer=phase_arc_computer,
+        brief_builder=brief_builder,
+        agent=agent,
+        validator=validator,
+        repair_engine=repair_engine,
+        methodology_profile_builder=methodology_builder,
+    )

@@ -47,6 +47,18 @@ from tests.factories.wellness_factory import (
     make_athlete_wellness_full,
     make_athlete_wellness_batch,
 )
+from tests.factories.training_plan_factory import (
+    make_training_plan,
+    make_training_plan_full,
+    make_training_plan_batch,
+    make_archived_training_plan,
+)
+from tests.factories.planned_session_factory import (
+    make_planned_session,
+    make_planned_session_full,
+    make_planned_session_batch,
+    make_week_sessions,
+)
 
 __all__ = [
     # Athlete
@@ -90,4 +102,14 @@ __all__ = [
     "make_athlete_wellness",
     "make_athlete_wellness_full",
     "make_athlete_wellness_batch",
+    # Training Plan
+    "make_training_plan",
+    "make_training_plan_full",
+    "make_training_plan_batch",
+    "make_archived_training_plan",
+    # Planned Session
+    "make_planned_session",
+    "make_planned_session_full",
+    "make_planned_session_batch",
+    "make_week_sessions",
 ]

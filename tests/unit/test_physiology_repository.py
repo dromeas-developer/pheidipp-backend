@@ -270,6 +270,90 @@ class TestHasOverlapWithExcludeId:
         assert has_overlap is True
 
 
+class TestHasOverlapSameDay:
+    """Test overlapping ranges where both start and end dates are the same (single-day range)."""
+
+    async def test_overlap_returns_true_for_same_day_range(
+        self,
+        athlete: Athlete,
+        physiology_repo: PhysiologyRepository,
+    ):
+        """Test has_overlap returns True when new range has identical start and end as existing."""
+        # Create existing record with same start and end date: Mar 15 - Mar 15
+        await _create_physiology(
+            session=physiology_repo.session,
+            athlete_id=athlete.id,
+            effective_from=date(2024, 3, 15),
+            effective_to=date(2024, 3, 15),
+        )
+
+        # New record with the exact same date range
+        has_overlap = await physiology_repo.has_overlap(
+            athlete_id=athlete.id,
+            effective_from=date(2024, 3, 15),
+            effective_to=date(2024, 3, 15),
+        )
+
+        assert has_overlap is True
+
+
+class TestHasOverlapTransactionRollback:
+    """Test that failed overlap inserts roll back the transaction."""
+
+    async def test_overlapping_insert_raises_and_rolls_back(
+        self,
+        athlete: Athlete,
+        physiology_repo: PhysiologyRepository,
+        test_db_session: AsyncSession,
+    ):
+        """Test that overlapping insert raises ValueError and leaves no orphaned records."""
+        from app.services.physiology_service import PhysiologyService
+        from app.repositories.athlete_repository import AthleteRepository
+        from app.schemas.physiology import AthletePhysiologyCreate
+
+        # Create existing open-ended physiology record
+        await _create_physiology(
+            session=physiology_repo.session,
+            athlete_id=athlete.id,
+            effective_from=date(2024, 1, 1),
+            effective_to=None,
+        )
+
+        # Count existing records
+        from sqlalchemy import select, func as sql_func
+        from app.models.physiology import AthletePhysiology
+
+        async def count_records() -> int:
+            result = await test_db_session.execute(
+                select(sql_func.count()).select_from(AthletePhysiology)
+                .where(AthletePhysiology.athlete_id == athlete.id)
+            )
+            return result.scalar_one()
+
+        initial_count = await count_records()
+        assert initial_count == 1
+
+        # Attempt to create overlapping record via service
+        athlete_repo = AthleteRepository(test_db_session)
+        physiology_service = PhysiologyService(physiology_repo, athlete_repo)
+
+        overlapping_data = AthletePhysiologyCreate(
+            athlete_id=athlete.id,
+            ftp=290,
+            source=DataSource.MANUAL,
+            effective_from=date(2024, 6, 15),
+            effective_to=date(2024, 12, 31),
+        )
+
+        # Should raise ValueError for overlapping dates
+        with pytest.raises(ValueError, match="overlaps"):
+            await physiology_service.create(overlapping_data)
+
+        # Verify transaction was rolled back - record count should still be 1
+        final_count = await count_records()
+        assert final_count == 1, "Transaction should have rolled back, no new record persisted"
+
+
 class TestHasOverlapEdgeCases:
     """Edge case tests for has_overlap method."""
 

@@ -100,3 +100,12 @@ class TestCurrentVersions:
     def test_first_message_maps_to_v1(self):
         """Verify CURRENT_VERSIONS maps 'first_message' to 'v1'."""
         assert CURRENT_VERSIONS["first_message"] == "v1"
+
+    def test_plan_generation_maps_to_v1(self):
+        """Verify CURRENT_VERSIONS maps 'plan_generation' to 'v1'."""
+        assert CURRENT_VERSIONS["plan_generation"] == "v1"
+
+    def test_plan_generation_current_resolves_to_v1(self):
+        """Verify PromptRegistry.current('plan_generation') returns the v1 prompt record."""
+        record = PromptRegistry.current("plan_generation")
+        assert record.version == "v1"

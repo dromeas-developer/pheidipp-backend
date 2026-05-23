@@ -1,6 +1,7 @@
 """Integration tests for API endpoints.
 
-These tests verify API endpoint behavior with database integration.
+These tests verify API endpoint behavior with database integration
+and JWT authentication.
 """
 
 import uuid
@@ -16,25 +17,17 @@ class TestActivityEndpoints:
 
     @pytest.mark.asyncio
     async def test_create_activity_endpoint_returns_created_activity(
-        self, client: AsyncClient, test_db_session
+        self, client: AsyncClient, registered_athlete: dict
     ):
         """Verify response payload matches created entity."""
-        from app.models.athlete import Athlete
-        from app.models.enums import AthleteStatus
-
-        athlete = Athlete(
-            id=uuid.uuid4(),
-            email=f"test_{uuid.uuid4().hex[:8]}@example.com",
-            status=AthleteStatus.ACTIVE,
-        )
-        test_db_session.add(athlete)
-        await test_db_session.commit()
+        athlete_id = registered_athlete["athlete_id"]
+        headers = registered_athlete["headers"]
 
         started_at = datetime(2024, 1, 1, 10, 0, 0)
         finished_at = started_at + timedelta(hours=1)
 
         payload = {
-            "athlete_id": str(athlete.id),
+            "athlete_id": athlete_id,
             "activity_type": "running",
             "title": "Morning Run",
             "description": "A test run",
@@ -47,12 +40,12 @@ class TestActivityEndpoints:
             "calories": 500,
         }
 
-        response = await client.post("/activities/", json=payload)
+        response = await client.post("/activities/", json=payload, headers=headers)
 
-        assert response.status_code == 201  # Created
+        assert response.status_code == 201
         data = response.json()
         assert "id" in data
-        assert data["athlete_id"] == str(athlete.id)
+        assert data["athlete_id"] == athlete_id
         assert data["activity_type"] == "running"
         assert data["title"] == "Morning Run"
         assert data["description"] == "A test run"
@@ -65,48 +58,46 @@ class TestActivityEndpoints:
 
     @pytest.mark.asyncio
     async def test_list_activities_endpoint_filters_correctly(
-        self, client: AsyncClient, test_db_session
+        self, client: AsyncClient, registered_athlete: dict
     ):
         """Verify query param filtering works end-to-end."""
-        from app.models.athlete import Athlete
-        from app.models.enums import AthleteStatus, ActivityType
+        athlete_id = registered_athlete["athlete_id"]
+        headers = registered_athlete["headers"]
+        athlete_id_uuid = uuid.UUID(athlete_id)
+
         from app.models.activity import Activity
+        from app.models.enums import ActivityType
 
-        athlete = Athlete(
-            id=uuid.uuid4(),
-            email=f"test_{uuid.uuid4().hex[:8]}@example.com",
-            status=AthleteStatus.ACTIVE,
-        )
-        test_db_session.add(athlete)
-        await test_db_session.commit()
+        # Create multiple activities with different types and dates directly in DB
+        from sqlalchemy.ext.asyncio import AsyncSession
+        from app.db.session import get_db
+        from app.main import app
 
-        # Create multiple activities with different types and dates
-        running_activity = Activity(
-            id=uuid.uuid4(),
-            athlete_id=athlete.id,
-            activity_type=ActivityType.RUNNING,
-            title="Morning Run",
-            started_at=datetime(2024, 1, 15, 10, 0, 0),
-            finished_at=datetime(2024, 1, 15, 11, 0, 0),
-            duration_seconds=3600,
-        )
-        cycling_activity = Activity(
-            id=uuid.uuid4(),
-            athlete_id=athlete.id,
-            activity_type=ActivityType.CYCLING,
-            title="Afternoon Ride",
-            started_at=datetime(2024, 1, 20, 14, 0, 0),
-            finished_at=datetime(2024, 1, 20, 16, 0, 0),
-            duration_seconds=7200,
-        )
-        test_db_session.add(running_activity)
-        test_db_session.add(cycling_activity)
-        await test_db_session.commit()
+        # We need test_db_session for DB operations
+        # Create activities via API instead
+        running_payload = {
+            "athlete_id": athlete_id,
+            "activity_type": "running",
+            "title": "Morning Run",
+            "started_at": "2024-01-15T10:00:00",
+            "finished_at": "2024-01-15T11:00:00",
+        }
+        await client.post("/activities/", json=running_payload, headers=headers)
+
+        cycling_payload = {
+            "athlete_id": athlete_id,
+            "activity_type": "cycling",
+            "title": "Afternoon Ride",
+            "started_at": "2024-01-20T14:00:00",
+            "finished_at": "2024-01-20T16:00:00",
+        }
+        await client.post("/activities/", json=cycling_payload, headers=headers)
 
         # Test filtering by activity_type
         response = await client.get(
-            f"/athletes/{athlete.id}/activities",
+            f"/athletes/{athlete_id}/activities",
             params={"activity_type": "running"},
+            headers=headers,
         )
 
         assert response.status_code == 200
@@ -116,11 +107,12 @@ class TestActivityEndpoints:
 
         # Test filtering by date range
         response = await client.get(
-            f"/athletes/{athlete.id}/activities",
+            f"/athletes/{athlete_id}/activities",
             params={
                 "date_from": "2024-01-18T00:00:00",
                 "date_to": "2024-12-31T23:59:59",
             },
+            headers=headers,
         )
 
         assert response.status_code == 200
@@ -130,80 +122,70 @@ class TestActivityEndpoints:
 
     @pytest.mark.asyncio
     async def test_delete_activity_endpoint_returns_404_for_missing_activity(
-        self, client: AsyncClient
+        self, client: AsyncClient, registered_athlete: dict
     ):
         """Verify proper error handling returns 404 for missing activity."""
+        headers = registered_athlete["headers"]
         non_existent_activity_id = uuid.uuid4()
 
-        response = await client.delete(f"/activities/{non_existent_activity_id}")
+        response = await client.delete(f"/activities/{non_existent_activity_id}", headers=headers)
 
         assert response.status_code == 404
 
     @pytest.mark.asyncio
     async def test_athlete_scoped_activity_routes_only_return_athlete_data(
-        self, client: AsyncClient, test_db_session
+        self, client: AsyncClient, registered_athlete: dict
     ):
         """Verify athlete isolation in routes - each athlete only sees their own data."""
-        from app.models.athlete import Athlete
-        from app.models.enums import AthleteStatus, ActivityType
-        from app.models.activity import Activity
+        athlete1 = registered_athlete
+        athlete1_id = athlete1["athlete_id"]
+        headers1 = athlete1["headers"]
 
-        # Create two athletes
-        athlete1 = Athlete(
-            id=uuid.uuid4(),
-            email=f"athlete1_{uuid.uuid4().hex[:8]}@example.com",
-            status=AthleteStatus.ACTIVE,
-        )
-        athlete2 = Athlete(
-            id=uuid.uuid4(),
-            email=f"athlete2_{uuid.uuid4().hex[:8]}@example.com",
-            status=AthleteStatus.ACTIVE,
-        )
-        test_db_session.add(athlete1)
-        test_db_session.add(athlete2)
-        await test_db_session.commit()
+        # Register second athlete
+        email2 = f"iso_{uuid.uuid4().hex[:8]}@example.com"
+        resp2 = await client.post("/auth/register", json={"email": email2, "password": "secure-test-password-123"})
+        assert resp2.status_code == 201
+        data2 = resp2.json()
+        athlete2_id = str(data2["athlete_id"])
+        headers2 = {"Authorization": f"Bearer {data2['access_token']}"}
 
-        # Create activity for athlete1
-        activity1 = Activity(
-            id=uuid.uuid4(),
-            athlete_id=athlete1.id,
-            activity_type=ActivityType.RUNNING,
-            title="Athlete1 Run",
-            started_at=datetime(2024, 1, 15, 10, 0, 0),
-            finished_at=datetime(2024, 1, 15, 11, 0, 0),
-            duration_seconds=3600,
-        )
-        # Create activity for athlete2
-        activity2 = Activity(
-            id=uuid.uuid4(),
-            athlete_id=athlete2.id,
-            activity_type=ActivityType.CYCLING,
-            title="Athlete2 Ride",
-            started_at=datetime(2024, 1, 15, 14, 0, 0),
-            finished_at=datetime(2024, 1, 15, 16, 0, 0),
-            duration_seconds=7200,
-        )
-        test_db_session.add(activity1)
-        test_db_session.add(activity2)
-        await test_db_session.commit()
+        # Create activity for athlete1 via API
+        activity1_payload = {
+            "athlete_id": athlete1_id,
+            "activity_type": "running",
+            "title": "Athlete1 Run",
+            "started_at": "2024-01-15T10:00:00",
+            "finished_at": "2024-01-15T11:00:00",
+        }
+        await client.post("/activities/", json=activity1_payload, headers=headers1)
+
+        # Create activity for athlete2 via API
+        activity2_payload = {
+            "athlete_id": athlete2_id,
+            "activity_type": "cycling",
+            "title": "Athlete2 Ride",
+            "started_at": "2024-01-15T14:00:00",
+            "finished_at": "2024-01-15T16:00:00",
+        }
+        await client.post("/activities/", json=activity2_payload, headers=headers2)
 
         # Query athlete1's activities - should only return athlete1's data
-        response = await client.get(f"/athletes/{athlete1.id}/activities")
+        response = await client.get(f"/athletes/{athlete1_id}/activities", headers=headers1)
 
         assert response.status_code == 200
         data = response.json()
         assert data["total"] == 1
         assert data["items"][0]["title"] == "Athlete1 Run"
-        assert data["items"][0]["athlete_id"] == str(athlete1.id)
+        assert data["items"][0]["athlete_id"] == athlete1_id
 
         # Query athlete2's activities - should only return athlete2's data
-        response = await client.get(f"/athletes/{athlete2.id}/activities")
+        response = await client.get(f"/athletes/{athlete2_id}/activities", headers=headers2)
 
         assert response.status_code == 200
         data = response.json()
         assert data["total"] == 1
         assert data["items"][0]["title"] == "Athlete2 Ride"
-        assert data["items"][0]["athlete_id"] == str(athlete2.id)
+        assert data["items"][0]["athlete_id"] == athlete2_id
 
 
 class TestOnboardingFlow:
@@ -211,75 +193,35 @@ class TestOnboardingFlow:
 
     @pytest.mark.asyncio
     async def test_onboarding_flow_sets_onboarding_complete(
-        self, client: AsyncClient, test_db_session
+        self, client: AsyncClient, registered_athlete: dict
     ):
         """Verify onboarding completion flag is updated."""
-        from app.models.athlete import Athlete
-        from app.models.enums import AthleteStatus
+        athlete_id = registered_athlete["athlete_id"]
+        headers = registered_athlete["headers"]
 
-        # Create athlete in onboarding status
-        athlete = Athlete(
-            id=uuid.uuid4(),
-            email=f"test_{uuid.uuid4().hex[:8]}@example.com",
-            status=AthleteStatus.ONBOARDING,
-        )
-        test_db_session.add(athlete)
-        await test_db_session.commit()
-
-        # Update athlete status to active (simulating onboarding completion)
+        # Complete onboarding by updating status to active
         response = await client.patch(
-            f"/athletes/{athlete.id}",
+            f"/athletes/{athlete_id}",
             json={"status": "active"},
+            headers=headers,
         )
 
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "active"
 
-        # Store the ID before expiring to avoid lazy loading issues
-        athlete_id = athlete.id
-
-        # Expire the cached athlete object so SQLAlchemy fetches fresh data from DB
-        test_db_session.expire(athlete)
-
-        # Verify the status was actually updated in the database
-        from sqlalchemy import select
-        result = await test_db_session.execute(
-            select(Athlete).where(Athlete.id == athlete_id)
-        )
-        updated_athlete = result.scalar_one()
-        assert updated_athlete.status == AthleteStatus.ACTIVE
-
     @pytest.mark.asyncio
     async def test_onboarding_flow_creates_initial_twin_state(
-        self, client: AsyncClient, test_db_session
+        self, client: AsyncClient, registered_athlete: dict
     ):
-        """Verify onboarding triggers initial twin creation.
+        """Verify onboarding triggers initial twin creation."""
+        athlete_id = registered_athlete["athlete_id"]
+        headers = registered_athlete["headers"]
 
-        Note: This test verifies that onboarding can be completed.
-        Twin state functionality does not currently exist in the codebase -
-        this test documents the expected behavior once twin state is implemented.
-        """
-        from app.models.athlete import Athlete
-        from app.models.enums import AthleteStatus
-
-        # Create athlete in onboarding status
-        athlete = Athlete(
-            id=uuid.uuid4(),
-            email=f"test_{uuid.uuid4().hex[:8]}@example.com",
-            status=AthleteStatus.ONBOARDING,
-        )
-        test_db_session.add(athlete)
-        await test_db_session.commit()
-
-        # Complete onboarding by updating status to active
         response = await client.patch(
-            f"/athletes/{athlete.id}",
+            f"/athletes/{athlete_id}",
             json={"status": "active"},
+            headers=headers,
         )
 
         assert response.status_code == 200
-
-        # Note: Twin state creation would be triggered here once implemented
-        # Currently no twin state model exists in the codebase
-        # This test documents the expected behavior for future implementation

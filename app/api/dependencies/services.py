@@ -31,7 +31,13 @@ from app.services.methodology_profile_builder import MethodologyProfileBuilder
 from app.services.plan_constraint_validator import PlanConstraintValidator
 from app.services.plan_repair_engine import PlanRepairEngine
 from app.services.training_plan_service import TrainingPlanService
+from app.services.auth_service import AuthService
 from app.agents.plan_generation_agent import PlanGenerationAgent
+
+
+def get_auth_service() -> AuthService:
+    """Factory for AuthService - no constructor args needed."""
+    return AuthService()
 
 
 async def get_activity_service(

@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies.services import get_training_plan_service
 from app.api.dependencies.services import get_db
+from app.api.dependencies.auth import require_self
 from app.core.unit_of_work import UnitOfWork
 from app.services.training_plan_service import TrainingPlanService
 from app.schemas.training_plan import TrainingPlanResponse
@@ -18,6 +19,7 @@ router = APIRouter(prefix="/athletes", tags=["training_plans"])
 )
 async def get_active_training_plan(
     athlete_id: UUID,
+    _: UUID = Depends(require_self),
     service: TrainingPlanService = Depends(get_training_plan_service),
     db: AsyncSession = Depends(get_db),
 ):
@@ -39,6 +41,7 @@ async def get_active_training_plan(
 async def get_training_plan(
     athlete_id: UUID,
     plan_id: UUID,
+    _: UUID = Depends(require_self),
     service: TrainingPlanService = Depends(get_training_plan_service),
     db: AsyncSession = Depends(get_db),
 ):
@@ -49,10 +52,9 @@ async def get_training_plan(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Training plan not found",
         )
-    # Verify plan belongs to athlete
     if result.training_plan.athlete_id != athlete_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Training plan does not belong to this athlete",
+            detail="Access denied",
         )
     return result

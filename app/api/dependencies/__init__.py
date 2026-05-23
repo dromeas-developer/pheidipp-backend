@@ -12,7 +12,9 @@ from app.api.dependencies.services import (
     get_twin_initialisation_service,
     get_onboarding_service,
     get_training_plan_service,
+    get_auth_service,
 )
+from app.api.dependencies.auth import get_current_athlete_id, require_self
 
 __all__ = [
     "get_activity_service",
@@ -28,4 +30,7 @@ __all__ = [
     "get_twin_initialisation_service",
     "get_onboarding_service",
     "get_training_plan_service",
+    "get_auth_service",
+    "get_current_athlete_id",
+    "require_self",
 ]

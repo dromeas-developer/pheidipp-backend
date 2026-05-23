@@ -22,6 +22,7 @@ from app.services.plan_generation_brief_builder import (
 from app.services.plan_constraint_validator import PlanConstraintValidator
 from app.services.plan_repair_engine import PlanRepairEngine
 from app.services.training_plan_service import TrainingPlanService
+from app.services.auth_service import AuthService
 
 
 __all__ = [
@@ -45,4 +46,5 @@ __all__ = [
     "PlanConstraintValidator",
     "PlanRepairEngine",
     "TrainingPlanService",
+    "AuthService",
     ]

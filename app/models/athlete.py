@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from app.models.twin_state import TwinState
     from app.models.coach_message import CoachMessage
     from app.models.training_plan import TrainingPlan
+    from app.models.refresh_token import RefreshToken
 
 
 
@@ -112,4 +113,9 @@ class Athlete(Base):
         back_populates="athlete",
         cascade="all, delete-orphan",
         order_by="TrainingPlan.created_at.desc()",
+    )
+    refresh_tokens: Mapped[list["RefreshToken"]] = relationship(
+        back_populates="athlete",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )

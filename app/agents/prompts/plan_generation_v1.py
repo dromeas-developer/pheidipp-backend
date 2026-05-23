@@ -107,7 +107,7 @@ Think about:
 Output JSON only."""
 
 
-MAX_OUTPUT_TOKENS = 4000
+MAX_OUTPUT_TOKENS = 16000
 
 
 PromptRegistry.register(

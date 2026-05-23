@@ -219,3 +219,7 @@ class MethodologyTrait(str, enum.Enum):
     VARIETY_EMPHASIS = "VARIETY_EMPHASIS"
     NEUROMUSCULAR_SUPPORT = "NEUROMUSCULAR_SUPPORT"
     CONSERVATIVE_PROGRESSION = "CONSERVATIVE_PROGRESSION"
+
+
+class TokenType(str, enum.Enum):
+    REFRESH = "refresh"

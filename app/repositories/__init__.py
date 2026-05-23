@@ -11,6 +11,7 @@ from app.repositories.twin_state_repository import TwinStateRepository
 from app.repositories.coach_message_repository import CoachMessageRepository
 from app.repositories.training_plan_repository import TrainingPlanRepository
 from app.repositories.planned_session_repository import PlannedSessionRepository
+from app.repositories.refresh_token_repository import RefreshTokenRepository
 
 
 __all__ = [
@@ -27,4 +28,5 @@ __all__ = [
     "CoachMessageRepository",
     "TrainingPlanRepository",
     "PlannedSessionRepository",
+    "RefreshTokenRepository",
     ]

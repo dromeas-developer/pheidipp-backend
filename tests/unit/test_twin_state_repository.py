@@ -19,7 +19,8 @@ def mock_session():
     """Mock AsyncSession for repository tests."""
     session = MagicMock()
     session.add = MagicMock()
-    session.flush = AsyncMock()
+    session.commit = AsyncMock()
+    session.refresh = AsyncMock()
     session.execute = AsyncMock()
     return session
 
@@ -58,10 +59,11 @@ class TestCreate:
             computation_metadata={"test": "data"},
         )
 
-        result = await repository.create(data)
+        result = await repository.create(**data.model_dump(exclude_unset=True))
 
         mock_session.add.assert_called_once()
-        mock_session.flush.assert_called_once()
+        mock_session.commit.assert_called_once()
+        mock_session.refresh.assert_called_once()
         # Verify the object added has the correct attributes
         added_obj = mock_session.add.call_args[0][0]
         assert added_obj.athlete_id == athlete_id

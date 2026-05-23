@@ -23,6 +23,7 @@ from app.models.enums import (
     SessionType,
     PhysiologicalIntent,
     MethodologyTrait,
+    TokenType,
 )
 from app.models.athlete import Athlete
 from app.models.athlete_profile import AthleteProfile
@@ -35,6 +36,7 @@ from app.models.twin_state import TwinState
 from app.models.coach_message import CoachMessage
 from app.models.training_plan import TrainingPlan
 from app.models.planned_session import PlannedSession
+from app.models.refresh_token import RefreshToken
 
 
 __all__ = [
@@ -64,6 +66,7 @@ __all__ = [
     "SessionType",
     "PhysiologicalIntent",
     "MethodologyTrait",
+    "TokenType",
     "Athlete",
     "AthleteProfile",
     "AthletePhysiology",
@@ -75,4 +78,5 @@ __all__ = [
     "CoachMessage",
     "TrainingPlan",
     "PlannedSession",
+    "RefreshToken",
     ]

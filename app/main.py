@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from app.config import settings
 from app.api.routes.health import health_router
+from app.api.routes.auth import router as auth_router
 from app.api.routes.athletes import router as athletes_router
 from app.api.routes.activities import router as activities_router
 from app.api.routes.physiology import router as physiology_router
@@ -23,6 +24,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan, openapi_url="/openapi.json", docs_url="/docs")
+app.include_router(auth_router)
 app.include_router(health_router)
 app.include_router(athletes_router)
 app.include_router(activities_router)

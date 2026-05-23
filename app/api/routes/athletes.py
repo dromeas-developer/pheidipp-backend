@@ -14,6 +14,7 @@ from app.api.dependencies import (
     get_onboarding_service,
     get_twin_state_service,
     get_coach_message_service,
+    require_self,
 )
 from app.tasks.first_message_task import generate_first_coach_message
 from app.tasks.plan_generation_task import generate_training_plan
@@ -21,7 +22,6 @@ from app.db.session import get_db
 from app.core.unit_of_work import UnitOfWork
 from app.services.athlete_service import AthleteService
 from app.schemas.athlete import (
-    AthleteCreate,
     AthleteUpdate,
     AthleteResponse,
 )
@@ -69,21 +69,10 @@ from app.services.coach_message_service import CoachMessageService
 router = APIRouter(prefix="/athletes", tags=["athletes"])
 
 
-@router.post("/", response_model=AthleteResponse)
-async def create_athlete(
-    payload: AthleteCreate,
-    service: AthleteService = Depends(get_athlete_service),
-):
-    try:
-        athlete = await service.create_athlete(payload)
-    except ValueError as e:
-        raise HTTPException(status_code=409, detail=str(e))
-    return AthleteResponse.model_validate(athlete)
-
-
 @router.get("/{athlete_id}", response_model=AthleteWithProfileResponse)
 async def get_athlete(
     athlete_id: UUID,
+    _: UUID = Depends(require_self),
     service: AthleteService = Depends(get_athlete_service),
 ):
     athlete = await service.get_athlete_with_profile(athlete_id)
@@ -96,6 +85,7 @@ async def get_athlete(
 async def update_athlete(
     athlete_id: UUID,
     payload: AthleteUpdate,
+    _: UUID = Depends(require_self),
     service: AthleteService = Depends(get_athlete_service),
 ):
     athlete = await service.update_athlete(athlete_id, payload)
@@ -108,6 +98,7 @@ async def update_athlete(
 async def upsert_profile(
     athlete_id: UUID,
     payload: AthleteProfileUpdate,
+    _: UUID = Depends(require_self),
     service: AthleteProfileService = Depends(get_athlete_profile_service),
 ):
     profile = await service.upsert_profile(athlete_id, payload)
@@ -117,6 +108,7 @@ async def upsert_profile(
 @router.get("/{athlete_id}/profile", response_model=AthleteProfileResponse)
 async def get_profile(
     athlete_id: UUID,
+    _: UUID = Depends(require_self),
     service: AthleteProfileService = Depends(get_athlete_profile_service),
 ):
     profile = await service.get_profile(athlete_id)
@@ -128,6 +120,7 @@ async def get_profile(
 @router.get("/{athlete_id}/activities", response_model=ActivityListResponse)
 async def list_athlete_activities(
     athlete_id: UUID,
+    _: UUID = Depends(require_self),
     params: ActivityListParams = Depends(),
     service: ActivityService = Depends(get_activity_service),
 ):
@@ -147,6 +140,7 @@ async def list_athlete_activities(
 @router.get("/{athlete_id}/wellness", response_model=WellnessListResponse)
 async def list_athlete_wellness(
     athlete_id: UUID,
+    _: UUID = Depends(require_self),
     params: WellnessListParams = Depends(),
     service: WellnessService = Depends(get_wellness_service),
 ):
@@ -161,6 +155,7 @@ async def list_athlete_wellness(
 @router.get("/{athlete_id}/fitness", response_model=FitnessListResponse)
 async def list_athlete_fitness(
     athlete_id: UUID,
+    _: UUID = Depends(require_self),
     params: FitnessListParams = Depends(),
     service: FitnessService = Depends(get_fitness_service),
 ):
@@ -175,6 +170,7 @@ async def list_athlete_fitness(
 @router.get("/{athlete_id}/physiology", response_model=list[AthletePhysiologyResponse])
 async def list_athlete_physiology(
     athlete_id: UUID,
+    _: UUID = Depends(require_self),
     skip: int = 0,
     limit: int = 50,
     service: PhysiologyService = Depends(get_physiology_service),
@@ -190,6 +186,7 @@ async def list_athlete_physiology(
 async def get_effective_physiology(
     athlete_id: UUID,
     target_date: str,
+    _: UUID = Depends(require_self),
     service: PhysiologyService = Depends(get_physiology_service),
 ) -> AthletePhysiologyResponse:
     from datetime import date
@@ -215,6 +212,7 @@ async def get_effective_physiology(
 )
 async def get_athlete_preferences(
     athlete_id: UUID,
+    _: UUID = Depends(require_self),
     service: AthletePreferencesService = Depends(get_athlete_preferences_service),
 ):
     result = await service.get_by_athlete(athlete_id)
@@ -230,6 +228,7 @@ async def get_athlete_preferences(
 )
 async def list_training_blocks(
     athlete_id: UUID,
+    _: UUID = Depends(require_self),
     service: TrainingBlockService = Depends(get_training_block_service),
 ):
     """Returns all blocks ordered by created_at DESC (active, completed, abandoned).
@@ -244,6 +243,7 @@ async def list_training_blocks(
 )
 async def get_active_training_block(
     athlete_id: UUID,
+    _: UUID = Depends(require_self),
     service: TrainingBlockService = Depends(get_training_block_service),
 ):
     """
@@ -275,6 +275,7 @@ async def onboard_athlete(
     athlete_id: UUID,
     payload: OnboardingRequest,
     background_tasks: BackgroundTasks,
+    _: UUID = Depends(require_self),
     athlete_service: AthleteService = Depends(get_athlete_service),
     onboarding_service: OnboardingService = Depends(get_onboarding_service),
     db: AsyncSession = Depends(get_db),
@@ -355,9 +356,15 @@ async def onboard_athlete(
                 ),
             )
 
-        preferences, training_block, twin_state = (
-            await onboarding_service.complete_onboarding(athlete_id, payload, uow)
-        )
+        try:
+            preferences, training_block, twin_state = (
+                await onboarding_service.complete_onboarding(athlete_id, payload, uow)
+            )
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=str(e),
+            )
 
     response = OnboardingResponse(
         onboarding_complete=True,
@@ -380,6 +387,7 @@ async def onboard_athlete(
 )
 async def get_onboarding_status(
     athlete_id: UUID,
+    _: UUID = Depends(require_self),
     athlete_service: AthleteService = Depends(get_athlete_service),
     ap_service: AthletePreferencesService = Depends(get_athlete_preferences_service),
     tb_service: TrainingBlockService = Depends(get_training_block_service),

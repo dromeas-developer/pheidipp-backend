@@ -13,7 +13,7 @@ class TestPlanGenerationV1PromptRegistration:
 
     def test_prompt_has_correct_max_output_tokens(self):
         record = PromptRegistry.get("plan_generation", "v1")
-        assert record.max_output_tokens == 4000
+        assert record.max_output_tokens == 16000
 
     def test_prompt_current_resolves_to_v1(self):
         record = PromptRegistry.current("plan_generation")

@@ -75,6 +75,7 @@ class TrainingPlan(Base):
         back_populates="training_plan",
         cascade="all, delete-orphan",
         order_by="PlannedSession.scheduled_date.asc()",
+        lazy="selectin",
     )
 
     __table_args__ = (

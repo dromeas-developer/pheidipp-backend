@@ -4,17 +4,22 @@ from urllib.parse import urlparse
 
 
 class Settings(BaseSettings):
-    DATABASE_URL: str = Field(..., alias="DATABASE_URL")
-    APP_HOST: str = Field(default="0.0.0.0", env="APP_HOST")
-    APP_PORT: int = Field(default=8000, ge=1024, le=65535, env="APP_PORT")
-    DEBUG_MODE: bool = Field(default=False, env="DEBUG")
-    APP_NAME: str = Field(default="pheidipp-backend", env="APP_NAME")
-    ENVIRONMENT: str = Field(default="development", env="ENVIRONMENT")
-    REDIS_URL: str = Field(default="redis://redis:6379/0", env="REDIS_URL")
-    LOG_LEVEL: str = Field(default="INFO", env="LOG_LEVEL")
-    LITELLM_API_KEY: str = Field(default="", env="LITELLM_API_KEY")
-    LITELLM_BASE_URL: str = Field(default="http://litellm:4000/v1", env="LITELLM_BASE_URL")
-    LLM_MODEL: str = Field(default="cohere/command-a-plus", env="LLM_MODEL")
+    DATABASE_URL: str = Field(default="")
+    APP_HOST: str = Field(default="0.0.0.0")
+    APP_PORT: int = Field(default=8000, ge=1024, le=65535)
+    DEBUG_MODE: bool = Field(default=False, validation_alias="DEBUG")
+    APP_NAME: str = Field(default="pheidipp-backend")
+    ENVIRONMENT: str = Field(default="development")
+    REDIS_URL: str = Field(default="redis://redis:6379/0")
+    LOG_LEVEL: str = Field(default="INFO")
+    LITELLM_API_KEY: str = Field(default="")
+    LITELLM_BASE_URL: str = Field(default="http://litellm:4000/v1")
+    LLM_MODEL: str = Field(default="cohere/command-a-plus")
+    JWT_SECRET_KEY: str = Field(default="")
+    JWT_ALGORITHM: str = Field(default="HS256")
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=15)
+    JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = Field(default=30)
+    JWT_ISSUER: str = Field(default="pheidipp-api")
 
     model_config = SettingsConfigDict(env_file=".env", extra="allow")
 

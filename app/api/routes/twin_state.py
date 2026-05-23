@@ -9,6 +9,7 @@ from app.db.session import get_db
 from app.schemas.twin_state import TwinStateResponse
 from app.services.twin_state_service import TwinStateService
 from app.api.dependencies.services import get_twin_state_service
+from app.api.dependencies.auth import require_self
 
 router = APIRouter(prefix="/athletes/{athlete_id}/twin", tags=["twin"])
 
@@ -21,6 +22,7 @@ class TwinStateHistoryResponse(BaseModel):
 @router.get("/", response_model=TwinStateResponse)
 async def get_current_twin_state(
     athlete_id: UUID,
+    _: UUID = Depends(require_self),
     service: TwinStateService = Depends(get_twin_state_service),
     db: AsyncSession = Depends(get_db),
 ):
@@ -37,6 +39,7 @@ async def get_current_twin_state(
 @router.get("/history", response_model=TwinStateHistoryResponse)
 async def get_twin_state_history(
     athlete_id: UUID,
+    _: UUID = Depends(require_self),
     service: TwinStateService = Depends(get_twin_state_service),
     limit: int = Query(ge=1, le=1000, default=100),
     offset: int = Query(ge=0, default=0),

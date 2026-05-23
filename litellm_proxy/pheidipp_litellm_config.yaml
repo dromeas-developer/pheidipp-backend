@@ -1,0 +1,76 @@
+# ============================================================
+# Pheidipp LiteLLM Proxy — config.yaml
+# ============================================================
+
+model_list:
+
+  # ── COHERE CLOUD ─────────────────────────────────────────
+  - model_name: cohere/command-a-plus
+    litellm_params:
+      model: cohere/command-a-plus-05-2026
+      api_key: os.environ/COHERE_API_KEY
+      timeout: 180
+    model_info:
+      rpm: 10
+      description: "Command A Plus via Cohere Cloud"
+
+
+# ============================================================
+# Router settings — controls retry and cooldown behaviour.
+# These are distinct from litellm_settings and are what the
+# router actually consults when deciding whether to back off.
+# ============================================================
+
+router_settings:
+  # How many times to retry a failed request against the same
+  # model group before returning an error to the caller.
+  num_retries: 1
+
+  # Minimum wait in seconds before retrying after a 429.
+  # The router adds exponential backoff on top of this floor.
+  retry_after: 30
+
+  # Seconds a deployment is removed from the active pool after
+  # hitting allowed_fails failures within one minute.
+  cooldown_time: 60
+
+  # Failures within one minute that trigger the cooldown above.
+  allowed_fails: 1
+
+  # Per-error-type retry counts — lets you be aggressive on
+  # transient errors while failing fast on permanent ones.
+  retry_policy:
+    RateLimitErrorRetries: 0       # cooldown handles this — don't retry
+    TimeoutErrorRetries: 1         # slow provider — retry twice
+    InternalServerErrorRetries: 2  # 5xx — usually transient
+    BadRequestErrorRetries: 0      # 400 — broken request, don't retry
+    AuthenticationErrorRetries: 0  # bad key — retrying wastes quota
+    ContentPolicyViolationErrorRetries: 0
+
+# ============================================================
+# Global LiteLLM settings
+# ============================================================
+
+litellm_settings:
+  # Hard ceiling on how long any single LLM call may take.
+  # Per-model timeouts in litellm_params take precedence when set.
+  request_timeout: 300
+  drop_params: true               # silently drop unsupported params (e.g. response_format for Cohere)
+  modify_params: true             # allows LiteLLM to fix message order issues
+  success_callback: []
+  failure_callback: []
+  cache: false
+  set_verbose: false
+  suppress_debug_info: true
+  json_logs: true 
+  callbacks: ["callbacks.proxy_handler_instance"]
+
+# ============================================================
+# Proxy server settings
+# ============================================================
+
+general_settings:
+  master_key: os.environ/LITELLM_API_KEY
+  store_model_in_db: false
+  disable_spend_logs: true
+  log_level: "WARNING"

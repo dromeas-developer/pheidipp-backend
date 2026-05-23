@@ -10,25 +10,21 @@ from unittest.mock import patch, AsyncMock, MagicMock
 class TestOnboardingTriggersPlanGeneration:
     @pytest.mark.asyncio
     async def test_completing_onboarding_adds_generate_training_plan_task(
-        self, client: AsyncClient, test_athlete
+        self, client: AsyncClient, registered_athlete: dict
     ):
         """Completing onboarding adds generate_training_plan to BackgroundTasks."""
-        athlete_id = test_athlete.id
+        athlete_id = registered_athlete["athlete_id"]
+        headers = registered_athlete["headers"]
 
         # Create profile first (required for onboarding)
         profile_payload = {
-            "first_name": "John",
-            "last_name": "Doe",
-            "display_name": "johndoe",
-            "date_of_birth": "1990-01-01",
-            "gender": "male",
-            "country_code": "US",
-            "timezone": "America/New_York",
-            "language_code": "en",
-            "unit_preference": "metric",
+            "first_name": "John", "last_name": "Doe", "display_name": "johndoe",
+            "date_of_birth": "1990-01-01", "gender": "male",
+            "country_code": "US", "timezone": "America/New_York",
+            "language_code": "en", "unit_preference": "metric",
         }
         profile_response = await client.put(
-            f"/athletes/{athlete_id}/profile", json=profile_payload
+            f"/athletes/{athlete_id}/profile", json=profile_payload, headers=headers
         )
         assert profile_response.status_code == 200
 
@@ -59,32 +55,28 @@ class TestOnboardingTriggersPlanGeneration:
 
         response = await client.post(
             f"/athletes/{athlete_id}/onboarding",
-            json=onboarding_payload
+            json=onboarding_payload,
+            headers=headers,
         )
-        # Accept both 200 and 201 as valid responses
         assert response.status_code in (200, 201)
 
     @pytest.mark.asyncio
     async def test_onboarding_triggers_both_coach_message_and_plan_generation(
-        self, client: AsyncClient, test_athlete
+        self, client: AsyncClient, registered_athlete: dict
     ):
         """Onboarding still triggers generate_first_coach_message alongside generate_training_plan."""
-        athlete_id = test_athlete.id
+        athlete_id = registered_athlete["athlete_id"]
+        headers = registered_athlete["headers"]
 
         # Create profile first (required for onboarding)
         profile_payload = {
-            "first_name": "John",
-            "last_name": "Doe",
-            "display_name": "johndoe",
-            "date_of_birth": "1990-01-01",
-            "gender": "male",
-            "country_code": "US",
-            "timezone": "America/New_York",
-            "language_code": "en",
-            "unit_preference": "metric",
+            "first_name": "John", "last_name": "Doe", "display_name": "johndoe",
+            "date_of_birth": "1990-01-01", "gender": "male",
+            "country_code": "US", "timezone": "America/New_York",
+            "language_code": "en", "unit_preference": "metric",
         }
         profile_response = await client.put(
-            f"/athletes/{athlete_id}/profile", json=profile_payload
+            f"/athletes/{athlete_id}/profile", json=profile_payload, headers=headers
         )
         assert profile_response.status_code == 200
 
@@ -113,31 +105,28 @@ class TestOnboardingTriggersPlanGeneration:
 
         response = await client.post(
             f"/athletes/{athlete_id}/onboarding",
-            json=onboarding_payload
+            json=onboarding_payload,
+            headers=headers,
         )
         assert response.status_code in (200, 201)
 
     @pytest.mark.asyncio
     async def test_onboarding_response_does_not_include_plan_data(
-        self, client: AsyncClient, test_athlete
+        self, client: AsyncClient, registered_athlete: dict
     ):
         """Onboarding response does not include plan data (plan generation is async)."""
-        athlete_id = test_athlete.id
+        athlete_id = registered_athlete["athlete_id"]
+        headers = registered_athlete["headers"]
 
         # Create profile first (required for onboarding)
         profile_payload = {
-            "first_name": "John",
-            "last_name": "Doe",
-            "display_name": "johndoe",
-            "date_of_birth": "1990-01-01",
-            "gender": "male",
-            "country_code": "US",
-            "timezone": "America/New_York",
-            "language_code": "en",
-            "unit_preference": "metric",
+            "first_name": "John", "last_name": "Doe", "display_name": "johndoe",
+            "date_of_birth": "1990-01-01", "gender": "male",
+            "country_code": "US", "timezone": "America/New_York",
+            "language_code": "en", "unit_preference": "metric",
         }
         profile_response = await client.put(
-            f"/athletes/{athlete_id}/profile", json=profile_payload
+            f"/athletes/{athlete_id}/profile", json=profile_payload, headers=headers
         )
         assert profile_response.status_code == 200
 
@@ -166,10 +155,10 @@ class TestOnboardingTriggersPlanGeneration:
 
         response = await client.post(
             f"/athletes/{athlete_id}/onboarding",
-            json=onboarding_payload
+            json=onboarding_payload,
+            headers=headers,
         )
         assert response.status_code in (200, 201)
         data = response.json()
-        # Plan data should NOT be in the onboarding response
         assert "training_plan" not in data
         assert "planned_sessions" not in data

@@ -6,6 +6,13 @@ from app.schemas.activity import (
     ActivityListParams,
     ActivityListResponse,
 )
+from app.schemas.auth import (
+    RegisterRequest,
+    LoginRequest,
+    TokenResponse,
+    RefreshRequest,
+    LogoutRequest,
+)
 from app.schemas.athlete import (
     AthleteBase,
     AthleteCreate,
@@ -86,6 +93,11 @@ from app.schemas.training_plan import (
 __all__ = [
     "ActivityBase",
     "ActivityCreate",
+    "RegisterRequest",
+    "LoginRequest",
+    "TokenResponse",
+    "RefreshRequest",
+    "LogoutRequest",
     "ActivityUpdate",
     "ActivityResponse",
     "ActivityListParams",

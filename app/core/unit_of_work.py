@@ -9,6 +9,7 @@ from app.repositories.athlete_profile_repository import AthleteProfileRepository
 from app.repositories.coach_message_repository import CoachMessageRepository
 from app.repositories.training_plan_repository import TrainingPlanRepository
 from app.repositories.planned_session_repository import PlannedSessionRepository
+from app.repositories.refresh_token_repository import RefreshTokenRepository
 
 
 class UnitOfWork:
@@ -30,6 +31,7 @@ class UnitOfWork:
             "coach_messages": CoachMessageRepository(self.session),
             "training_plans": TrainingPlanRepository(self.session),
             "planned_sessions": PlannedSessionRepository(self.session),
+            "refresh_tokens": RefreshTokenRepository(self.session),
         }
         return self
 

@@ -5,6 +5,7 @@ services:
     depends_on:
       - db
       - redis
+      - litellm
     environment:
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/pheidipp
       RUNNING_IN_DOCKER: "true"
@@ -32,6 +33,20 @@ services:
   redis:
     image: redis:7
     container_name: pheidipp_redis
+
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: pheidipp_litellm
+    working_dir: /app
+    ports:
+      - "4001:4000"   # host:4001 → container:4000 — avoids conflict with any existing Litellm on host:4000
+    volumes:
+      - ./litellm_proxy/pheidipp_litellm_config.yaml:/app/config.yaml:ro
+      - ./litellm_proxy/callbacks.py:/app/callbacks.py
+    env_file:
+      - ./litellm_proxy/.env.litellm
+    command: ["--config", "/app/config.yaml", "--port", "4000", "--host", "0.0.0.0"]
+    restart: unless-stopped
 
 volumes:
   postgres_data:

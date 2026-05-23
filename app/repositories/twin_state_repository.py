@@ -13,11 +13,7 @@ class TwinStateRepository(BaseRepository[TwinState]):
     def __init__(self, session: AsyncSession):
         super().__init__(session, TwinState)
 
-    async def create(self, data: TwinStateCreate) -> TwinState:
-        db_obj = TwinState(**data.model_dump())
-        self.session.add(db_obj)
-        await self.session.flush()
-        return db_obj
+
 
     async def get_by_athlete_id(self, athlete_id: uuid.UUID) -> Optional[TwinState]:
         stmt = (

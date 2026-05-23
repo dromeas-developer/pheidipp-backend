@@ -180,7 +180,7 @@ async def clean_db_tables(test_db_engine):
 
 @pytest.fixture
 async def test_athlete(test_db_session: AsyncSession) -> Athlete:
-    """Create a test athlete in the database."""
+    """Create a test athlete in the database (direct DB, no auth)."""
     repo = AthleteRepository(test_db_session)
     athlete = await repo.create(
         email=f"test_athlete_{uuid.uuid4().hex[:8]}@example.com",
@@ -188,6 +188,37 @@ async def test_athlete(test_db_session: AsyncSession) -> Athlete:
         status=AthleteStatus.ACTIVE,
     )
     return athlete
+
+
+@pytest.fixture
+async def registered_athlete(client: AsyncClient) -> dict:
+    """Register a test athlete via POST /auth/register and return auth data.
+
+    Returns:
+        dict with keys: athlete_id (str), access_token (str),
+                        refresh_token (str), headers (dict).
+    """
+    email = f"auth_test_{uuid.uuid4().hex[:8]}@example.com"
+    password = "secure-test-password-123"
+    payload = {"email": email, "password": password}
+    response = await client.post("/auth/register", json=payload)
+    assert response.status_code == 201, f"Registration failed: {response.text}"
+    data = response.json()
+    athlete_id = str(data["athlete_id"])
+    access_token = data["access_token"]
+    headers = {"Authorization": f"Bearer {access_token}"}
+    return {
+        "athlete_id": athlete_id,
+        "access_token": access_token,
+        "refresh_token": data["refresh_token"],
+        "headers": headers,
+    }
+
+
+@pytest.fixture
+async def auth_headers(registered_athlete: dict) -> dict:
+    """Return Authorization headers for the registered test athlete."""
+    return registered_athlete["headers"]
 
 
 # ============================================================================

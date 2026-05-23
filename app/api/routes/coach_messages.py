@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import get_coach_message_service
+from app.api.dependencies.auth import require_self
 from app.db.session import get_db
 from app.core.unit_of_work import UnitOfWork
 from app.services.coach_message_service import CoachMessageService
@@ -20,6 +21,7 @@ router = APIRouter(prefix="/athletes", tags=["coach_messages"])
 )
 async def list_coach_messages(
     athlete_id: UUID,
+    _: UUID = Depends(require_self),
     limit: int = Query(default=50, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     service: CoachMessageService = Depends(get_coach_message_service),
@@ -37,6 +39,7 @@ async def list_coach_messages(
 )
 async def get_latest_coach_message(
     athlete_id: UUID,
+    _: UUID = Depends(require_self),
     service: CoachMessageService = Depends(get_coach_message_service),
     db: AsyncSession = Depends(get_db),
 ):
@@ -58,6 +61,7 @@ async def get_latest_coach_message(
 )
 async def get_first_coach_message(
     athlete_id: UUID,
+    _: UUID = Depends(require_self),
     service: CoachMessageService = Depends(get_coach_message_service),
     db: AsyncSession = Depends(get_db),
 ):

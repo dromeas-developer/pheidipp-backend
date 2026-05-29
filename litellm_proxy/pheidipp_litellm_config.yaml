@@ -7,13 +7,22 @@ model_list:
   # ── COHERE CLOUD ─────────────────────────────────────────
   - model_name: cohere/command-a-plus
     litellm_params:
-      model: cohere/command-a-plus-05-2026
+      model: openai/command-a-plus-05-2026
+      base_url: https://api.cohere.ai/compatibility/v1
       api_key: os.environ/COHERE_API_KEY
       timeout: 180
     model_info:
       rpm: 10
       description: "Command A Plus via Cohere Cloud"
-
+  - model_name: cohere/command-a
+    litellm_params:
+      model: openai/command-a-03-2025
+      base_url: https://api.cohere.ai/compatibility/v1
+      api_key: os.environ/COHERE_API_KEY
+      timeout: 180
+    model_info:
+      rpm: 10
+      description: "Command A via Cohere Cloud"
 
 # ============================================================
 # Router settings — controls retry and cooldown behaviour.

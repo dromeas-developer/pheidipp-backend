@@ -1,0 +1,132 @@
+# Async Pipeline — Worker Queue Architecture
+
+## Purpose
+- Defines the worker queue topology, task definitions, and execution guarantees
+- All heavy processing runs async — API responses never wait for analysis
+
+## Infrastructure
+
+```typescript
+// Queue backend: Redis
+// Worker framework: Celery (Python) or ARQ (async Python)
+// Task visibility: task_id returned from async-triggering API endpoints (202 Accepted)
+```
+
+## Task Inventory
+
+### Ingestion Tasks
+
+**`FitIngestionTask`**
+Trigger: FIT file uploaded or sync batch item received
+Steps: parse → upload to object storage → create Activity → compute load → evaluate calibration → if eligible: enqueue TwinRecalibrationTask → clean signal → store RawSensorStream → enqueue SegmentationTask
+Idempotent: yes (deduplicated by `external_id`)
+Retry: up to 5 times with exponential backoff
+Timeout: 120s
+
+**`IntervalsIcuSyncTask`**
+Trigger: scheduled (every 4h) + on-demand
+Steps: for each connected athlete → fetch new activities since cursor → enqueue FitIngestionTask per activity → update sync cursor
+Retry: up to 3 times
+Timeout: 300s
+
+**`IntervalsIcuWellnessSyncTask`**
+Trigger: scheduled (daily 03:00 UTC)
+Steps: for each connected athlete → fetch wellness since cursor → upsert AthleteWellness records
+Retry: up to 3 times
+Timeout: 120s
+
+### Analysis Tasks
+
+**`TwinRecalibrationTask`**
+Trigger: `activity_calibration_eligible` event
+Steps: run ThresholdDetectionService → run BayesianUpdate → insert new TwinState → if confidence upgraded: fire `twin_confidence_upgraded` event
+Idempotent: yes (TwinState insert is append-only; duplicate triggers create duplicate records but are benign)
+Retry: up to 3 times
+Timeout: 30s
+
+**`SignalCleaningTask`**
+Trigger: after Activity created with `fit_file_key`
+Steps: run 7-step cleaning pipeline → upload cleaned stream → create RawSensorStream → update Activity.cleaning_pipeline_version
+Retry: up to 3 times
+Timeout: 60s
+
+**`SegmentationTask`**
+Trigger: after RawSensorStream created
+Steps: create PlannedSegments from WorkoutSteps → create DeviceSegments from FIT laps → run segmentation pipeline → create PhysiologicalSegments
+Retry: up to 3 times
+Timeout: 120s
+
+**`ExecutionAnalysisTask`**
+Trigger: `activity_calibration_eligible` event (parallel with TwinRecalibrationTask)
+Steps: fetch FIT from object storage → run ExecutionAnalysisService → create ExecutionObservation
+Retry: up to 3 times; if FIT fetch fails all 3 times → alert
+Timeout: 30s
+
+### Coaching Tasks
+
+**`PostWorkoutTask`**
+Trigger: `session_completed` event
+Steps: wait for ExecutionAnalysisTask completion → run ObjectiveUpdateService → run ComparableSessionService → assemble context → call PostWorkoutAgent → write CoachingMessage
+Dependencies: ExecutionAnalysisTask must complete first (poll or event-based)
+Retry: up to 2 times (LLM calls are not idempotent; limited retries)
+Timeout: 60s
+
+**`WorkoutPrefetchTask`**
+Trigger: scheduled (18h before each athlete's training window)
+Steps: for each athlete with a pending session tomorrow → fetch weather → run WorkoutGenerationAgent → store GeneratedWorkout
+Retry: up to 2 times
+Timeout: 30s per athlete
+
+### Maintenance Tasks
+
+**`BaselineComputationTask`**
+Trigger: scheduled (nightly 01:00 UTC)
+Steps: for each athlete with new wellness data in past 24h → compute baselines → upsert AthleteWellnessBaseline records
+Timeout: 2h batch window
+Retry: per-athlete; failed athletes skipped and retried next night
+
+**`MissedSessionSweepTask`**
+Trigger: scheduled (daily 06:00 UTC)
+Steps: transition `generated` sessions with `target_date < today` to `missed` → create wellness_alert CoachingMessage for affected athletes
+Timeout: 30s
+
+**`GapCurveFittingTask`**
+Trigger: after FitIngestionTask when athlete reaches 20+ outdoor sessions
+Steps: run GapCurveFittingService → if R²≥0.70: update AthleteProfile.gap_curve_model
+Retry: up to 2 times
+Timeout: 60s
+
+**`CyclePersonalisationTask`**
+Trigger: `cycle_day_one_logged` when ≥3 complete cycles exist
+Steps: run CyclePersonalisationService → update AthleteProfile.cycle_personal_model
+Timeout: 10s
+
+**`AdaptationBlockDetectionTask`**
+Trigger: scheduled (nightly)
+Steps: identify completed hard blocks → run AdaptationObservationService for each
+Timeout: 60s per athlete batch
+
+**`LibraryPromotionTask`**
+Trigger: scheduled (nightly)
+Steps: find GeneratedWorkout entries with times_offered≥3 and acceptance_rate≥0.6 → promote to WorkoutLibraryEntry
+Timeout: 30s
+
+## Execution Guarantees
+
+```typescript
+// At-least-once delivery: tasks may execute more than once
+// All tasks must be idempotent or have idempotency checks
+// Dead-letter queue: tasks that fail max retries → DLQ; alert fires
+
+// Task visibility for athlete-facing operations:
+// FIT upload → 202 Accepted + task_id
+// POST /athletes/{id}/activities/upload → { task_id: "uuid" }
+// GET /tasks/{task_id} → { status: "pending"|"running"|"completed"|"failed", result_url?: string }
+```
+
+## Cross-References
+- FitIngestionTask full pipeline: `01-entities/activity.md`
+- Segmentation pipeline: `02-computations/signal-cleaning.md`
+- TwinRecalibration: `01-entities/twin-state.md`
+- Event topology (how tasks are triggered): `04-platform/event-topology.md`
+- Failure handling: `04-platform/failure-handling.md`

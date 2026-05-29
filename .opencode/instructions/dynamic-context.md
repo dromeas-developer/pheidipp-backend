@@ -215,7 +215,7 @@
   - GET /{athlete_id}/activities → `app/api/routes/athletes.py:list_athlete_activities`
   - GET /{athlete_id}/wellness → `app/api/routes/athletes.py:list_athlete_wellness`
   - GET /{athlete_id}/fitness → `app/api/routes/athletes.py:list_athlete_fitness`
-  - GET /{athlete_id}/physiology → `app/api/routes/athletes.py:list_athlete_physiology`
+  - GET /{athlete_id}/physiology → `app/api/routes/athletes.py:list_athlete_physiology` (docs/architecture/definitions/athlete_physiology.md)
   - GET /{athlete_id}/physiology/effective → `app/api/routes/athletes.py:get_effective_physiology`
   - GET /{athlete_id}/preferences → `app/api/routes/athletes.py:get_athlete_preferences`
   - GET /{athlete_id}/training-blocks → `app/api/routes/athletes.py:list_training_blocks`

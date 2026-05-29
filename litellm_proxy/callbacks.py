@@ -4,7 +4,7 @@ from litellm.integrations.custom_logger import CustomLogger
 
 # Models that fail or produce garbage when reasoning/thinking content
 # is left in the message history. All others are left untouched so that
-# provider-side prefix caching (e.g. Mistral) stays stable.
+# provider-side prefix caching stays stable.
 _REASONING_SENSITIVE_MODELS = (
     "mistral-medium",
     "kimi-k2",
@@ -15,6 +15,15 @@ _REASONING_SENSITIVE_MODELS = (
     "glm-4.7",
 )
 
+_EMPTY_CONTENT_SENSITIVE_MODELS = (
+    "cohere/",
+    "command-",
+)
+
+def _is_empty_content_sensitive(model: str) -> bool:
+    lower = model.lower()
+    return any(pattern in lower for pattern in _EMPTY_CONTENT_SENSITIVE_MODELS)
+
 def _is_reasoning_sensitive(model: str) -> bool:
     lower = model.lower()
     return any(pattern in lower for pattern in _REASONING_SENSITIVE_MODELS)
@@ -23,37 +32,77 @@ def _is_reasoning_sensitive(model: str) -> bool:
 class MessageHistoryCleaner(CustomLogger):
 
     async def async_pre_call_hook(self, user_api_key_dict, cache, data, call_type):
-        model = data.get("model", "")
-        messages = data.get("messages", [])
-        strip_thinking = _is_reasoning_sensitive(model)
+        try:
+            model = data.get("model", "")
+            messages = data.get("messages", [])
+            strip_thinking = _is_reasoning_sensitive(model)
+            fix_empty_content = _is_empty_content_sensitive(model)
 
-        for msg in messages:
-            if not isinstance(msg, dict) or msg.get("role") != "assistant":
-                continue
+            cleaned_messages = []
+            for msg in messages:
+                if not isinstance(msg, dict) or msg.get("role") != "assistant":
+                    cleaned_messages.append(msg)
+                    continue
 
-            if strip_thinking:
-                # Remove top-level reasoning fields injected by some providers
-                msg.pop("reasoning_content", None)
-                msg.pop("thinking", None)
+                # Shallow copy the message to avoid corrupting data referenced elsewhere
+                msg_copy = dict(msg)
 
-                # Remove Anthropic-style thinking blocks from content arrays
-                if isinstance(msg.get("content"), list):
-                    msg["content"] = [
-                        block for block in msg["content"]
-                        if not (
-                            isinstance(block, dict) and
-                            block.get("type") in ("thinking", "redacted_thinking")
-                        )
-                    ]
-                    if not msg["content"]:
-                        msg["content"] = ""
+                if strip_thinking:
+                    # 1. Remove top-level reasoning keys injected by native providers
+                    msg_copy.pop("reasoning_content", None)
+                    msg_copy.pop("thinking", None)
 
-            # Always normalise tool-call argument serialisation so the prefix
-            # is byte-stable across turns (fixes Mistral cache misses).
-            for tc in msg.get("tool_calls", []) or []:
-                self._fix_tool_call(tc)
+                    # 2. Handle both String and List formats for msg["content"]
+                    content = msg_copy.get("content")
+                    if isinstance(content, str):
+                        msg_copy["content"] = self._strip_reasoning(content)
+                    elif isinstance(content, list):
+                        # Filter out explicit Anthropic-style or OpenAI-style thinking blocks
+                        msg_copy["content"] = [
+                            block for block in content
+                            if not (
+                                isinstance(block, dict) and
+                                block.get("type") in ("thinking", "redacted_thinking", "reasoning")
+                            )
+                        ]
+                        # Process text blocks wrapped within content arrays
+                        for block in msg_copy["content"]:
+                            if isinstance(block, dict) and block.get("type") == "text" and isinstance(block.get("text"), str):
+                                block["text"] = self._strip_reasoning(block["text"])
 
-        data["messages"] = messages
+                        # If content array is empty, fall back to None or empty string gracefully
+                        if not msg_copy["content"]:
+                            msg_copy["content"] = None
+
+                # 3. Always normalize tool-call serialization for byte-stable cache hits
+                if "tool_calls" in msg_copy and msg_copy["tool_calls"]:
+                    # Create a deep copy of tool calls to isolate changes safely
+                    normalized_tool_calls = []
+                    for tc in msg_copy["tool_calls"]:
+                        tc_copy = dict(tc) if isinstance(tc, dict) else tc
+                        self._fix_tool_call(tc_copy)
+                        normalized_tool_calls.append(tc_copy)
+                    msg_copy["tool_calls"] = normalized_tool_calls
+
+                # Fix empty content for sensitive models (e.g. Cohere)
+                if fix_empty_content:
+                    content = msg_copy.get("content")
+                    has_tool_calls = bool(msg_copy.get("tool_calls"))
+                    content_empty = content is None or (isinstance(content, str) and not content.strip()) or content == []
+
+                    if content_empty and not has_tool_calls:
+                        # Drop the message entirely — provider will reject it
+                        continue
+                    if content_empty and has_tool_calls:
+                        # Provider accepts null but not "" for tool-call turns
+                        msg_copy["content"] = None
+
+                cleaned_messages.append(msg_copy)
+
+            data["messages"] = cleaned_messages
+        except Exception as e:
+            print(f"[PHEIDIPP] Error pre-cleaning message history: {e}", flush=True)
+            
         return data
 
     async def async_log_success_event(self, kwargs, response_obj, start_time, end_time):
@@ -66,7 +115,7 @@ class MessageHistoryCleaner(CustomLogger):
 
     def _log_usage(self, kwargs, response_obj):
         try:
-            usage = response_obj.usage
+            usage = getattr(response_obj, "usage", None)
             if not usage:
                 return
 
@@ -95,79 +144,84 @@ class MessageHistoryCleaner(CustomLogger):
 
     def _strip_reasoning(self, text: str) -> str:
         """
-        Remove common reasoning patterns while preserving final answer.
-        This is heuristic but highly effective.
+        Remove system <think> tags and heuristic thinking signatures,
+        returning only the final clean execution text.
         """
         if not text:
             return text
 
+        # Step A: Explicitly excise standard xml/markdown thinking blocks (e.g., DeepSeek R1 style)
+        if "<think>" in text:
+            text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
+
+        lower = text.lower()
         patterns = [
             r"(final answer\s*:)",
             r"(answer\s*:)",
             r"(conclusion\s*:)",
         ]
 
-        lower = text.lower()
-
+        # Step B: Scan regex boundaries for textual pivots
         for pattern in patterns:
             match = re.search(pattern, lower)
             if match:
                 idx = match.start()
                 return text[idx:].split(":", 1)[-1].strip()
 
+        # Step C: Catch sequential thinking patterns
         if "let's think step by step" in lower:
             parts = text.split("\n")
-            return parts[-1].strip()
+            # Pull only the concluding non-empty string line
+            for part in reversed(parts):
+                if part.strip():
+                    return part.strip()
 
         return text
 
     def _fix_tool_call(self, tc):
         """
-        Unwrap double-encoded JSON strings in tool arguments (Llama quirk) and
-        re-serialise with compact separators so the byte representation is
-        stable across turns. Stable bytes = stable prefix = cache hits.
+        Unwrap double-encoded JSON arguments and enforce compact serialization.
+        Ensures perfect downstream byte-matching stability.
         """
         try:
-            func = (
-                tc.get("function")
-                if isinstance(tc, dict)
-                else getattr(tc, "function", None)
-            )
+            is_dict = isinstance(tc, dict)
+            func = tc.get("function") if is_dict else getattr(tc, "function", None)
             if not func:
                 return
 
-            arguments = (
-                func.get("arguments")
-                if isinstance(func, dict)
-                else getattr(func, "arguments", None)
-            )
+            is_func_dict = isinstance(func, dict)
+            arguments = func.get("arguments") if is_func_dict else getattr(func, "arguments", None)
             if not arguments:
                 return
 
-            args = json.loads(arguments)
+            # Parse input string
+            if isinstance(arguments, str):
+                args = json.loads(arguments)
+            else:
+                args = arguments
+
             changed = False
+            if isinstance(args, dict):
+                for key, val in args.items():
+                    if isinstance(val, str):
+                        try:
+                            parsed = json.loads(val)
+                            if isinstance(parsed, (list, dict)):
+                                args[key] = parsed
+                                changed = True
+                        except Exception:
+                            pass
 
-            for key, val in args.items():
-                if isinstance(val, str):
-                    try:
-                        parsed = json.loads(val)
-                        if isinstance(parsed, (list, dict)):
-                            args[key] = parsed
-                            changed = True
-                    except Exception:
-                        pass
-
-            # Always re-serialise with compact, deterministic separators.
-            # This prevents json.dumps default whitespace from producing
-            # different bytes on different runs, which would break prefix cache.
-            new_args = json.dumps(args, separators=(",", ":"))
+            # Enforce deterministic spacing via separators
+            new_args = json.dumps(args, separators=(",", ":"), sort_keys=True)
             if new_args != arguments or changed:
-                if isinstance(func, dict):
+                if is_func_dict:
                     func["arguments"] = new_args
                 else:
                     func.arguments = new_args
 
         except Exception:
             pass
+
 
 proxy_handler_instance = MessageHistoryCleaner()

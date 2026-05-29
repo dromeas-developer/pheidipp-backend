@@ -37,7 +37,7 @@ def main() -> int:
     from indexing import build_index  # noqa: E402
 
     project_path = str(Path(__file__).resolve().parents[1])  # backend root
-    storage_dir  = str(mcp_dir / "storage")
+    storage_dir  = str(mcp_dir / "storage/code")
 
     print(f"[reindex] Project : {project_path}")
     print(f"[reindex] Storage : {storage_dir}")

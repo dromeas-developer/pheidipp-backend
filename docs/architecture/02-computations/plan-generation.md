@@ -14,6 +14,12 @@ type PlanGenerationInputs = {
   cycle_phase_log: CyclePhaseLog | null  // used to avoid key sessions in late luteal
   today: string  // YYYY-MM-DD
 }
+
+// GoalType determines phase arc structure:
+// - race_event: peaking/tapering toward goal event date
+// - fitness_improvement: progressive development, threshold emphasis
+// - maintenance: consistency-focused rolling blocks
+// - recovery: conservative progression, healing priority
 ```
 
 ## Phase Arc Formula
@@ -46,19 +52,59 @@ function computePhaseArc(
 }
 ```
 
-### Open Training Mode
-
-Rolling 8-week `rolling_block` phases. No taper. Regenerated at the start of each new rolling block.
+### Fitness Improvement Mode
 
 ```typescript
-function computeOpenTrainingArc(): PhaseDescriptor[] {
+function computeFitnessImprovementArc(
+  total_weeks: number,
+  athlete_preferences: AthletePreferences
+): PhaseDescriptor[] {
+  // 8-week rolling progression with threshold emphasis
+  const base_weeks = Math.min(total_weeks, 8)
+
+  if (total_weeks >= 8) {
+    // Full 8-week arc
+    return [
+      { label: 'base_building', weeks: 4, ... }
+    , { label: 'threshold_development', weeks: 3, ... }
+    , { label: 'race_specific', weeks: 1, ... }  // repurposed: capacity building
+    ]
+  } else {
+    return [{ label: 'rolling_block', weeks: total_weeks, primary_focus: 'Progressive development' }]
+  }
+}
+```
+
+### Maintenance Mode
+
+```typescript
+function computeMaintenanceArc(
+  total_weeks: number,
+  athlete_preferences: AthletePreferences
+): PhaseDescriptor[] {
+  // 4-week rolling block emphasizing consistency and form preservation
   return [{
     label: 'rolling_block',
-    start_date: today,
-    end_date: addWeeks(today, 8),
-    weeks: 8,
-    primary_focus: 'Consistent aerobic development',
-    weekly_session_count: computeSessionCount(athlete_preferences)
+    weeks: Math.min(total_weeks, 4),
+    primary_focus: 'Consistent aerobic development with form preservation'
+  }]
+}
+```
+
+### Recovery Mode
+
+```typescript
+function computeRecoveryArc(
+  injury_severity: InjurySeverity,
+  athlete_preferences: AthletePreferences
+): PhaseDescriptor[] {
+  // Conservative load progression based on injury severity
+  const phase_weeks = injury_severity === 'minor' ? 2 : injury_severity === 'major' ? 4 : 3
+
+  return [{
+    label: 'recovery',
+    weeks: phase_weeks,
+    primary_focus: 'Healing and gradual return to training'
   }]
 }
 ```

@@ -61,7 +61,7 @@ and adaptation data collection.
 ## Endpoints Introduced
 
 - `GET /athletes/{athlete_id}/plan` — returns active TrainingPlan with phases array.
-  Protected by `require_self`.
+  Phase arc varies by goal_type: race_event uses periodised structure; fitness_improvement uses progressive development; maintenance uses consistency-focused rolling blocks; recovery uses conservative progression. Protected by `require_self`.
 - `GET /athletes/{athlete_id}/plan/sessions` — returns all PlannedSession records
   for the active plan, orderable by `target_date`. Protected by `require_self`.
 - `GET /athletes/{athlete_id}/plan/upcoming` — returns the next 5 PlannedSession
@@ -85,9 +85,11 @@ and adaptation data collection.
 ## Done Criteria
 
 - After onboarding, calling the plan endpoint returns a TrainingPlan with the
-  correct phase sequence for the goal event type and time available.
+  correct phase sequence for the goal_type (race_event: periodised; fitness_improvement: progressive development; maintenance: consistency rolling; recovery: conservative progression).
 - Phases have the correct proportional duration (40% base / 30% threshold /
-  15% race-specific / 2 weeks taper / 1 week race-week for standard races).
+  15% race-specific / 2 weeks taper / 1 week race-week for race_event goals).
+  Fitness improvement uses threshold-emphasis progression; maintenance uses 4-week rolling;
+  recovery uses injury-severity-based conservative phases.
 - `PlannedSession` records cover the full duration to the goal event with no gaps.
 - No two consecutive quality sessions appear in the generated schedule.
 - Changing `goal_event_date` by more than 7 days via PATCH creates a new TrainingPlan

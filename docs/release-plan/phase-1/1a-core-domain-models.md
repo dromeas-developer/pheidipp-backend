@@ -62,8 +62,11 @@ Full field set from `architecture/planning-and-sessions.md` including:
 Full field set from `architecture/planning-and-sessions.md` including:
 `goal_type`, `goal_event_type`, `goal_event_date`, `custom_distance_km`,
 `weekly_volume_hours`, `weekly_volume_km`, `fitness_level` (1-5 CHECK),
-`recent_injury`, `status` (enum: `active`, `completed`, `abandoned`),
+`recent_injury`, `injury_severity`, `status` (enum: `active`, `completed`, `abandoned`),
 `created_at`, `closed_at`.
+`goal_type` values: `race_event`, `fitness_improvement`, `maintenance`, `recovery`.
+`goal_event_type` null when goal_type ≠ `race_event`.
+`injury_severity` required when goal_type = `recovery` (enum: `InjurySeverity`: `minor`, `moderate`, `major`).
 DB-level constraint: cannot have two `active` blocks per athlete (partial unique
 index on `athlete_id WHERE status = 'active'`).
 
@@ -144,7 +147,7 @@ Fields: `id`, `activity_id` FK (unique — one analysis per activity),
 All in `app/models/enums.py`:
 `Sex`, `SportBackground`, `TrainingTimeOfDay`, `GpsSource`, `HrSource`,
 `PowerSource`, `PrimaryTrainingPlatform`, `GoalType`, `GoalEventType`,
-`TrainingBlockStatus`, `PhaseLabel`, `SessionType`, `PlannedSessionStatus`,
+`InjurySeverity`, `TrainingBlockStatus`, `PhaseLabel`, `SessionType`, `PlannedSessionStatus`,
 `TwinConfidenceLevel`, `TwinTrigger`, `MessageType`, `ActivitySource`,
 `RecoveryModifierLevel`, `TrainingPlanStatus`.
 

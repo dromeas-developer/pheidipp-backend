@@ -92,8 +92,8 @@ calibration sessions, not raw TwinState estimate).
 - `observed_pace_at_lt2` requires at least 1 calibration-eligible threshold
   session. If none exist, fallback to raw `lt2_estimate_bpm` converted to pace
   via a population HR-to-pace curve (lower confidence — flagged in response).
-- Race prediction is created for `goal_type = race_event` only. Open training
-  blocks (`goal_type = open_training`) return 204.
+- Race prediction is created for `goal_type = race_event` only. Non-race goals
+  (fitness_improvement, maintenance, recovery) return 204.
 - Each update trigger creates a new record — old predictions are retained for
   the history endpoint.
 
@@ -106,4 +106,4 @@ calibration sessions, not raw TwinState estimate).
   entry with an updated (hopefully improved) `baseline_prediction_seconds`.
 - Within 14 days of the goal event, `weather_adjusted_seconds` is non-null
   when a weather forecast is available.
-- An athlete on an open training block receives 204.
+- An athlete on an open training block (fitness_improvement or maintenance goal_type) receives 204.

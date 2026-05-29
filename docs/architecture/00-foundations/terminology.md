@@ -112,6 +112,21 @@ type SessionType =
   | 'rest'
 ```
 
+### InjurySeverity
+```typescript
+type InjurySeverity = 'minor' | 'moderate' | 'major'
+```
+Used when `goal_type = 'recovery'` to determine phase duration and load progression.
+
+### GoalType
+```typescript
+type GoalType =
+  | 'race_event'        // periodised toward specific goal; peaking, tapering, race-specific preparation
+  | 'fitness_improvement' // active development; progressive overload; measurable gains
+  | 'maintenance'       // consistency-focused; habit preservation; fitness preservation
+  | 'recovery'          // healing-focused; conservative load; protective coaching
+```
+
 ### PhaseLabel
 ```typescript
 type PhaseLabel =

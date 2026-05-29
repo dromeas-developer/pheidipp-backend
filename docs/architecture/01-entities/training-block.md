@@ -8,7 +8,11 @@
 ## TypeScript Schema
 
 ```typescript
-type GoalType = 'race_event' | 'open_training'
+type GoalType =
+  | 'race_event'        // periodised toward specific goal; peaking, tapering, race-specific preparation
+  | 'fitness_improvement' // active development; progressive overload; measurable gains
+  | 'maintenance'       // consistency-focused; habit preservation; fitness preservation
+  | 'recovery'          // healing-focused; conservative load; protective coaching
 
 type GoalEventType =
   | 'marathon' | 'half_marathon' | '10k' | '5k'
@@ -22,9 +26,9 @@ type TrainingBlock = {
 
   // Goal definition — immutable after creation
   goal_type: GoalType
-  goal_event_type: GoalEventType | null   // null when goal_type = 'open_training'
+  goal_event_type: GoalEventType | null   // null when goal_type ≠ 'race_event'
   goal_event_name: string | null
-  goal_event_date: string | null     // YYYY-MM-DD; null for open training
+  goal_event_date: string | null     // YYYY-MM-DD; null for non-race_event goal types
   custom_distance_km: number | null  // > 0; only when goal_event_type = 'custom'
   goal_description: string | null    // free text; surfaced to first message agent
 
@@ -33,6 +37,9 @@ type TrainingBlock = {
   weekly_volume_km: number           // >= 0; CHECK constraint
   fitness_level: number              // 1–5; CHECK constraint; feeds Tier 3 bootstrap
   recent_injury: string | null       // free text; surfaced to plan generation
+
+  // Recovery context — required when goal_type = 'recovery'
+  injury_severity: InjurySeverity | null  // null for other goal types
 
   // Status — the only mutable fields
   status: TrainingBlockStatus
@@ -43,8 +50,9 @@ type TrainingBlock = {
 
 ## Invariants
 - **One active block per athlete.** Enforced by a partial unique index on `(athlete_id) WHERE status = 'active'`. Attempting to create a second active block returns 409 Conflict. The caller must explicitly close the existing block first.
-- **Semantic fields are immutable after creation.** `goal_type`, `goal_event_type`, `goal_event_date`, `custom_distance_km`, `weekly_volume_hours`, `weekly_volume_km`, `fitness_level`, `recent_injury` cannot be changed via PATCH. If the athlete's situation changes materially, a new block captures the new context.
+- **Semantic fields are immutable after creation.** `goal_type`, `goal_event_type`, `goal_event_date`, `custom_distance_km`, `weekly_volume_hours`, `weekly_volume_km`, `fitness_level`, `recent_injury`, `injury_severity` cannot be changed via PATCH. If the athlete's situation changes materially, a new block captures the new context.
 - **PATCH is restricted to** `status`, `goal_event_date`, and `goal_description` only. `goal_event_date` is an exception to the immutability rule because races get rescheduled; it triggers plan regeneration if the change is > 7 days.
+- **Recovery mode requires injury_severity.** `injury_severity` is mandatory when `goal_type = 'recovery'`.
 - No DELETE. Status transitions to `completed` or `abandoned` are the end state.
 - `fitness_level` (1–5) feeds the Tier 3 twin bootstrap in `TwinBootstrapService`. It is the athlete's self-assessment and is never updated automatically.
 
@@ -65,7 +73,7 @@ stateDiagram-v2
 ### Produced
 | Event | Trigger | Version | Payload |
 |---|---|---|---|
-| `training_block_created` | Block inserted with status=active | v1 | `{training_block_id, goal_type, goal_event_date, fitness_level}` |
+| `training_block_created` | Block inserted with status=active | v1 | `{training_block_id, goal_type, goal_event_type, goal_event_date, fitness_level}` |
 
 ### Consumed
 | Event | Action | Version |
@@ -88,6 +96,7 @@ Request:
   weekly_volume_km: number, required
   fitness_level: number (1–5), required
   recent_injury?: string
+  injury_severity?: 'minor' | 'moderate' | 'major'  # required when goal_type = 'recovery'
 Response: 201
   training_block: TrainingBlockResponse
 Auth: Bearer JWT, require_self
@@ -151,7 +160,7 @@ Does Not Own:
 
 ## Observability
 Metrics:
-- `training_block.created.total`: by goal_type
+- `training_block.created.total`: by goal_type (race_event, fitness_improvement, maintenance, recovery)
 - `training_block.completed.total`
 - `training_block.abandoned.total`
 Logs:

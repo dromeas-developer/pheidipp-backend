@@ -51,7 +51,11 @@ taper_weeks           = 2  (ultra: 3)
 race_week_weeks       = 1
 ```
 
-For `goal_type = 'open_training'`: rolling 8-week `rolling_block` phases. No taper.
+For `goal_type = 'fitness_improvement'`: progressive development with threshold emphasis. No taper. Fixed 8-week rolling progression.
+
+For `goal_type = 'maintenance'`: consistency-focused. 4-week rolling block emphasizing aerobic base and form preservation. No intensity peaks.
+
+For `goal_type = 'recovery'`: healing-focused. Conservative load distribution, gradual return progression over 2-4 weeks based on injury severity.
 
 ## Regeneration Triggers
 A new plan is generated (old one superseded) when:

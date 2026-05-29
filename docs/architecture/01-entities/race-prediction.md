@@ -122,7 +122,7 @@ function weatherAdjustment(
 GET /athletes/{athlete_id}/prediction
 Response: 200 | 204
   prediction: RacePredictionResponse  # most recent for active block
-  # 204 when: confidence=low, goal_type=open_training, or no prediction yet
+  # 204 when: confidence=low, goal_type≠race_event, or no prediction yet
 Auth: Bearer JWT, require_self
 
 GET /athletes/{athlete_id}/prediction/history

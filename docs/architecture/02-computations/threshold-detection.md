@@ -118,16 +118,18 @@ Triggered by `TwinRecalibrationService` after Bayesian update:
 
 See `00-foundations/confidence-model.md` for downstream effects.
 
-## Outputs → TwinState
+## Outputs → AthletePhysiology
 
 ```typescript
-// New TwinState fields updated by threshold detection:
+// AthletePhysiology fields updated by threshold detection:
+// (via PhysiologyUpdateService.bayesian_update())
 {
-  lt1_estimate_bpm: number,       // posterior mean
-  lt2_estimate_bpm: number,       // posterior mean
-  ftp_estimate_watts: number | null,  // from power-to-HR ratio; null if no power data
-  confidence_level: TwinConfidenceLevel  // updated if threshold crossed
+  lt1: PhysiologyParameterState,  // posterior mean + uncertainty updated
+  lt2: PhysiologyParameterState,  // posterior mean + uncertainty updated
+  ftp: PhysiologyParameterState | null  // updated when power-to-HR ratio produces result
 }
+// A new TwinState is then appended referencing the updated AthletePhysiology
+// TwinState.confidence_level is recomputed from AthletePhysiology.lt2.prior_weight
 ```
 
 ## Version History
@@ -137,6 +139,7 @@ See `00-foundations/confidence-model.md` for downstream effects.
 | `threshold-v2-rr` | RR inflection added (Phase 2d) |
 
 ## Cross-References
+- AthletePhysiology (where posterior estimates are stored): `01-entities/athlete-physiology.md`
 - TwinState confidence transitions: `00-foundations/confidence-model.md`
 - Signal cleaning (produces cleaned RR series input): `02-computations/signal-cleaning.md`
 - Data tier constraints on which algorithm applies: `00-foundations/data-tiers.md`

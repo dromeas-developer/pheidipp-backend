@@ -165,6 +165,6 @@ See `01-entities/twin-state.md` for the full TwinState schema.
 
 ## Cross-References
 - Effort normalisation (GAP input to formulas): `02-computations/effort-normalisation.md`
-- TwinState Layer 1 Banister model: `01-entities/twin-state.md`
+- AthleteFitness Banister model (where load scores are applied): `01-entities/athlete-fitness.md`
 - Data tier capabilities: `00-foundations/data-tiers.md`
 - Calibration eligibility rules (full detail): `01-entities/activity.md`

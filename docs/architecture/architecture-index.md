@@ -3,8 +3,8 @@
 
 Every document in this index defines a precise contract: schema, invariants, events, APIs, storage model, mutation rules, failure semantics, and observability. Read only the documents relevant to the task at hand.
 
-**No roadmap. No phase sequencing. No build planning.** For those, see `docs/release-plan/release-index.md`.
-**No product behaviour or coach voice.** For those, see `docs/vision/vision-index.md`.
+**No roadmap. No phase sequencing. No build planning.** For those, see `release-index.md`.
+**No product behaviour or coach voice.** For those, see `vision-index.md`.
 
 When this architecture conflicts with the release plan on technical design, this index is authoritative. When the release plan conflicts on sequencing or scope, the release plan is authoritative.
 
@@ -28,6 +28,10 @@ When this architecture conflicts with the release plan on technical design, this
 | Calibration eligibility | Five-rule gate; always Python; never overridden manually | `02-computations/load-computation.md` |
 | Confidence level | Ratchets up only; never decreases | `00-foundations/confidence-model.md` |
 | Active TrainingBlock | One per athlete; partial unique index enforces | `01-entities/training-block.md` |
+| AthletePhysiology | Mutable one-per-athlete; PhysiologyMeasurement is append-only history | `01-entities/athlete-physiology.md` |
+| AthleteFitness | Mutable one-per-athlete; historical state via TwinState FK chain | `01-entities/athlete-fitness.md` |
+| Lab/field test input | Updates AthletePhysiology only; AthleteFitness unchanged | `01-entities/athlete-physiology.md` |
+| TwinState references | FK to athlete_physiology_id + athlete_fitness_id; no inline duplication | `01-entities/twin-state.md` |
 | Comparable session | Backend Python selects; LLM never chooses | `02-computations/comparable-sessions.md` |
 | Race prediction | Not written at LOW confidence; not created for open training | `01-entities/race-prediction.md` |
 | GenerationEvent | Written for every LLM call attempt including failures | `01-entities/generation-event.md` |
@@ -99,8 +103,16 @@ The lean physiological observation index. `fit_file_key` hard prerequisite. No g
 **Read for:** Activity field list; `fit_file_key` invariant; why no averages are stored; ingestion state diagram.
 
 ### `01-entities/twin-state.md`
-Append-only twin snapshot. Four recalibration triggers. Confidence transition thresholds. Context assembly for agents (coaching language at each confidence level). Three-dimensional Layer 1 schema evolution plan.
-**Read for:** TwinState field list; append-only invariant; what agents receive from context assembly; confidence transitions.
+Snapshot assembler — holds FK references to the then-current `AthletePhysiology` and `AthletesFitness` records rather than duplicating their values inline. Five recalibration triggers including the new `physiology_input` trigger for lab/field tests. Confidence level computation from `AthletePhysiology.lt2.prior_weight`. When a new TwinState is and is not written (form shift > 1 unit threshold). Context assembly digest for agents.
+**Read for:** TwinState schema; why it references not duplicates; when TwinStates are written; context assembly output; confidence computation.
+
+### `01-entities/athlete-physiology.md`
+Per-athlete physiological parameter estimates: LT1, LT2, FTP, VO2max, max HR. Mutable current state + append-only `PhysiologyMeasurement` history. `MeasurementSource` enum and observation weights by source (questionnaire 0.5 → lab_test 12–15). Bayesian update formula with prior decay (42-day time constant). Full lab test and field test ingestion flow (source-weighted; high-weight observations dominate prior). Training-derived updates (automatic; lower weight). State transition diagram from bootstrapped through lab_calibrated. `physiology_input` trigger for non-activity updates. API: `POST /physiology/measurements` accepts lab_test and field_test sources only.
+**Read for:** how lab tests feed into the system; observation weights by source; Bayesian update formula; distinction from AthleteFitness; what parameters are null at onboarding.
+
+### `01-entities/athlete-fitness.md`
+Per-athlete Banister model rolling state: fitness, fatigue, and form per dimension. Mutable one-per-athlete; historical state reconstructed from TwinState FK chain. Banister update formula with per-dimension time constants. Individual time constant fitting (Phase 6d+). Form-to-readiness-descriptor mapping (form scores never exposed to athletes or agents — only the descriptor). How a lab test interacts with AthleteFitness (it does not — lab tests update AthletePhysiology only). Three-dimensional activation (Phase 6c: nullable aerobic/neuromuscular/structural columns).
+**Read for:** Banister formula; why fitness scores are never exposed as numbers; how AthleteFitness relates to AthletePhysiology and TwinState; individual time constants.
 
 ### `01-entities/athlete-wellness.md`
 Daily passive wellness record. Upsert/additive-merge semantics. `min_sleeping_hr_bpm` as resting HR anchor. `hrv_overnight_avg_ms` preferred over morning measurement.

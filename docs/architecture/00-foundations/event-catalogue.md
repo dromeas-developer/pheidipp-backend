@@ -41,6 +41,10 @@ type EventType =
   | 'post_workout_analysis_requested'
   | 'coaching_message_generated'
   | 'objective_updated'
+  | 'physiology_updated'          // AthletePhysiology posterior shifted > 1 unit
+  | 'physiology_lab_test_ingested' // lab_test measurement created
+  | 'fitness_updated'              // AthleteFitness form shifted > 1 unit
+  | 'fitness_time_constants_fitted' // individual Banister constants activated
   | 'race_prediction_updated'
   // Cycle events
   | 'cycle_day_one_logged'
@@ -233,6 +237,47 @@ type RacePredictionUpdatedPayload = {
 ```
 **Producer:** `RacePredictionService`
 **Consumers:** API layer (home screen refresh signal)
+
+---
+
+### `physiology_updated`
+```typescript
+type PhysiologyUpdatedPayload = {
+  parameters_updated: PhysiologyParameter[]
+  dominant_sources: Partial<Record<PhysiologyParameter, MeasurementSource>>
+  prior_weights: Partial<Record<PhysiologyParameter, number>>
+}
+```
+**Producer:** `PhysiologyUpdateService`
+**Consumers:** `TwinRecalibrationService` (appends new TwinState)
+
+---
+
+### `physiology_lab_test_ingested`
+```typescript
+type PhysiologyLabTestIngestedPayload = {
+  parameters_measured: PhysiologyParameter[]
+  measurement_date: string
+  source: 'lab_test' | 'field_test'
+}
+```
+**Producer:** `PhysiologyInputService`
+**Consumers:** `PhysiologyUpdateService`, `ProactiveMessageService`
+
+---
+
+### `fitness_updated`
+```typescript
+type FitnessUpdatedPayload = {
+  aggregate_form: number
+  form_descriptor: string
+  last_activity_id: string
+}
+```
+**Producer:** `FitnessUpdateService`
+**Consumers:** `TwinRecalibrationService` (if form shift > 1)
+
+---
 
 ## Invariants
 - All events are scoped to a single `athlete_id`

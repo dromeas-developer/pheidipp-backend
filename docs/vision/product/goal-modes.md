@@ -35,4 +35,4 @@ Transitions are always framed as coaching conversations, not administrative chan
 
 ## What Never Changes Between Modes
 
-The quality of analysis, the coach's voice, and the twin's underlying physiological modelling are identical in both modes. Open mode is not a stripped-down experience — it is a genuinely different coaching relationship for athletes who are not racing. The only thing that changes is what the coaching is oriented toward.
+The quality of analysis, the coach's voice, and the twin's underlying physiological modelling are identical in all modes. Non-race modes are not stripped-down experiences — they are genuinely different coaching relationships for athletes pursuing goals beyond racing. The only thing that changes is what the coaching is oriented toward.

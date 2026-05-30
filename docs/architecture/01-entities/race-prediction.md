@@ -3,6 +3,7 @@
 ## Purpose
 - Point-in-time prediction of the athlete's finish time for their goal event
 - Updates as fitness evolves; every update creates a new record (the prediction arc)
+- B-race predictions generated for secondary events, providing calibration feedback without target-setting pressure
 - Not surfaced at LOW confidence; not created for open training blocks
 
 ## TypeScript Schema

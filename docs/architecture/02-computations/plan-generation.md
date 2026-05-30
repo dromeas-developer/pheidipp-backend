@@ -13,6 +13,7 @@ type PlanGenerationInputs = {
   twin_state: TwinState
   cycle_phase_log: CyclePhaseLog | null  // used to avoid key sessions in late luteal
   today: string  // YYYY-MM-DD
+  secondary_events: SecondaryEvent[]     // B-races and C-races for disruption window calculation
 }
 
 // GoalType determines phase arc structure:
@@ -20,6 +21,10 @@ type PlanGenerationInputs = {
 // - fitness_improvement: progressive development, threshold emphasis
 // - maintenance: consistency-focused rolling blocks
 // - recovery: conservative progression, healing priority
+
+// Secondary events create disruption windows within the phase arc:
+// - B-races: 4 days pre-race, 3 days post-race (reduced load/recovery focus)
+// - C-races: 2 days pre-race, 1 day post-race (minimal adjustment)
 ```
 
 ## Phase Arc Formula
@@ -157,11 +162,15 @@ type RegenerationTrigger =
   | 'goal_date_change'      // goal_event_date moved by > 7 days
   | 'confidence_upgrade'    // twin moved from low→medium; plan can be more precise
   | 'session_dropout'       // > 20% of sessions in 3-week window skipped or missed
+  | 'secondary_event_added' // B-race or C-race added within active plan date range
+  | 'secondary_event_removed' // Secondary event removed, sessions restored
 
 function shouldRegenerate(trigger: RegenerationTrigger, old_plan: TrainingPlan, new_twin: TwinState): boolean {
   // goal_date_change: only if abs(new_date - old_date) > 7 days
   // confidence_upgrade: only if old plan was generated at 'low' confidence
   // session_dropout: checked by nightly monitoring task
+  // secondary_event changes: triggers redistribution, not full regeneration unless
+  //   the disruption window cannot be accommodated within existing phase structure
 }
 ```
 

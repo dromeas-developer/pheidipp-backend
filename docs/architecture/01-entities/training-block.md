@@ -20,6 +20,20 @@ type GoalEventType =
 
 type TrainingBlockStatus = 'active' | 'completed' | 'abandoned'
 
+type SecondaryEventType =
+  | 'half_marathon' | '10k' | '5k' | 'trail_race'
+
+type SecondaryEventPriority = 'B' | 'C'
+
+type SecondaryEvent = {
+  id: string                      // UUID, PK
+  training_block_id: string       // UUID, FK → TrainingBlock
+  event_type: SecondaryEventType
+  event_date: string              // YYYY-MM-DD
+  event_name: string | null
+  priority: SecondaryEventPriority
+}
+
 type TrainingBlock = {
   id: string                         // UUID, PK
   athlete_id: string                 // UUID, FK → Athlete
@@ -31,6 +45,9 @@ type TrainingBlock = {
   goal_event_date: string | null     // YYYY-MM-DD; null for non-race_event goal types
   custom_distance_km: number | null  // > 0; only when goal_event_type = 'custom'
   goal_description: string | null    // free text; surfaced to first message agent
+
+  // Secondary events — mutable; max 3 per block
+  secondary_events: SecondaryEvent[]
 
   // Self-reported context at creation — immutable after creation
   weekly_volume_hours: number        // >= 0; CHECK constraint
@@ -50,8 +67,10 @@ type TrainingBlock = {
 
 ## Invariants
 - **One active block per athlete.** Enforced by a partial unique index on `(athlete_id) WHERE status = 'active'`. Attempting to create a second active block returns 409 Conflict. The caller must explicitly close the existing block first.
-- **Semantic fields are immutable after creation.** `goal_type`, `goal_event_type`, `goal_event_date`, `custom_distance_km`, `weekly_volume_hours`, `weekly_volume_km`, `fitness_level`, `recent_injury`, `injury_severity` cannot be changed via PATCH. If the athlete's situation changes materially, a new block captures the new context.
+- **Semantic fields are immutable after creation.** `goal_type`, `goal_event_type`, `goal_event_date`, `custom_distance_km`, `weekly_volume_hours`, `weekly_volume_km`, `fitness_level`, `recent_injury`, `injury_severity` cannot be changed via PATCH. Secondary events are mutable and managed via dedicated endpoints.
 - **PATCH is restricted to** `status`, `goal_event_date`, and `goal_description` only. `goal_event_date` is an exception to the immutability rule because races get rescheduled; it triggers plan regeneration if the change is > 7 days.
+- **Secondary events are mutable.** `POST /athletes/{athlete_id}/blocks/{block_id}/secondary-events` creates secondary events. `PATCH` and `DELETE` on these endpoints update/remove them. Max 3 secondary events per block.
+- **Secondary events cannot conflict with A-race schedule.** Validation constraint prevents scheduling within taper phase or race week of the primary goal.
 - **Recovery mode requires injury_severity.** `injury_severity` is mandatory when `goal_type = 'recovery'`.
 - No DELETE. Status transitions to `completed` or `abandoned` are the end state.
 - `fitness_level` (1–5) feeds the Tier 3 twin bootstrap in `TwinBootstrapService`. It is the athlete's self-assessment and is never updated automatically.
@@ -74,6 +93,8 @@ stateDiagram-v2
 | Event | Trigger | Version | Payload |
 |---|---|---|---|
 | `training_block_created` | Block inserted with status=active | v1 | `{training_block_id, goal_type, goal_event_type, goal_event_date, fitness_level}` |
+| `secondary_event_registered` | Secondary event added to block | v1 | `{secondary_event_id, training_block_id, event_type, event_date, priority}` |
+| `secondary_event_removed` | Secondary event removed from block | v1 | `{secondary_event_id, training_block_id, event_date}` |
 
 ### Consumed
 | Event | Action | Version |
@@ -118,6 +139,30 @@ Auth: Bearer JWT, require_self
 GET /athletes/{athlete_id}/blocks
 Response: 200
   blocks: TrainingBlockResponse[]  # all blocks, ordered by created_at desc
+Auth: Bearer JWT, require_self
+
+POST /athletes/{athlete_id}/blocks/{block_id}/secondary-events
+Description: Registers a secondary event (B-race or C-race) on an active block. Returns 422 if validation fails (max 3, conflict with A-race schedule).
+Request:
+  event_type: SecondaryEventType, required
+  event_date: string (YYYY-MM-DD), required
+  event_name?: string
+  priority: SecondaryEventPriority, required  # 'B' or 'C'
+Response: 201
+  secondary_event: SecondaryEventResponse
+Auth: Bearer JWT, require_self
+
+PATCH /athletes/{athlete_id}/blocks/{block_id}/secondary-events/{event_id}
+Request:
+  event_date?: string  # triggers redistribution if needed
+  event_name?: string
+Response: 200
+  secondary_event: SecondaryEventResponse
+Auth: Bearer JWT, require_self
+
+DELETE /athletes/{athlete_id}/blocks/{block_id}/secondary-events/{event_id}
+Response: 200
+  secondary_event: SecondaryEventResponse
 Auth: Bearer JWT, require_self
 ```
 

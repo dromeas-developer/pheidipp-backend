@@ -33,7 +33,9 @@ The athlete should read this paragraph and feel genuinely seen. Not profiled by 
 **The plan.** An overview of the training plan structure built for this athlete toward
 their goal. How many phases, what each focuses on, the overall arc from now to race day.
 Why this specific structure makes sense given what was found. The athlete should understand
-not just what the plan does but why it does it.
+not just what the plan does but why it does it. When secondary events are registered,
+the first message references them as fitness checkpoints that provide calibration signals
+without compromising the primary goal timeline.
 
 **The first block.** A specific preview of the first two to three weeks. What the focus
 will be, what the key sessions will look like, what the coach is trying to accomplish in

@@ -11,6 +11,14 @@ The predicted time is visible on the home view. Watching it improve as fitness b
 through a training block is one of the most quietly motivating elements of the product.
 The number makes abstract fitness gains concrete and visible.
 
+For athletes pursuing race goals with registered B-races, secondary predictions are also produced. See secondary-events for the coaching approach. These appear alongside the primary prediction and serve a different
+coaching purpose. Where the primary prediction shows "what you're aiming for," the
+B-race prediction shows "what I recommend targeting" — a conservative, controlled
+effort based on your current fatigue state and fitness level. The coach message specifies
+the exact pace/power/time target to ensure the B-race provides valuable feedback while
+protecting your primary goal preparation. This preserves the training plan integrity
+while still providing meaningful race experience.
+
 ## Baseline Prediction
 
 Derived from the twin's current threshold estimates, aerobic capacity indicators, and

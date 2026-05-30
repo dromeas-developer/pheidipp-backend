@@ -5,6 +5,8 @@
 
 The athlete can always see the full architecture of their training plan — not just today, but the entire journey to their goal. Each phase is shown with its label (base building, threshold development, race specific, taper, race week), its duration in weeks, and its primary training focus.
 
+When secondary events (B-races, C-races) are registered, they appear as markers within the macro view. See secondary-events for the coaching approach. B-races show their date and a notation of reduced load before and after. C-races appear as subtle indicators that the athlete's training rhythm may shift slightly. This visibility helps the athlete understand why certain weeks are structured differently — the hard session moved to accommodate a B-race, the recovery window extended after a half-marathon tune-up.
+
 This macro view serves a specific psychological purpose: it makes individual hard weeks tolerable. An athlete who can see that the current hard block is followed by a recovery week, and that the next phase shifts emphasis, can endure the present effort in context. Without this view, every hard week feels like an arbitrary imposition. With it, the athlete understands the structure they are moving through.
 
 ## Future Workout Specificity

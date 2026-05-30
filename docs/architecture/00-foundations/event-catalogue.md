@@ -24,6 +24,12 @@ type EventType =
   // Twin events
   | 'twin_recalibrated'
   | 'twin_confidence_upgraded'
+  // Physiology events
+  | 'physiology_updated'
+  | 'physiology_lab_test_ingested'
+  // Fitness events
+  | 'fitness_updated'
+  | 'fitness_time_constants_fitted'
   // Wellness events
   | 'wellness_record_ingested'
   | 'wellness_baseline_updated'
@@ -31,6 +37,8 @@ type EventType =
   // Planning events
   | 'onboarding_completed'
   | 'training_block_created'
+  | 'secondary_event_registered'
+  | 'secondary_event_removed'
   | 'training_plan_generated'
   | 'planned_session_generated'
   | 'session_skipped'
@@ -41,10 +49,6 @@ type EventType =
   | 'post_workout_analysis_requested'
   | 'coaching_message_generated'
   | 'objective_updated'
-  | 'physiology_updated'          // AthletePhysiology posterior shifted > 1 unit
-  | 'physiology_lab_test_ingested' // lab_test measurement created
-  | 'fitness_updated'              // AthleteFitness form shifted > 1 unit
-  | 'fitness_time_constants_fitted' // individual Banister constants activated
   | 'race_prediction_updated'
   // Cycle events
   | 'cycle_day_one_logged'
@@ -232,11 +236,39 @@ type RacePredictionUpdatedPayload = {
   training_block_id: string
   baseline_prediction_seconds: number
   confidence_level: 'medium' | 'high'
-  update_trigger: 'activity_sync' | 'weather_update' | 'course_profile' | 'new_block'
+  update_trigger: 'activity_sync' | 'weather_update' | 'course_profile' | 'new_block' | 'secondary_event_added' | 'secondary_event_removed'
 }
 ```
 **Producer:** `RacePredictionService`
 **Consumers:** API layer (home screen refresh signal)
+
+---
+
+### `secondary_event_registered`
+```typescript
+type SecondaryEventRegisteredPayload = {
+  secondary_event_id: string
+  training_block_id: string
+  event_type: SecondaryEventType
+  event_date: string
+  priority: SecondaryEventPriority
+}
+```
+**Producer:** `TrainingBlockService` (secondary event endpoint)
+**Consumers:** `PlanGenerationService`, `RacePredictionService`
+
+---
+
+### `secondary_event_removed`
+```typescript
+type SecondaryEventRemovedPayload = {
+  secondary_event_id: string
+  training_block_id: string
+  event_date: string
+}
+```
+**Producer:** `TrainingBlockService` (secondary event endpoint)
+**Consumers:** `PlanGenerationService`, `RacePredictionService`
 
 ---
 

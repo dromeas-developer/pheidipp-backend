@@ -1,5 +1,6 @@
-# Goal Modes & Coaching Posture
-*The coaching relationship shifts fundamentally based on what the athlete is working toward*
+# Goal Modes
+
+The same underlying data produces different coaching narratives depending on goal context. The coach does not apply a template — it reads the goal mode and speaks accordingly.
 
 ## Four Goal Modes
 
@@ -13,8 +14,6 @@
 
 ## Adaptive Coaching Language
 
-The same underlying data produces different coaching narratives depending on goal context. The coach does not apply a template — it reads the goal mode and speaks accordingly.
-
 In race mode: "sharpening," "final prep," "race-specific," urgency where it serves. In fitness improvement mode: "development," "progressive overload," "capacity building," measurable gains. In maintenance mode: "consistency," "gradual progress," "sustainable habits," patience where the athlete might otherwise feel pressure. In recovery mode: "healing," "protective," "gradual return," monitoring where the athlete might otherwise push too hard.
 
 The athlete should never have to tell the coach which mode they're in day to day — the coach already knows and speaks from that context.
@@ -26,6 +25,7 @@ When an athlete completes a goal event, the coach acknowledges it and initiates 
 When an athlete sets a new goal event mid-cycle, the plan restructures accordingly. The twin reassesses current fitness and fatigue state and rebuilds the periodisation toward the new target. The coach communicates the logic of the new structure.
 
 **Mode Switching:**
+
 - From Race to any other: Coach initiates recovery period first, then transitions to chosen mode based on athlete's readiness and goals.
 - From Recovery to Fitness Improvement: Coach monitors healing markers before recommending progression.
 - From Maintenance to Fitness Improvement: Coach detects readiness signals and proposes development phase.

@@ -73,6 +73,30 @@ Each entry defines what a document covers, its dependencies, boundaries, and usa
   read_for: Free Coach Chat scope and redirect language; group training model; voice vision.
   scope_boundary: Coach Chat excludes sleep/nutrition/injury; group training has no social layer; voice is same content as text.
 
+- id: product.training-plan-generation
+  path: product/training-plan-generation.md
+  summary: Core overview of how Pheidipp designs adaptive, LLM-driven training plans — philosophy, workflow, strategic framework, race handling, confidence subsystem, and fallback model.
+  tags: [training-plan, plan-generation, strategic-framework, race-handling, confidence]
+  depends_on: [product.global-invariants, product.secondary-events, twin.confidence-and-uncertainty]
+  read_for: how training plans are generated; the four-phase workflow; strategic framework structure; race roles; confidence effects on planning.
+  scope_boundary: Plan generation is coach-driven; athletes accept or abandon plans, not choose between them; checkpoints are recommended, not mandatory.
+
+- id: product.training-plan-hypotheses
+  path: product/training-plan-hypotheses.md
+  summary: Defines how the LLM generates three distinct strategic hypotheses using four primary dimensions, validates them against hard invariants, and scores them for selection.
+  tags: [hypothesis-generation, constraint-validation, scoring, methodology, load-distribution]
+  depends_on: [product.training-plan-generation, product.global-invariants]
+  read_for: the four hypothesis dimensions; distinctness rule; constraint-first validation logic; scoring criteria; hypothesis output format.
+  scope_boundary: Each hypothesis differs in ≥2 dimensions; invalid hypotheses are discarded before scoring; coach selects, athlete does not choose.
+
+- id: product.training-plan-checkpoints
+  path: product/training-plan-checkpoints.md
+  summary: Defines the checkpoint hierarchy, scheduling logic, completion flow, adaptive recovery, and evolution triggers for training plans.
+  tags: [checkpoints, calibration, benchmark, race-simulation, adaptive-evolution]
+  depends_on: [product.training-plan-generation, twin.confidence-and-uncertainty]
+  read_for: checkpoint types and their purposes; scheduling logic; completion flow; adaptive recovery rules; evolution triggers.
+  scope_boundary: Checkpoints are recommended, not mandatory; declined checkpoints use conservative assumptions; completion may trigger replanning.
+
 
 - id: twin.adaptation-signature
   path: twin/adaptation-signature.md

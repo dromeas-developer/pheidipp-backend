@@ -58,10 +58,19 @@ type TrainingBlock = {
   // Recovery context — required when goal_type = 'recovery'
   injury_severity: InjurySeverity | null  // null for other goal types
 
+  // Intermediate goal — set when training length gate triggers
+  intermediate_goal: IntermediateGoal | null
+
   // Status — the only mutable fields
   status: TrainingBlockStatus
   created_at: string                 // ISO 8601
   closed_at: string | null           // set when status → completed or abandoned
+}
+
+type IntermediateGoal = {
+  description: string                         // plain English; e.g. "12-week aerobic base block"
+  physiological_objectives: string[]          // e.g. ["aerobic_fitness", "threshold_power", "structural_resilience"]
+  duration_weeks: number                      // 8–12 weeks
 }
 ```
 
@@ -72,6 +81,7 @@ type TrainingBlock = {
 - **Secondary events are mutable.** `POST /athletes/{athlete_id}/blocks/{block_id}/secondary-events` creates secondary events. `PATCH` and `DELETE` on these endpoints update/remove them. Max 3 secondary events per block.
 - **Secondary events cannot conflict with A-race schedule.** Validation constraint prevents scheduling within taper phase or race week of the primary goal.
 - **Recovery mode requires injury_severity.** `injury_severity` is mandatory when `goal_type = 'recovery'`.
+- **Intermediate goal is set by training length gate.** `intermediate_goal` is populated when the training length gate determines the goal is >24 weeks away. The plan then covers only the intermediate duration.
 - No DELETE. Status transitions to `completed` or `abandoned` are the end state.
 - `fitness_level` (1–5) feeds the Tier 3 twin bootstrap in `TwinBootstrapService`. It is the athlete's self-assessment and is never updated automatically.
 

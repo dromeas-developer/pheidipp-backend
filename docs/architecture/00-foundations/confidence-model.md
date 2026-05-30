@@ -72,7 +72,8 @@ If a significant fitness disruption (illness, injury, extended break) occurs, a 
 |---|---|---|---|
 | Workout generation agent | Effort descriptions, ranges | Threshold-referenced ranges | Threshold-referenced point estimates |
 | Post-workout agent | Avoids specific claims | Moderate specificity | High specificity; names exact thresholds |
-| Plan generation | Conservative volumes | Calibrated to threshold | Fully personalised |
+| Plan generation | Conservative volumes; more checkpoints | Calibrated to threshold; moderate checkpoints | Fully personalised; fewer checkpoints |
+| Checkpoint scheduling | Strongly recommend calibration checkpoints | Recommend calibration for medium-confidence metrics | Skip checkpoints for high-confidence metrics |
 | Race prediction endpoint | 204 No Content | Returns with ±5% range | Returns point estimate |
 | First message agent | Acknowledges uncertainty | Moderate confidence language | Can make specific physiological claims |
 

@@ -29,6 +29,34 @@ type TrainingPlan = {
   status: TrainingPlanStatus
   superseded_at: string | null    // set when a newer plan is created for the same block
   created_at: string              // ISO 8601
+
+  // Hypothesis metadata (set for race_event mode; null for other modes)
+  selected_hypothesis: SelectedHypothesis | null
+  
+  // Checkpoint schedule (set for race_event mode; empty for other modes)
+  checkpoint_schedule: CheckpointDescriptor[]
+}
+
+type SelectedHypothesis = {
+  name: string
+  methodology: string
+  approach: string
+  recovery_cycle: string
+  load_distribution: {
+    zone1_2: number
+    zone3: number
+    zone4_5: number
+  }
+  rationale: string
+}
+
+type CheckpointDescriptor = {
+  type: CheckpointType
+  week_number: number
+  target_date: string
+  target_metric: string
+  session_type: SessionType
+  planner_message: string
 }
 ```
 
@@ -37,6 +65,8 @@ type TrainingPlan = {
 - Old plans are never deleted. `superseded_at` is the only mutation on an inactive plan.
 - `phases` is a non-overlapping, ordered array. The combined date range covers from the plan start date to `TrainingBlock.goal_event_date` without gaps.
 - `twin_state_id` records which twin version produced this plan. A plan produced at LOW confidence will have different phase structures than one produced at MEDIUM or HIGH.
+- `selected_hypothesis` is set only for `race_event` mode plans. For `fitness_improvement`, `maintenance`, and `recovery` modes, it is null.
+- `checkpoint_schedule` contains all checkpoints for the plan. Checkpoints are scheduled during synthesis and correspond to PlannedSession records with `checkpoint_type` set.
 
 ## Phase Arc Formula
 

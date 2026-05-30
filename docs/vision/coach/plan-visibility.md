@@ -26,3 +26,15 @@ These transitions are coaching moments, not silent plan updates. An athlete movi
 ## Current Position Visibility
 
 The home view always shows clearly which week and phase the athlete is currently in, how far through the phase they are, and how many weeks remain to the goal event. Simple, always visible, never buried. The athlete never has to navigate to find out where they are in the plan.
+
+---
+
+## Checkpoint Visibility
+
+Checkpoints appear as distinct markers within the macro plan view — visually different from regular training sessions. Each checkpoint shows its type (calibration, benchmark, race simulation, secondary race, or progress review), the target metric being assessed, and the week it occurs.
+
+The coach frames checkpoints explicitly in the daily journal when they approach. A calibration checkpoint is introduced as: "This week's tempo run has a specific job — it will help me fine-tune your lactate threshold estimate so the next phase of training is more precisely targeted." A benchmark checkpoint is framed as: "Before we move into race-specific work, I want to see where your aerobic development stands. This long run with heart rate drift will tell us."
+
+Checkpoints are not hidden within regular sessions. The athlete knows a checkpoint is happening, why it matters, and what the system will learn from it. This transparency builds trust and reinforces the assessment-driven nature of the plan.
+
+When a checkpoint completes and the twin updates, the coach communicates what changed — "Your half-marathon confirms your threshold is around 4:10/km, better than the 4:15 we estimated. I've updated your training zones and increased your marathon pace target slightly." The athlete sees that checkpoints have consequences, not just data collection for its own sake.

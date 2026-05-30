@@ -53,6 +53,8 @@ type EventType =
   // Cycle events
   | 'cycle_day_one_logged'
   | 'cycle_phase_changed'
+  // Checkpoint events
+  | 'checkpoint_completed'
 ```
 
 ## Event Schemas
@@ -269,6 +271,23 @@ type SecondaryEventRemovedPayload = {
 ```
 **Producer:** `TrainingBlockService` (secondary event endpoint)
 **Consumers:** `PlanGenerationService`, `RacePredictionService`
+
+---
+
+### `checkpoint_completed`
+```typescript
+type CheckpointCompletedPayload = {
+  checkpoint_id: string
+  planned_session_id: string
+  checkpoint_type: CheckpointType
+  target_metric: string
+  metric_updated: boolean
+  confidence_changed: boolean
+  replan_triggered: boolean
+}
+```
+**Producer:** `SessionLifecycleService` (when a checkpoint session completes)
+**Consumers:** `PlanGenerationService` (replan if needed), `ProactiveMessageService` (athlete notification)
 
 ---
 

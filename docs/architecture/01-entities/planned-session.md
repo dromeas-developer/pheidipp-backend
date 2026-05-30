@@ -26,6 +26,10 @@ type PlannedSession = {
   intent_description: string       // plain English; shown in near-term preview
   approximate_duration_minutes: number
 
+  // Checkpoint metadata (set if this session is a checkpoint)
+  checkpoint_type: CheckpointType | null   // null = not a checkpoint
+  checkpoint_metric: string | null         // primary metric being assessed
+
   // Status lifecycle
   status: PlannedSessionStatus
   skip_reason: string | null       // set when status → skipped
@@ -66,7 +70,7 @@ stateDiagram-v2
 | Event | Trigger | Version | Payload |
 |---|---|---|---|
 | `planned_session_generated` | status → generated | v1 | `{planned_session_id, target_date, session_type}` |
-| `session_completed` | status → completed | v1 | `{planned_session_id, activity_id, session_type, calibration_eligible}` |
+| `session_completed` | status → completed | v1 | `{planned_session_id, activity_id, session_type, calibration_eligible, checkpoint_type?, checkpoint_metric?}` |
 | `session_skipped` | status → skipped | v1 | `{planned_session_id, skip_reason, redistributed_to_date}` |
 | `session_missed` | status → missed (nightly sweep) | v1 | `{planned_session_id, target_date, session_type}` |
 

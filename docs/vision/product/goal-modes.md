@@ -6,6 +6,10 @@ The same underlying data produces different coaching narratives depending on goa
 
 **Race / Goal event mode.** The plan is periodised and tailored toward a specific target date and performance goal. Every workout, phase, and recovery period serves the race. Coaching focuses on peaking, tapering, and race-specific preparation. The twin surfaces urgency where appropriate and frames each session as a step toward the goal event.
 
+In race mode, plan generation begins with the training length gate — a critical first step that evaluates whether the goal timeline is appropriate before any hypothesis generation occurs. Goals more than 24 weeks away trigger an intermediate goal proposal focused on physiological foundations rather than a single long plan. Goals fewer than 8 weeks away with low fitness trigger a shorter goal proposal.
+
+When the timeline is appropriate, the LLM generates three distinct strategic hypotheses using four primary dimensions: methodology, approach, recovery cycle, and load distribution. Each hypothesis represents a genuinely different coaching philosophy. The coach selects the best hypothesis, and the system synthesises a strategic framework covering the macrocycle structure, race schedule, checkpoint schedule, intensity distribution, progression model, and recovery model. See training-plan-generation for the full generation process.
+
 **Fitness Improvement mode.** Active development phase focused on measurable physiological gains and capacity expansion. The plan uses progressive overload with structured adaptation blocks. Coaching emphasizes development milestones, strength building, and measurable progress. The twin tracks adaptation signals and surfaces improvement patterns.
 
 **Maintenance mode.** Consistency-focused relationship for athletes not pursuing specific goals. The coaching posture shifts away from periodisation toward habit preservation and gradual, sustainable improvement. Success is defined as consistent training, fitness preservation, and injury-free consistency. The twin maintains current fitness while warning against over-adaptation.

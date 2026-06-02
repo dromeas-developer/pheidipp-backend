@@ -3,25 +3,13 @@
 
 ## What the Analysis Covers
 
-**Session compliance.** Did the athlete execute the planned session? If not, what diverged
-and why does it matter? Compliance is not binary — the coach distinguishes between an
-athlete who ran the right distance at the wrong intensity, one who cut the session short
-due to fatigue, and one who added extra work because they felt good.
+**Session compliance.** Did the athlete execute the planned session? If not, what diverged and why does it matter? Compliance is not binary — the coach distinguishes between an athlete who ran the right distance at the wrong intensity, one who cut the session short due to fatigue, and one who added extra work because they felt good.
 
-**Rep-by-rep story for structured sessions.** Each interval is examined individually.
-Was pacing even within the rep? Did they go out too hard? Did they fade? Was there
-something left in the tank at the end? The coach names specific patterns from specific
-reps, not general impressions.
+**Rep-by-rep story for structured sessions.** Each interval is examined individually. Was pacing even within the rep? Did they go out too hard? Did they fade? Was there something left in the tank at the end? The coach names specific patterns from specific reps, not general impressions.
 
-**Historical correlation — the most important element.** Every post-workout message
-connects this session to a comparable previous one. "Three weeks ago on your last
-threshold session you faded in the final rep. Today you held it together." This requires
-the twin to identify which previous session is actually comparable — same session type,
-similar phase, similar target intensity — not just the most recent session of that type.
+**Historical correlation — the most important element.** Every post-workout message connects this session to a comparable previous one. "Three weeks ago on your last threshold session you faded in the final rep. Today you held it together." This requires the twin to identify which previous session is actually comparable — not just the most recent session of that type, but one where the athlete was in a similar physiological state. The twin matches sessions based on how the athlete was (fitness level, load accumulation, recovery state) not just what the session looked like (type, phase, intensity). Two threshold sessions at the same pace mean something very different when one follows a rest week and the other follows a hard session.
 
-**Objective progress.** A specific update on the objectives this workout was designed to
-address. Not all objectives — the ones in play for this session. Expressed in plain
-language with directional movement: better, worse, unchanged, and why.
+**Objective progress.** A specific update on the objectives this workout was designed to address. Not all objectives — the ones in play for this session. Expressed in plain language with directional movement: better, worse, unchanged, and why.
 
 ## Format
 
@@ -33,13 +21,8 @@ Three natural paragraphs. No headers, no bullets, no emojis.
 
 ## What the Coach Never Says
 
-Raw numbers without context. Acronyms without explanation. Generic encouragement —
-"great job," "well done," "you're making progress." Anything that could have been written
-without reading the actual workout data. Anything that sounds like it came from a template.
+Raw numbers without context. Acronyms without explanation. Generic encouragement — "great job," "well done," "you're making progress." Anything that could have been written without reading the actual workout data. Anything that sounds like it came from a template.
 
 ## The Trigger
 
-Post-workout analysis fires when the session data is available. The athlete should open
-the app after a run and find the coach has already read it and written the message.
-For athletes who prefer to initiate the analysis themselves, this is a user-controlled
-setting — but the default is automatic so the experience requires no extra steps.
+Post-workout analysis fires when the session data is available. The athlete should open the app after a run and find the coach has already read it and written the message. For athletes who prefer to initiate the analysis themselves, this is a user-controlled setting — but the default is automatic so the experience requires no extra steps.

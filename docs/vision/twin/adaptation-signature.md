@@ -15,26 +15,26 @@ reality and works with it rather than pretending it can be solved.
 
 ## The Training Block as the Atomic Unit
 
-Individual sessions are not the unit of analysis for adaptation learning. The **training
-block** is.
+Individual sessions are not the unit of analysis for adaptation learning. The **adaptation
+window** is.
 
-A hard block is two or three quality sessions in close succession — threshold work,
+A hard adaptation window is two or three quality sessions in close succession — threshold work,
 intervals, long runs — treated as a single compound stimulus. The twin does not attempt
-to decompose the individual contribution of each session within a block. It treats the
-block as one unit with a defined start, a defined end, and a measurable intensity profile.
+to decompose the individual contribution of each session within an adaptation window. It treats the
+adaptation window as one unit with a defined start, a defined end, and a measurable intensity profile.
 
 This makes the attribution problem tractable: one compound stimulus, one clean recovery
 observation window, one readable response.
 
 ## Three Training Unit Types
 
-**Hard blocks.** Two to three quality sessions in close succession. The stimulus unit.
+**Hard adaptation windows.** Two to three quality sessions in close succession. The stimulus unit.
 Characterised by type (interval-dominant, threshold-dominant, volume-dominant), total
 load across all three dimensions from Layer 1, and internal structure.
 
 **Isolated sessions.** A single quality session with easy days either side. The cleanest
 signal available — one stimulus, one recovery window, minimal confounding. The twin weights
-isolated sessions more heavily than block-embedded sessions when learning adaptation
+isolated sessions more heavily than sessions embedded in adaptation windows when learning adaptation
 patterns because the experimental conditions are more controlled.
 
 **Recovery and easy periods.** Not filler between hard work — active observation windows.
@@ -60,18 +60,20 @@ the athlete arrives fresh — removing accumulated fatigue as a confounding vari
 creating consistent pre-session baselines. Easy days after create clean recovery
 observation windows.
 
-Hard blocks are deliberate and periodic, not the default structure. When prescribed, the
-twin treats the entire block as a single stimulus and reads the recovery response at block
-level.
+Hard adaptation windows are deliberate and periodic, not the default structure. When prescribed, the
+twin treats the entire adaptation window as a single stimulus and reads the recovery response at adaptation window
+level. At the planning level, these are implemented as `block_id` groups on PlannedSession records. The weekly
+synthesis agent creates `block_id` groups of 2-3 consecutive quality sessions; the adaptation signature layer then
+observes the recovery response to those groups.
 
 ## What the Twin Measures After Each Block
 
-After every hard block or isolated quality session, the twin monitors three response
+After every hard adaptation window or isolated quality session, the twin monitors three response
 dimensions:
 
 **Short-term fatigue depth.** How much do wellness signals drop immediately — HRV
 suppression, elevated sleeping HR, reduced sleep quality. The magnitude relative to the
-block's load profile is the fatigue sensitivity signal.
+adaptation window's load profile is the fatigue sensitivity signal.
 
 **Recovery trajectory.** How quickly do wellness signals return to personal baseline.
 Some athletes bounce back within 24 hours; others take 72 hours or more. This recovery
@@ -102,7 +104,7 @@ patterns.
 
 The adaptation signature takes the longest of any layer to become reliable. Meaningful
 individual signal typically emerges after six to eight weeks of consistent training with
-adequate data quality. Full confidence requires a complete training block cycle — build,
+adequate data quality. Full confidence requires a complete training cycle — build,
 peak, recovery — ideally repeated more than once.
 
 Low confidence means the plan is more conservative and the coach communicates less

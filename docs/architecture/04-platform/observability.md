@@ -24,12 +24,21 @@
 - `twin_state.confidence_upgrades.total` per week (leading indicator of onboarding success)
 - `threshold_detection.update_rate` — % of calibration-eligible sessions producing threshold update
 - `wellness_baseline.coverage_rate` — % athletes with ≥14 records in 28-day window
+- `body_composition.coverage_rate` — % athletes with ≥12 body composition records (weight) in 28-day window
 
 ### Session Lifecycle
 - `planned_session.skip_rate` by session_type (threshold, vo2max, long_run, easy_aerobic)
 - `planned_session.miss_rate` by phase_label
 - `planned_session.redistribution_rate`
 - `workout_library.acceptance_rate` by session_type
+
+### Auth Health
+- `athlete.auth.registrations.total` by provider (email, google, strava)
+- `athlete.auth.logins.total` by provider
+- `athlete.auth.logins.failed.total` by provider
+- `athlete.auth.methods.linked.total` by provider
+- `athlete.auth.methods.removed.total` by provider
+- `athlete.auth.oauth.refresh.failures.total` by provider
 
 ## Structured Log Events
 
@@ -44,6 +53,15 @@ All log events use structured JSON format. Key fields on every log:
 
 { "event": "activity.fit_parse.failed", "athlete_id": "...", "source": "manual_upload",
   "error_type": "corrupt_file" }
+
+// Auth
+{ "event": "athlete.registered", "athlete_id": "...", "auth_provider": "email", "has_password": true }
+
+{ "event": "athlete.logged_in", "athlete_id": "...", "auth_provider": "google", "success": true }
+
+{ "event": "auth_method.linked", "athlete_id": "...", "provider": "strava" }
+
+{ "event": "auth_method.removed", "athlete_id": "...", "provider": "email" }
 
 // Twin
 { "event": "twin_state.inserted", "athlete_id": "...", "trigger": "calibration",
@@ -76,6 +94,8 @@ All log events use structured JSON format. Key fields on every log:
 | Condition | Threshold | Meaning |
 |---|---|---|
 | `activity.ingestion.latency_ms` p95 | > 60s | Ingestion pipeline degraded |
+| `athlete.auth.logins.failed.total` | > 10 in 5 minutes | Possible brute force or credential stuffing |
+| `athlete.auth.oauth.refresh.failures.total` | > 5 consecutive for same provider | OAuth provider token refresh broken |
 | `intervals_icu.sync.failures` | > 5 consecutive for same athlete | Integration broken |
 | `weather_forecast.fetch.success_rate` | < 70% over 1h | Weather API issue |
 | Baseline computation not completing within batch window | > 2h | Nightly task hung |
@@ -87,6 +107,7 @@ All log events use structured JSON format. Key fields on every log:
 | `twin_state.confidence_upgrades.total` | 0 per week for > 2 weeks | No athletes progressing |
 | `planned_session.miss_rate` | > 30% over 7 days | Athletes not completing sessions |
 | `generation_event.cost_per_day` | > 2× rolling 7-day average | Prompt regression or token bloat |
+| `athlete.auth.methods.linked.total` | 0 new links per week | Auth linking feature unused |
 
 ## Tracing
 

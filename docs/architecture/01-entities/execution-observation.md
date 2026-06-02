@@ -17,7 +17,7 @@ type SessionShape =
 
 type RepAnalysis = {
   rep_index: number
-  inferred_state: PhysiologicalIntentState
+  inferred_state: PhysiologicalIntent
   confidence: number
   mean_gap_sec_per_km: number | null
   mean_hr_bpm: number | null
@@ -39,7 +39,6 @@ type CoachingObservations = {
   session_type_specific: {
     // Aerobic sessions:
     cardiac_drift_score?: number
-    zone_encroachment_events?: number
     decoupling_ratio?: number
     // Threshold/interval sessions:
     cross_rep_trend?: 'even' | 'progressive_fade' | 'positive_split' | 'w_shape'
@@ -52,17 +51,36 @@ type CoachingObservations = {
   }
   per_rep_analysis?: RepAnalysis[]   // null until Phase 5c (segment-level analysis)
   recovery_analysis?: RecoveryAnalysis[]
-  flags: string[]                    // notable anomalies, e.g. 'zone_encroachment_lap_3'
+  flags: string[]                    // notable anomalies
+}
+
+type IntentCompliance = {
+  step_id: string
+  prescribed_intent: PhysiologicalIntent
+  actual_intent: PhysiologicalIntent
+  compliance: 'compliant' | 'under' | 'over' | 'mismatch'
+  deviation: number
+  family: ComplianceFamily
 }
 
 type ExecutionObservation = {
   id: string                         // UUID, PK
   activity_id: string                // UUID, FK → Activity (one-to-one)
   session_shape: SessionShape
+  intent_compliance: IntentCompliance[]  // step-level intent compliance
   effort_compliance: Record<string, unknown>  // lap-level compliance pre-5b
   key_signals: Record<string, unknown>
   coaching_observations: CoachingObservations
   analysis_version: string           // 'lap-v1' pre-5c; 'segment-v1' post-5c
+}
+
+type WorkoutComplianceSummary = {
+  workout_id: string
+  step_results: IntentCompliance[]
+  overall_compliance: 'compliant' | 'under' | 'over' | 'mixed'
+  intent_distribution: Record<PhysiologicalIntent, number>
+  purpose: SessionPurpose
+  summary: string  // plain English; narrated by agent
 }
 ```
 

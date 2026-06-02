@@ -11,7 +11,7 @@ type SeedingInputs = {
   twin_state: TwinState
   execution_observations: ExecutionObservation[]  // from imported history (Tier 1); empty for Tier 3
   athlete_preferences: AthletePreferences
-  training_block: TrainingBlock
+  training_goal: TrainingGoal
 }
 
 // Tier-based category availability
@@ -72,10 +72,10 @@ function evaluateObjectivePostSession(
       }
       break
 
-    case 'zone_compliance':
-      const encroachments = signals.zone_encroachment_events ?? 0
+    case 'intent_compliance':
+      const encroachments = signals.intent_encroachment_events ?? 0
       direction = encroachments === 0 ? 'improving' : encroachments > 3 ? 'regressing' : 'stable'
-      evidence = `${encroachments} zone encroachment event(s) detected`
+      evidence = `${encroachments} intent encroachment event(s) detected`
       break
 
     // ... other categories

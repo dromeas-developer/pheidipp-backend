@@ -19,6 +19,8 @@ athlete-provided physiological benchmarks. Lab/test uploads provide higher thres
 than peer-based inference, but execution patterns and adaptation signatures still require
 real training data to develop.
 
+Confidence transitions are quality-weighted, not session-count-based. A single lab test carries more evidence than multiple easy sessions with optical HR. The system weighs observation quality when determining when to upgrade confidence levels — it is the quality of the data, not just the quantity, that drives confidence forward.
+
 **Tier 3 — Questionnaire inputs only.** The most conservative baseline, built from
 onboarding responses alone. Initial targets are expressed as ranges or effort descriptions
 rather than precise numbers. The twin becomes more confident and specific as real training

@@ -99,10 +99,41 @@ Both run concurrently. `PostWorkoutTask` waits for both to complete.
 1. `PlanGenerationService.regenerate()` (if old plan was at LOW confidence)
 2. `ProactiveMessageService.check_confidence_upgrade()`
 
+**`twin_model_ready`:**
+1. `PlanGenerationService.generate()` (creates TrainingPlan + first WeeklyPlan)
+2. `FirstMessageAgent.generate()` (after plan is persisted)
+
+**`checkpoint_completed`:**
+1. `PlanGenerationService.evaluate_replan()` (if replan_triggered = true)
+2. `ProactiveMessageService.check_checkpoint_result()` (athlete notification)
+
+**`secondary_event_registered`:**
+1. `PlanGenerationService.validate_and_redistribute()` (check if plan adjustment needed)
+2. `RacePredictionService.update()` (recalculate race prediction)
+
+**`secondary_event_removed`:**
+1. `PlanGenerationService.validate_and_redistribute()` (check if plan adjustment needed)
+2. `RacePredictionService.update()` (recalculate race prediction)
+
+**`session_skipped` / `session_missed`:**
+1. `WeeklyPlanService.update_session_status()` (update WeeklyPlan session counts)
+2. Next `PreWeekReviewAgent` run reads accumulated data (NOT full plan regeneration)
+
 **`session_completed`:**
 1. `ObjectiveUpdateService.evaluate_post_session()` (must complete first)
 2. `ComparableSessionService.find()` (can run in parallel with ObjectiveUpdateService)
 3. `PostWorkoutTask` (waits for both above)
+
+**`week_completed`:**
+1. `PreWeekReviewAgent` reviews next week's intent
+2. `WeeklySynthesisAgent` produces next WeeklyPlan (after pre-week review)
+
+**`pre_week_review_completed`:**
+1. `WeeklySynthesisAgent` produces WeeklyPlan for the reviewed week
+
+**`weekly_plan_created`:**
+1. Daily `WorkoutGenerationAgent` reads today's session from the new WeeklyPlan
+2. `PreWeekReviewAgent` (for next week, scheduled trigger)
 
 ## Ordering Constraints
 
@@ -124,7 +155,129 @@ Both run concurrently. `PostWorkoutTask` waits for both to complete.
 // - Order guaranteed by: SegmentationTask triggered by RawSensorStream creation event
 ```
 
+## Plan Generation Event Flows
+
+### Initial Plan Generation
+```
+twin_model_ready ──────────────────┐
+                                   │
+                                   ▼
+                    ┌─────────────────────────┐
+                    │ PlanGenerationService   │
+                    │ (phase arc + first      │
+                    │  WeeklyPlan created)     │
+                    └─────────────────────────┘
+                                   │
+                                   ▼
+                         training_plan_generated
+                                   │
+                    ┌──────────────┴──────────────┐
+                    ▼                              ▼
+          FirstMessageAgent              WeatherForecast prefetch
+          (reads WeeklyPlan)
+```
+
+### Plan Regeneration (Confidence Upgrade)
+```
+twin_confidence_upgraded ──────────┐
+                                   │
+                                   ▼
+                    ┌─────────────────────────┐
+                    │ PlanGenerationService   │
+                    │ (re-runs hypothesis +   │
+                    │  phase arc synthesis)    │
+                    └─────────────────────────┘
+                                   │
+                                   ▼
+                         training_plan_generated
+                                   │
+                                   ▼
+                    ┌─────────────────────────┐
+                    │ PreWeekReviewService    │
+                    │ (evaluates next week's  │
+                    │  intent — deterministic)│
+                    └─────────────────────────┘
+                                   │
+                                   ▼
+                    ┌─────────────────────────┐
+                    │ WeeklySynthesisAgent    │
+                    │ (produces WeeklyPlan)   │
+                    └─────────────────────────┘
+```
+
+### Checkpoint Replan Flow
+```
+session_completed ─────────────────┐
+                                   │
+                                   ▼
+                    ┌─────────────────────────┐
+                    │ SessionLifecycleService │
+                    └─────────────────────────┘
+                                   │
+                                   ▼
+                         checkpoint_completed
+                                   │
+                                   ▼
+                    ┌─────────────────────────┐
+                    │ PlanGenerationService   │
+                    │ (evaluates replan need) │
+                    └─────────────────────────┘
+                                   │
+                          ┌────────┴────────┐
+                          │                 │
+                    replan_triggered    no_replan
+                          │                 │
+                          ▼                 │
+                 training_plan_generated    │
+                          │                 │
+                          ▼                 ▼
+                 ProactiveMessageService   (no action)
+```
+
+### Secondary Event Flow
+```
+secondary_event_registered ────────┐
+                                   │
+                                   ▼
+                    ┌─────────────────────────┐
+                    │ PlanGenerationService   │
+                    │ (validates, redistributes)│
+                    └─────────────────────────┘
+                                   │
+                          ┌────────┴────────┐
+                          │                 │
+                    redistribution    regeneration
+                    possible          needed
+                          │                 │
+                          ▼                 ▼
+                 session_redistributed   training_plan_generated
+```
+
+### Session Dropout Monitoring
+```
+session_skipped / session_missed ──┐
+                                   │
+                                   ▼
+                    ┌─────────────────────────┐
+                    │ PlanGenerationService   │
+                    │ (monitors dropout rate) │
+                    └─────────────────────────┘
+                                   │
+                                   ▼
+                    Dropout > 20% in 3-week window?
+                                   │
+                          ┌────────┴────────┐
+                          │                 │
+                         Yes               No
+                          │                 │
+                          ▼                 ▼
+                 training_plan_generated   (no action)
+```
+
+---
+
 ## Cross-References
+
 - All events and their schemas: `00-foundations/event-catalogue.md`
 - Task definitions and retry policies: `04-platform/async-pipeline.md`
 - Failure handling per task type: `04-platform/failure-handling.md`

@@ -13,7 +13,7 @@ class ContextBudgetService {
   // For FirstMessageAgent
   async buildFirstMessageContext(athlete_id: string): Promise<FirstMessageContext> {
     const twin_state = await TwinStateRepository.get_latest(athlete_id)
-    const training_block = await TrainingBlockRepository.get_active(athlete_id)
+    const training_goal = await TrainingGoalRepository.get_active(athlete_id)
     const preferences = await AthletePreferencesRepository.get(athlete_id)
     const profile = await AthleteProfileRepository.get(athlete_id)
     const plan = await TrainingPlanRepository.get_active(athlete_id)
@@ -21,7 +21,7 @@ class ContextBudgetService {
     const context = {
       readiness: TwinContextAssemblerService.assemble(twin_state),
       computed_observations: computeOnboardingObservations(twin_state, preferences),
-      goal_summary: buildGoalSummary(training_block),
+      goal_summary: buildGoalSummary(training_goal),
       profile_summary: buildProfileSummary(profile, preferences),
       plan_overview: buildPlanOverview(plan),
       first_block_preview: buildFirstBlockPreview(plan)

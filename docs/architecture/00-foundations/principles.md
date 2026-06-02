@@ -8,7 +8,7 @@
 
 1. **Activities are physiological observations, not workout summaries.** `Activity` stores what the twin model needs. It never stores avg_hr, avg_pace, avg_power, or lap dumps. The FIT file is the source of truth.
 
-2. **The twin is deterministic Python. The LLM writes narrative.** All analytical computation — fitness scoring, threshold estimation, execution classification, load accumulation, wellness trend analysis — lives in Python services. LLM agents receive a pre-computed digest and write coaching text. They never derive findings.
+2. **The twin computes metrics deterministically in Python. The LLM reasons about structure and instantiates plans from pre-computed metrics. Python validates structural invariants.** All analytical computation — fitness scoring, threshold estimation, execution classification, load accumulation, wellness trend analysis — lives in Python services. LLM agents receive pre-computed metrics and twin state summary, then reason about plan structure (strategic hypotheses, week-by-week session placement) and generate narrative. Python validates all structural invariants during plan generation and session lifecycle.
 
 3. **`fit_file_key` is a hard prerequisite.** No `Activity` record commits without its raw file stored in object storage. This is the reprocessing anchor. If object storage fails, the task retries. No exceptions.
 
@@ -26,24 +26,32 @@
 
 10. **Old analytical records are never deleted.** Superseded records receive `superseded_at`. New records are inserted alongside.
 
+11. **Anti-goals are architectural constraints.** The following product boundaries are enforced through bounded models and API design: no dashboard UX, no raw-data-first experiences, no multi-sport conversion factors, no athlete-authored training plans. These are not merely product preferences — they are architectural governance boundaries. Future system evolution must be evaluated against these constraints.
+
+12. **Premium features require architectural foresight.** Free Coach Chat (conversational agent), Group & Team Training (shared plan, individual twins), and Voice Companion (audio delivery surface) are defined in product vision but have no current architecture. When implemented, they must integrate with existing agent architecture, context budgeting, and coach voice constraints. These features should not bolt on as separate systems.
+
+13. **Peer-similar bootstrap is a Tier 2 onboarding path.** For athletes without importable training history, the twin can bootstrap from anonymised models of similar athletes. This peer-similar model source, selection criteria, and application mechanism must be defined in architecture before implementation. The peer-similar path produces initial physiological estimates that are replaced by real training data as sessions accumulate.
+
+14. **Algorithm improvements reprocess recent history.** When a calibration algorithm improves or a new metric becomes available, the system reprocesses recent calibration-eligible sessions through the new algorithm. This accelerates the benefit of improvements without waiting passively for new data. The current state (`AthletePhysiology`, `AthleteFitness`) updates to reflect the improved algorithm. Historical records (`TwinState`, `PhysiologyMeasurement`) remain untouched — the audit trail is preserved through version strings and append-only writes. The athlete receives a coaching communication explaining what changed and why.
+
 ## Five-Layer Separation of Concerns
 
 ```
 ┌──────────────────────────────────────────────────────┐
-│  5. TWIN INTERPRETATION                               │
-│     TwinState recalibration · coaching signals        │
+│  5. TWIN INTERPRETATION                              │
+│     TwinState recalibration · coaching signals       │
 ├──────────────────────────────────────────────────────┤
-│  4. ADAPTATION OBSERVATION                            │
-│     Block-level response · yield profiles             │
+│  4. ADAPTATION OBSERVATION                           │
+│     Block-level response · yield profiles            │
 ├──────────────────────────────────────────────────────┤
-│  3. PHYSIOLOGICAL ANALYSIS                            │
-│     ExecutionObservation · segmentation               │
+│  3. PHYSIOLOGICAL ANALYSIS                           │
+│     ExecutionObservation · segmentation              │
 ├──────────────────────────────────────────────────────┤
-│  2. WORKOUT EXECUTION STRUCTURE                       │
-│     PlannedSegment · DeviceSegment · PhysSegment      │
+│  2. WORKOUT EXECUTION STRUCTURE                      │
+│     PlannedSegment · DeviceSegment · PhysSegment     │
 ├──────────────────────────────────────────────────────┤
-│  1. RAW SENSOR INGESTION                              │
-│     FIT file · stream cleaning · load computation     │
+│  1. RAW SENSOR INGESTION                             │
+│     FIT file · stream cleaning · load computation    │
 └──────────────────────────────────────────────────────┘
 ```
 

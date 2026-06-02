@@ -9,26 +9,30 @@
 
 ```typescript
 type TargetSet = {
-  // Targets populated based on data tier:
-  // Tier 1-2: power targets primary
-  // Tier 3-4: pace targets primary
-  // Tier 5-6: description only; numeric targets null
-  pace_sec_per_km: number | null     // always GAP; never raw pace
-  power_watts: number | null
-  hr_zone: number | null             // 1–5
-  description: string                // plain English; always present
+  targets: WorkoutTarget[]
+  description: string  // plain English; always present
 }
 
 type GeneratedWorkout = {
   id: string                         // UUID, PK
   planned_session_id: string         // UUID, FK → PlannedSession (one-to-one)
   twin_state_id: string              // UUID, FK → TwinState (the twin version used)
-  theoretical_targets: TargetSet     // from current dynamic zones; no modifiers applied
+  theoretical_targets: TargetSet     // from current dynamic thresholds; no modifiers applied
   adjusted_targets: TargetSet        // after recovery modifier + cycle modifier + weather
   recovery_modifier_level: RecoveryModifierLevel  // default: 'green'
-  recovery_modifier_reason: string | null  // structured text; narrated by agent
+  recovery_modifier_reason: string | null  // structured text; narrated agent
   generated_at: string               // ISO 8601
-  // Note: workout_structure JSONB (Phase 1) removed when WorkoutStep records exist (2c+)
+}
+
+type WorkoutTarget = {
+  signal_type: 'power' | 'gap' | 'hr' | 'description'
+  primary: {
+    min: number | null
+    max: number | null
+    unit: string
+  }
+  fallback: WorkoutTarget | null
+  description: string  // always present; plain English
 }
 ```
 
@@ -44,7 +48,7 @@ type GeneratedWorkout = {
 ```
 TwinState (threshold estimates)
   ↓ TwinContextAssemblerService
-  → theoretical_targets (zone-based targets from dynamic zones)
+  → theoretical_targets (range-based targets from IntentRanges)
     ↓ WellnessModifierService (recovery level + scale factor)
     ↓ CyclePhaseService (luteal temp offset if applicable)
     ↓ WeatherAdjustmentService (heat_index + wind)

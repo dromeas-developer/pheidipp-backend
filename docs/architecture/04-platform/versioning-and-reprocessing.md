@@ -104,6 +104,61 @@ CURRENT_VERSIONS = {
 
 When a new version is released, the constant is updated here and all subsequent records use the new version. Historical records retain their original version string.
 
+## Automatic Reprocessing on Algorithm Improvement
+
+When a pipeline version improves, recent history is reprocessed rather than waiting for new data to arrive gradually.
+
+### Reprocessing Window
+
+- **Default window:** Recent calibration-eligible sessions (typically 90 days)
+- **Rationale:** Covers approximately one full training cycle, providing sufficient data for the Bayesian posterior to benefit from improved observations without reprocessing the entire athlete history
+
+### What Gets Updated
+
+| Entity | Action | Rationale |
+|--------|--------|-----------|
+| `AthletePhysiology` | Posterior updated in place | Current state reflects best available algorithm |
+| `PhysiologyMeasurement` | New records appended alongside old | Append-only history; old records retained |
+| `AthleteFitness` | Scores updated in place | Current state reflects improved threshold estimates |
+| `TwinState` | New record appended if posterior shifts materially | Append-only audit trail |
+| `ExecutionObservation` | New records created; old superseded | Version string tracks which algorithm produced each |
+| `PhysiologicalSegment` | New records created; old superseded | Version string tracks which algorithm produced each |
+| `ConfidenceLevel` | May decrease if new algorithm reveals weaker evidence | Confidence represents certainty, not progress |
+
+### What Never Changes
+
+| Entity | Reason |
+|--------|--------|
+| Old `TwinState` records | Audit trail — what the twin knew at that point in time |
+| Old coaching messages | Historical decisions are not retroactively modified |
+| `Activity` load scores | Updated in place (exception to supersession rule) |
+
+### Trigger Conditions
+
+Automatic reprocessing fires when:
+
+1. A new pipeline version is registered in `CURRENT_VERSIONS`
+2. The version change is classified as a **calibration improvement** (not a minor fix)
+3. The athlete has calibration-eligible sessions within the reprocessing window
+
+### Communication Protocol
+
+When reprocessing causes a material change in threshold estimates or confidence, the coach communicates:
+
+> "We've improved how we detect your lactate threshold. Your actual threshold is slightly [higher/lower] than we estimated, which means [more precise targets / adjusted training zones]. This isn't a change in your fitness — it's a better reading of where you are."
+
+If confidence decreases due to improved detection methods:
+
+> "We've improved our detection methods, and your threshold estimate is less certain than we previously thought. Your targets will be wider ranges for now — this is honest uncertainty, not a step backward."
+
+This builds trust through transparency rather than hiding the algorithm improvement.
+
+### Why Old Coaching Decisions Remain Valid
+
+Coaching recommendations are always made using the best understanding available at the time. Improved models may produce more accurate future guidance, but they do not imply previous recommendations were incorrect. An athlete who followed their coach's guidance with a less precise model trained correctly — they simply had wider targets. The improved model narrows those targets going forward.
+
+This is analogous to how a human coach operates. A coach who learns something new about their athlete doesn't regret their previous advice — they apply the new knowledge to future decisions. The twin does the same.
+
 ## Cross-References
 - fit_file_key as reprocessing anchor: `00-foundations/principles.md`
 - Version fields per entity: `01-entities/activity.md`, `01-entities/physiological-segment.md`, `01-entities/twin-state.md`

@@ -13,7 +13,7 @@ The coach can and does prescribe non-running work when it serves the athlete's r
 
 Athletes cannot create, edit, or customise workouts. The coach owns all workout design. This is intentional, not missing functionality.
 
-The athlete's agency over any given session is limited to three choices: accept the planned workout, substitute from coach-suggested alternatives, or skip with the system proposing to reschedule or adjust the plan. This boundary prevents complexity spiral, maintains coaching quality control, and keeps the product honest about what it is — a coaching system, not a training tool.
+The athlete's agency over any given session is limited to three choices: accept the planned workout, substitute from coach-suggested alternatives, or skip. Skipped sessions are absorbed by the weekly coaching rhythm — the next week's planning accounts for the disruption without breaking the overall plan. This boundary prevents complexity spiral, maintains coaching quality control, and keeps the product honest about what it is — a coaching system, not a training tool.
 
 ## No Raw Data Surfaces
 
@@ -29,3 +29,13 @@ If yes (completed): athlete is prompted to sync or upload. Plan holds while pend
 If no response: system holds judgement and asks again at next app open.
 
 This ambiguity-first approach protects model accuracy over convenience.
+
+---
+
+## Same-Day Training Sessions
+
+Advanced athletes sometimes train twice a day — an easy morning run plus an evening intensity session, or a double threshold day. The system supports this through AM/PM session slots with primary and secondary designation.
+
+The primary session receives full workout generation with precise targets. The secondary session may be a suggested non-running session (strength, yoga, mobility) without detailed targets. Recovery time is measured from primary session to primary session, not session to session, reflecting the physiological reality that a morning easy run plus an evening threshold session provides more recovery than two hard sessions on consecutive days.
+
+The weekly plan accounts for total athlete availability, including doubles capacity, when defining macro load. This ensures the training load reflects what the athlete actually trains, not just session count.

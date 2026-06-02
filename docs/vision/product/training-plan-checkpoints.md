@@ -1,7 +1,4 @@
-# Training Plan Checkpoints
-*How checkpoints provide data, reduce uncertainty, and validate progress throughout the training plan.*
-
----
+# training-plan-checkpoints
 
 ## Checkpoint Hierarchy
 
@@ -19,9 +16,9 @@ A checkpoint is any scheduled moment of assessment that provides data, reduces u
 
 ---
 
-## Checkpoint Scheduling Logic
+## Checkpoint Scheduling
 
-Checkpoints are scheduled during synthesis based on four factors:
+Checkpoints are scheduled during plan synthesis based on four factors:
 
 1. **Confidence gaps.** Low or medium confidence in a metric triggers a calibration checkpoint targeting that specific metric.
 2. **Race calendar.** B-races and C-races are naturally secondary race checkpoints. No additional scheduling is needed.
@@ -35,7 +32,7 @@ Checkpoints are scheduled during synthesis based on four factors:
 | Aspect | Regular Workout | Checkpoint |
 |--------|-----------------|------------|
 | Purpose | Training stimulus | Data collection |
-| Target precision | Zone-based | Specific metric |
+| Target precision | Range-based | Specific metric |
 | Post-session analysis | Standard | Detailed metric update |
 | Twin update | Load contribution | Potential threshold or confidence update |
 | Replan trigger | No | Possibly, if confidence changes significantly |
@@ -43,11 +40,11 @@ Checkpoints are scheduled during synthesis based on four factors:
 
 ---
 
-## Checkpoint Completion Flow
+## Checkpoint Completion
 
 When a checkpoint completes, the system analyses whether the target metric was updated and whether confidence changed. The flow differs based on what the checkpoint reveals:
 
-**Metric Updated, Confidence Improved (LOW → MEDIUM).** The system removes conservative buffers and enables more precise targets for subsequent sessions. The coach communicates: "Your half-marathon confirms your threshold is around 4:10/km — better than the 4:15 we estimated. I've updated your training zones and increased your marathon pace target slightly."
+**Metric Updated, Confidence Improved (LOW → MEDIUM).** The system removes conservative buffers and enables more precise targets for subsequent sessions. The coach communicates: "Your half-marathon confirms your threshold is around 4:10/km — better than the 4:15 we estimated. I have updated your training zones and increased your marathon pace target slightly."
 
 **Metric Updated, Confidence Improved (MEDIUM → HIGH).** The system enables point estimates and removes ranges. The coach communicates: "I now have enough data to be precise. Your training targets will be specific numbers rather than ranges."
 
@@ -59,35 +56,39 @@ When a checkpoint completes, the system analyses whether the target metric was u
 
 ## Adaptive Recovery
 
-Recovery after checkpoints and races is based on actual execution, not planned targets. If the athlete followed the prescribed effort, standard recovery applies. If the athlete overshot the target — running Zone 4 when Zone 3 was prescribed — recovery is extended by 2 days to account for the additional stress. If the athlete undershot, standard recovery applies but the data is flagged as less useful for twin calibration.
+Recovery after checkpoints and races is based on actual execution, not planned targets. If the athlete followed the prescribed effort, standard recovery applies. If the athlete ran harder than prescribed, recovery is extended to account for the additional stress. If the athlete ran easier than prescribed, standard recovery applies but the data is less useful for twin calibration.
+
+The recovery extension scales with the athlete's individual recovery profile when sufficient adaptation data exists. For athletes without individual data, a conservative default applies. Personalised recovery scaling becomes available only after the twin has reached high confidence and has accumulated at least three complete adaptation window observations. Until then, a standard recovery extension is applied.
 
 This ensures the twin's model reflects actual physiological stress rather than intended stress, preserving the accuracy of future predictions.
 
-| Scenario | Target Effort | Actual Effort | Recovery Adjustment |
-|----------|---------------|---------------|---------------------|
-| Athlete followed plan | Zone 3 | Zone 3 | Standard recovery |
-| Athlete overshot | Zone 3 | Zone 4 | Extend recovery (+2 days) |
-| Athlete undershot | Zone 3 | Zone 2 | Standard recovery (data less useful) |
+| Scenario | What Was Prescribed | What Happened | Recovery Adjustment |
+|----------|---------------------|---------------|---------------------|
+| Athlete followed plan | Easy moderate effort | Easy moderate effort | Standard recovery |
+| Athlete overshot | Easy moderate effort | Hard threshold effort | Extended recovery (scales with athlete profile) |
+| Athlete undershot | Easy moderate effort | Very easy effort | Standard recovery (data less useful) |
 
 ---
 
-## Adaptive Evolution Triggers
+## Adaptive Evolution
 
-Plans evolve in response to real training data, race results, and changing circumstances:
+Plans evolve in response to real training data, race results, and changing circumstances. Most evolution happens at the weekly level — the weekly coaching rhythm absorbs disruptions and adjusts tactical details without changing the strategic roadmap.
 
-**Checkpoint Completed.** The twin state is updated with new metric estimates. If confidence improved, intensity targets are refined. If the confidence change is significant enough to warrant a different approach, replanning is triggered.
+**Checkpoint Completed.** The twin state is updated with new metric estimates. If confidence improved, the weekly coaching rhythm can use more precise targets. If the confidence change is significant enough to warrant a different strategic approach, replanning is triggered.
 
-**B-race or C-race Completed.** The twin state is updated with race performance data. The remaining plan is reassessed — if the race revealed higher fitness than expected, targets may increase. If it revealed lower fitness, the plan may become more conservative.
+**B-race or C-race Completed.** The twin state is updated with race performance data. The weekly rhythm absorbs the race impact — adjusting the next week's load and emphasis. The strategic roadmap stays intact unless the race reveals a fundamental shift in fitness that requires restructuring the phase arc.
 
 **Athlete Adds Race.** The system validates the addition against the existing plan. If valid, the plan is adjusted. If the addition conflicts with A-race preparation, the coach advises against it.
 
-**Athlete Removes Race.** The plan is re-optimised for the remaining races. Sessions that served the removed race may be repurposed or redistributed.
+**Athlete Removes Race.** The plan is re-optimised for the remaining races. Sessions that served the removed race may be repurposed or redistributed by the weekly rhythm.
 
-**Twin Confidence Upgrade.** When the twin's confidence in a key metric improves — for example, from LOW to MEDIUM — the system re-runs synthesis and instantiation. The improved data may enable a more precise or ambitious plan.
+**Twin Confidence Upgrade.** When the twin's confidence in a key metric improves — for example, from LOW to MEDIUM — the system regenerates the plan with more precise methodology. The improved data enables a more targeted strategic roadmap.
 
-**Goal Date Change.** If the goal date moves by more than 7 days, the strategic framework is re-synthesised for the new timeline.
+**Goal Date Change.** If the goal date moves by more than 7 days, the strategic roadmap is re-synthesised for the new timeline.
 
-**Session Dropout.** If more than 20% of sessions within a 3-week window are skipped or missed, the system reassesses plan viability. This may trigger a coaching conversation about workload, motivation, or external factors.
+**Session Disruption.** Missed sessions, schedule changes, and slower-than-expected recovery are absorbed by the weekly coaching rhythm — not by plan regeneration. The next week's review adjusts emphasis, session count, and intensity to account for the disruption. The strategic direction stays intact.
+
+If session disruption becomes persistent — more than 20% of sessions missed across multiple weeks — the coach initiates a conversation about workload, motivation, or external factors. This may lead to a plan adjustment, but it starts as a coaching conversation, not an automatic system response.
 
 ---
 
@@ -97,21 +98,21 @@ The twin's risk factors trigger specific load adjustments that modify the standa
 
 | Risk Factor | Adjustment | Example |
 |-------------|------------|---------|
-| structural_risk = HIGH | Replace flat intervals with hill repeats | 4x400m flat becomes 4x30s hill sprints |
-| recovery_modifier = RED | Add extra recovery day after hard weeks | 3:1 hard:easy becomes 2:1 hard:easy |
-| adaptation_signature = SLOW_INTENSITY | Reduce Zone 4–5 volume by 30% | 15% becomes 10% of weekly volume |
-| cycle_phase = LUTEAL | Reduce long run distance by 10% | 20km becomes 18km |
-| sport_background = CROSSOVER | Extend base phase by 20% | 8 weeks becomes 10 weeks |
-| B-race week | Reduce load by 20% in the week before the race | Normal week 100% becomes 80% |
+| High structural risk | Replace flat intervals with hill repeats | Flat track intervals become hill sprints |
+| Reduced recovery capacity | Add extra recovery day after hard weeks | Three hard days per week becomes two |
+| Slow intensity adaptation | Reduce hard training volume proportionally | Hard work allocation scales down based on demonstrated yield |
+| Luteal phase | Reduce long run distance proportionally | Long run distance scales with individual phase sensitivity |
+| Crossover athlete (not running-primary) | Extend base phase and cap structural load | Structural capacity builds before volume increases |
+| B-race week | Reduce load before the race | Normal week load drops to accommodate race effort |
 
-These adjustments are applied during synthesis, not as after-the-fact corrections. The strategic framework includes them explicitly so the athlete can see how their individual factors shape the plan.
+These adjustments are applied during weekly synthesis, not as after-the-fact corrections. The weekly coaching rhythm includes them so the athlete sees how their individual factors shape each week.
 
 ---
 
 ## Cross-References
 
-- Main plan generation overview: training-plan-generation
-- Hypothesis generation and validation: training-plan-hypotheses
+- Plan generation overview: plan-generation
+- Hypothesis selection: hypothesis-selection
+- Weekly coaching rhythm: weekly-coaching-rhythm
 - Checkpoint entity and storage: checkpoint (architecture)
 - Confidence model and levels: confidence-and-uncertainty
-- Race roles and handling: training-plan-generation (Race Roles and Handling section)

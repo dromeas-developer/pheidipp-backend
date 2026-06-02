@@ -41,12 +41,12 @@ consistent within the rep or did they surge and back off, what was the cross-rep
 consistent execution, progressive fade, or a W-shaped pattern of blowing up and recovering.
 
 **Recovery intervals are a commonly mishandled signal.** During a threshold or tempo
-workout, the cardiovascular system has not had time to return to Zone 2 HR by the time
+workout, the cardiovascular system has not had time to return to recovery HR by the time
 the next rep begins — analysing recovery quality by HR zone is almost always misleading.
 
 The correct signals for recovery quality: power drop to recovery target (when power data
 is available), grade-adjusted pace pullback to recovery pace, or HR trajectory showing a
-consistent downward trend even if it has not reached Zone 2 HR. The rate of HR decline
+consistent downward trend even if it has not reached recovery HR. The rate of HR decline
 during recovery is itself a fitness signal — better conditioned athletes recover faster
 between efforts. The twin uses the best available signal and explicitly avoids
 misclassifying incomplete HR recovery as poor execution.

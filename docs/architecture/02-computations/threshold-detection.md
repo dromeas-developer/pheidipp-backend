@@ -2,7 +2,7 @@
 
 ## Purpose
 - Defines the three threshold detection algorithms and the Bayesian update mechanism
-- These algorithms produce the lt1/lt2/ftp estimates stored on TwinState
+- These algorithms produce the lt1/lt2/cp estimates stored on AthletePhysiology
 
 ## Signal Selection
 
@@ -66,13 +66,13 @@ Used alongside HR-based detection when power data available. Not standalone.
 ```typescript
 // At sub-threshold: power/HR ratio stable within a session
 // Above LT2: ratio begins sustained decline (cardiovascular cost rises faster than output)
-// Produces LT2 in watts → stored as ftp_estimate_watts on TwinState
+// Produces LT2 in watts → stored as cp_estimate_watts on AthletePhysiology
 // Only written when power series shows clear ratio breakpoint
 ```
 
 ## Bayesian Update Mechanism
 
-Combines a new detection observation with the existing prior on TwinState:
+The Bayesian update formula, observation weights, and prior decay are defined in `02-computations/physiology-update.md`. The threshold detection algorithms produce observations that feed into that update mechanism.
 
 ```typescript
 type ThresholdPrior = {
@@ -82,29 +82,8 @@ type ThresholdPrior = {
   last_observation_date: string
 }
 
-function bayesianUpdate(
-  prior: ThresholdPrior,
-  observation: { lt1_bpm: number | null; lt2_bpm: number | null; confidence_weight: number },
-  days_since_last_observation: number
-): ThresholdPrior {
-  // Prior decay: observations > 6 weeks old carry reduced weight
-  const decay_factor = Math.exp(-days_since_last_observation / 42)
-  const decayed_prior_weight = prior.prior_weight * decay_factor
-
-  const new_weight = observation.confidence_weight
-
-  const posterior_lt1 = observation.lt1_bpm !== null
-    ? (prior.lt1_bpm * decayed_prior_weight + observation.lt1_bpm * new_weight)
-      / (decayed_prior_weight + new_weight)
-    : prior.lt1_bpm  // no update if observation was null
-
-  return {
-    lt1_bpm: posterior_lt1,
-    lt2_bpm: /* same pattern */ 0,
-    prior_weight: decayed_prior_weight + new_weight,
-    last_observation_date: new Date().toISOString().split('T')[0]
-  }
-}
+// The update formula is applied by PhysiologyUpdateService:
+// See 02-computations/physiology-update.md for the full bayesian_update() function
 ```
 
 ## Confidence Level Transitions
@@ -124,12 +103,21 @@ See `00-foundations/confidence-model.md` for downstream effects.
 // AthletePhysiology fields updated by threshold detection:
 // (via PhysiologyUpdateService.bayesian_update())
 {
-  lt1: PhysiologyParameterState,  // posterior mean + uncertainty updated
-  lt2: PhysiologyParameterState,  // posterior mean + uncertainty updated
-  ftp: PhysiologyParameterState | null  // updated when power-to-HR ratio produces result
+  lt1: {
+    hr: PhysiologyParameterState,      // posterior mean + uncertainty
+    power: PhysiologyParameterState | null,
+    pace: PhysiologyParameterState | null
+  },
+  lt2: {
+    hr: PhysiologyParameterState,      // posterior mean + uncertainty (primary confidence driver)
+    power: PhysiologyParameterState | null,
+    pace: PhysiologyParameterState | null
+  },
+  cp: PhysiologyParameterState | null
 }
-// A new TwinState is then appended referencing the updated AthletePhysiology
-// TwinState.confidence_level is recomputed from AthletePhysiology.lt2.prior_weight
+// A new TwinState is then appended with inline snapshot of the updated threshold values
+// TwinState.confidence_level is recomputed from AthletePhysiology.lt2.hr.prior_weight
+// TwinState.metric_confidence is derived from respective parameter prior weights
 ```
 
 ## Version History

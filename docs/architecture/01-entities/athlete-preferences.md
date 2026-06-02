@@ -45,6 +45,7 @@ type WeeklySchedule = {
 }
 
 type AthletePreferences = {
+  id: string                        // UUID, PK
   athlete_id: string               // UUID, FK → Athlete, one-to-one
   sport_background: SportBackground
   years_structured_training: number  // >= 0
@@ -59,7 +60,7 @@ type AthletePreferences = {
 ```
 
 ## Invariants
-- One `AthletePreferences` per `Athlete`. Created during onboarding.
+- One `AthletePreferences` per `Athlete`. Created during onboarding. Enforced by unique constraint on `(athlete_id)`.
 - `years_structured_training >= 0`. CHECK constraint at DB level.
 - No DELETE endpoint. Preferences are always present once onboarding completes.
 - `sport_background` not `running_primary` activates the crossover athlete structural capacity ramp in plan generation. See `02-computations/plan-generation.md`.
@@ -128,6 +129,8 @@ Auth: Bearer JWT, require_self
 | Data | Strategy | Consistency | Retention |
 |---|---|---|---|
 | `athlete_preferences` table | mutable (PATCH) | strong | indefinite |
+
+Unique constraint: `(athlete_id)` — one record per athlete.
 
 Changes are not versioned — only `updated_at` is tracked. Historical preference states are not retained. This is intentional: preferences affect future plan generation, not historical analysis.
 

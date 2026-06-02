@@ -19,7 +19,7 @@ When this architecture conflicts with the release plan on technical design, this
 | TwinState | Append-only; insert only; no UPDATE or DELETE | `01-entities/twin-state.md` |
 | LLM role | Narrates pre-computed findings; never derives analytical conclusions | `principles.md` |
 | LLM context | 2k–6k tokens per agent; `ContextBudgetService` enforces before call | `03-agents/context-budget-service.md` |
-| `PhysiologicalIntentState` | Shared enum across all layers; 8 values; `unknown` is valid output | `00-foundations/terminology.md` |
+| `PhysiologicalIntent` | Shared enum across all layers; 8 values; session-level adaptation target | `00-foundations/terminology.md` |
 | `PhysiologicalSegment` | Stable interface across all segmentation generations | `01-entities/physiological-segment.md` |
 | Old analytical records | Never deleted; `superseded_at` on superseded records | `04-platform/versioning-and-reprocessing.md` |
 | GAP | Always grade-adjusted pace; never raw pace | `02-computations/effort-normalisation.md` |
@@ -27,9 +27,12 @@ When this architecture conflicts with the release plan on technical design, this
 | Processing | Async worker queue; API responses never wait for analysis | `04-platform/async-pipeline.md` |
 | Calibration eligibility | Five-rule gate; always Python; never overridden manually | `02-computations/load-computation.md` |
 | Confidence level | Ratchets up only; never decreases | `00-foundations/confidence-model.md` |
-| Active TrainingBlock | One per athlete; partial unique index enforces | `01-entities/training-block.md` |
+| Active TrainingGoal | One per athlete; partial unique index enforces | `01-entities/training-goal.md` |
+| `block_id` = adaptation window | `block_id` groups on PlannedSession are the planning-level implementation of adaptation windows; `AdaptationBlockDetectionTask` detects the same pattern for observation | `01-entities/planned-session.md`, `01-entities/adaptation-observation.md` |
 | AthletePhysiology | Mutable one-per-athlete; PhysiologyMeasurement is append-only history | `01-entities/athlete-physiology.md` |
 | AthleteFitness | Mutable one-per-athlete; historical state via TwinState FK chain | `01-entities/athlete-fitness.md` |
+| Bayesian update | PhysiologyUpdateService applies observation weights and prior decay | `02-computations/physiology-update.md` |
+| Banister update | FitnessUpdateService applies impulse-response formula with time constants | `02-computations/banister-update.md` |
 | Lab/field test input | Updates AthletePhysiology only; AthleteFitness unchanged | `01-entities/athlete-physiology.md` |
 | TwinState references | FK to athlete_physiology_id + athlete_fitness_id; no inline duplication | `01-entities/twin-state.md` |
 | Comparable session | Backend Python selects; LLM never chooses | `02-computations/comparable-sessions.md` |
@@ -70,6 +73,10 @@ One document per persisted entity. Each defines the full contract: schema, invar
 Root entity. Registration, `onboarding_complete` gate, `require_self` auth dependency. One-to-one with `AthleteProfile` and `AthletePreferences`.
 **Read for:** registration flow; onboarding_complete semantics; require_self pattern.
 
+### `01-entities/athlete-auth.md`
+Authentication method storage. Provider abstraction (email, Google, Strava). Credential lifecycle. Multi-provider support and account linking.
+**Read for:** how authentication is abstracted from identity; OAuth support; credential encryption; multi-provider linking.
+
 ### `01-entities/athlete-profile.md`
 Stable demographics (DOB, sex, height, weight). Storage for fitted personalisation models: `gap_curve_model`, `weather_response_model`, `banister_constants`, `cycle_personal_model`. Mutable only by background computation services.
 **Read for:** where personalisation models are stored; `sex = 'female'` enabling cycle tracking; which profile fields are immutable.
@@ -78,17 +85,24 @@ Stable demographics (DOB, sex, height, weight). Storage for fitted personalisati
 Mutable training configuration. `weekly_schedule` JSONB structure. `hr_source` enum values and their data tier implications. `sport_background` crossover athlete flag.
 **Read for:** `weekly_schedule` JSONB structure; `hr_source` enum; data tier inference from preferences.
 
-### `01-entities/training-block.md`
-Goal context container. Partial unique index enforcing one active block per athlete. Immutable semantic fields. PATCH restricted to status, goal_event_date, goal_description.
-**Read for:** TrainingBlock field list; one-active-block invariant; what is immutable after creation.
+### `01-entities/training-goal.md`
+Goal context container. Partial unique index enforcing one active goal per athlete. Immutable semantic fields. PATCH restricted to status, goal_event_date, goal_description.
+**Read for:** TrainingGoal field list; one-active-goal invariant; what is immutable after creation.
 
 ### `01-entities/training-plan.md`
-Periodised plan for a TrainingBlock. `phases` JSONB structure. Supersession chain (old plan marked `superseded_at`, never deleted). Regeneration triggers.
-**Read for:** `phases` JSONB structure; supersession pattern; plan regeneration triggers.
+
+Periodised plan for a TrainingGoal. `phases` JSONB structure. `phase_arc` — strategic intent per week (no session-level detail). Supersession chain (old plan marked `superseded_at`, never deleted). Regeneration triggers.
+**Read for:** `phases` and `phase_arc` structure; supersession pattern; plan regeneration triggers.
+
+### `01-entities/weekly-plan.md`
+
+Weekly session schedule within a training plan. Created by the weekly synthesis agent. Contains `AdjustedWeeklyIntent` and `WeeklySession[]`. Status lifecycle: synthesised → active → completed. `accumulated_fatigue_delta` feeds forward to next pre-week review.
+**Read for:** weekly plan schema; session schedule structure; how weekly plans relate to the training plan phase arc.
 
 ### `01-entities/planned-session.md`
-Individual training session in the plan. Full status machine: `pending → generated → completed / skipped / missed / redistributed`. Session lifecycle transitions. Structural distribution rules.
-**Read for:** `PlannedSession` status machine; skip/miss/redistribute transitions; structural rule enforcement.
+
+Individual training session in a weekly plan. FK to `WeeklyPlan` (not directly to `TrainingPlan`). Full status machine: `pending → generated → completed / skipped / missed / redistributed`. Session lifecycle transitions. Structural distribution rules enforced by weekly synthesis agent.
+**Read for:** `PlannedSession` status machine; skip/miss/redistribute transitions; relationship to WeeklyPlan.
 
 ### `01-entities/generated-workout.md`
 Day-of workout. Two-column target storage (`theoretical_targets` and `adjusted_targets`). Modifier computation chain summary. `WorkoutStep` FK relationship. Idempotent generation.
@@ -107,12 +121,12 @@ Snapshot assembler — holds FK references to the then-current `AthletePhysiolog
 **Read for:** TwinState schema; why it references not duplicates; when TwinStates are written; context assembly output; confidence computation.
 
 ### `01-entities/athlete-physiology.md`
-Per-athlete physiological parameter estimates: LT1, LT2, FTP, VO2max, max HR. Mutable current state + append-only `PhysiologyMeasurement` history. `MeasurementSource` enum and observation weights by source (questionnaire 0.5 → lab_test 12–15). Bayesian update formula with prior decay (42-day time constant). Full lab test and field test ingestion flow (source-weighted; high-weight observations dominate prior). Training-derived updates (automatic; lower weight). State transition diagram from bootstrapped through lab_calibrated. `physiology_input` trigger for non-activity updates. API: `POST /physiology/measurements` accepts lab_test and field_test sources only.
-**Read for:** how lab tests feed into the system; observation weights by source; Bayesian update formula; distinction from AthleteFitness; what parameters are null at onboarding.
+Per-athlete physiological parameter estimates: LT1, LT2, FTP, VO2max, max HR. Mutable current state + append-only `PhysiologyMeasurement` history. `MeasurementSource` enum. State transition diagram from bootstrapped through lab_calibrated. API: `POST /physiology/measurements` accepts lab_test and field_test sources only.
+**Read for:** parameter schema; observation history structure; how lab tests flow through (high-level); state transitions; what parameters are null at onboarding.
 
 ### `01-entities/athlete-fitness.md`
-Per-athlete Banister model rolling state: fitness, fatigue, and form per dimension. Mutable one-per-athlete; historical state reconstructed from TwinState FK chain. Banister update formula with per-dimension time constants. Individual time constant fitting (Phase 6d+). Form-to-readiness-descriptor mapping (form scores never exposed to athletes or agents — only the descriptor). How a lab test interacts with AthleteFitness (it does not — lab tests update AthletePhysiology only). Three-dimensional activation (Phase 6c: nullable aerobic/neuromuscular/structural columns).
-**Read for:** Banister formula; why fitness scores are never exposed as numbers; how AthleteFitness relates to AthletePhysiology and TwinState; individual time constants.
+Per-athlete Banister model rolling state: fitness, fatigue, and form per dimension. Mutable one-per-athlete; historical state reconstructed from TwinState FK chain. Form-to-readiness-descriptor mapping (form scores never exposed to athletes or agents). Three-dimensional activation (Phase 6c: nullable aerobic/neuromuscular/structural columns).
+**Read for:** fitness/fatigue/form schema; why fitness scores are never exposed as numbers; how AthleteFitness relates to AthletePhysiology and TwinState.
 
 ### `01-entities/athlete-wellness.md`
 Daily passive wellness record. Upsert/additive-merge semantics. `min_sleeping_hr_bpm` as resting HR anchor. `hrv_overnight_avg_ms` preferred over morning measurement.
@@ -143,7 +157,7 @@ Cleaned stream metadata record. Separate object storage key from raw FIT. `avail
 **Read for:** cleaned stream key pattern; channel availability semantics; cleaning failure handling.
 
 ### `01-entities/objective.md`
-Per-block coaching objective. `Objective` and `ObjectiveUpdate` schemas. Seeding rules (≤5, ≥1 maintain). Post-session update flow (Python evaluates; LLM narrates). Day-of filter by `session_types_relevant`.
+Per-goal coaching objective. `Objective` and `ObjectiveUpdate` schemas. Seeding rules (≤5, ≥1 maintain). Post-session update flow (Python evaluates; LLM narrates). Day-of filter by `session_types_relevant`.
 **Read for:** objective and objective_update schemas; seeding invariants; evaluation timing relative to agent.
 
 ### `01-entities/race-prediction.md`
@@ -162,6 +176,10 @@ Curated substitution template. `EmbeddedStep` structure. Substitution query filt
 Block-level adaptation signal. `yield_by_intent_state` JSONB. Recovery trajectory measurement. Plan personalisation from accumulated observations.
 **Read for:** adaptation observation schema; what yield profiles contain; how they feed plan generation.
 
+### `01-entities/checkpoint.md`
+Scheduled assessment point within a training plan. Five types: calibration, benchmark, race_simulation, secondary_race, progress_review. One-to-one with PlannedSession. Status lifecycle: scheduled → completed/skipped. Completion fields set atomically. Produces `checkpoint_completed` event.
+**Read for:** checkpoint types; scheduling logic; completion flow; event contract.
+
 ---
 
 ## 02-computations/
@@ -169,12 +187,20 @@ Block-level adaptation signal. `yield_by_intent_state` JSONB. Recovery trajector
 One document per computation algorithm. Inputs → outputs → formulas → version history.
 
 ### `02-computations/load-computation.md`
-Aerobic, neuromuscular, and structural load formulas. Calibration eligibility five-rule gate. Banister model update. Version history from heuristic to threshold-referenced to personalised.
-**Read for:** exact load formulas; calibration eligibility rules; Banister model update.
+Aerobic, neuromuscular, and structural load formulas. Calibration eligibility five-rule gate. Version history from heuristic to threshold-referenced to personalised.
+**Read for:** exact load formulas; calibration eligibility rules.
+
+### `02-computations/banister-update.md`
+Banister impulse-response update formula. Population default time constants (fitness τ = 42 days, fatigue τ = 7 days). Individual time constant fitting (Phase 6d). Form-to-descriptor mapping for LLM agents. How load scores from Activity feed into fitness/fatigue scores.
+**Read for:** Banister update formula; time constant semantics; individual fitting; form descriptor mapping.
 
 ### `02-computations/threshold-detection.md`
-HR deflection algorithm. HRV inflection algorithm. Power-to-HR ratio. Bayesian update formula and prior decay. Confidence transition thresholds.
-**Read for:** threshold detection algorithms; Bayesian update formula; when each algorithm applies.
+HR deflection algorithm. HRV inflection algorithm. Power-to-HR ratio. Confidence transition thresholds.
+**Read for:** threshold detection algorithms; when each algorithm applies.
+
+### `02-computations/physiology-update.md`
+Bayesian update mechanism for physiological parameters. Observation weights by source (questionnaire 0.5 → lab_test 12–15). Prior decay (42-day time constant). Lab test and field test ingestion flows. Training-derived continuous updates. How observations from threshold-detection feed into the posterior.
+**Read for:** Bayesian update formula; observation weights; lab/field test flows; training-derived update pipeline.
 
 ### `02-computations/effort-normalisation.md`
 GAP invariant. Generation 1 static formula. Generation 2 per-athlete curve (≥20 sessions, R²≥0.70). Generation 3 personalised cost model. Active generation selection logic. Downstream consumers.
@@ -195,6 +221,10 @@ Generation 1 threshold-based segmentation. HR zone classification. Confidence co
 ### `02-computations/segmentation-hmm.md`
 Generation 3 HMM. Why HMM fits (four reasons). Architecture: 7 states, feature vectors, transition matrix, Gaussian emissions. Viterbi + forward-backward inference. Population vs per-athlete model. Fallback chain.
 **Read for:** HMM architecture; why HMM was chosen; inference algorithms; model training and fallback.
+
+### `02-computations/session-count.md`
+Deterministic session count computation from intensity bias and athlete preference. Pure Python function — no LLM reasoning required.
+**Read for:** session count rules; how intensity bias affects session count; invariant: lower of computed and preference wins.
 
 ### `02-computations/plan-generation.md`
 Phase arc formulas for race and open training. Session distribution structural rules. Crossover athlete ramp. Regeneration trigger conditions.
@@ -219,7 +249,7 @@ Seeding rules (max 5, ≥1 maintain, tier-based categories). Post-session evalua
 One document per LLM agent. Context inputs, output contract, voice constraints, idempotency, failure semantics.
 
 ### `03-agents/first-message-agent.md`
-Context budget ~3k–5k tokens. Full context type. Output: four paragraphs. Must reference `sport_background` and `structural_risk_flag`. One per block; 409 on second call.
+Context budget ~3k–5k tokens. Full context type. Output: four paragraphs. Must reference `sport_background` and `structural_risk_flag`. One per goal; 409 on second call.
 **Read for:** first message context structure; four-paragraph output contract; idempotency; quality bar.
 
 ### `03-agents/workout-generation-agent.md`
@@ -237,6 +267,34 @@ Context budget ~1k token. SkipReason classification. SkipFlow routing to redistr
 ### `03-agents/wellness-alert-agent.md`
 Wellness alert (2k tokens), phase transition (1k), plan regeneration (1k). Frequency gates per message type. Output: one paragraph each.
 **Read for:** proactive message triggers; frequency gates; context per message type.
+
+### `03-agents/hypothesis-agent.md`
+Context budget ~3k–5k tokens. Generates three strategic approaches using four reasoning dimensions. Produces hypotheses with rationale, intensity balance, and risk notes. Not idempotent.
+**Read for:** hypothesis generation context; four reasoning dimensions; distinctness rule; output format.
+
+### `03-agents/hypothesis-selector-agent.md`
+
+Context budget ~4k–6k tokens. Scores and selects best approach. Synthesizes strategic framework with phase arc, race schedule, checkpoint schedule, intensity balance. Scoring: twin alignment (50%), goal fit (30%), injury safety (10%).
+**Read for:** scoring criteria; constraint-first validation; framework synthesis with phase arc; checkpoint scheduling logic.
+
+### `03-agents/pre-week-review-agent.md` (Python service)
+
+**Python service, not an LLM agent.** Evaluates the plan's intent for the upcoming week against accumulated execution data and current athlete state. All decision logic is deterministic — no LLM reasoning required.
+**Read for:** adjustment sources (fatigue correction, schedule constraint, adaptation acceleration); deterministic decision logic; constraints on what can/cannot be adjusted.
+
+### `03-agents/weekly-synthesis-agent.md`
+
+Context budget ~3k–5k tokens. Produces the actual session schedule for a single week. Reads adjusted intent from pre-week review (Python service) and current athlete state. Outputs WeeklyPlan with session count, types, days, and approximate duration. Inherits all session placement rules from the deprecated session-planner-agent. Session count is a pre-computed input — the agent does not compute it.
+**Read for:** session placement rules; intensity bias → session type distribution; race week handling; template fallback.
+
+### `03-agents/session-planner-agent.md` (DEPRECATED)
+
+**Deprecated** — replaced by the weekly synthesis layer:
+- `03-agents/weekly-synthesis-agent.md` — produces weekly session schedules
+- `03-agents/pre-week-review-agent.md` — reviews and adjusts weekly intent
+- `02-computations/plan-generation.md` — produces phase arc (strategic intent)
+
+Retained for historical reference only.
 
 ### `03-agents/context-budget-service.md`
 `ContextBudgetService` implementation for all three primary agents. Token budget enforcement before API call. Priority truncation ordering per agent.

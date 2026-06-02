@@ -2,7 +2,7 @@
 
 ## Purpose
 - Stores one segment of a generated workout with its physiological intent and data-tier-appropriate targets
-- Carries PhysiologicalIntentState as the primary intent signal used by all downstream analysis
+- Carries PhysiologicalIntent as the primary intent signal used by all downstream analysis
 - The atomic unit for execution compliance assessment
 
 ## TypeScript Schema
@@ -15,27 +15,40 @@ type WorkoutStep = {
   generated_workout_id: string           // UUID, FK → GeneratedWorkout
   step_order: number                     // 1-indexed; unique within workout
   step_type: StepType
-  physiological_intent: PhysiologicalIntentState  // NEVER null
+  
+  // The three-layer hierarchy
+  session_type: SessionType
+  physiological_intent: PhysiologicalIntent  // NEVER null
+  session_purpose: SessionPurpose            // default: 'general'
 
-  // Targets — populated based on athlete data tier
-  // Tier 1-2: target_power_watts primary
-  // Tier 3-4: target_gap_sec_per_km primary
-  // Tier 5-6: null; description only
-  target_duration_seconds: number | null
-  target_hr_zone: number | null          // 1–5; supplementary
-  target_power_watts: number | null      // Tier 1-2
-  target_gap_sec_per_km: number | null   // ALWAYS GAP; never raw pace
+  // Range-based target (athlete sees explicit numbers, never zone numbers)
+  target: WorkoutTarget
 
-  description: string  // plain English shown to athlete; always present
+  // Duration
+  duration_seconds: number | null
+
+  // Description (always present; plain English)
+  description: string
+}
+
+type WorkoutTarget = {
+  signal_type: 'power' | 'gap' | 'hr' | 'description'
+  primary: {
+    min: number | null
+    max: number | null
+    unit: string
+  }
+  fallback: WorkoutTarget | null
+  description: string  // always present; plain English
 }
 ```
 
 ## Invariants
 - `physiological_intent` is **never null**. Every step has an intent, including warmup and cooldown.
-  - `step_type = 'warmup'` → `physiological_intent = 'warmup'`
-  - `step_type = 'cooldown'` → `physiological_intent = 'cooldown'`
+  - `step_type = 'warmup'` → `physiological_intent = 'recovery'`
+  - `step_type = 'cooldown'` → `physiological_intent = 'recovery'`
   - `step_type = 'recovery'` (between intervals) → `physiological_intent = 'recovery'`
-  - `step_type = 'work'` → `physiological_intent` set from the session's prescribed effort state
+  - `step_type = 'work'` → `physiological_intent` derived from session's `SessionType` via `SESSION_INTENT_MAP`
 - `step_order` is unique within a `generated_workout_id`. Enforced by unique constraint on `(generated_workout_id, step_order)`.
 - `target_gap_sec_per_km` uses GAP values only. The workout generation agent prompt enforces this.
 - Numeric targets are null for Tier 5-6 athletes. `description` is always non-null and always carries the intent in plain language.
@@ -83,7 +96,7 @@ Index: `(generated_workout_id, step_order)` for ordered step retrieval.
 ## Runtime Ownership
 Owns:
 - Step-level intent and targets
-- The prescribed PhysiologicalIntentState for each workout segment
+- The prescribed PhysiologicalIntent for each workout segment
 
 Does Not Own:
 - How targets are computed → `03-agents/workout-generation-agent.md`

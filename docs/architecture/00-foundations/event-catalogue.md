@@ -21,9 +21,15 @@ type EventType =
   | 'fit_file_received'
   | 'activity_ingested'
   | 'activity_calibration_eligible'
+  // Auth events
+  | 'athlete_registered'
+  | 'athlete_logged_in'
+  | 'auth_method_added'
+  | 'auth_method_removed'
   // Twin events
   | 'twin_recalibrated'
   | 'twin_confidence_upgraded'
+  | 'twin_model_ready'
   // Physiology events
   | 'physiology_updated'
   | 'physiology_lab_test_ingested'
@@ -36,7 +42,7 @@ type EventType =
   | 'recovery_modifier_changed'
   // Planning events
   | 'onboarding_completed'
-  | 'training_block_created'
+  | 'training_goal_created'
   | 'secondary_event_registered'
   | 'secondary_event_removed'
   | 'training_plan_generated'
@@ -44,6 +50,10 @@ type EventType =
   | 'session_skipped'
   | 'session_missed'
   | 'session_completed'
+  // Weekly synthesis events
+  | 'pre_week_review_completed'
+  | 'weekly_plan_created'
+  | 'week_completed'
   // Coaching events
   | 'workout_generated'
   | 'post_workout_analysis_requested'
@@ -70,6 +80,59 @@ type FitFileReceivedPayload = {
 ```
 **Producer:** `FitIngestionTask`
 **Consumers:** `LoadComputationService`, `SignalCleaningService`
+
+---
+
+### `athlete_registered`
+```typescript
+type AthleteRegisteredPayload = {
+  auth_provider: 'email' | 'google' | 'strava'
+  has_password: boolean              // false for OAuth-only accounts
+  profile_completed: boolean         // was profile data provided at registration
+}
+```
+**Producer:** `AuthService` (POST /auth/register or POST /auth/google or POST /auth/strava)
+**Consumers:** Audit log, analytics pipeline
+
+---
+
+### `athlete_logged_in`
+```typescript
+type AthleteLoggedInPayload = {
+  auth_provider: 'email' | 'google' | 'strava'
+  token_type: 'access' | 'refresh'
+  ip_address: string | null
+  user_agent: string | null
+}
+```
+**Producer:** `AuthService` (POST /auth/login or POST /auth/login/google)
+**Consumers:** Security monitoring, audit log
+
+---
+
+### `auth_method_added`
+```typescript
+type AuthMethodAddedPayload = {
+  provider: 'email' | 'google' | 'strava'
+  is_primary: boolean
+  has_password: boolean
+}
+```
+**Producer:** `AuthService` (POST /athletes/{id}/auth/link)
+**Consumers:** Audit log
+
+---
+
+### `auth_method_removed`
+```typescript
+type AuthMethodRemovedPayload = {
+  provider: 'email' | 'google' | 'strava'
+  remaining_methods: ('email' | 'google' | 'strava')[]
+  was_primary: boolean
+}
+```
+**Producer:** `AuthService` (DELETE /athletes/{id}/auth/link/{provider})
+**Consumers:** Audit log
 
 ---
 
@@ -161,32 +224,36 @@ type RecoveryModifierChangedPayload = {
 ---
 
 ### `onboarding_completed`
+
 ```typescript
 type OnboardingCompletedPayload = {
-  training_block_id: string
+  training_goal_id: string
   twin_state_id: string
   data_tier: number
   confidence_level: 'low'    // always low at onboarding
 }
 ```
+
 **Producer:** `OnboardingService`
-**Consumers:** `PlanGenerationService`, `FirstMessageAgent`
+**Consumers:** `TwinBootstrapService` (starts twin model build). Note: plan generation is triggered by `twin_model_ready`, NOT by `onboarding_completed`. For Tier 1 athletes, `twin_model_ready` fires after historical data ingestion completes.
 
 ---
 
 ### `training_plan_generated`
+
 ```typescript
 type TrainingPlanGeneratedPayload = {
   training_plan_id: string
-  training_block_id: string
+  training_goal_id: string
   phase_count: number
   total_weeks: number
   supersedes_plan_id: string | null
-  trigger: 'new_block' | 'goal_date_change' | 'confidence_upgrade' | 'session_dropout'
+  trigger: 'new_goal' | 'goal_date_change' | 'confidence_upgrade'
 }
 ```
-**Producer:** `PlanGenerationService`
-**Consumers:** `ProactiveMessageService` (plan regeneration notification)
+
+**Producer:** `TrainingGoal` entity (via `PlanGenerationService`)
+**Consumers:** `PreWeekReviewAgent` (schedules first weekly synthesis), `FirstMessageAgent` (generates first message from WeeklyPlan), `ProactiveMessageService` (plan regeneration notification), `WeatherForecastService` (prefetch for upcoming session dates)
 
 ---
 
@@ -235,10 +302,10 @@ type CoachingMessageGeneratedPayload = {
 ```typescript
 type RacePredictionUpdatedPayload = {
   race_prediction_id: string
-  training_block_id: string
+  training_goal_id: string
   baseline_prediction_seconds: number
   confidence_level: 'medium' | 'high'
-  update_trigger: 'activity_sync' | 'weather_update' | 'course_profile' | 'new_block' | 'secondary_event_added' | 'secondary_event_removed'
+  update_trigger: 'activity_sync' | 'weather_update' | 'course_profile' | 'new_goal' | 'secondary_event_added' | 'secondary_event_removed'
 }
 ```
 **Producer:** `RacePredictionService`
@@ -250,13 +317,14 @@ type RacePredictionUpdatedPayload = {
 ```typescript
 type SecondaryEventRegisteredPayload = {
   secondary_event_id: string
-  training_block_id: string
+  training_goal_id: string
   event_type: SecondaryEventType
   event_date: string
   priority: SecondaryEventPriority
 }
 ```
-**Producer:** `TrainingBlockService` (secondary event endpoint)
+
+**Producer:** `TrainingGoal` entity (secondary event endpoint)
 **Consumers:** `PlanGenerationService`, `RacePredictionService`
 
 ---
@@ -265,11 +333,12 @@ type SecondaryEventRegisteredPayload = {
 ```typescript
 type SecondaryEventRemovedPayload = {
   secondary_event_id: string
-  training_block_id: string
+  training_goal_id: string
   event_date: string
 }
 ```
-**Producer:** `TrainingBlockService` (secondary event endpoint)
+
+**Producer:** `TrainingGoal` entity (secondary event endpoint)
 **Consumers:** `PlanGenerationService`, `RacePredictionService`
 
 ---
@@ -318,6 +387,7 @@ type PhysiologyLabTestIngestedPayload = {
 ---
 
 ### `fitness_updated`
+
 ```typescript
 type FitnessUpdatedPayload = {
   aggregate_form: number
@@ -325,8 +395,110 @@ type FitnessUpdatedPayload = {
   last_activity_id: string
 }
 ```
+
 **Producer:** `FitnessUpdateService`
 **Consumers:** `TwinRecalibrationService` (if form shift > 1)
+
+---
+
+### `twin_model_ready`
+
+```typescript
+type TwinModelReadyPayload = {
+  twin_state_id: string
+  data_tier: DataTier
+  confidence_level: TwinConfidenceLevel
+}
+```
+
+**Producer:** `TwinRecalibrationService` (fires once after onboarding when twin has sufficient data)
+**Consumers:** `PlanGenerationService` (triggers initial plan generation + first WeeklyPlan)
+
+Trigger criteria by onboarding tier:
+- **Tier 1** (imported history): Fires after historical data ingestion completes and first `activity_sync` or `calibration` TwinState is created
+- **Tier 2** (peer-similar or lab test): Fires immediately after twin bootstrap
+- **Tier 3** (questionnaire only): Fires immediately after twin bootstrap
+
+---
+
+### `session_missed`
+
+```typescript
+type SessionMissedPayload = {
+  planned_session_id: string
+  target_date: string
+  session_type: string
+}
+```
+
+**Producer:** `MissedSessionSweepTask` (nightly sweep)
+**Consumers:** `WeeklyPlanService` (updates WeeklySession status; checks if week is complete)
+
+---
+
+### `pre_week_review_completed`
+
+```typescript
+type PreWeekReviewCompletedPayload = {
+  training_plan_id: string
+  week_number: number
+  adjustment_made: boolean
+  adjustment_source: 'plan_unchanged' | 'fatigue_correction' | 'schedule_constraint' | 'adaptation_acceleration' | 'checkpoint_result'
+}
+```
+
+**Producer:** `PreWeekReviewAgent`
+**Consumers:** `WeeklySynthesisAgent` (creates WeeklyPlan from AdjustedWeeklyIntent)
+
+Note: Payload contains `training_plan_id` and `week_number`, NOT `weekly_plan_id` — the WeeklyPlan does not exist yet at the time of the review.
+
+---
+
+### `weekly_plan_created`
+
+```typescript
+type WeeklyPlanCreatedPayload = {
+  weekly_plan_id: string
+  training_plan_id: string
+  week_number: number
+  session_count: number
+}
+```
+
+**Producer:** `WeeklySynthesisAgent`
+**Consumers:** `WorkoutGenerationAgent` (reads today's session from new WeeklyPlan), `WeatherForecastService` (prefetch for session dates)
+
+---
+
+### `week_completed`
+
+```typescript
+type WeekCompletedPayload = {
+  weekly_plan_id: string
+  week_number: number
+  sessions_completed: number
+  sessions_missed: number
+  accumulated_fatigue_delta: number
+}
+```
+
+**Producer:** `WeeklyPlanService` (when all sessions in week are completed or missed)
+**Consumers:** `PreWeekReviewAgent` (reviews next week's intent), `AdaptationBlockDetectionTask` (checks if hard block completed)
+
+---
+
+### `wellness_baseline_updated`
+
+```typescript
+type WellnessBaselineUpdatedPayload = {
+  athlete_id: string
+  signals_updated: string[]
+  sample_counts: Record<string, number>
+}
+```
+
+**Producer:** `BaselineComputationTask`
+**Consumers:** `WellnessModifierService` (recovers modifier with updated baselines)
 
 ---
 

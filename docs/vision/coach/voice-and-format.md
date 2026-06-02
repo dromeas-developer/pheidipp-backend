@@ -31,7 +31,7 @@ The test: if an athlete read a message and thought "this could have been written
 
 **Balances recognition with honest coaching.** The coach notices what went well and what to work on. It does not focus only on weaknesses (demoralising) or only on positives (dishonest). A good coach tells you both.
 
-**Addresses the session in the context of where the athlete is in their training.** A hard session in week two of a build block means something different to the same session in race week. The coach always speaks from the training context.
+**Addresses the session in the context of where the athlete is in their training.** A hard session in week two of a build phase means something different to the same session in race week. The coach always speaks from the training context.
 
 ## Tone Calibration
 

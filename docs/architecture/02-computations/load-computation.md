@@ -48,7 +48,7 @@ function computeAerobicLoadHeuristic(
 ```typescript
 function computeAerobicLoadPower(
   power_records: number[],       // watts per second
-  ftp_estimate: number           // from TwinState
+  cp_estimate: number            // from AthletePhysiology
 ): number {
   return power_records.reduce((acc, w) => {
     const intensity_factor = w / ftp_estimate
@@ -66,7 +66,7 @@ Measures fast-twitch demand, explosive stress, and high-intensity neuromuscular 
 ```typescript
 function computeNeuromuscularLoad(
   gap_records: number[],         // sec/km per second; from effort normalisation
-  ftp_estimate: number | null,   // watts; null for non-power athletes
+  cp_estimate: number | null,    // watts; null for non-power athletes
   power_records: number[] | null // null if no power meter
 ): number {
   // Variability index: coefficient of variation of pace/power over session
@@ -76,7 +76,7 @@ function computeNeuromuscularLoad(
   const variability_index = Math.sqrt(variance) / mean
 
   // Time above VO2max threshold (95% of LT2 intensity)
-  const vo2_threshold = ftp_estimate ? ftp_estimate * 1.05 : null
+  const vo2_threshold = cp_estimate ? cp_estimate * 1.05 : null
   const time_above_vo2 = vo2_threshold
     ? power_records!.filter(w => w > vo2_threshold).length
     : gap_records.filter(g => g < /* estimated VO2 pace */ 0).length  // simplified
@@ -142,18 +142,14 @@ function isCalibrationEligible(activity: Activity, fit_data: FitData): boolean {
 
 ## Outputs → TwinState Layer 1
 
-The three load scores feed the Banister impulse-response model in `TwinRecalibrationService`:
+The three load scores feed the Banister impulse-response model. The full Banister update formula and time constant semantics are defined in `02-computations/banister-update.md`.
 
 ```typescript
-// Banister update (simplified):
-fitness_score(t) = fitness_score(t-1) * exp(-1/τ_fitness) + aerobic_load
-fatigue_score(t) = fatigue_score(t-1) * exp(-1/τ_fatigue) + aerobic_load
-
-// τ values: population defaults until Phase 6d individual fitting
-// τ_aerobic_fitness = 42 days; τ_aerobic_fatigue = 7 days
+// Banister update (summary):
+// fitness_score(t) = fitness_score(t-1) * exp(-1/τ_fitness) + aerobic_load
+// fatigue_score(t) = fatigue_score(t-1) * exp(-1/τ_fatigue) + aerobic_load
+// See 02-computations/banister-update.md for full formula, time constants, and individual fitting.
 ```
-
-See `01-entities/twin-state.md` for the full TwinState schema.
 
 ## Version History
 | Version | Change |

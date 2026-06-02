@@ -58,6 +58,7 @@ type Checkpoint = {
 - **Checkpoint type determines expected behaviour.** Calibration checkpoints expect metric updates. Benchmark checkpoints expect progress comparison. Race simulation expects race-pace validation. Secondary race expects race performance data. Progress review expects adaptation signal.
 - **Completion fields set atomically.** `metric_updated`, `confidence_changed`, `replan_triggered`, and `completed_at` are set together when status transitions to completed.
 - **Checkpoint cannot be created retroactively.** Checkpoints are scheduled during plan synthesis, not after session completion.
+- **Overshoot recovery uses static default until individual data is available.** The `+2 day` default applies unless `TwinState.confidence_level = 'high'` AND `AdaptationSignature` has ≥ 3 complete adaptation window observations. This prevents premature personalization from noisy data.
 
 ---
 
@@ -157,11 +158,13 @@ Owns:
 - Checkpoint scheduling logic (when and where to place checkpoints)
 - Checkpoint status lifecycle
 - Metric update and confidence change tracking
+- Overshoot recovery rules (extension calculation and effort deviation classification)
 
 Does Not Own:
 - Session distribution rules → `02-computations/plan-generation.md`
 - Twin metric updates → `01-entities/twin-state.md`
 - Plan regeneration logic → `02-computations/plan-generation.md`
+- Adaptation observation data → `01-entities/adaptation-observation.md`
 
 ---
 
@@ -170,6 +173,68 @@ Does Not Own:
 - Checkpoint completion without PlannedSession found → integrity violation; alert
 - Metric update fails → checkpoint marked completed with `metric_updated = false`; standard load update continues
 - Replan trigger fires but synthesis fails → checkpoint completed; replan retried on next trigger
+
+---
+
+## Overshoot Recovery Rules
+
+When a checkpoint completes and the athlete's actual effort deviates from prescription, recovery windows are adjusted to reflect actual physiological stress.
+
+### Constants and Overrides
+
+```typescript
+// Static default — applied when individual data is insufficient
+const OVERSHOOT_RECOVERY_EXTENSION_DAYS = 2
+
+// Eligibility for dynamic override:
+// - TwinState.confidence_level = 'high'
+// - AdaptationSignature has ≥ 3 complete block observations
+// If eligible, extension is scaled by the athlete's observed recovery trajectory
+function computeOvershootRecovery(
+  athlete_recovery_profile: AdaptationObservation[] | null,
+  twin_confidence: TwinConfidenceLevel
+): number {
+  if (twin_confidence === 'high' && athlete_recovery_profile && athlete_recovery_profile.length >= 3) {
+    const avg_recovery_days = mean(athlete_recovery_profile.map(o => o.recovery_trajectory.days_to_baseline_return))
+    // Scale: athletes who recover faster get smaller extensions, slower athletes get larger
+    // Floor of 1 day, ceiling of 5 days
+    return clamp(Math.round(avg_recovery_days * 0.5), 1, 5)
+  }
+  return OVERSHOOT_RECOVERY_EXTENSION_DAYS
+}
+```
+
+### Classification Logic
+
+```typescript
+type EffortDeviation = 'followed_plan' | 'overshot' | 'undershot'
+
+function classifyEffortDeviation(
+  prescribed: SessionType,
+  actual_load: number,
+  prescribed_load: number
+): EffortDeviation {
+  const deviation_ratio = actual_load / prescribed_load
+  if (deviation_ratio > 1.3) return 'overshot'    // >30% above prescribed load
+  if (deviation_ratio < 0.7) return 'undershot'   // >30% below prescribed load
+  return 'followed_plan'
+}
+```
+
+### Recovery Adjustment by Deviation
+
+| Deviation | Recovery Adjustment | Data Quality Impact |
+|-----------|--------------------|--------------------|
+| `followed_plan` | Standard recovery | Normal calibration value |
+| `overshot` | Extended by `computeOvershootRecovery()` days | Normal calibration value (actual stress was higher) |
+| `undershot` | Standard recovery | Reduced calibration value (effort below threshold signal) |
+
+### Invariants
+
+- Overshoot recovery extension is applied to the next quality session spacing, not to the session itself
+- The extension is communicated to the athlete in plain language by the coach
+- Undershot sessions are still processed for twin calibration but flagged as lower confidence observations
+- The dynamic override requires both HIGH confidence AND ≥ 3 adaptation block observations; either condition missing falls back to static default
 
 ---
 

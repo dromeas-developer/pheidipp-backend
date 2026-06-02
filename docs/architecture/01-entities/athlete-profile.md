@@ -10,18 +10,17 @@
 type Sex = 'male' | 'female' | 'not_specified'
 
 type AthleteProfile = {
+  id: string                         // UUID, PK
   athlete_id: string          // UUID, FK → Athlete, one-to-one
   date_of_birth: string       // ISO date YYYY-MM-DD
   sex: Sex
   height_cm: number | null
-  weight_kg: number | null
-  // Extended fields added by later phases:
-  gap_curve_model: GapCurveModel | null           // set by 5d
-  weather_response_model: WeatherResponseModel | null  // set by 6b
-  banister_constants: BanisterConstants | null    // set by 6d
-  cycle_personal_model: CyclePersonalModel | null // set by 4f
-  location_lat: number | null                     // added 3d
-  location_lng: number | null                     // added 3d
+  gap_curve_model: GapCurveModel | null           // per-athlete GAP curve (null = use population)
+  weather_response_model: WeatherResponseModel | null  // per-athlete weather response (null = use population)
+  banister_constants: BanisterConstants | null     // per-athlete fitted time constants (null = use population defaults in AthleteFitness)
+  cycle_personal_model: CyclePersonalModel | null  // per-athlete cycle model (null = no cycle tracking)
+  location_lat: number | null
+  location_lng: number | null
   updated_at: string          // ISO 8601
 }
 
@@ -42,12 +41,18 @@ type WeatherResponseModel = {
 }
 
 type BanisterConstants = {
-  aerobic_fitness_tau: number          // population default: 42 days
-  aerobic_fatigue_tau: number          // population default: 7 days
-  neuromuscular_fitness_tau: number    // population default: 21 days
-  neuromuscular_fatigue_tau: number    // population default: 3 days
-  structural_fitness_tau: number       // population default: 56 days
-  structural_fatigue_tau: number       // population default: 14 days
+  aerobic: {
+    fitness_tau_days: number          // population default: 42
+    fatigue_tau_days: number          // population default: 7
+  }
+  neuromuscular: {
+    fitness_tau_days: number          // population default: 21
+    fatigue_tau_days: number          // population default: 3
+  }
+  structural: {
+    fitness_tau_days: number          // population default: 56
+    fatigue_tau_days: number          // population default: 14
+  }
   fitted_from_weeks: number
   fitted_at: string
 }
@@ -70,11 +75,11 @@ type CyclePersonalModel = {
 ```
 
 ## Invariants
-- One `AthleteProfile` per `Athlete`. Created at registration.
+- One `AthleteProfile` per `Athlete`. Created at registration. Enforced by unique constraint on `(athlete_id)`.
 - `sex = 'female'` enables menstrual cycle tracking (`CyclePhaseLog`) and cycle modifier in wellness computation.
 - `gap_curve_model` is only applied when `r_squared >= 0.70`. Below this, the population formula is used.
 - `weather_response_model` is only applied when `r_squared >= 0.65`.
-- `banister_constants` replaces population defaults for all subsequent `TwinState` recalibrations once set.
+- `banister_constants` stores per-athlete fitted time constants. When set, `AthleteFitness.time_constants` references these values (source='individual_fitted'). When null, `AthleteFitness.time_constants` uses population defaults (source='population_default').
 - `cycle_personal_model.phase_sensitivity` of `0.0` means the model detected no phase correlation — cycle modifier is effectively zeroed for this athlete. This is a valid outcome.
 
 ## Events
@@ -88,6 +93,7 @@ type CyclePersonalModel = {
 | Event | Action | Version |
 |---|---|---|
 | `activity_ingested` (outdoor, ≥20 sessions) | Triggers `GapCurveFittingTask` | v1 |
+| `activity_ingested` (outdoor, ≥25 sessions, heat_index range ≥10°C) | Triggers `WeatherResponseCurveFittingTask` | v1 |
 | `cycle_day_one_logged` (≥3 complete cycles) | Triggers `CyclePersonalisationTask` | v1 |
 
 ## APIs
@@ -113,9 +119,11 @@ Note: date_of_birth and sex are immutable after creation
 ## Storage Model
 | Data | Strategy | Consistency | Retention |
 |---|---|---|---|
-| `athlete_profiles` | mutable (PATCH for user fields) | strong | indefinite |
+| `athlete_profiles` table | mutable (PATCH for user fields) | strong | indefinite |
 | `gap_curve_model` JSONB | mutable (overwritten on refit) | strong | indefinite |
 | `cycle_personal_model` JSONB | mutable (overwritten on refit) | strong | indefinite |
+
+Unique constraint: `(athlete_id)` — one record per athlete.
 
 ## Mutation Rules
 | Layer | Read | Write | Delete |

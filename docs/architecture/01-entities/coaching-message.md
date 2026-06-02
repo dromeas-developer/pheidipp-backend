@@ -9,7 +9,7 @@
 
 ```typescript
 type MessageType =
-  | 'first_message'        // onboarding; one per athlete per block
+  | 'first_message'        // onboarding; one per athlete per goal
   | 'post_workout'         // after session analysis; one per activity
   | 'wellness_alert'       // proactive wellness pattern detection
   | 'phase_transition'     // plan moves to a new phase
@@ -56,7 +56,7 @@ Proactive messages (wellness_alert, phase_transition, etc.) are typically one pa
 
 ## Invariants
 - `content` is never modified after creation. Messages are immutable.
-- `first_message` — only one per athlete per active block. A second call to the generation endpoint returns 409.
+- `first_message` — only one per athlete per active goal. A second call to the generation endpoint returns 409.
 - `post_workout` — only one per `activity_id`. Idempotent: second call returns existing message.
 - Proactive messages have frequency guards enforced at the service layer (not DB constraints).
 - Every message creation is preceded by a `GenerationEvent` record. A `CoachingMessage` without a corresponding `GenerationEvent` indicates a recording failure — monitored as an alert.
@@ -90,7 +90,7 @@ Response: 200
 Auth: Bearer JWT, require_self
 
 POST /athletes/{athlete_id}/coach/first-message
-Response: 201 | 409 (if already exists for this block)
+Response: 201 | 409 (if already exists for this goal)
   message: CoachingMessageResponse
 Auth: Bearer JWT, require_self
 

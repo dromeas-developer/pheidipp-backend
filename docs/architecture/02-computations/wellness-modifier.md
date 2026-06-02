@@ -110,15 +110,34 @@ function applyRecoveryModifier(
 ): TargetSet {
   const scale = { green: 1.0, amber: 0.92, red: 0.85 }[level]
   // amber: -5% to -10%; red: -10% to -20% (midpoints used)
+  
   return {
-    ...theoretical_targets,
-    pace_sec_per_km: theoretical_targets.pace_sec_per_km
-      ? theoretical_targets.pace_sec_per_km / scale  // slower pace = higher sec/km value
-      : null,
-    power_watts: theoretical_targets.power_watts
-      ? theoretical_targets.power_watts * scale
-      : null,
-    hr_zone: theoretical_targets.hr_zone  // HR zones unchanged by modifier
+    targets: theoretical_targets.targets.map(target => {
+      if (target.signal_type === 'power' && target.primary.min !== null) {
+        return {
+          ...target,
+          primary: {
+            min: Math.round(target.primary.min * scale),
+            max: target.primary.max !== null ? Math.round(target.primary.max * scale) : null,
+            unit: target.primary.unit
+          }
+        }
+      }
+      if (target.signal_type === 'gap' && target.primary.min !== null) {
+        // GAP: slower pace = higher sec/km value
+        return {
+          ...target,
+          primary: {
+            min: Math.round(target.primary.min / scale),
+            max: target.primary.max !== null ? Math.round(target.primary.max / scale) : null,
+            unit: target.primary.unit
+          }
+        }
+      }
+      // HR targets unchanged by recovery modifier (HR is relative to current physiology)
+      return target
+    }),
+    description: theoretical_targets.description
   }
 }
 ```

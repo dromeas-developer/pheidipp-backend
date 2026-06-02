@@ -28,12 +28,23 @@ type WorkoutLibraryEntry = {
 type EmbeddedStep = {
   step_order: number
   step_type: StepType
-  physiological_intent: PhysiologicalIntentState
-  target_duration_seconds: number | null
-  target_hr_zone: number | null
-  target_power_watts: number | null
-  target_gap_sec_per_km: number | null
+  session_type: SessionType
+  physiological_intent: PhysiologicalIntent
+  session_purpose: SessionPurpose      // default: 'general'
+  target: WorkoutTarget
+  duration_seconds: number | null
   description: string
+}
+
+type WorkoutTarget = {
+  signal_type: 'power' | 'gap' | 'hr' | 'description'
+  primary: {
+    min: number | null
+    max: number | null
+    unit: string
+  }
+  fallback: WorkoutTarget | null
+  description: string  // always present; plain English
 }
 ```
 

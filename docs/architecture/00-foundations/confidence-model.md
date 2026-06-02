@@ -20,6 +20,18 @@ type ConfidenceTransitionTrigger =
   | 'four_hr_calibration_sessions'       // LOW → MEDIUM
   | 'two_rr_sessions'                    // MEDIUM → HIGH
   | 'one_dedicated_calibration_run'      // MEDIUM → HIGH
+
+// Per-metric confidence breakdown on TwinState
+// Each derived from respective AthletePhysiology parameter prior weight
+type TwinMetricConfidence = {
+  lt1_hr: TwinConfidenceLevel
+  lt1_power: TwinConfidenceLevel | null    // null if no power data
+  lt1_pace: TwinConfidenceLevel | null     // null if no pace data
+  lt2_hr: TwinConfidenceLevel
+  lt2_power: TwinConfidenceLevel | null      // null if no power data
+  lt2_pace: TwinConfidenceLevel | null       // null if no pace data
+  cp: TwinConfidenceLevel | null              // null if no power data
+}
 ```
 
 ## State Transitions
@@ -40,7 +52,7 @@ stateDiagram-v2
 ### LOW
 **When:** Initial state after questionnaire-only bootstrap. No real training data processed.
 **Threshold estimates:** From age-graded population norms. Unreliable for individual precision.
-**Coaching language:** Conservative. Targets expressed as effort descriptions ("Zone 2 effort") and ranges ("5:30–5:50/km"). Never precise numbers.
+**Coaching language:** Conservative. Targets expressed as effort descriptions ("easy aerobic effort") and ranges ("5:30–5:50/km"). Never precise numbers.
 **Race prediction:** Not surfaced. `GET /athletes/{id}/prediction` returns 204.
 **Plan structure:** Conservative session volumes. Long recovery buffers.
 
@@ -68,17 +80,20 @@ If a significant fitness disruption (illness, injury, extended break) occurs, a 
 
 ## Downstream Effects of Confidence Level
 
-| Consumer | LOW behaviour | MEDIUM behaviour | HIGH behaviour |
-|---|---|---|---|
-| Workout generation agent | Effort descriptions, ranges | Threshold-referenced ranges | Threshold-referenced point estimates |
-| Post-workout agent | Avoids specific claims | Moderate specificity | High specificity; names exact thresholds |
-| Plan generation | Conservative volumes; more checkpoints | Calibrated to threshold; moderate checkpoints | Fully personalised; fewer checkpoints |
-| Checkpoint scheduling | Strongly recommend calibration checkpoints | Recommend calibration for medium-confidence metrics | Skip checkpoints for high-confidence metrics |
-| Race prediction endpoint | 204 No Content | Returns with ±5% range | Returns point estimate |
-| First message agent | Acknowledges uncertainty | Moderate confidence language | Can make specific physiological claims |
+| Consumer | Uses | LOW behaviour | MEDIUM behaviour | HIGH behaviour |
+|---|---|---|---|---|
+| **TwinState** | `confidence_level` (coarse) | Conservative coaching language | Threshold-referenced ranges | Point estimates |
+| **TwinState** | `metric_confidence` (per-metric) | Null fields for missing metrics | Available metrics with appropriate precision | All available metrics at high precision |
+| Workout generation agent | `metric_confidence` for primary metric | Effort descriptions | Threshold-referenced ranges | Threshold-referenced point estimates |
+| Post-workout agent | `metric_confidence` per step | Avoids specific claims | Moderate specificity | High specificity; names exact thresholds |
+| Plan generation | `confidence_level` (coarse) | Conservative volumes; more checkpoints | Calibrated to threshold; moderate checkpoints | Fully personalised; fewer checkpoints |
+| Checkpoint scheduling | `metric_confidence` to target weak areas | Strongly recommend calibration checkpoints | Recommend calibration for medium-confidence metrics | Skip checkpoints for high-confidence metrics |
+| Race prediction endpoint | `confidence_level` | 204 No Content | Returns with ±5% range | Returns point estimate |
+| First message agent | `confidence_level` | Acknowledges uncertainty | Moderate confidence language | Can make specific physiological claims |
 
 ## Invariants
-- `confidence_level` is stored on every `TwinState` record at the time of creation
+- `confidence_level` is stored on every `TwinState` record at the time of creation. Derived from `AthletePhysiology.lt2.hr.prior_weight` (coarse signal for simple consumers).
+- `metric_confidence` provides per-metric confidence breakdown on `TwinState`. Each derived from respective `AthletePhysiology` parameter prior weights at snapshot time.
 - The confidence level of a `TwinState` never changes after creation
 - A new `TwinState` record is created when confidence transitions
 - `RacePrediction` with `confidence_level = low` is never written — the service returns null

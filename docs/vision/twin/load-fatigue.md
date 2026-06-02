@@ -62,8 +62,8 @@ the training record but excluded from twin calibration.
 **Tier 6 — Manual input only.** No device data at all. Session logged for the training
 record only. Never used to update the twin model.
 
-Note on optical HR: modern sensors in quality GPS watches are adequate for zone-based load
-calculation. Their limitation versus chest strap is specifically the absence of RR interval
+Note on optical HR: modern sensors in quality GPS watches are adequate for intent-range-based
+load calculation. Their limitation versus chest strap is specifically the absence of RR interval
 data for threshold detection — not HR accuracy for sustained aerobic efforts.
 
 ## Grade-Adjusted Pace — Always, Never Raw Pace
@@ -101,3 +101,13 @@ what was observed and what adjustment has been made to the session.
 
 If an athlete consistently produces sessions without device data, the coach surfaces this
 as an opportunity to give the coaching system better data — never as criticism.
+
+---
+
+## Recovery Timing and Session Priority
+
+Recovery windows are measured from primary session to primary session. Secondary sessions — whether a double-day PM session or a suggested non-running workout — do not reset the recovery clock.
+
+This reflects physiological reality: a morning easy run followed by an evening threshold session provides more recovery between primary efforts than two hard sessions on consecutive days. The twin's recovery model accounts for this by tracking primary session spacing rather than total session count.
+
+The weekly plan respects this when scheduling quality sessions: a double day with AM primary + PM secondary followed by a single primary session the next day provides adequate recovery for most athletes.

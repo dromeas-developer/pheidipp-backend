@@ -33,17 +33,19 @@ These invariants protect the athlete's trust in the system. Trust is the product
 
 **Simplicity compounds value.** Every additional setting, workflow, metric, chart, or customization surface must justify its existence against core coaching value. Minimalism is intentional and protective of the athlete experience.
 
+**The athlete is never exposed to system complexity.** When services fail, data is temporarily unavailable, or processing is delayed, the athlete sees a calm, honest message — not an error code, not a loading spinner, not a technical explanation. The system absorbs its own complexity and presents only what the athlete needs to know. Failures are communicated as temporary pauses, not broken states. The coach pauses and asks again later; it does not panic or disappear.
+
 ---
 
 ## Physiological Safety Invariants
 
 These invariants protect the athlete from training patterns that increase injury or overtraining risk. They are enforced by the plan generation system and respected by all coaching logic.
 
-**No unsafe load spikes.** Acute load increase must not exceed 10% week-over-week. This prevents the rapid volume or intensity progressions that precipitate overuse injuries. The rule applies to total weekly load and to individual session load.
+**No unsafe load spikes.** Weekly training load must not increase by more than 10%. This prevents the rapid volume or intensity progressions that precipitate overuse injuries. The rule applies to total weekly load and to individual session load.
 
-**No incompatible intensity stacking.** No back-to-back Zone 4–5 sessions. High-intensity efforts require neuromuscular recovery that a single easy day does not provide. The system enforces at least one easy or rest day between quality sessions.
+**No incompatible intensity stacking.** No hard sessions on consecutive days. Intense efforts require neuromuscular recovery that a single easy day does not provide. The system enforces at least one easy or rest day between quality sessions.
 
-**Minimum recovery spacing.** At least 48 hours between hard sessions. This ensures adequate neuromuscular and structural recovery regardless of session type. A threshold session Monday and a VO2max session Tuesday violates this invariant.
+**Minimum recovery spacing.** At least 48 hours between intense efforts. This ensures adequate neuromuscular and structural recovery regardless of session type. A hard session Monday followed by another hard session Tuesday violates this invariant.
 
 **No overlapping tapers.** The system cannot taper for multiple races simultaneously. Tapering reduces training stress to preserve fitness for a specific event. Tapering for two events at once means neither receives adequate preparation. When races are too close, the system selects the higher-priority race for tapering.
 
@@ -63,7 +65,7 @@ These invariants preserve the integrity of the athlete's primary goal when secon
 
 These invariants define the boundaries of what the system will and will not plan.
 
-**Training length gate.** Goals more than 24 weeks away trigger an intermediate goal proposal. The system does not attempt to plan training horizons where too many variables remain uncertain. See training-plan-generation for the full gate logic.
+**Training length gate.** Goals beyond the configurable planning horizon trigger an intermediate goal proposal. The 24-week default is parameterised by goal type, athlete experience, and fitness level. The system does not attempt to plan training horizons where too many variables remain uncertain. See plan-generation for the full gate logic.
 
 **Running-only twin model.** Non-running activities are excluded from twin calibration. This is an accuracy decision. Cross-modal conversions — swim sessions translated into equivalent running stress, strength sessions assigned arbitrary scores — introduce errors that compound over time. The twin holds its judgement on non-running sessions and waits for the next run.
 
@@ -77,4 +79,4 @@ These invariants protect the athlete's autonomy and the plan's structural integr
 
 **Workouts only on available days and times.** The plan respects the athlete's stated availability. Sessions are never placed on days the athlete has marked as unavailable, regardless of optimisation pressure.
 
-**One session per day.** A plan never schedules two sessions on the same day. This preserves the structural clarity of the plan and prevents the accumulation of fatigue from multiple daily efforts.
+**Primary sessions are scheduled to allow adequate recovery. Secondary sessions on the same day are permitted when they don't interfere with the primary session's recovery.** This supports doubles scheduling where secondary sessions (non-running suggestions like strength, yoga, mobility) are placed in the PM slot after a primary running session, without compromising the recovery window measured between primary sessions.

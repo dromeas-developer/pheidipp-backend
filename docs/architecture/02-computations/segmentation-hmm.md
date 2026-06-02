@@ -18,11 +18,13 @@
 ## HMM Architecture
 
 ```typescript
-// 7 observable states corresponding to PhysiologicalIntentState values
-// UNKNOWN is not a modelled state — it is produced when max posterior < 0.45
-const HMM_STATES: Exclude<PhysiologicalIntentState, 'unknown'>[] = [
+// 7 observable states for segment-level inference
+// These are distinct from session-level PhysiologicalIntent — the HMM classifies
+// time-series segments within a workout, not the session's adaptation target.
+// 'unknown' is produced when max posterior < 0.45.
+const HMM_STATES = [
   'warmup', 'low_aerobic', 'high_aerobic', 'threshold', 'vo2', 'recovery', 'cooldown'
-]
+] as const
 
 // Transition matrix A[i][j] = P(state_j | state_i)
 // Initialised from population priors; fine-tuned per athlete after 30+ labelled segments
@@ -50,9 +52,9 @@ type FeatureVector = {
 
 ```typescript
 type HmmInferenceResult = {
-  viterbi_sequence: PhysiologicalIntentState[]     // most likely state sequence
-  posteriors: Record<PhysiologicalIntentState, number>[]  // per time step
-  segment_posteriors: Record<PhysiologicalIntentState, number>  // aggregated per segment
+  viterbi_sequence: string[]     // most likely state sequence (HMM_STATES values)
+  posteriors: Record<string, number>[]  // per time step
+  segment_posteriors: Record<string, number>  // aggregated per segment
 }
 
 function inferStates(

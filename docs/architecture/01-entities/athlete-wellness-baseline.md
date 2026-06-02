@@ -17,6 +17,12 @@ type WellnessSignal =
   | 'deep_sleep_minutes'
   | 'rem_sleep_minutes'
 
+type BodyCompositionSignal =
+  | 'weight_kg'
+  | 'body_fat_pct'
+  | 'muscle_mass_kg'
+  | 'bone_mass_kg'
+
 type AthleteWellnessBaseline = {
   athlete_id: string          // UUID, FK → Athlete
   signal: WellnessSignal      // unique per athlete per signal

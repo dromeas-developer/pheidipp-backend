@@ -4,7 +4,7 @@ When an athlete pursues a primary race goal (A-race), they may additionally regi
 
 ## B-Races
 
-B-races are meaningful secondary goals (typically half-marathon, 10k, or shorter distances) that occur within the training block. The coaching approach treats these as fitness checkpoints, not time-trial efforts. Within the plan generation framework, B-races serve a dual purpose: they provide race experience and pacing feedback, and they function as secondary race checkpoints — natural assessment opportunities that improve twin confidence without requiring additional standalone sessions. See training-plan-generation for the full checkpoint hierarchy.
+B-races are meaningful secondary goals (typically half-marathon, 10k, or shorter distances) that occur within the training plan. The coaching approach treats these as fitness checkpoints, not time-trial efforts. Within the plan generation framework, B-races serve a dual purpose: they provide race experience and pacing feedback, and they function as secondary race checkpoints — natural assessment opportunities that improve twin confidence without requiring additional standalone sessions. See training-plan-checkpoints for the full checkpoint hierarchy.
 
 - Pre-race: Load reduces in the 3-4 days before to ensure freshness
 - Race day: The coach specifies a controlled target pace/power/time based on current fitness and fatigue state to reduce injury and overtraining risk, protecting the primary goal preparation

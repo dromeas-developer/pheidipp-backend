@@ -25,7 +25,7 @@ type WorkoutGenerationContext = {
     confidence_level: TwinConfidenceLevel
     fitness_form_descriptor: string
     // Threshold targets at confidence-appropriate precision:
-    // LOW: effort descriptions ("Zone 2 effort", "comfortably hard")
+    // LOW: effort descriptions ("easy aerobic effort", "comfortably hard")
     // MEDIUM: ranges ("5:30–5:50/km")
     // HIGH: point estimates ("5:38/km")
     threshold_target_description: string
@@ -52,7 +52,7 @@ type WorkoutGenerationOutput = {
   steps: {
     step_order: number
     step_type: StepType
-    physiological_intent: PhysiologicalIntentState  // never null
+    physiological_intent: PhysiologicalIntent  // never null
     target_duration_seconds: number | null
     target_hr_zone: number | null
     target_power_watts: number | null
@@ -68,10 +68,10 @@ type WorkoutGenerationOutput = {
 
 ```typescript
 const TARGET_RULES_BY_TIER: Record<DataTier, TargetTypeRule> = {
-  1: { primary: 'target_power_watts',    secondary: 'target_gap_sec_per_km' },
-  2: { primary: 'target_power_watts',    secondary: 'target_gap_sec_per_km' },
-  3: { primary: 'target_gap_sec_per_km', secondary: 'target_hr_zone' },
-  4: { primary: 'target_gap_sec_per_km', secondary: 'target_hr_zone' },
+  1: { primary: 'power',    secondary: 'gap' },
+  2: { primary: 'power',    secondary: 'gap' },
+  3: { primary: 'gap',      secondary: 'hr' },
+  4: { primary: 'gap',      secondary: 'hr' },
   5: { primary: 'description_only',      secondary: null },
   6: { primary: 'description_only',      secondary: null }
 }
@@ -82,21 +82,30 @@ const TARGET_RULES_BY_TIER: Record<DataTier, TargetTypeRule> = {
 
 ```typescript
 // Invariant: physiological_intent is NEVER null
-const INTENT_BY_STEP_TYPE: Record<StepType, PhysiologicalIntentState | 'from_session_type'> = {
-  warmup:   'warmup',
-  cooldown: 'cooldown',
+const INTENT_BY_STEP_TYPE: Record<StepType, PhysiologicalIntent | 'from_session_type'> = {
+  warmup:   'recovery',
+  cooldown: 'recovery',
   recovery: 'recovery',   // between intervals
-  work:     'from_session_type'  // derived from session_type + phase_label
+  work:     'from_session_type'  // derived from session_type via SESSION_INTENT_MAP
 }
 
-const WORK_INTENT_BY_SESSION_TYPE: Record<SessionType, PhysiologicalIntentState> = {
-  easy_aerobic:     'low_aerobic',
-  long_run:         'low_aerobic',
+const WORK_INTENT_BY_SESSION_TYPE: Record<SessionType, PhysiologicalIntent> = {
+  easy_run:         'low_aerobic',
+  long_run:         'high_aerobic',
+  medium_long_run:  'high_aerobic',
+  steady_state:     'high_aerobic',
   threshold:        'threshold',
-  vo2max_intervals: 'vo2',
-  tempo:            'high_aerobic',
+  tempo:            'threshold',
+  vo2max:           'vo2max',
+  hill_repeats:     'vo2max',
+  fartlek:          'vo2max',
+  strides:          'neuromuscular',
+  drills_mobility:  'neuromuscular',
   recovery_run:     'recovery',
-  // rest/strength/cross_training: no WorkoutStep records generated
+  optional_run:     'recovery',
+  cross_training:   'low_aerobic',
+  test_session:     'vo2max',  // default; depends on test protocol
+  // rest: no WorkoutStep records generated
 }
 ```
 
@@ -135,4 +144,4 @@ Generating a workout for a `planned_session_id` that already has a `GeneratedWor
 - GeneratedWorkout schema: `01-entities/generated-workout.md`
 - Modifier computation chain: `02-computations/wellness-modifier.md`
 - TwinState context assembly: `01-entities/twin-state.md` → Context Assembly
-- PhysiologicalIntentState values: `00-foundations/terminology.md`
+- PhysiologicalIntent values: `00-foundations/terminology.md`

@@ -29,10 +29,10 @@ conversion errors that corrupt the signals the model depends on. The boundary is
 
 ## The Twin Is Always Honest About Confidence
 
-Every estimate the twin produces carries an internal confidence level that affects
+Every estimate the twin produces carries an evidence confidence level that affects
 downstream decisions. Conservative coaching language, target ranges rather than point
-estimates, and cautious plan structures are the natural output of a low-confidence twin.
-As real data accumulates and the model learns this specific athlete, confidence grows and
+estimates, and cautious plan structures are the natural output of a low-evidence-confidence twin.
+As real data accumulates and the model learns this specific athlete, evidence confidence grows and
 coaching becomes more precise.
 
 The twin never pretends to know more than it does. This is an invariant, not a UX choice.

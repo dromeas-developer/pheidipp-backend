@@ -10,6 +10,8 @@
 ```typescript
 type WellnessSource = 'garmin' | 'whoop' | 'oura' | 'polar' | 'manual'
 
+type BodyCompositionSource = 'garmin_scale' | 'withings' | 'manual'
+
 type AthleteWellness = {
   athlete_id: string            // UUID, FK → Athlete
   date: string                  // YYYY-MM-DD; unique per athlete
@@ -23,6 +25,19 @@ type AthleteWellness = {
   source: WellnessSource
   source_record_id: string | null  // deduplication key from source platform
   ingested_at: string              // ISO 8601
+}
+
+// Body composition metrics (separate ingestion path, separate source)
+type BodyCompositionRecord = {
+  athlete_id: string                   // UUID, FK → Athlete
+  date: string                         // YYYY-MM-DD; unique per athlete
+  weight_kg: number                    // required for body composition record
+  body_fat_pct: number | null
+  muscle_mass_kg: number | null
+  bone_mass_kg: number | null
+  source: BodyCompositionSource
+  source_record_id: string | null        // deduplication key from source platform
+  ingested_at: string                   // ISO 8601
 }
 ```
 

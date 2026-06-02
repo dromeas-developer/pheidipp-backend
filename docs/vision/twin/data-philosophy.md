@@ -46,7 +46,7 @@ The twin waits for the next run. That is the signal it trusts.
 
 ## The Honesty Invariant
 
-The twin is always honest about its confidence level. Conservative language, target ranges
+The twin is always honest about its evidence confidence level. Conservative language, target ranges
 rather than point estimates, and cautious plan structures are the natural output of genuine
-uncertainty — not a product limitation. As confidence grows through accumulated data,
+uncertainty — not a product limitation. As evidence confidence grows through accumulated data,
 coaching becomes correspondingly more specific and more useful.

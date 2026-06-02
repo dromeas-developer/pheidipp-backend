@@ -57,7 +57,7 @@ The athlete cannot create, edit, or customise workouts. This boundary prevents c
 
 ## Plan Modification Authority
 
-The system modifies plans based on checkpoint completions, race results, calendar changes, and dropout patterns. These modifications are coach decisions, not athlete requests. The athlete sees the adjustment and understands the rationale, but does not initiate replanning.
+The system modifies plans based on checkpoint completions, race results, calendar changes, and material shifts in the athlete's state. These modifications are coach decisions, not athlete requests. The athlete sees the adjustment and understands the rationale, but does not initiate replanning. Most day-to-day adjustments — missed sessions, schedule changes, slower-than-expected recovery — are absorbed by the weekly coaching rhythm without modifying the plan itself.
 
 When an athlete adds a secondary event, the system validates whether it fits within the existing plan. If it does, the plan is adjusted. If it compromises the A-race timeline, the coach advises against it. The athlete can override this advice — adding a race is within their autonomy — but the coach makes the conflict clear.
 

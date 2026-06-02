@@ -16,7 +16,7 @@ type PlannedSegment = {
   workout_step_id: string              // FK → WorkoutStep
   planned_start_offset_seconds: number
   planned_duration_seconds: number
-  target_state: PhysiologicalIntentState
+  target_state: string  // segment-level intent (not session-level PhysiologicalIntent)
 }
 
 // DeviceSegment — what the watch recorded (from FIT lap messages)
@@ -36,9 +36,9 @@ type PhysiologicalSegment = {
   planned_segment_id: string | null    // FK → PlannedSegment; null if alignment failed
   start_offset_seconds: number
   duration_seconds: number
-  inferred_state: PhysiologicalIntentState  // 'unknown' when confidence < 0.45
+  inferred_state: string  // segment-level intent; 'unknown' when confidence < 0.45
   confidence: number                   // 0.0–1.0; posterior probability of inferred_state
-  state_probabilities: Record<PhysiologicalIntentState, number> | null
+  state_probabilities: Record<string, number> | null
   // null for heuristic-v1 and statistical-v1
   // populated for hmm-v1 (full posterior distribution)
   observed_signals: {

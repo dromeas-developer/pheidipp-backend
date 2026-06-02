@@ -13,12 +13,12 @@ type PredictionUpdateTrigger =
   | 'activity_sync'        // calibration-eligible session processed
   | 'weather_update'       // race-day forecast updated within 14 days
   | 'course_profile'       // athlete uploaded course GPX
-  | 'new_block'            // new training block created
+  | 'new_goal'            // new training goal created
 
 type RacePrediction = {
   id: string                             // UUID, PK
   athlete_id: string                     // UUID, FK → Athlete
-  training_block_id: string              // UUID, FK → TrainingBlock
+  training_goal_id: string              // UUID, FK → TrainingGoal
   twin_state_id: string                  // UUID, FK → TwinState used for computation
   predicted_at: string                   // ISO 8601
   target_distance_km: number
@@ -99,9 +99,9 @@ function weatherAdjustment(
 
 ## Invariants
 - `RacePredictionService` returns `null` and writes no record when `TwinState.confidence_level = 'low'`. The API endpoint returns 204.
-- Only created for `TrainingBlock.goal_type = 'race_event'`. Open training blocks return 204.
+- Only created for `TrainingGoal.goal_type = 'race_event'`. Open training goals return 204.
 - Every update trigger creates a new record. Old predictions are retained — they form the prediction arc visible in history.
-- `weather_adjusted_seconds` is only computed and set within 14 days of `TrainingBlock.goal_event_date`. Before that window, it is null.
+- `weather_adjusted_seconds` is only computed and set within 14 days of `TrainingGoal.goal_event_date`. Before that window, it is null.
 - Records are never modified after creation.
 
 ## Events
@@ -146,7 +146,7 @@ Auth: Bearer JWT, require_self
 |---|---|---|---|
 | `race_predictions` table | append-only | strong | indefinite |
 
-Index: `(athlete_id, training_block_id, predicted_at DESC)` for latest prediction query.
+Index: `(athlete_id, training_goal_id, predicted_at DESC)` for latest prediction query.
 
 ## Mutation Rules
 | Layer | Read | Write | Delete |

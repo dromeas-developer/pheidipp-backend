@@ -33,12 +33,14 @@ consciously feels fatigued.
 phases. Used as the resting HR anchor for zone calculations. More stable than average
 sleeping HR and less influenced by external factors.
 
+The time-of-day modifier is part of the wellness modifier pipeline in architecture. It adjusts the correlation between wellness signals and execution quality based on whether the athlete trains in the morning or afternoon, avoiding misattribution of life stress to fitness state.
+
 ## Resting HR — A Definition That Matters
 
 Three distinct measurements are commonly conflated under "resting HR":
 
 - **Overnight minimum HR** — most stable, passively capturable, the measurement Pheidipp
-  uses for all zone calculations
+  uses for all intent range calculations
 - **True resting HR** (supine, morning, before rising) — reproducible but requires
   deliberate capture that athletes stop doing consistently
 - **Standing or ambient HR** — most variable, least useful for precision inputs

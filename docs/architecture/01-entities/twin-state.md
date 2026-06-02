@@ -1,21 +1,12 @@
-# TwinState — Snapshot Assembler
+# TwinState
+
+Immutable historical record of what the twin system believed about an athlete at a specific point in time. Append-only — never updated or deleted.
 
 ## Purpose
-- Records what the twin knew at a specific point in time by referencing the then-current AthletePhysiology and AthleteFitness records
-- Append-only audit trail of every twin recalibration event
-- The entity consumed by context assembly for LLM agents
 
-## What Changed From the Previous Design
+Every coaching decision, race prediction, and training recommendation is grounded in a specific snapshot of the athlete's fitness, fatigue, form, thresholds, and readiness. `TwinState` is the audit trail that makes this reasoning transparent and reproducible.
 
-`TwinState` no longer duplicates physiological parameter values or fitness/fatigue scores inline. Instead it holds foreign keys to the `AthletePhysiology` and `AthleteFitness` records that were current at the time of the snapshot. This eliminates three problems:
-
-1. **Noise**: A short easy jog previously caused a full TwinState row with unchanged threshold fields to be written. Now it causes `AthleteFitness` to update; `TwinState` appends a new row referencing the new fitness record and the unchanged physiology record.
-
-2. **Duplication**: LT1, LT2, FTP, VO2max were duplicated between `TwinState` and the implicit physiology tracking. Now there is one authoritative source (`AthletePhysiology`) and `TwinState` references it.
-
-3. **Lab test integration**: A lab test updates `AthletePhysiology` which triggers a new `TwinState` snapshot. The clean separation makes it obvious that the lab test updated physiology, not fitness/fatigue.
-
-## TypeScript Schema
+## Schema
 
 ```typescript
 type TwinTrigger =
@@ -28,11 +19,7 @@ type TwinTrigger =
 type TwinState = {
   id: string                          // UUID, PK
   athlete_id: string                  // UUID, FK → Athlete
-  training_block_id: string           // UUID, FK → TrainingBlock (active at creation)
-
-  // References to the current state of the two domain entities
-  athlete_physiology_id: string       // UUID, FK → AthletePhysiology
-  athlete_fitness_id: string          // UUID, FK → AthleteFitness
+  training_goal_id: string           // UUID, FK → TrainingGoal (active at creation)
 
   // Context fields owned by TwinState itself
   data_tier: 1 | 2 | 3 | 4 | 5 | 6
@@ -40,61 +27,144 @@ type TwinState = {
   trigger: TwinTrigger
   model_version: string               // frozen pipeline snapshot identifier
   created_at: string                  // ISO 8601
+
+  // Inline snapshot — what the system believed at this point in time
+  // These are the actual values used by coaching decisions, not references to mutable records
+  fitness: number                     // aerobic equivalent
+  fatigue: number                     // accumulated training load
+  form: number                        // computed: fitness - fatigue
+
+  // Threshold snapshots
+  lt1_pace_sec_per_km: number | null
+  lt1_power_watts: number | null
+  lt1_hr_bpm: number | null
+  lt2_pace_sec_per_km: number | null
+  lt2_power_watts: number | null
+  lt2_hr_bpm: number | null
+  cp_watts: number | null             // Critical Power; null if no power data
+
+  // Readiness context
+  readiness_level: RecoveryModifierLevel  // from WellnessModifierService
+  wellness_trend: WellnessTrend | null    // 7-day composite trend at snapshot time
+
+  // Per-metric confidence breakdown (separate from coarse confidence_level)
+  // Derived from threshold detection prior weights at snapshot time
+  metric_confidence: {
+    lt1_hr: TwinConfidenceLevel
+    lt1_power: TwinConfidenceLevel | null    // null if no power data
+    lt1_pace: TwinConfidenceLevel | null     // null if no pace data
+    lt2_hr: TwinConfidenceLevel
+    lt2_power: TwinConfidenceLevel | null      // null if no power data
+    lt2_pace: TwinConfidenceLevel | null       // null if no pace data
+    cp: TwinConfidenceLevel | null              // null if no power data
+  }
 }
 ```
 
-## What Each Trigger Means for the Referenced Entities
+## What Changed from the Previous Design
 
-| Trigger | AthletePhysiology changed? | AthleteFitness changed? |
+`TwinState` previously held foreign keys to `AthletePhysiology` and `AthleteFitness` records. This was broken: those records are mutable (updated in place), so TwinState FKs became stale over time. A TwinState claiming "at time T, fitness was record 123" would point to the current state of record 123, not its state at time T.
+
+The current design inlines the actual values (fitness, fatigue, form, thresholds, readiness) at snapshot time. `TwinState` is now the authoritative historical record. `AthleteFitness`, `AthletePhysiology`, and `AthleteWellness` remain mutable current-state entities — they are the operational layer, not the historical layer.
+
+This solves:
+
+1. **Broken FK references**: TwinState owns its snapshot values. No stale pointers to mutable records.
+2. **Historical fidelity**: Every TwinState contains the exact scores and thresholds that drove coaching decisions at that point in time.
+3. **Query simplicity**: `SELECT * FROM twin_states WHERE athlete_id = ? ORDER BY created_at DESC` gives full fitness/threshold history without reconstruction logic.
+
+## Invariants
+
+- Append-only. No `UPDATE` or `DELETE` at any layer. `TwinStateRepository` exposes only `insert`, `get_latest`, and `get_history`.
+- One TwinState per calibration event. Multiple TwinStates per day are possible (e.g. `activity_sync` followed by `wellness_update`).
+- `training_goal_id` is frozen at creation time — it records which goal was active when this snapshot was taken, even if the goal is later superseded.
+- `model_version` is frozen — it identifies the exact computation pipeline version, enabling reproducibility audits.
+- `confidence_level` is recomputed from `AthletePhysiology.lt2.prior_weight` at each snapshot.
+
+## Events
+
+### Produced
+
+| Event | Trigger | Version | Payload |
+|---|---|---|---|
+| `twin_recalibrated` | new TwinState inserted | v1 | `{athlete_id, twin_state_id, trigger, confidence_level, form, lt2_bpm, readiness_level}` |
+| `twin_confidence_upgraded` | confidence_level increased | v1 | `{athlete_id, from_level, to_level, twin_state_id}` |
+| `twin_model_ready` | first TwinState created (onboarding complete) | v1 | `{athlete_id}` |
+
+### Consumed
+
+| Event | Action | Version |
 |---|---|---|
-| `questionnaire` | Yes — bootstrapped from population norms | Yes — initialised to zero fitness/fatigue |
-| `activity_sync` | No — no threshold signal in this session | Yes — fitness/fatigue updated from load scores |
-| `calibration` | Yes — threshold detection fired | Yes — fitness/fatigue also updated |
-| `physiology_input` | Yes — lab or field test entered | No — fitness/fatigue unchanged |
-| `wellness_update` | No | No — only readiness context changes |
+| `fitness_updated` | Create new TwinState with latest scores + current thresholds | v1 |
+| `physiology_updated` | Create new TwinState with latest thresholds + current scores | v1 |
+| `recovery_modifier_changed` (AMBER or RED only) | Create new TwinState with updated readiness context | v1 |
 
-## Confidence Level
+### What Each Trigger Means for the Mutable State Layer
 
-Owned by `TwinState`, not by `AthletePhysiology`. Confidence reflects the accumulated Bayesian evidence across all physiological parameters, translated to the coaching-language tiers.
+| Trigger | AthletePhysiology changed? | AthleteFitness changed? | What TwinState inlines |
+|---|---|---|---|
+| `questionnaire` | Yes — bootstrapped from population norms | Yes — initialised to zero fitness/fatigue | Initial thresholds + zero fitness/fatigue/form |
+| `activity_sync` | No — no threshold signal in this session | Yes — fitness/fatigue updated from load scores | Updated fitness/fatigue/form, unchanged thresholds |
+| `calibration` | Yes — threshold detection fired | Yes — fitness/fatigue also updated | Updated thresholds + updated fitness/fatigue/form |
+| `physiology_input` | Yes — lab or field test entered | No — fitness/fatigue unchanged | Updated thresholds, unchanged fitness/fatigue/form |
+| `wellness_update` | No | No — only readiness context changes | Unchanged fitness/fatigue/thresholds, updated readiness |
 
-```typescript
-// Confidence transitions — see 00-foundations/confidence-model.md for full detail
-// LOW:    questionnaire bootstrap only
-// MEDIUM: AthletePhysiology.lt2.prior_weight >= 4.0
-//         (approx 4 HR deflection sessions at default weight)
-// HIGH:   AthletePhysiology.lt2.prior_weight >= 8.0
-//         OR ≥ 2 sessions with training_rr_inflection source
+## APIs
+
+```yaml
+GET /athletes/{athlete_id}/twin
+Response: 200
+  twin_state: TwinStateResponse  # includes inline fitness, thresholds, readiness values
+Auth: Bearer JWT, require_self
+
+GET /athletes/{athlete_id}/twin/history
+Query:
+  limit?: number (default 20, max 100)
+Response: 200
+  history: TwinStateResponse[]  # ordered by created_at desc; each contains inline snapshot
+Auth: Bearer JWT, require_self
 ```
-
-`confidence_level` is computed at TwinState creation time from the current `AthletePhysiology.lt2.prior_weight`. It ratchets upward only — it is never decreased on a new TwinState record even if the prior has partially decayed.
 
 ## Context Assembly — What Agents Receive
 
-`TwinContextAssemblerService` reads the TwinState + its referenced entities and produces a coaching digest:
+`TwinContextAssemblerService` reads a single TwinState record (which contains inline snapshot values) and produces a coaching digest. No joins to AthleteFitness or AthletePhysiology needed — all values are already in TwinState.
 
 ```typescript
 type TwinContextSummary = {
-  // From AthleteFitness
+  // Derived from inline TwinState snapshot values
   form_descriptor: string            // e.g. "building — good readiness with fitness accumulating"
-  readiness_level: RecoveryModifierLevel  // after wellness modifier applied
+  readiness_level: RecoveryModifierLevel  // from inline readiness_level
 
-  // From AthletePhysiology (precision depends on confidence_level)
+  // Threshold targets (precision depends on metric_confidence for that signal)
   threshold_target_description: string
-  // LOW:    "comfortably hard effort, about Zone 3"
+  // LOW:    "comfortably hard effort"
   // MEDIUM: "5:30–5:50/km at threshold, roughly 165–170 bpm"
   // HIGH:   "5:38/km at threshold, 168 bpm"
 
-  lt2_pace_sec_per_km: number | null   // null if LOW confidence
-  ftp_watts: number | null             // null if no power data ever processed
+  lt2_pace_sec_per_km: number | null   // null if lt2_pace confidence is LOW or no threshold data
+  lt2_power_watts: number | null       // null if lt2_power confidence is LOW or no power data
+  cp_watts: number | null              // Critical Power; null if cp confidence is LOW
 
   // From TwinState itself
   data_tier: DataTier
-  target_type: 'power' | 'pace' | 'effort_description'
-  confidence_level: TwinConfidenceLevel
+  target_type: 'power' | 'gap' | 'description'
+  confidence_level: TwinConfidenceLevel       // coarse signal derived from lt2.hr
+  metric_confidence: TwinMetricConfidence     // per-metric confidence for precision consumers
+
+  // Computed intent ranges (derived from inline threshold values)
+  intent_ranges: IntentRange[]
 }
 ```
 
-The LLM agent receives `TwinContextSummary` — never raw `AthletePhysiology` or `AthleteFitness` fields.
+## Performance Constraints
+
+- Reads from single TwinState record; no joins needed.
+- `get_latest(athlete_id)` is the most frequent query in the system — indexed on `(athlete_id, created_at DESC)`.
+- History endpoint bounded by `limit` parameter (max 100).
+
+## Retention
+
+Indefinite. TwinState records accumulate over time — this is by design. Each record is small (~500 bytes). At one record per calibration event (roughly 2–5 per week for active athletes), this is ~100–260 records per year, or ~100KB–260KB per year per athlete.
 
 ## Append-Only Invariant
 
@@ -105,102 +175,15 @@ TwinState records are never updated or deleted. The `TwinStateRepository` expose
 
 No `update()` or `delete()` methods exist at any layer.
 
-## When a New TwinState Is Written
-
-```typescript
-// A new TwinState row is appended when any of the following change:
-// 1. AthleteFitness.aggregate.form changes by > 1 unit (meaningful fitness shift)
-// 2. AthletePhysiology is updated (any parameter posterior shift > 1 unit)
-// 3. confidence_level transitions (always writes a new row regardless of magnitude)
-// 4. wellness_update trigger fires (readiness context changes)
-
-// A new TwinState is NOT written when:
-// - A non-calibration-eligible activity is processed (no fitness/physiology change)
-// - A wellness record is ingested but the modifier level does not change
-// - AthleteFitness.form changes by ≤ 1 unit (noise threshold)
-```
-
-## model_version
-
-Identifies the exact pipeline snapshot that produced this TwinState. Increments when:
-- Load computation formula changes (ingestion_pipeline_version changes)
-- Banister time constants transition from population to individual fitted
-- Confidence level transition thresholds are revised
-
-## Events
-
-### Produced
-| Event | Trigger | Version | Payload |
-|---|---|---|---|
-| `twin_recalibrated` | Every new TwinState insertion | v1 | `{twin_state_id, previous_id, trigger, confidence_level, athlete_fitness_id, athlete_physiology_id}` |
-| `twin_confidence_upgraded` | When `confidence_level` increases | v1 | `{twin_state_id, from, to}` |
-
-### Consumed
-| Event | Action | Version |
-|---|---|---|
-| `fitness_updated` | If form shift > 1: append new TwinState | v1 |
-| `physiology_updated` | Append new TwinState | v1 |
-| `recovery_modifier_changed` (AMBER/RED) | Append new TwinState with `wellness_update` trigger | v1 |
-
-## APIs
-
-```yaml
-GET /athletes/{athlete_id}/twin
-Response: 200
-  twin_state: TwinStateResponse
-  physiology: AthletePhysiologyResponse  # current referenced physiology
-  fitness_summary: { form_descriptor: string, readiness_level: string }
-  # raw fitness scores are never included
-Auth: Bearer JWT, require_self
-
-GET /athletes/{athlete_id}/twin/history
-Query:
-  limit?: number (default 20, max 100)
-Response: 200
-  history: TwinStateResponse[]  # ordered by created_at desc
-Auth: Bearer JWT, require_self
-```
-
 ## Storage Model
+
 | Data | Strategy | Consistency | Retention |
 |---|---|---|---|
 | `twin_states` table | append-only | strong | indefinite |
 
-Index: `(athlete_id, created_at DESC)` for `get_latest()`.
-
-## Mutation Rules
-| Layer | Read | Write | Delete |
-|---|---|---|---|
-| API | Yes (read-only) | No | No |
-| Service | Yes | insert() only | No |
-| Repository | Yes | insert() only | No |
-
-## Runtime Ownership
-Owns:
-- The append-only snapshot audit trail
-- `data_tier`, `confidence_level`, `trigger`, `model_version`
-- Context assembly for LLM agents (via `TwinContextAssemblerService`)
-
-Does Not Own:
-- Physiological parameter estimates → `01-entities/athlete-physiology.md`
-- Fitness/fatigue/form scores → `01-entities/athlete-fitness.md`
-- How load scores are computed → `02-computations/load-computation.md`
-- How thresholds are detected → `02-computations/threshold-detection.md`
-- How wellness modifier affects readiness → `02-computations/wellness-modifier.md`
-
-## Failure Semantics
-- TwinState insert failure → previous TwinState remains current; retry; alert after 3 failures
-- Referenced `athlete_physiology_id` or `athlete_fitness_id` not found → integrity violation; alert
-
-## Performance Constraints
-- `get_latest()`: p95 < 20ms
-- `insert()`: p95 < 50ms
-- `TwinContextAssemblerService.assemble()`: p95 < 30ms (reads 3 entities; all cached)
-
 ## Observability
-Metrics:
-- `twin_state.created.total`: by trigger type
-- `twin_state.confidence_upgrades.total`: by transition (low→medium, medium→high)
-- `twin_state.per_athlete.daily_rate`: average TwinState records per athlete per day (monitors noise)
-Logs:
-- `twin_state.inserted`: athlete_id, trigger, confidence_level, model_version
+
+- `twin_state.inserted` — every insert is logged
+- `twin_state.per_athlete.daily_rate` — alert if > 5/day (indicates recalibration loop)
+- `twin_state.confidence_upgrades.total` — tracks progress toward high confidence
+- `twin_state.created.total` — overall volume metric

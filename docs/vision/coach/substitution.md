@@ -22,6 +22,7 @@ Substitutions draw from a library of curated sessions. The library is not a mark
 ## Illness Flow
 
 The coach asks how the athlete is feeling and roughly how long they expect to be affected. Short illness — one to three days — results in the plan holding and easy sessions being replaced with rest. Longer illness triggers plan restructuring designed to bring the athlete back smoothly: very easy aerobic work before any reintroduction of structure.
+
 The return-to-training ramp is conservative. The twin treats the illness period as forced detraining, adjusting fitness and fatigue estimates accordingly before the first session back so that targets are appropriate for the athlete's actual current state.
 
 ## Injury Flow
@@ -41,3 +42,13 @@ If no: the standard skip flow handles it — reschedule or let the plan adjust.
 If no response: the system holds its judgement and asks again at the next app open.
 
 When the athlete's actual data arrives, any estimates are replaced by real values throughout the model. The full post-workout analysis triggers retroactively.
+
+---
+
+## Non-Running Session Suggestions
+
+The coach can prescribe non-running work when it serves the athlete's running goals: strength and conditioning, yoga and mobility, cross-training during injury recovery. These appear in the weekly plan as secondary sessions with type and duration only — no detailed workout targets are generated.
+
+The athlete sees these suggestions alongside their primary running sessions. They know which sessions are primary (full workout generated) and which are secondary (suggestions). The athlete decides whether to complete the secondary sessions based on their schedule and energy.
+
+This boundary is intentional: the coaching system owns running workout design. Non-running work is prescribed at the level of type and duration, leaving execution details to the athlete or their strength coach.

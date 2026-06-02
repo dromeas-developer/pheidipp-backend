@@ -1,5 +1,4 @@
-# Physiological Thresholds — Layer 2
-*Dynamic functional zones that evolve with the athlete's actual training*
+# Training Zones
 
 ## Philosophy
 
@@ -8,7 +7,7 @@ individual level — the same effort feels different after poor sleep, in heat, 
 different points in a training block. The twin derives threshold estimates from objective
 signals captured during normal training.
 
-Thresholds — LT1, LT2, FTP, max HR, VO2max estimate — are not static numbers set at
+Thresholds — LT1, LT2, CP, max HR, VO2max estimate — are not static numbers set at
 onboarding. They are living values, tracked continuously and updated from training data
 rather than waiting for dedicated test sessions.
 
@@ -52,16 +51,18 @@ inputs. Confidence is low and flagged accordingly.
 
 ## Calibration Confidence Degradation
 
-Threshold confidence degrades over time without fresh calibration signal, even for athletes
+### Calibration Freshness and Recommendation Strength
+
+Threshold recommendation strength degrades over time without fresh calibration signal, even for athletes
 with extensive training history. Thresholds derived from lab tests or dedicated sessions lose
 certainty as months pass without re-measurement. The twin tracks the time since last
-calibration event and reflects this in its confidence scoring.
+calibration event and reflects this in its recommendation strength.
 
 An athlete who uploaded a lab test 18 months ago should see coaching language that
-acknowledges uncertainty: wider target ranges, more frequent calibration sessions suggested,
+acknowledges staleness: wider target ranges, more frequent calibration sessions suggested,
 and coach language like "your lab test suggested X, but recent race performances indicate
-you may have shifted." The model does not silently expire calibration, but it does
-reflect growing uncertainty through its recommendations.
+you may have shifted." The model does not silently expire calibration evidence, but it does
+reflect growing staleness through reduced recommendation strength and wider target ranges.
 
 ## Passive Calibration From Normal Training
 
@@ -92,10 +93,31 @@ Lab/test uploads are always welcome as calibration refresh events, regardless of
 tier. An athlete who completes a new threshold test should be able to upload results and
 immediately benefit from updated threshold confidence.
 
+## Range-Based Targets, Not Zone Numbers
+
+The athlete never sees "Zone 2" or "Zone 4". They see explicit numbers:
+- `165-172 bpm` (HR)
+- `250-280W` (power)
+- `4:05-4:15/km` (GAP)
+
+Zones are internal to the system — used for compliance assessment and adaptation tracking,
+never surfaced to athletes. The coach computes ranges from zone boundaries, and the ranges
+are what the athlete sees.
+
+### Why This Is Better
+
+| Zone-Based Model | Range-Based Model |
+|------------------|-------------------|
+| "Zone 4" | "250-280W" |
+| Athlete must learn zone meanings | Athlete sees explicit numbers |
+| Zones vary between platforms | Ranges are individualised |
+| Zone compliance is abstract | Intent compliance is concrete |
+| Zones obscure the target | Ranges clarify the target |
+
 ## Two-Column Target Display
 
 Every generated workout shows two sets of targets side by side:
-- **Theoretical targets** — derived from the athlete's current dynamic zones as modelled
+- **Theoretical targets** — derived from the athlete's current dynamic thresholds as modelled
   by the twin. These reflect the twin's live understanding of the athlete's fitness state.
 - **Adjusted targets** — the coach's recommendation for today, after applying current
   recovery and readiness state and the weather forecast for the athlete's training window.
@@ -103,3 +125,84 @@ Every generated workout shows two sets of targets side by side:
 The athlete always sees both. This distinction teaches the athlete over time how fatigue
 and conditions affect their numbers — building genuine self-awareness rather than
 just compliance with a single number.
+
+## Signal-Aware Target Selection
+
+The system selects the best signal type for each workout step based on:
+- Session type
+- Physiological intent
+- Signal availability
+- Signal quality
+- Athlete calibration confidence
+
+**Easy/recovery sessions**: HR is most meaningful (aerobic development is about cardiac load).
+**Threshold sessions**: Power is most meaningful (sustainable mechanical output).
+**VO2max sessions**: Power is most meaningful (maximal oxygen uptake).
+
+When the primary signal is unavailable, the system automatically falls back to the next-best option.
+
+### Why HR for Easy Runs, Power for Threshold
+
+**Easy runs (HR)**: Aerobic development is about cardiac load, not mechanical output. An easy run at 200W means nothing if HR is in threshold zone. HR tells you whether the athlete is actually training aerobically.
+
+**Threshold sessions (Power)**: Threshold is about sustainable mechanical output, not cardiac response. HR lags during threshold work; power is instantaneous. Power tells you whether the athlete is actually at threshold intensity.
+
+**VO2max sessions (Power)**: VO2max is about maximal oxygen uptake, best expressed as power. HR at VO2max is near-max and noisy; power is precise.
+
+## Multi-Dimensional Physiology
+
+LT1 and LT2 are physiological states, not signal values. They can be expressed in multiple signal types:
+
+```
+LT2 (physiological state)
+  ├── HR expression:    172 bpm
+  ├── Power expression: 285 watts (if power meter available)
+  └── Pace expression:  4:05/km GAP (from GAP model)
+```
+
+The athlete's physiology doesn't change based on which sensor you're reading. But the *expression* of that physiology in signal units does change.
+
+### Critical Power (CP) vs LT2
+
+- **CP is the primary performance anchor** for runners with power meters
+- **LT2 is the primary physiological anchor** — ranges derive from LT2
+- When direct LT2 power estimation is unavailable, CP may be used as a proxy
+- If only CP is available, treat it as LT2_power with an explicit note that it's an approximation
+
+## Intent Ranges: Computed From Physiology
+
+Each physiological intent has a range for each signal type, derived from the athlete's individual thresholds:
+
+```
+low_aerobic:
+  HR:    < LT1 × 0.95
+  Power: < LT2 × 0.55
+  GAP:   > LT1 × 1.10 (slower = higher sec/km)
+
+high_aerobic:
+  HR:    LT1 × 0.95 – LT1 × 1.05
+  Power: LT2 × 0.55 – LT2 × 0.75
+  GAP:   LT1 × 0.95 – LT1 × 1.10
+
+threshold:
+  HR:    LT2 × 0.95 – LT2 × 1.05
+  Power: LT2 × 0.90 – LT2 × 1.05
+  GAP:   LT2 × 0.95 – LT2 × 1.05
+
+vo2max:
+  HR:    > LT2 × 1.05
+  Power: > LT2 × 1.05
+  GAP:   < LT2 × 0.95 (faster = lower sec/km)
+
+recovery:
+  HR:    < LT1 × 0.85
+  Power: < LT2 × 0.45
+  GAP:   > LT1 × 1.20 (very slow)
+
+neuromuscular:
+  HR:    null (not meaningful)
+  Power: null (too variable)
+  GAP:   null (too variable)
+```
+
+Note: These ranges are architecture-level approximations. Exact multiplier constants belong in implementation and may vary by athlete type (beginner, elite, marathoner, 5K specialist).

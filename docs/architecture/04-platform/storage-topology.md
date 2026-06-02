@@ -23,9 +23,11 @@ All relational entity data. Strong consistency. Indefinite retention.
 - `objective_updates`, `cycle_phase_logs`
 - `physiological_segments` (+ `superseded_at`)
 - `race_predictions`, `adaptation_observations`
+- `checkpoints` (status + completion fields mutable)
 
 *Mutable:*
 - `athletes`, `athlete_profiles`, `athlete_preferences`
+- `athlete_auths` (credentials encrypted; mutable for token refresh and last_login_at)
 - `training_blocks` (status only), `training_plans` (status + superseded_at)
 - `planned_sessions` (status + linkage fields)
 - `generated_workouts`, `workout_steps` (immutable after creation)
@@ -78,8 +80,8 @@ CREATE INDEX idx_planned_sessions_plan_date ON planned_sessions (training_plan_i
 CREATE INDEX idx_planned_sessions_status_date ON planned_sessions (athlete_id, status, target_date)
   WHERE status IN ('pending', 'generated');
 
--- Active training block (one-per-athlete partial unique index)
-CREATE UNIQUE INDEX idx_training_blocks_active ON training_blocks (athlete_id)
+-- Active training goal (one-per-athlete partial unique index)
+CREATE UNIQUE INDEX idx_training_goals_active ON training_goals (athlete_id)
   WHERE status = 'active';
 
 -- Recent activities for twin recalibration (rolling 90-day window)
@@ -93,6 +95,15 @@ CREATE INDEX idx_phys_segments_activity_version ON physiological_segments
 -- Wellness baseline lookup
 CREATE UNIQUE INDEX idx_wellness_baselines_signal ON athlete_wellness_baselines
   (athlete_id, signal);
+
+-- Auth provider lookup (one per athlete per provider)
+CREATE UNIQUE INDEX idx_athlete_auths_provider ON athlete_auths
+  (athlete_id, provider);
+
+-- OAuth account lookup (nullable; only set for OAuth providers)
+CREATE INDEX idx_athlete_auths_provider_user ON athlete_auths
+  (provider, provider_user_id)
+  WHERE provider_user_id IS NOT NULL;
 ```
 
 ## Cross-References

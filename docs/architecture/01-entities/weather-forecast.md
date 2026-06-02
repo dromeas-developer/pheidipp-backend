@@ -49,11 +49,12 @@ function computeHeatIndex(tempC: number, humidityPct: number): number {
 Applied by `WeatherAdjustmentService` to produce `adjusted_targets`:
 
 ```typescript
-// Heat adjustment (pace targets only — not HR zones)
+// Heat adjustment (pace and power targets only — HR targets unchanged)
+// HR is relative to current physiology, not affected by environmental conditions
 const NEUTRAL_HEAT_INDEX = 15.0   // °C
 const HEAT_COEFFICIENT = 0.006    // population default; replaced by individual in 6b
 
-function heatPaceAdjustment(heatIndexC: number, individualCoeff?: number): number {
+function heatAdjustment(heatIndexC: number, individualCoeff?: number): number {
   const coeff = individualCoeff ?? HEAT_COEFFICIENT
   const heatStress = Math.max(0, heatIndexC - NEUTRAL_HEAT_INDEX)
   return 1.0 + (heatStress * coeff)
@@ -61,9 +62,51 @@ function heatPaceAdjustment(heatIndexC: number, individualCoeff?: number): numbe
 }
 
 // Wind adjustment (pace targets only)
-function windPaceAdjustment(windSpeedMs: number, isHeadwind: boolean): number {
+function windAdjustment(windSpeedMs: number, isHeadwind: boolean): number {
   if (isHeadwind) return 1.0 + (windSpeedMs * 0.003)
   return 1.0 - (windSpeedMs * 0.001)  // tailwind benefit is ~1/3 of headwind cost
+}
+
+function applyWeatherAdjustment(
+  targets: TargetSet,
+  heatIndexC: number,
+  windSpeedMs: number,
+  isHeadwind: boolean,
+  individualHeatCoeff?: number
+): TargetSet {
+  const heatFactor = heatAdjustment(heatIndexC, individualHeatCoeff)
+  const windFactor = windAdjustment(windSpeedMs, isHeadwind)
+  const combinedFactor = heatFactor * windFactor
+  
+  return {
+    targets: targets.targets.map(target => {
+      if (target.signal_type === 'gap' && target.primary.min !== null) {
+        // GAP: environmental stress → slower pace → higher sec/km
+        return {
+          ...target,
+          primary: {
+            min: Math.round(target.primary.min * combinedFactor),
+            max: target.primary.max !== null ? Math.round(target.primary.max * combinedFactor) : null,
+            unit: target.primary.unit
+          }
+        }
+      }
+      if (target.signal_type === 'power' && target.primary.min !== null) {
+        // Power: environmental stress → reduced sustainable power
+        return {
+          ...target,
+          primary: {
+            min: Math.round(target.primary.min / combinedFactor),
+            max: target.primary.max !== null ? Math.round(target.primary.max / combinedFactor) : null,
+            unit: target.primary.unit
+          }
+        }
+      }
+      // HR and description targets unchanged by weather
+      return target
+    }),
+    description: targets.description
+  }
 }
 ```
 

@@ -73,29 +73,37 @@ Each entry defines what a document covers, its dependencies, boundaries, and usa
   read_for: Free Coach Chat scope and redirect language; group training model; voice vision.
   scope_boundary: Coach Chat excludes sleep/nutrition/injury; group training has no social layer; voice is same content as text.
 
-- id: product.training-plan-generation
-  path: product/training-plan-generation.md
-  summary: Core overview of how Pheidipp designs adaptive, LLM-driven training plans — philosophy, workflow, strategic framework, race handling, confidence subsystem, and fallback model.
-  tags: [training-plan, plan-generation, strategic-framework, race-handling, confidence]
+- id: product.plan-generation
+  path: product/plan-generation.md
+  summary: Defines how Pheidipp generates a strategic roadmap (phase arc) for training — not a session schedule. Covers the four-tier coaching model, hypothesis selection, first-week atomic creation, and gating on twin readiness.
+  tags: [plan-generation, strategic-roadmap, phase-arc, weekly-coaching]
   depends_on: [product.global-invariants, product.secondary-events, twin.confidence-and-uncertainty]
-  read_for: how training plans are generated; the four-phase workflow; strategic framework structure; race roles; confidence effects on planning.
-  scope_boundary: Plan generation is coach-driven; athletes accept or abandon plans, not choose between them; checkpoints are recommended, not mandatory.
+  read_for: how training plans are generated; the strategic roadmap concept; why sessions are not generated upfront; the four-tier coaching model.
+  scope_boundary: Plan generation produces a phase arc; sessions are produced by the weekly coaching rhythm; coach decides, athlete accepts or abandons.
 
-- id: product.training-plan-hypotheses
-  path: product/training-plan-hypotheses.md
-  summary: Defines how the LLM generates three distinct strategic hypotheses using four primary dimensions, validates them against hard invariants, and scores them for selection.
-  tags: [hypothesis-generation, constraint-validation, scoring, methodology, load-distribution]
-  depends_on: [product.training-plan-generation, product.global-invariants]
-  read_for: the four hypothesis dimensions; distinctness rule; constraint-first validation logic; scoring criteria; hypothesis output format.
-  scope_boundary: Each hypothesis differs in ≥2 dimensions; invalid hypotheses are discarded before scoring; coach selects, athlete does not choose.
+- id: product.hypothesis-selection
+  path: product/hypothesis-selection.md
+  summary: Defines how the coach explores three genuinely different strategic approaches, validates them against hard invariants, scores them, and selects the best one for the athlete.
+  tags: [hypothesis-selection, strategic-exploration, scoring, coaching-philosophy]
+  depends_on: [product.plan-generation, product.global-invariants]
+  read_for: why three hypotheses; the four reasoning dimensions; constraint-first validation; scoring criteria; why the coach decides.
+  scope_boundary: Each hypothesis differs in ≥2 dimensions; invalid hypotheses discarded before scoring; coach selects, athlete does not choose.
+
+- id: product.weekly-coaching-rhythm
+  path: product/weekly-coaching-rhythm.md
+  summary: Defines the three-timescale coaching model (plan → weekly rhythm → daily workout) and how the weekly review adjusts emphasis based on accumulated reality without breaking the strategic roadmap.
+  tags: [weekly-coaching, adaptive-planning, three-timescales, disruption-absorption]
+  depends_on: [product.plan-generation]
+  read_for: how the weekly rhythm works; what changes and what doesn't; how disruptions are absorbed; coach authority at the weekly level.
+  scope_boundary: Weekly rhythm adjusts emphasis within the current phase; cannot change the strategic direction; most adaptation happens here, not through plan regeneration.
 
 - id: product.training-plan-checkpoints
   path: product/training-plan-checkpoints.md
-  summary: Defines the checkpoint hierarchy, scheduling logic, completion flow, adaptive recovery, and evolution triggers for training plans.
-  tags: [checkpoints, calibration, benchmark, race-simulation, adaptive-evolution]
-  depends_on: [product.training-plan-generation, twin.confidence-and-uncertainty]
-  read_for: checkpoint types and their purposes; scheduling logic; completion flow; adaptive recovery rules; evolution triggers.
-  scope_boundary: Checkpoints are recommended, not mandatory; declined checkpoints use conservative assumptions; completion may trigger replanning.
+  summary: Defines the checkpoint hierarchy, scheduling logic, completion flow, adaptive recovery, and how evolution happens at the weekly level rather than through plan regeneration.
+  tags: [checkpoints, calibration, benchmark, race-simulation, adaptive-evolution, weekly-absorption]
+  depends_on: [product.plan-generation, product.weekly-coaching-rhythm, twin.confidence-and-uncertainty]
+  read_for: checkpoint types and purposes; scheduling logic; completion flow; adaptive recovery rules; how disruptions are absorbed at the weekly level.
+  scope_boundary: Checkpoints are recommended, not mandatory; declined checkpoints use conservative assumptions; session disruption absorbed by weekly rhythm, not plan regeneration.
 
 
 - id: twin.adaptation-signature
@@ -221,11 +229,11 @@ Each entry defines what a document covers, its dependencies, boundaries, and usa
 
 - id: coach.plan-visibility
   path: coach/plan-visibility.md
-  summary: Shows full macro plan visibility with phase labels while generating specific workouts only on the day to avoid false precision.
-  tags: [plan-visibility, periodisation, phase-transitions]
-  depends_on: [twin.adaptation-signature]
-  read_for: what the athlete can see of their plan; why future targets are not shown; phase transitions.
-  scope_boundary: Future sessions show intent only; phase transitions explicitly acknowledged as coaching moments.
+  summary: Shows the macro plan view (phase arc), near-term sessions from the weekly plan, today's session with two-column targets, and checkpoint visibility. Data sources are clearly separated: phase arc for the big picture, weekly plan for near-term sessions.
+  tags: [plan-visibility, phase-arc, near-term-sessions, checkpoint-visibility, data-sources]
+  depends_on: [product.plan-generation, product.weekly-coaching-rhythm]
+  read_for: what the athlete can see of their plan; how data sources are separated; phase transitions as coaching moments; why raw data is not shown.
+  scope_boundary: Macro view shows phase arc; near-term sessions come from weekly plan; daily targets generated on the day; no raw data charts.
 
 - id: coach.post-workout
   path: coach/post-workout.md

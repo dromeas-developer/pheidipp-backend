@@ -57,13 +57,16 @@ If `sample_count < 14`, no baseline is written for that signal. The signal is ex
 
 These weights are defined here as the authoritative reference for `WellnessModifierService`:
 
-| Signal | Weight | Direction of concern |
-|---|---|---|
-| `avg_sleeping_hr_bpm` | 0.35 | Elevated above baseline |
-| `hrv_overnight_avg_ms` | 0.30 | Suppressed below baseline |
-| `total_sleep_minutes` | 0.20 | Reduced below baseline |
-| `min_sleeping_hr_bpm` | 0.10 | Elevated above baseline |
-| `deep_sleep_minutes` | 0.05 | Reduced below baseline |
+| Signal | Weight | Direction of concern | Notes |
+|---|---|---|---|
+| `avg_sleeping_hr_bpm` | 0.35 | Elevated above baseline | Primary recovery trend signal |
+| `hrv_overnight_avg_ms` | 0.30 | Suppressed below baseline | Autonomic nervous system recovery indicator |
+| `total_sleep_minutes` | 0.20 | Reduced below baseline | Volume of recovery time |
+| `min_sleeping_hr_bpm` | 0.10 | Elevated above baseline | Physiological floor; more stable than avg HR |
+| `deep_sleep_minutes` | 0.05 | Reduced below baseline | Physical/tissue repair; higher measurement noise |
+| `rem_sleep_minutes` | 0.08 | Reduced below baseline | Cognitive/emotional recovery; higher measurement noise than deep sleep |
+
+**Weight sum:** 1.08. Normalised by `computeCompositeScore` (divides by `weight_total`). The normalisation means absolute weights matter less than relative proportions, but the proportions should reflect the vision's emphasis: HR signals (45%) dominate, sleep signals (33%) are secondary, cognitive recovery (7%) is a meaningful but non-dominant input.
 
 Deviation score formula:
 ```typescript
@@ -120,5 +123,6 @@ Does Not Own:
 
 ## Observability
 Metrics:
-- `wellness_baseline.athletes_with_full_coverage`: count of athletes with ≥5 signals baselined
+- `wellness_baseline.athletes_with_full_coverage`: count of athletes with ≥6 signals baselined (avg_hr, hrv, total_sleep, min_hr, deep_sleep, rem_sleep)
+- `wellness_baseline.athletes_with_rem_coverage`: count of athletes with `rem_sleep_minutes` baseline available
 - `wellness_baseline.computation.latency_ms`

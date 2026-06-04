@@ -77,7 +77,36 @@ function routeSkipFlow(classification: SkipClassification): void {
 ## Performance Constraints
 - p95 < 3s (small context; fast classification)
 
+## Decision Authority
+
+Implements the **Workout Acceptance** authority boundary from `docs/vision/coach/decision-authority.md`.
+
+The athlete has three options for a scheduled workout: accept the planned workout, substitute from coach-suggested alternatives, or skip with the system proposing to reschedule or adjust the plan. The athlete cannot create, edit, or customise workouts. This agent classifies the reason for a skip and routes to the appropriate flow (redistribution, injury escalation, illness handling, or no redistribution). It does not generate alternative workouts — that is the workout library's role. The authority boundary is enforced by the absence of a "create workout" path in this agent's output contract.
+
+---
+
 ## Cross-References
+
+### Vision → Architecture Flow Mapping
+
+| SkipFlow | Vision Flow (`substitution.md`) | Behaviour |
+|---|---|---|
+| `no_redistribution` | Rest Days (no availability in week) | Load dropped; plan adjusts forward |
+| `offer_redistribution` | Workout Substitution Flow + Rest Days (with availability) | Find redistribution window + library substitutes |
+| `injury_escalation` | Injury Flow | Plan restructured around constraint; cross-training where possible |
+| `illness_handling` | Illness Flow | Conservative return ramp; forced detraining adjustment |
+
+### Vision Flows Not Covered by This Agent
+
+| Vision Flow | Ownership | Notes |
+|---|---|---|
+| Unsynced Workout Handling | *(see substitution.md)* | Check-in when expected data missing; distinct from skip flow |
+| Post-hoc Detection | *(see substitution.md)* | Mismatch detection after upload; distinct from skip flow |
+| Non-Running Session Suggestions | *(see substitution.md)* | Prescription layer; not part of skip classification |
+
+### Related Architecture Entities
+
+- Decision authority: `docs/vision/coach/decision-authority.md` → "Workout Acceptance"
 - PlannedSession lifecycle: `01-entities/planned-session.md`
 - Session redistribution algorithm: `02-computations/plan-generation.md`
 - WorkoutLibraryEntry substitution query: `01-entities/workout-library-entry.md`

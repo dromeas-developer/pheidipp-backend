@@ -17,35 +17,36 @@ When this architecture conflicts with the release plan on technical design, this
 | Activity model | Lean index only — no averages, no lap dumps | `principles.md` |
 | `fit_file_key` | Required before Activity commits; never null for non-manual | `principles.md`, `01-entities/activity.md` |
 | TwinState | Append-only; insert only; no UPDATE or DELETE | `01-entities/twin-state.md` |
-| LLM role | Narrates pre-computed findings; never derives analytical conclusions | `principles.md` |
+| LLM role | Reasons about strategy from pre-computed metrics; never processes raw data | `principles.md` |
 | LLM context | 2k–6k tokens per agent; `ContextBudgetService` enforces before call | `03-agents/context-budget-service.md` |
-| `PhysiologicalIntent` | Shared enum across all layers; 8 values; session-level adaptation target | `00-foundations/terminology.md` |
+| `PhysiologicalIntent` | Shared enum across all layers; 6 values; session-level adaptation target | `00-foundations/terminology.md` |
 | `PhysiologicalSegment` | Stable interface across all segmentation generations | `01-entities/physiological-segment.md` |
 | Old analytical records | Never deleted; `superseded_at` on superseded records | `04-platform/versioning-and-reprocessing.md` |
 | GAP | Always grade-adjusted pace; never raw pace | `02-computations/effort-normalisation.md` |
 | Non-running activities | Logged in training record; excluded from twin calibration | `principles.md` |
 | Processing | Async worker queue; API responses never wait for analysis | `04-platform/async-pipeline.md` |
 | Calibration eligibility | Five-rule gate; always Python; never overridden manually | `02-computations/load-computation.md` |
-| Confidence level | Ratchets up only; never decreases | `00-foundations/confidence-model.md` |
+| Confidence level | Evidence confidence ratchets up only; recommendation strength can decrease | `00-foundations/confidence-model.md` |
 | Active TrainingGoal | One per athlete; partial unique index enforces | `01-entities/training-goal.md` |
 | `block_id` = adaptation window | `block_id` groups on PlannedSession are the planning-level implementation of adaptation windows; `AdaptationBlockDetectionTask` detects the same pattern for observation | `01-entities/planned-session.md`, `01-entities/adaptation-observation.md` |
 | AthletePhysiology | Mutable one-per-athlete; PhysiologyMeasurement is append-only history | `01-entities/athlete-physiology.md` |
-| AthleteFitness | Mutable one-per-athlete; historical state via TwinState FK chain | `01-entities/athlete-fitness.md` |
+| AthleteFitness | Mutable one-per-athlete; historical state captured in TwinState (inline values) | `01-entities/athlete-fitness.md` |
 | Bayesian update | PhysiologyUpdateService applies observation weights and prior decay | `02-computations/physiology-update.md` |
 | Banister update | FitnessUpdateService applies impulse-response formula with time constants | `02-computations/banister-update.md` |
 | Lab/field test input | Updates AthletePhysiology only; AthleteFitness unchanged | `01-entities/athlete-physiology.md` |
-| TwinState references | FK to athlete_physiology_id + athlete_fitness_id; no inline duplication | `01-entities/twin-state.md` |
+| TwinState snapshot | Inline values (fitness, fatigue, form, thresholds, readiness) at snapshot time; no FK references to mutable records | `01-entities/twin-state.md` |
 | Comparable session | Backend Python selects; LLM never chooses | `02-computations/comparable-sessions.md` |
 | Race prediction | Not written at LOW confidence; not created for open training | `01-entities/race-prediction.md` |
 | GenerationEvent | Written for every LLM call attempt including failures | `01-entities/generation-event.md` |
+| Vision cross-references | Design philosophy, differentiators, and constraints mapped to architecture | `00-foundations/principles.md` (Vision Cross-References section) |
 
 ---
 
 ## 00-foundations/
 
 ### `00-foundations/principles.md`
-The ten architectural invariants every engineer must internalise. The five-layer separation of concerns diagram with layer independence rule. Processing is always async.
-**Read for:** the non-negotiable rules; what the five layers are; the core activity-as-observation principle.
+The fourteen architectural invariants every engineer must internalise. The five-layer separation of concerns diagram with layer independence rule. Processing is always async. Vision cross-references mapping design philosophy, differentiators, and constraints to architecture implementations.
+**Read for:** the non-negotiable rules; what the five layers are; the core activity-as-observation principle; how product vision maps to architecture.
 
 ### `00-foundations/terminology.md`
 Canonical definitions for every domain term, with TypeScript schemas for all shared enums: `PhysiologicalIntentState`, `TwinConfidenceLevel`, `RecoveryModifierLevel`, `SessionType`, `PhaseLabel`, `CyclePhase`, `DataTier`.
@@ -117,16 +118,16 @@ The lean physiological observation index. `fit_file_key` hard prerequisite. No g
 **Read for:** Activity field list; `fit_file_key` invariant; why no averages are stored; ingestion state diagram.
 
 ### `01-entities/twin-state.md`
-Snapshot assembler — holds FK references to the then-current `AthletePhysiology` and `AthletesFitness` records rather than duplicating their values inline. Five recalibration triggers including the new `physiology_input` trigger for lab/field tests. Confidence level computation from `AthletePhysiology.lt2.prior_weight`. When a new TwinState is and is not written (form shift > 1 unit threshold). Context assembly digest for agents.
-**Read for:** TwinState schema; why it references not duplicates; when TwinStates are written; context assembly output; confidence computation.
+Snapshot assembler — inlines actual values (fitness, fatigue, form, thresholds, readiness) at snapshot time rather than holding FK references to mutable records. Five recalibration triggers including the new `physiology_input` trigger for lab/field tests. Confidence level computation from `AthletePhysiology.lt2.prior_weight`. When a new TwinState is and is not written (form shift > 1 unit threshold). Context assembly digest for agents.
+**Read for:** TwinState schema; why it inlines values instead of using FKs; when TwinStates are written; context assembly output; confidence computation.
 
 ### `01-entities/athlete-physiology.md`
-Per-athlete physiological parameter estimates: LT1, LT2, FTP, VO2max, max HR. Mutable current state + append-only `PhysiologyMeasurement` history. `MeasurementSource` enum. State transition diagram from bootstrapped through lab_calibrated. API: `POST /physiology/measurements` accepts lab_test and field_test sources only.
-**Read for:** parameter schema; observation history structure; how lab tests flow through (high-level); state transitions; what parameters are null at onboarding.
+Per-athlete physiological parameter estimates: LT1, LT2, CP, VO2max, max HR. Mutable current-state entity with historical state captured in TwinState (inline values). Append-only `PhysiologyMeasurement` history for raw measurement data. `MeasurementSource` enum. State transition diagram from bootstrapped through lab_calibrated. API: `POST /physiology/measurements` accepts lab_test and field_test sources only.
+**Read for:** parameter schema; observation history structure; TwinState inline snapshot design; how lab tests flow through (high-level); state transitions; what parameters are null at onboarding.
 
 ### `01-entities/athlete-fitness.md`
-Per-athlete Banister model rolling state: fitness, fatigue, and form per dimension. Mutable one-per-athlete; historical state reconstructed from TwinState FK chain. Form-to-readiness-descriptor mapping (form scores never exposed to athletes or agents). Three-dimensional activation (Phase 6c: nullable aerobic/neuromuscular/structural columns).
-**Read for:** fitness/fatigue/form schema; why fitness scores are never exposed as numbers; how AthleteFitness relates to AthletePhysiology and TwinState.
+Per-athlete Banister model rolling state: fitness, fatigue, and form per dimension. Mutable one-per-athlete; historical state captured in TwinState (inline values). Form-to-readiness-descriptor mapping (form scores never exposed to athletes or agents). Three-dimensional activation (Phase 6c: nullable aerobic/neuromuscular/structural columns).
+**Read for:** fitness/fatigue/form schema; why fitness scores are never exposed as numbers; TwinState inline snapshot design; how AthleteFitness relates to AthletePhysiology.
 
 ### `01-entities/athlete-wellness.md`
 Daily passive wellness record. Upsert/additive-merge semantics. `min_sleeping_hr_bpm` as resting HR anchor. `hrv_overnight_avg_ms` preferred over morning measurement.
@@ -227,11 +228,15 @@ Deterministic session count computation from intensity bias and athlete preferen
 **Read for:** session count rules; how intensity bias affects session count; invariant: lower of computed and preference wins.
 
 ### `02-computations/plan-generation.md`
-Phase arc formulas for race and open training. Session distribution structural rules. Crossover athlete ramp. Regeneration trigger conditions.
-**Read for:** phase arc percentages; session distribution rules and their rationale; crossover ramp; regeneration gates.
+Hub document for plan generation. Defines shared types (PhaseArcEntry, CheckpointDescriptor), inputs (PlanGenerationInputs), persistence logic (persistPlan, createFirstWeeklyPlan), and regeneration triggers. Mode-specific computation is split across four files:
+- `plan-generation-race.md` — LLM-driven hypothesis generation with constraint-first validation
+- `plan-generation-fitness-improvement.md` — objective-driven rolling blocks, block renewal, checkpoint scheduling
+- `plan-generation-maintenance.md` — rolling 4-week block, consistency tracking, transition detection
+- `plan-generation-recovery.md` — severity-driven 3-phase arc, healing assessment, setback detection
+**Read for:** shared types and inputs; persistence logic; regeneration triggers; navigation to mode-specific files.
 
 ### `02-computations/adaptation-signature.md`
-Hard block definition. Three adaptation signal dimensions (fatigue depth, recovery trajectory, next-session execution). Yield profile computation. How yield feeds plan personalisation. Plan structure as data collection.
+Hard adaptation window definition. Three adaptation signal dimensions (fatigue depth, recovery trajectory, next-session execution). Yield profile computation. How yield feeds plan personalisation. Plan structure as data collection.
 **Read for:** how adaptation is measured; yield profile computation; how results feed plan personalisation.
 
 ### `02-computations/comparable-sessions.md`
@@ -286,15 +291,6 @@ Context budget ~4k–6k tokens. Scores and selects best approach. Synthesizes st
 
 Context budget ~3k–5k tokens. Produces the actual session schedule for a single week. Reads adjusted intent from pre-week review (Python service) and current athlete state. Outputs WeeklyPlan with session count, types, days, and approximate duration. Inherits all session placement rules from the deprecated session-planner-agent. Session count is a pre-computed input — the agent does not compute it.
 **Read for:** session placement rules; intensity bias → session type distribution; race week handling; template fallback.
-
-### `03-agents/session-planner-agent.md` (DEPRECATED)
-
-**Deprecated** — replaced by the weekly synthesis layer:
-- `03-agents/weekly-synthesis-agent.md` — produces weekly session schedules
-- `03-agents/pre-week-review-agent.md` — reviews and adjusts weekly intent
-- `02-computations/plan-generation.md` — produces phase arc (strategic intent)
-
-Retained for historical reference only.
 
 ### `03-agents/context-budget-service.md`
 `ContextBudgetService` implementation for all three primary agents. Token budget enforcement before API call. Priority truncation ordering per agent.

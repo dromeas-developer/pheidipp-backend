@@ -16,7 +16,7 @@ type CheckpointType =
   | 'calibration'        // test workout for specific metric
   | 'benchmark'          // standardised progress measurement
   | 'race_simulation'    // race-pace effort without full stress
-  | 'secondary_race'     // B-race or C-race as assessment
+  | 'secondary_race'     // B-event or C-event as assessment
   | 'progress_review'    // periodic adaptation check
 
 type CheckpointStatus =
@@ -55,7 +55,7 @@ type Checkpoint = {
 ## Invariants
 
 - **One checkpoint per PlannedSession.** A PlannedSession may be flagged as a checkpoint, but a checkpoint cannot exist without a corresponding PlannedSession. The `training_plan_id` is derived from the PlannedSession's FK — no redundant FK on Checkpoint.
-- **Checkpoint type determines expected behaviour.** Calibration checkpoints expect metric updates. Benchmark checkpoints expect progress comparison. Race simulation expects race-pace validation. Secondary race expects race performance data. Progress review expects adaptation signal.
+- **Checkpoint type determines expected behaviour.** Calibration checkpoints expect metric updates. Benchmark checkpoints expect progress comparison. Race simulation expects race-pace validation. Secondary event expects event performance data. Progress review expects adaptation signal.
 - **Completion fields set atomically.** `metric_updated`, `confidence_changed`, `replan_triggered`, and `completed_at` are set together when status transitions to completed.
 - **Checkpoint cannot be created retroactively.** Checkpoints are scheduled during plan synthesis, not after session completion.
 - **Overshoot recovery uses static default until individual data is available.** The `+2 day` default applies unless `TwinState.confidence_level = 'high'` AND `AdaptationSignature` has ≥ 3 complete adaptation window observations. This prevents premature personalization from noisy data.
@@ -96,7 +96,7 @@ Checkpoints are scheduled during Phase 2 (synthesis) of plan generation based on
 | `calibration` | submaximal_tempo, threshold | Refine specific metric estimate | Yes | Yes (if confidence changes) |
 | `benchmark` | long_run_hr_drift, time_trial | Measure progress against baseline | Yes | Possibly |
 | `race_simulation` | marathon_pace_long_run | Test readiness without full stress | Yes | Possibly |
-| `secondary_race` | (actual race) | Leverage race as assessment | Yes | Yes |
+| `secondary_race` | (actual event) | Leverage event as assessment | Yes | Yes |
 | `progress_review` | weekly_form_check | Periodic adaptation signal | No | No |
 
 ---
@@ -263,3 +263,20 @@ Logs:
 - A PlannedSession that is a checkpoint has `checkpoint_type` and `checkpoint_metric` fields set on the PlannedSession record itself. The Checkpoint entity is created atomically with the PlannedSession.
 - When a checkpoint session completes, `SessionLifecycleService` checks if the PlannedSession is a checkpoint and processes the checkpoint logic accordingly.
 - Checkpoint data flows into the twin update pipeline via the existing `session_completed` event. The checkpoint-specific logic (metric update, confidence assessment, replan trigger) is handled by a dedicated checkpoint completion handler.
+
+---
+
+## Cross-References
+
+- **Vision secondary events:** secondary-events (vision) — describes coaching transitions for B-races and C-races that map to `secondary_race` checkpoint type.
+- **Vision training plan checkpoints:** training-plan-checkpoints (vision) — describes checkpoint hierarchy, scheduling, completion, adaptive recovery, and adaptive evolution that map to this entity's fields, events, and behaviours.
+  - Checkpoint hierarchy → `CheckpointType` enum and `type` field
+  - Checkpoint scheduling → Checkpoint Scheduling Logic section
+  - Checkpoint completion → State Transitions, Events (`checkpoint_completed`)
+  - Adaptive recovery → Overshoot Recovery Rules section
+  - Adaptive evolution → State Transitions, replan triggers, confidence changes
+- **Mode-specific checkpoint scheduling:**
+  - Race mode: `02-computations/plan-generation-race.md` — race-calibrated checkpoints
+  - Fitness improvement: `02-computations/plan-generation-fitness-improvement.md` — objective-targeted checkpoints
+  - Maintenance: `02-computations/plan-generation-maintenance.md` — benchmark every 8–12 weeks, progress review every 4 weeks
+  - Recovery: `02-computations/plan-generation-recovery.md` — healing-focused progress reviews at phase transitions, calibration at Phase 3

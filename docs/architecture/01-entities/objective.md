@@ -96,6 +96,7 @@ The agent receives pre-computed `ObjectiveUpdate` records — it narrates findin
 ## Invariants
 - `direction_of_change` and `evidence` on `ObjectiveUpdate` are always Python-computed. Never LLM-derived.
 - `Objective.title` and `description` are always LLM-generated (short strings only).
+- Objective `title` and `description` must never reference zone numbers (e.g., "Zone 4"). Use range-based language (e.g., "threshold effort targets") consistent with the vision principle that zones are internal to the system.
 - Objectives are scoped to a `training_goal_id`. When a goal closes, objectives for that goal are not carried to the new goal — new objectives are seeded.
 - `ObjectiveUpdate` is append-only. Updates accumulate as a history.
 - A maximum of 5 active objectives per goal. New objectives supersede old ones when the limit is reached.

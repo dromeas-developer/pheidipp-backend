@@ -95,7 +95,7 @@ type PhaseArcEntry = {
 }
 
 type RaceScheduleEntry = {
-  race: string                       // "A-race", "B-race", "C-race"
+  race: string                       // "A-race", "B-event", "C-event"
   type: GoalEventType
   week: number
   role: 'peak' | 'tune_up' | 'training'
@@ -166,9 +166,10 @@ type PhaseAdjustment = {
 
 | Criterion | Weight | Description |
 |-----------|--------|-------------|
-| Twin Alignment | 50% | Addresses strengths and weaknesses identified in twin analysis |
-| Goal Fit | 30% | Aligns with goal type, distance, and race calendar |
-| Injury Safety | 10% | Mitigates twin-identified structural and recovery risks |
+| Twin Alignment | 35% | Addresses strengths and weaknesses identified in twin analysis |
+| Goal Fit | 25% | Aligns with goal type, distance, and race calendar |
+| Objective Alignment | 25% | Addresses the athlete's active objectives (e.g., aerobic_base improve, threshold_quality maintain) |
+| Injury Safety | 15% | Mitigates twin-identified structural and recovery risks |
 
 ---
 
@@ -221,10 +222,23 @@ Checkpoints are scheduled based on:
 
 ---
 
+## Decision Authority
+
+Implements two authority boundaries from `docs/vision/coach/decision-authority.md`:
+
+**Hypothesis Selection.** The coach selects the best hypothesis. The athlete does not choose between plans. The agent scores hypotheses against twin alignment, goal fit, and injury safety, then selects the highest-scoring valid candidate and synthesises a strategic framework. The athlete receives one plan with a clear rationale. There is no multiple-choice screen, no A/B testing, no negotiation over which hypothesis to use. The athlete's agency is limited to accepting or abandoning the resulting plan.
+
+**Checkpoint Recommendation.** Checkpoints are strongly recommended, not mandatory. The agent schedules checkpoints based on confidence gaps, phase transitions, and race calendar. The athlete can decline a checkpoint. If declined, the plan continues with conservative assumptions and the cost of declining (wider zones, less precision) is communicated transparently. The agent does not enforce checkpoint completion — it surfaces the recommendation and the consequence of declining.
+
+---
+
 ## Cross-References
 
+- Decision authority: `docs/vision/coach/decision-authority.md` → "Hypothesis Selection" and "Checkpoint Recommendation"
+- Selection criteria philosophy: `docs/vision/product/hypothesis-selection.md`
 - Hypothesis generation: `03-agents/hypothesis-agent.md`
 - Weekly synthesis: `03-agents/weekly-synthesis-agent.md`
-- Plan generation pipeline: `02-computations/plan-generation.md`
-- Validation logic: `02-computations/plan-generation.md` → validatePhaseArc
+- Plan generation pipeline: `02-computations/plan-generation-race.md` (race mode hypothesis validation and synthesis)
+- Shared types and persistence: `02-computations/plan-generation.md`
+- Validation logic: `02-computations/plan-generation-race.md` → validatePhaseArc
 - Checkpoint types: `01-entities/checkpoint.md`

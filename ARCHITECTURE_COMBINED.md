@@ -1,77 +1,6 @@
 # Pheidipp Architecture - Combined Documentation
 
-Generated: 2026-06-01 21:52:51
-
----
-
-## Table of Contents
-
-- [00-foundations/confidence-model](#00-foundations-confidence-model)
-- [00-foundations/data-tiers](#00-foundations-data-tiers)
-- [00-foundations/event-catalogue](#00-foundations-event-catalogue)
-- [00-foundations/principles](#00-foundations-principles)
-- [00-foundations/terminology](#00-foundations-terminology)
-- [01-entities/activity](#01-entities-activity)
-- [01-entities/adaptation-observation](#01-entities-adaptation-observation)
-- [01-entities/athlete-auth](#01-entities-athlete-auth)
-- [01-entities/athlete-fitness](#01-entities-athlete-fitness)
-- [01-entities/athlete-integration](#01-entities-athlete-integration)
-- [01-entities/athlete-physiology](#01-entities-athlete-physiology)
-- [01-entities/athlete-preferences](#01-entities-athlete-preferences)
-- [01-entities/athlete-profile](#01-entities-athlete-profile)
-- [01-entities/athlete-wellness-baseline](#01-entities-athlete-wellness-baseline)
-- [01-entities/athlete-wellness](#01-entities-athlete-wellness)
-- [01-entities/athlete](#01-entities-athlete)
-- [01-entities/checkpoint](#01-entities-checkpoint)
-- [01-entities/coaching-message](#01-entities-coaching-message)
-- [01-entities/cycle-phase-log](#01-entities-cycle-phase-log)
-- [01-entities/execution-observation](#01-entities-execution-observation)
-- [01-entities/generated-workout](#01-entities-generated-workout)
-- [01-entities/generation-event](#01-entities-generation-event)
-- [01-entities/objective](#01-entities-objective)
-- [01-entities/physiological-segment](#01-entities-physiological-segment)
-- [01-entities/planned-session](#01-entities-planned-session)
-- [01-entities/race-prediction](#01-entities-race-prediction)
-- [01-entities/raw-sensor-stream](#01-entities-raw-sensor-stream)
-- [01-entities/training-goal](#01-entities-training-goal)
-- [01-entities/training-plan](#01-entities-training-plan)
-- [01-entities/twin-state](#01-entities-twin-state)
-- [01-entities/weather-forecast](#01-entities-weather-forecast)
-- [01-entities/weekly-plan](#01-entities-weekly-plan)
-- [01-entities/workout-library-entry](#01-entities-workout-library-entry)
-- [01-entities/workout-step](#01-entities-workout-step)
-- [02-computations/adaptation-signature](#02-computations-adaptation-signature)
-- [02-computations/banister-update](#02-computations-banister-update)
-- [02-computations/comparable-sessions](#02-computations-comparable-sessions)
-- [02-computations/effort-normalisation](#02-computations-effort-normalisation)
-- [02-computations/load-computation](#02-computations-load-computation)
-- [02-computations/objective-management](#02-computations-objective-management)
-- [02-computations/physiology-update](#02-computations-physiology-update)
-- [02-computations/plan-generation](#02-computations-plan-generation)
-- [02-computations/segmentation-heuristic](#02-computations-segmentation-heuristic)
-- [02-computations/segmentation-hmm](#02-computations-segmentation-hmm)
-- [02-computations/signal-cleaning](#02-computations-signal-cleaning)
-- [02-computations/threshold-detection](#02-computations-threshold-detection)
-- [02-computations/wellness-modifier](#02-computations-wellness-modifier)
-- [03-agents/context-budget-service](#03-agents-context-budget-service)
-- [03-agents/first-message-agent](#03-agents-first-message-agent)
-- [03-agents/hypothesis-agent](#03-agents-hypothesis-agent)
-- [03-agents/hypothesis-selector-agent](#03-agents-hypothesis-selector-agent)
-- [03-agents/post-workout-agent](#03-agents-post-workout-agent)
-- [03-agents/pre-week-review-agent](#03-agents-pre-week-review-agent)
-- [03-agents/session-planner-agent](#03-agents-session-planner-agent)
-- [03-agents/skip-conversation-agent](#03-agents-skip-conversation-agent)
-- [03-agents/weekly-synthesis-agent](#03-agents-weekly-synthesis-agent)
-- [03-agents/wellness-alert-agent](#03-agents-wellness-alert-agent)
-- [03-agents/workout-generation-agent](#03-agents-workout-generation-agent)
-- [04-platform/async-pipeline](#04-platform-async-pipeline)
-- [04-platform/event-topology](#04-platform-event-topology)
-- [04-platform/failure-handling](#04-platform-failure-handling)
-- [04-platform/observability](#04-platform-observability)
-- [04-platform/storage-topology](#04-platform-storage-topology)
-- [04-platform/versioning-and-reprocessing](#04-platform-versioning-and-reprocessing)
-- [architecture-index](#architecture-index)
-- [document-template](#document-template)
+Generated: 2026-06-03 16:29:45
 
 ---
 
@@ -80,8 +9,28 @@ Generated: 2026-06-01 21:52:51
 # Confidence Model — How Certainty Flows Through the System
 
 ## Purpose
-- Defines the three confidence levels and what each permits in coaching output
-- Specifies the exact transition thresholds and how confidence propagates downstream
+
+- Defines per-metric confidence levels for each physiological parameter (LT1, LT2, CP, VO2max)
+- Specifies the global confidence level derived from key metrics for simple consumers
+- Specifies evidence-weight-based transition thresholds and how confidence propagates downstream
+- Explains how each evidence source contributes to confidence for specific metrics
+
+> **Vision rationale:** Confidence is a trust mechanism, not a performance metric. The twin never pretends to know more than it does. False precision destroys trust permanently — an athlete who receives a precise threshold target that turns out to be wrong trusts the coach less than one told "this is an estimate based on limited data." Conservative coaching language, target ranges rather than point estimates, and cautious plan structures are the natural output of a low-evidence-confidence twin. This is an invariant, not a UX choice. See `docs/vision/twin/confidence-and-uncertainty.md#the-core-principle`.
+
+> **For the athlete-facing experience of cold start and onboarding tier definitions, see [cold-start.md](../../vision/twin/cold-start.md).**
+
+## Onboarding Tiers vs. Data Tiers
+
+The system uses two distinct "tier" concepts that are orthogonal to each other:
+
+| Concept | Source | Meaning | Values |
+|---------|--------|---------|--------|
+| **Onboarding Tier** | Vision (`cold-start.md`) | What data was available at onboarding to bootstrap the twin | 3 tiers: imported history, peer-similar/lab, questionnaire only |
+| **Data Tier** | Architecture (`data-tiers.md`) | What sensors and hardware the athlete uses during training | 6 tiers: power+RR, power+optical, RR-only, chest strap, optical HR, manual |
+
+These are independent dimensions. A Tier 1 onboarding athlete (imported history) could train with Tier 4 hardware (optical HR, no power). A Tier 3 onboarding athlete (questionnaire only) could train with Tier 1 hardware (power meter + chest strap).
+
+**Confidence transitions depend on data tier capabilities** (what signals are available for evidence accumulation), not on onboarding tier. Onboarding tier determines the starting point; data tier determines the rate and ceiling of evidence accumulation.
 
 ## TypeScript Schema
 
@@ -92,16 +41,19 @@ type ConfidenceTransition = {
   from: TwinConfidenceLevel
   to: TwinConfidenceLevel
   trigger: ConfidenceTransitionTrigger
+  metric: string                          // which metric is transitioning
+  evidence_weight: number                 // accumulated evidence weight at transition
   requirements: string
 }
 
 type ConfidenceTransitionTrigger =
-  | 'four_hr_calibration_sessions'       // LOW → MEDIUM
-  | 'two_rr_sessions'                    // MEDIUM → HIGH
-  | 'one_dedicated_calibration_run'      // MEDIUM → HIGH
+  | 'evidence_threshold_met'             // accumulated evidence weight crossed threshold
+  | 'lab_test_ingested'                  // lab test provides immediate high-weight evidence
+  | 'field_test_ingested'                // field test provides medium-weight evidence
 
 // Per-metric confidence breakdown on TwinState
 // Each derived from respective AthletePhysiology parameter prior weight
+// This is the PRIMARY confidence mechanism
 type TwinMetricConfidence = {
   lt1_hr: TwinConfidenceLevel
   lt1_power: TwinConfidenceLevel | null    // null if no power data
@@ -111,43 +63,126 @@ type TwinMetricConfidence = {
   lt2_pace: TwinConfidenceLevel | null       // null if no pace data
   cp: TwinConfidenceLevel | null              // null if no power data
 }
+
+// Global confidence level derived from key metrics
+// Used for simple consumers (plan structure, race prediction availability)
+// Derived as the minimum confidence of LT1 HR and LT2 HR
+type GlobalConfidenceLevel = {
+  level: TwinConfidenceLevel
+  derived_from: ('lt1_hr' | 'lt2_hr')[]   // which metrics determined this level
+}
+
+// Evidence weight thresholds for confidence transitions
+// These are initial defaults based on observation weights
+const CONFIDENCE_THRESHOLDS = {
+  low_to_medium: 4.0,    // evidence units needed for MEDIUM
+  medium_to_high: 8.0    // evidence units needed for HIGH
+}
+
+// Evidence weights by source (how much each source contributes to confidence)
+const EVIDENCE_WEIGHTS = {
+  questionnaire_estimate: 0.5,
+  training_hr_deflection: 1.0,     // contributes to lt1_hr and lt2_hr
+  training_rr_inflection: 2.5,     // contributes to lt1_hr and lt2_hr (higher quality)
+  training_power_hr_ratio: 1.5,    // contributes to cp
+  field_test: {
+    lt1: 2.0,                      // if field test targets LT1
+    lt2: 4.0,                      // if field test targets LT2
+    cp: 5.0                        // if field test targets CP
+  },
+  lab_test: {
+    lt1: 12.0,
+    lt2: 15.0,
+    cp: 10.0,
+    vo2max: 15.0
+  }
+}
 ```
 
 ## State Transitions
 
 ```mermaid
 stateDiagram-v2
-    [*] --> low : questionnaire bootstrap
-    low --> medium : 4 calibration-eligible\nHR sessions processed
-    medium --> high : 2 RR-interval sessions\nOR 1 dedicated calibration run
+    [*] --> low : questionnaire bootstrap\n(all parameters start LOW)
+    low --> medium : evidence weight ≥ 4.0\n(per-metric threshold)
+    medium --> high : evidence weight ≥ 8.0\n(per-metric threshold)
     high --> high : ongoing (does not decrease)
     note right of low : Targets as effort ranges\nNo race prediction surfaced
     note right of medium : Threshold-referenced targets\nRace prediction with ±5% range
     note right of high : Point-estimate targets\nRace prediction as point estimate
 ```
 
+Global Confidence Level
+
+The global `confidence_level` on TwinState is derived as the **minimum confidence of LT1 HR and LT2 HR**. This provides a simple signal for consumers that don't need per-metric detail.
+
+| Global Level | Meaning | Used By |
+|--------------|---------|---------|
+| LOW | At least one of LT1/LT2 is LOW | Plan structure, race prediction gate |
+| MEDIUM | Both LT1 and LT2 are at least MEDIUM | Threshold-referenced coaching |
+| HIGH | Both LT1 and LT2 are HIGH | Point-estimate coaching |
+
 ## Confidence Level Definitions
 
+> **Communication under uncertainty:** The coach never says "I don't know." Instead, it communicates the boundaries of what it knows through language specificity. The athlete learns to read confidence through the specificity of coaching — more specific language means more data behind it. This builds genuine self-awareness rather than blind compliance. The four language tiers are: "Based on what you've described..." (Tier 3 cold start), "Your recent sessions suggest..." (low evidence confidence), "Your data shows..." (medium evidence confidence), "Your threshold is..." (high evidence confidence). See `docs/vision/twin/confidence-and-uncertainty.md#communication-under-uncertainty`.
+
 ### LOW
-**When:** Initial state after questionnaire-only bootstrap. No real training data processed.
+**When:** Initial state after onboarding. All athletes start here regardless of onboarding tier. See "Initial Confidence by Onboarding Tier" below for expected transition trajectories.
 **Threshold estimates:** From age-graded population norms. Unreliable for individual precision.
 **Coaching language:** Conservative. Targets expressed as effort descriptions ("easy aerobic effort") and ranges ("5:30–5:50/km"). Never precise numbers.
 **Race prediction:** Not surfaced. `GET /athletes/{id}/prediction` returns 204.
 **Plan structure:** Conservative session volumes. Long recovery buffers.
 
+### Initial Confidence by Onboarding Tier
+
+| Onboarding Tier | Initial Global Confidence | Expected Path to MEDIUM | Expected Path to HIGH | Rationale |
+|-----------------|---------------------------|------------------------|----------------------|-----------|
+| Tier 1 (imported history) | LOW (transitions fast) | 1–3 sessions | 4–8 sessions | Imported data bootstraps priors with real physiological data. Evidence weight starts below 4.0 but accumulates quickly from first sessions. |
+| Tier 2 (lab test uploaded) | MEDIUM for tested metrics; LOW for untested | Immediate for tested metrics | 4–8 sessions for untested metrics | Lab test provides 12–15 evidence units, immediately exceeding the 4.0 threshold for tested metrics. Untested metrics still need real training data. |
+| Tier 2 (peer-similar only) | LOW | 4–6 sessions | 8–12 sessions | Peer models provide better priors than questionnaire alone but still require real training data for meaningful confidence. |
+| Tier 3 (questionnaire only) | LOW | 6–10 sessions | 12–20 sessions | Age-graded population norms only. Requires the most real training data to accumulate evidence. |
+
+> **Note:** These are estimates based on evidence weight thresholds (4.0 for MEDIUM, 8.0 for HIGH) and typical observation weights. Actual transition speed depends on data tier capabilities (sensor quality) and training volume. These should be validated against real convergence data — see open questions below.
+
+### Transition Velocity by Data Tier
+
+Data tier determines what signals are available for evidence accumulation, which directly affects how quickly confidence transitions occur:
+
+> **Vision rationale:** Data quality affects the rate of evidence accumulation. Athletes with chest straps and power meters accumulate evidence faster than those with optical HR only. Lab tests accelerate the process significantly. The twin is transparent about which data quality tier it is working with. See `docs/vision/twin/confidence-and-uncertainty.md#how-confidence-evolves`.
+
+| Data Tier | Available Signals | Evidence Rate | Impact on Confidence |
+|-----------|-------------------|---------------|---------------------|
+| Tier 1 (power + chest strap RR) | HR deflection, RR inflection, power-to-HR ratio | Fastest | All metrics accumulate evidence simultaneously |
+| Tier 2 (power + optical HR) | HR deflection, power-to-HR ratio (no RR) | Fast | CP and power-based metrics accumulate faster than HR-only metrics |
+| Tier 3 (chest strap RR, no power) | HR deflection, RR inflection | Medium | LT1/LT2 HR accumulate; no CP or power confidence |
+| Tier 4 (chest strap or optical HR) | HR deflection only | Slow | LT1/LT2 HR accumulate slowly; no RR, no power |
+| Tier 5–6 (no HR or manual) | None | None | No confidence accumulation from training data |
+
 ### MEDIUM
-**When:** After four calibration-eligible sessions with HR data have been processed.
-**Threshold estimates:** Have moved from population norms toward real data. MEDIUM confidence means the Bayesian prior has been meaningfully updated by at least four observations.
+**When:** When accumulated evidence weight for a metric reaches 4.0 (approximately 4 HR deflection sessions at weight 1.0 each, or 1 lab test at weight 12-15, or 1 field test at weight 2-4).
+**Threshold estimates:** Have moved from population norms toward real data. MEDIUM confidence means the Bayesian prior has been meaningfully updated by observations.
 **Coaching language:** Threshold-referenced. Targets can reference threshold estimates (e.g. "target 10 seconds per km below your threshold pace"). Expressed as ranges.
 **Race prediction:** Surfaced with explicit ±5% range framing.
 **Plan structure:** More precisely calibrated to the athlete's actual threshold data.
 
 ### HIGH
-**When:** After two RR-interval sessions OR one dedicated calibration run.
+**When:** When accumulated evidence weight for a metric reaches 8.0 (approximately 8 HR deflection sessions, or 2 RR sessions at weight 2.5 each + 3 HR sessions, or 1 field test at weight 4.0 + 4 HR sessions, or 1 lab test at weight 12-15).
 **Threshold estimates:** Sufficient data density for reliable point estimates. The Bayesian posterior has converged.
 **Coaching language:** Precise. Point estimates used. Coach can make specific claims about threshold pace, zones, targets.
 **Race prediction:** Surfaced as a point estimate.
 **Plan structure:** Fully personalised to demonstrated threshold values.
+
+Per-Metric Confidence
+
+Confidence is **per-metric**, not global. Each physiological parameter accumulates evidence independently:
+
+- **LT1 HR**: Evidence from HR deflection analysis, RR inflection, MAF tests, lab tests
+- **LT2 HR**: Evidence from HR deflection analysis, RR inflection, field tests, lab tests
+- **CP**: Evidence from power-to-HR ratio, CP tests, lab tests
+- **LT1/LT2 Power**: Evidence from power-based sessions, lab tests
+- **LT1/LT2 Pace**: Evidence from pace-based sessions (derived from HR/power correlation)
+
+A lab test for LT2 provides evidence for LT2, not LT1. A field test for LT2 provides evidence for LT2, not LT1. The system tracks evidence accumulation per metric.
 
 ## Confidence Does Not Decrease
 
@@ -155,40 +190,106 @@ Confidence ratchets upward only. It does not decrease even if the athlete stops 
 
 **Rationale:** The threshold estimates may drift as fitness changes, but the Bayesian prior's data density does not un-accumulate. What changes is the prior decay — older observations carry less weight, making the estimate less certain — but this is handled within the Bayesian update formula, not by downgrading the confidence enum.
 
+> **Vision rationale:** Evidence does not disappear when an athlete takes time off; the data remains valid even if the athlete has detrained. What changes is recommendation strength and calibration freshness, not the underlying evidence confidence. The system handles two distinct scenarios differently:
+>
+> - **Data staleness:** When an athlete stops training or data becomes old, confidence stays at its current level. The prior decay mechanism handles uncertainty within the current confidence level — older observations carry less weight, making the estimate less certain without demoting the level. This avoids jarring coaching language changes from temporary data gaps.
+> - **Algorithm improvement:** When a new algorithm improves interpretation, evidence confidence remains unchanged — the data itself has not changed. What changes is estimation certainty: the system's interpretation of that data has become more rigorous.
+>
+> The distinction is between time (data staleness) and correctness (algorithm improvement). See `docs/vision/twin/confidence-and-uncertainty.md#the-honesty-invariant`.
+
 If a significant fitness disruption (illness, injury, extended break) occurs, a new TwinState is created with the current confidence level. The prior decay in the threshold detection system naturally handles stale estimates.
+
+## Recommendation Strength vs. Evidence Confidence
+
+Recommendation strength is distinct from evidence confidence. It represents how strongly the coach is willing to act on the current model.
+
+| Factor | Effect on Recommendation Strength |
+|---|---|
+| Stale calibration data | Decreases |
+| Poor execution consistency | Decreases |
+| Recent calibration signal | Increases |
+| High data tier (RR + power) | Increases |
+
+Recommendation strength can decrease while evidence confidence remains constant. An athlete with 500 workouts and lab testing has high evidence confidence. If they disappear for 6 months, their recommendation strength drops because the evidence is stale — but the evidence itself remains valid.
+
+This separation creates an elegant athlete experience:
+- **Evidence confidence:** "The system knows a lot about this athlete"
+- **Recommendation strength:** "The system is cautious about current recommendations"
+
+> **Implementation note:** This distinction is not yet implemented as a separate concept in the architecture. It is partially captured by the prior decay mechanism within the Bayesian update. When recommendation strength is implemented, it should affect coaching language conservatism, plan structure, and session targeting independently of evidence confidence. See `docs/vision/twin/confidence-and-uncertainty.md#recommendation-strength`.
+
+## Algorithm Improvement Transparency
+
+When the twin's calibration algorithms improve, recent history is reprocessed through the updated methodology. This means the athlete benefits from better threshold detection, improved adaptation modelling, or refined execution analysis without waiting for new data to accumulate.
+
+The reprocessing is transparent. The coach explains what changed and why it matters for training. The athlete sees their targets adjust not because their fitness changed, but because the system's understanding of their fitness became more precise.
+
+Historical coaching decisions are not retroactively modified. The athlete can see what the twin knew at each point in time, even if the twin's knowledge has since improved. This preserves the integrity of the coaching relationship while allowing the system to get smarter over time.
+
+Coaching recommendations are always made using the best understanding available at the time. Improved models may produce more accurate future guidance, but they do not imply previous recommendations were incorrect.
+
+> **Vision rationale:** This transparency maintains trust. The athlete understands that the system is improving, not that it was wrong. See `docs/vision/twin/confidence-and-uncertainty.md#algorithm-improvements`.
 
 ## Downstream Effects of Confidence Level
 
 | Consumer | Uses | LOW behaviour | MEDIUM behaviour | HIGH behaviour |
 |---|---|---|---|---|
-| **TwinState** | `confidence_level` (coarse) | Conservative coaching language | Threshold-referenced ranges | Point estimates |
+| **TwinState** | `confidence_level` (global) | Conservative coaching language | Threshold-referenced ranges | Point estimates |
 | **TwinState** | `metric_confidence` (per-metric) | Null fields for missing metrics | Available metrics with appropriate precision | All available metrics at high precision |
 | Workout generation agent | `metric_confidence` for primary metric | Effort descriptions | Threshold-referenced ranges | Threshold-referenced point estimates |
 | Post-workout agent | `metric_confidence` per step | Avoids specific claims | Moderate specificity | High specificity; names exact thresholds |
-| Plan generation | `confidence_level` (coarse) | Conservative volumes; more checkpoints | Calibrated to threshold; moderate checkpoints | Fully personalised; fewer checkpoints |
+| Plan generation | `confidence_level` (global) | Conservative volumes; more checkpoints | Calibrated to threshold; moderate checkpoints | Fully personalised; fewer checkpoints |
 | Checkpoint scheduling | `metric_confidence` to target weak areas | Strongly recommend calibration checkpoints | Recommend calibration for medium-confidence metrics | Skip checkpoints for high-confidence metrics |
-| Race prediction endpoint | `confidence_level` | 204 No Content | Returns with ±5% range | Returns point estimate |
-| First message agent | `confidence_level` | Acknowledges uncertainty | Moderate confidence language | Can make specific physiological claims |
+| Race prediction endpoint | `confidence_level` (global) | 204 No Content | Returns with ±5% range | Returns point estimate |
+| First message agent | `confidence_level` (global) | Acknowledges uncertainty | Moderate confidence language | Can make specific physiological claims |
+
+### Coaching Language by Onboarding Tier × Confidence Level
+
+The intersection of onboarding tier and confidence level determines appropriate coaching language. This ensures honest communication that reflects both what the system knows and how it was bootstrapped:
+
+| Onboarding Tier + Level | Coaching Language | Examples |
+|------------------------|-------------------|----------|
+| Tier 3 + LOW | Acknowledges questionnaire basis; defers to real data | "Based on what you've described..." / "Let's see how this feels..." / "We'll calibrate as we see your actual data." |
+| Tier 2 (peer) + LOW | Acknowledges peer-based estimate; defers to real data | "From athletes like you, we estimate..." / "This is a starting point — your real data will refine it." |
+| Tier 2 (lab) + MEDIUM | Acknowledges lab data for tested metrics; notes untested gaps | "Your lab test gives us confidence in [metric]. We're still learning [other metric]." |
+| Tier 1 + LOW | Acknowledges imported history; notes current fitness uncertainty | "Your training history gives us a starting point..." / "We're still learning your current fitness level." |
+| Any tier + MEDIUM | Threshold-referenced ranges | "Target 10 seconds per km below your threshold pace." / "Your threshold is estimated at 4:30–4:40/km." |
+| Any tier + HIGH | Precise point estimates | "Your threshold pace is 4:35/km." / "Target HR: 155 bpm." |
+
+> **Note:** Tier 1 athletes at LOW should use different language than Tier 3 athletes at LOW, even though the confidence level is the same. The onboarding tier provides context about what the system already knows, which affects how uncertainty is communicated.
 
 ## Invariants
-- `confidence_level` is stored on every `TwinState` record at the time of creation. Derived from `AthletePhysiology.lt2.hr.prior_weight` (coarse signal for simple consumers).
-- `metric_confidence` provides per-metric confidence breakdown on `TwinState`. Each derived from respective `AthletePhysiology` parameter prior weights at snapshot time.
+- `confidence_level` is stored on every `TwinState` record at the time of creation. Derived as the **minimum confidence of LT1 HR and LT2 HR** (global signal for simple consumers).
+- `metric_confidence` provides per-metric confidence breakdown on `TwinState`. Each derived from respective `AthletePhysiology` parameter prior weights at snapshot time. This is the **primary** confidence mechanism.
+- Confidence is **per-metric**: each physiological parameter accumulates evidence independently. A field test for LT2 increases LT2 confidence, not LT1 confidence.
+- Evidence weight thresholds (4.0 for MEDIUM, 8.0 for HIGH) are initial defaults based on observation weights. These should be validated against real convergence data.
 - The confidence level of a `TwinState` never changes after creation
 - A new `TwinState` record is created when confidence transitions
 - `RacePrediction` with `confidence_level = low` is never written — the service returns null
 
 ## Runtime Ownership
 Owns:
-- Transition thresholds
+- Transition thresholds (evidence weight thresholds per metric)
 - What each level permits in downstream systems
+- Global confidence derivation (minimum of LT1 HR and LT2 HR)
 
 Does Not Own:
 - How the Bayesian update accumulates evidence → `02-computations/threshold-detection.md`
 - Which specific `TwinState` trigger fires → `01-entities/twin-state.md`
 - How agents translate confidence into language → `03-agents/`
+- How LT1 is detected from natural training → `02-computations/lt1-detection.md` (new)
 
 ## Open Questions
-- The transition thresholds (4 HR sessions for MEDIUM, 2 RR for HIGH) are initial defaults. These should be validated against real convergence data once sufficient athletes have been onboarded.
+- Evidence weight thresholds (4.0 for MEDIUM, 8.0 for HIGH) are initial defaults. These should be validated against real convergence data once sufficient athletes have been onboarded.
+- The 42-day prior decay time constant is aligned with aerobic fitness decay in the Banister model. This ensures threshold estimates and fitness scores decay at roughly the same rate.
+- LT1 detection is harder than LT2 detection because LT1 is a subtle physiological transition. The system uses passive inference from natural training (HR ceiling, drift analysis, recovery analysis) plus optional active tests (MAF test, controlled progression) to build LT1 confidence.
+
+## Cross-References
+- **Vision — confidence and uncertainty rationale (honesty invariant, communication under uncertainty, recommendation strength, algorithm improvements):** `docs/vision/twin/confidence-and-uncertainty.md`
+- **Vision — cold start and onboarding tier definitions:** `docs/vision/twin/cold-start.md`
+- **Architecture — data tier capabilities and signal hierarchy:** `00-foundations/data-tiers.md`
+- **Architecture — threshold detection algorithms (Bayesian update mechanics):** `02-computations/threshold-detection.md`
+- **Architecture — LT1 detection from natural training:** `02-computations/lt1-detection.md`
 
 ## 00-foundations > data-tiers
 
@@ -219,14 +320,16 @@ type DataTierCapabilities = {
 
 ## Tier Definitions
 
-| Tier | Hardware | Power | RR | HR | GPS | Calibration | Notes |
-|---|---|---|---|---|---|---|---|
-| 1 | Running power meter + chest strap (RR) | ✓ | ✓ | ✓ | ✓ | ✓ | Most precise. Passive threshold tracking via RR. |
-| 2 | Running power meter + optical HR | ✓ | ✗ | ✓ | ✓ | ✓ | Very strong for load. No RR for threshold detection. |
-| 3 | Chest strap (RR) + GAP + GPS | ✗ | ✓ | ✓ | ✓ | ✓ | RR data available. GAP as mechanical proxy. |
-| 4 | Optical HR + GAP + GPS | ✗ | ✗ | ✓ | ✓ | ✓ | Realistic baseline for core audience. Fully usable. |
-| 5 | GAP + GPS only (no HR) | ✗ | ✗ | ✗ | ✓ | ✗ | Logged for record. Excluded from twin calibration. |
-| 6 | Manual entry only | ✗ | ✗ | ✗ | ✗ | ✗ | Training record only. No analytical value. |
+| Tier | Hardware | Power | RR | HR | GPS | Calibration | Threshold Detection | Notes |
+|---|---|---|---|---|---|---|---|---|
+| 1 | Running power meter + chest strap (RR) | ✓ | ✓ | ✓ | ✓ | ✓ | HR deflection + RR inflection + power-to-HR ratio | Most precise. Passive threshold tracking via RR. |
+| 2 | Running power meter + optical HR | ✓ | ✗ | ✓ | ✓ | ✓ | HR deflection + power-to-HR ratio only | Very strong for load. No RR for inflection detection. |
+| 3 | Chest strap (RR) + GAP + GPS | ✗ | ✓ | ✓ | ✓ | ✓ | HR deflection + RR inflection | RR data available. GAP as mechanical proxy. |
+| 4 | Optical HR + GAP + GPS | ✗ | ✗ | ✓ | ✓ | ✓ | HR deflection only | Realistic baseline for core audience. Fully usable. |
+| 5 | GAP + GPS only (no HR) | ✗ | ✗ | ✓ | ✓ | ✗ | None (no HR signal) | Logged for record. Excluded from twin calibration. |
+| 6 | Manual entry only | ✗ | ✗ | ✗ | ✗ | ✗ | None | Training record only. No analytical value. |
+
+**Key insight**: Threshold detection requires intensity variation, not just HR accuracy. Easy runs are calibration-eligible (meet the five-rule gate) but do NOT provide threshold detection evidence because they lack the intensity variation needed for HR deflection/RR inflection algorithms. A calibration-eligible easy run contributes to fitness/fatigue scores, not threshold confidence.
 
 ## Load Dimensions by Tier
 
@@ -247,6 +350,87 @@ type DataTierCapabilities = {
 | 1, 2 | Power-to-HR ratio analysis | Supplementary only |
 | 2, 4 | HR deflection analysis | Moderate |
 | 5, 6 | Historical inference only | No update |
+
+**Vision ↔ Architecture note:** This table implements the vision's "Signal Hierarchy" from `docs/vision/twin/training-zones.md`. The vision describes five conceptual tiers (RR intervals → HR-based → Dedicated calibration → Lab/Test → Inference). This architecture table maps those to hardware-based data tiers:
+
+| Vision Signal Tier | Architecture Equivalent | Observation Weight |
+|---|---|---|
+| Raw RR intervals (chest strap) | Tier 1, 3 → `training_rr_inflection` | 2.5 |
+| HR-based signals without RR | Tier 2, 4 → `training_hr_deflection` | 1.0 |
+| Dedicated calibration sessions | Calibration-eligible sessions with intensity variation → `field_test` | 2.0–5.0 |
+| Lab/Test Uploads | `lab_test` source | 12.0–15.0 |
+| Inference from training history | `questionnaire_estimate` source | 0.5 |
+
+The vision's hierarchy is about signal quality. The architecture's tiers are about hardware capability. They overlap but are not identical — a Tier 1 athlete (power + RR) can still produce low-quality RR data if the chest strap is faulty, and a Tier 4 athlete (optical HR) can produce high-quality HR deflection data over many sessions.
+
+## Vision ↔ Architecture: Data Philosophy
+
+This section maps the five principles from `docs/vision/twin/data-philosophy.md` to their architectural implementations in this document and across the architecture layer. These principles are the design rationale behind the tier structure, invariants, and observation weights defined above.
+
+### 1. Real Signals, Not Assumptions
+
+The vision commits to using actual physiological data rather than estimated or inferred metrics. Grade-adjusted pace replaces raw pace. RR intervals are preferred over optical HR. Lab/test uploads are accepted with provenance.
+
+| Philosophy Element | Architecture Implementation |
+|---|---|
+| GAP replaces raw pace | Invariant #9 in `principles.md`: "Raw pace is never used." |
+| RR intervals preferred | Tier 1–3 have `has_rr = true`; RR enables `training_rr_inflection` (observation weight 2.5) vs `training_hr_deflection` (weight 1.0) |
+| Lab/test uploads with provenance | `lab_test` source receives the highest observation weight (12.0–15.0) in the system |
+| Honest confidence when data is poor | Tier 5–6 have `threshold_detection: 'none'`; `calibration_eligible = false` |
+
+### 2. Data Quality Over Quantity
+
+The vision commits to excluding sessions without device data from twin calibration. Noisy or incomplete data corrupts the model more than gaps do. The twin always knows the data quality tier and weights learning accordingly.
+
+| Philosophy Element | Architecture Implementation |
+|---|---|
+| Manual entry excluded from calibration | `calibration_eligible = false` for `manual_entry` source; Tier 6 invariant |
+| Noisy data excluded | Tier 5–6 never calibration-eligible; Tier 6 null loads |
+| Quality-aware weighting | Observation weights by source (0.5–15.0 range encodes quality into Bayesian update) |
+| Confidence reflects data quality | Per-metric confidence from prior weights; `metric_confidence` on TwinState |
+
+### 3. Continuous Learning From Real Training
+
+The vision commits to updating the twin from every real training session. Individual time constants, threshold estimates, and adaptation patterns improve as data accumulates.
+
+| Philosophy Element | Architecture Implementation |
+|---|---|
+| Every session updates the twin | TwinState is append-only (invariant #4 in `principles.md`); recalibration appends new record |
+| Continuous improvement over time | Bayesian update with observation weights; confidence transitions LOW → MEDIUM → HIGH |
+| Historical reprocessing | Algorithm improvements reprocess recent history (invariant #14 in `principles.md`) |
+| Auditability of learning | Append-only + version strings make every historical decision explainable |
+
+### 4. Non-Running Data Does Not Corrupt the Running Model
+
+The vision commits to logging non-running activities but never calibrating them into the twin. No arbitrary conversion factors. The twin waits for the next run.
+
+| Philosophy Element | Architecture Implementation |
+|---|---|
+| Non-running excluded from calibration | Invariant #8 in `principles.md`: "Non-running activities are excluded from twin calibration" |
+| No conversion factors | Anti-goal #11 in `principles.md`: "no multi-sport conversion factors" enforced as architectural constraint |
+| Activities logged but not calibrated | `calibration_eligible = false` for non-running; Activity record exists but twin does not learn from it |
+
+### 5. The Honesty Invariant
+
+The vision commits to always being honest about evidence confidence. Conservative language, target ranges rather than point estimates, cautious plan structures. As evidence confidence grows, coaching becomes more specific.
+
+| Philosophy Element | Architecture Implementation |
+|---|---|
+| Conservative at low confidence | RacePrediction returns null at LOW confidence (204, no record) |
+| Per-metric honesty | Confidence is per-metric, not global; each parameter accumulates independently |
+| Unknown states preserved | `inferred_state = 'unknown'` when confidence < 0.45; coach makes no claims about unknown segments |
+| Range over point estimates | Bayesian posterior distributions (`state_probabilities`); confidence intervals on thresholds |
+| Plans reflect confidence level | `twin_state_id` on TrainingPlan records which twin version produced it; LOW confidence → different phase structures |
+
+### Summary: Why the Tier Structure Exists
+
+The six-tier hardware classification is not an arbitrary technical decision. It is the architectural expression of five philosophical commitments:
+
+1. **Tiers exist** because real signals vary in quality, and the system must be explicit about what it can and cannot know.
+2. **Tier 5–6 exclusion** exists because gaps are preferred over noise — the system refuses to learn from data it cannot trust.
+3. **Observation weights vary by source** because not all evidence is equal, and the Bayesian update must reflect that.
+4. **Non-running activities are logged but not calibrated** because the running model must not be corrupted by signals it was not designed to process.
+5. **Confidence is per-metric and visible** because the system must never overstate what it knows.
 
 ## Tier Inference from AthletePreferences
 
@@ -269,6 +453,8 @@ function inferDataTier(hrSource: HrSource, powerSource: PowerSource): DataTier {
 - Tier 6 activities have null `aerobic_load`, `neuromuscular_load`, `structural_load`
 - A session without GPS (`has_gps = false`) defaults to Tier 6 for structural load purposes even if HR is present
 - Optical HR (`wrist_optical`) is adequate for zone-based load calculation. Its limitation versus chest strap is specifically the absence of RR intervals for threshold detection — not HR accuracy for sustained aerobic efforts
+- Threshold detection capability is determined by data tier (see Tier Definitions table). Tiers 1–4 provide different levels of threshold detection; Tiers 5–6 provide none.
+- Easy runs are calibration-eligible for load computation but do NOT provide threshold detection evidence (insufficient intensity variation for HR deflection/RR inflection algorithms)
 
 ## Runtime Ownership
 Owns:
@@ -330,7 +516,7 @@ type EventType =
   | 'recovery_modifier_changed'
   // Planning events
   | 'onboarding_completed'
-  | 'training_block_created'
+  | 'training_goal_created'
   | 'secondary_event_registered'
   | 'secondary_event_removed'
   | 'training_plan_generated'
@@ -515,7 +701,7 @@ type RecoveryModifierChangedPayload = {
 
 ```typescript
 type OnboardingCompletedPayload = {
-  training_block_id: string
+  training_goal_id: string
   twin_state_id: string
   data_tier: number
   confidence_level: 'low'    // always low at onboarding
@@ -532,15 +718,15 @@ type OnboardingCompletedPayload = {
 ```typescript
 type TrainingPlanGeneratedPayload = {
   training_plan_id: string
-  training_block_id: string
+  training_goal_id: string
   phase_count: number
   total_weeks: number
   supersedes_plan_id: string | null
-  trigger: 'new_block' | 'goal_date_change' | 'confidence_upgrade'
+  trigger: 'new_goal' | 'goal_date_change' | 'confidence_upgrade'
 }
 ```
 
-**Producer:** `PlanGenerationService`
+**Producer:** `TrainingGoal` entity (via `PlanGenerationService`)
 **Consumers:** `PreWeekReviewAgent` (schedules first weekly synthesis), `FirstMessageAgent` (generates first message from WeeklyPlan), `ProactiveMessageService` (plan regeneration notification), `WeatherForecastService` (prefetch for upcoming session dates)
 
 ---
@@ -590,10 +776,10 @@ type CoachingMessageGeneratedPayload = {
 ```typescript
 type RacePredictionUpdatedPayload = {
   race_prediction_id: string
-  training_block_id: string
+  training_goal_id: string
   baseline_prediction_seconds: number
   confidence_level: 'medium' | 'high'
-  update_trigger: 'activity_sync' | 'weather_update' | 'course_profile' | 'new_block' | 'secondary_event_added' | 'secondary_event_removed'
+  update_trigger: 'activity_sync' | 'weather_update' | 'course_profile' | 'new_goal' | 'secondary_event_added' | 'secondary_event_removed'
 }
 ```
 **Producer:** `RacePredictionService`
@@ -605,13 +791,14 @@ type RacePredictionUpdatedPayload = {
 ```typescript
 type SecondaryEventRegisteredPayload = {
   secondary_event_id: string
-  training_block_id: string
+  training_goal_id: string
   event_type: SecondaryEventType
   event_date: string
   priority: SecondaryEventPriority
 }
 ```
-**Producer:** `TrainingBlockService` (secondary event endpoint)
+
+**Producer:** `TrainingGoal` entity (secondary event endpoint)
 **Consumers:** `PlanGenerationService`, `RacePredictionService`
 
 ---
@@ -620,11 +807,12 @@ type SecondaryEventRegisteredPayload = {
 ```typescript
 type SecondaryEventRemovedPayload = {
   secondary_event_id: string
-  training_block_id: string
+  training_goal_id: string
   event_date: string
 }
 ```
-**Producer:** `TrainingBlockService` (secondary event endpoint)
+
+**Producer:** `TrainingGoal` entity (secondary event endpoint)
 **Consumers:** `PlanGenerationService`, `RacePredictionService`
 
 ---
@@ -821,12 +1009,13 @@ Does Not Own:
 ## Purpose
 - Defines the non-negotiable rules every engineer must internalise before touching any part of the system
 - Establishes the five-layer separation of concerns that governs all data flow
+- Several invariants below implement philosophical commitments from `docs/vision/twin/data-philosophy.md` — see inline references in invariants #8, #9, #11, #14
 
 ## Invariants
 
 1. **Activities are physiological observations, not workout summaries.** `Activity` stores what the twin model needs. It never stores avg_hr, avg_pace, avg_power, or lap dumps. The FIT file is the source of truth.
 
-2. **The twin is deterministic Python. The LLM writes narrative.** All analytical computation — fitness scoring, threshold estimation, execution classification, load accumulation, wellness trend analysis — lives in Python services. LLM agents receive a pre-computed digest and write coaching text. They never derive findings.
+2. **The twin computes metrics deterministically in Python. The LLM reasons about structure and instantiates plans from pre-computed metrics. Python validates structural invariants.** All analytical computation — fitness scoring, threshold estimation, execution classification, load accumulation, wellness trend analysis — lives in Python services. LLM agents receive pre-computed metrics and twin state summary, then reason about plan structure (strategic hypotheses, week-by-week session placement) and generate narrative. Python validates all structural invariants during plan generation and session lifecycle.
 
 3. **`fit_file_key` is a hard prerequisite.** No `Activity` record commits without its raw file stored in object storage. This is the reprocessing anchor. If object storage fails, the task retries. No exceptions.
 
@@ -838,38 +1027,38 @@ Does Not Own:
 
 7. **All heavy processing is async.** FIT parsing, twin recalibration, post-workout analysis — all run in a worker queue (Celery or ARQ over Redis). API responses never wait for these.
 
-8. **Non-running activities are excluded from twin calibration.** They appear in the training record. They never feed load computation, threshold detection, execution analysis, or adaptation modelling.
+8. **Non-running activities are excluded from twin calibration.** They appear in the training record. They never feed load computation, threshold detection, execution analysis, or adaptation modelling. *(Implements vision principle "Non-Running Data Does Not Corrupt the Running Model" from `docs/vision/twin/data-philosophy.md`.)*
 
-9. **Raw pace is never used.** Grade-adjusted pace (GAP) is the standard input throughout. See `02-computations/effort-normalisation.md`.
+9. **Raw pace is never used.** Grade-adjusted pace (GAP) is the standard input throughout. See `02-computations/effort-normalisation.md`. *(Implements vision principle "Real Signals, Not Assumptions" from `docs/vision/twin/data-philosophy.md`.)*
 
 10. **Old analytical records are never deleted.** Superseded records receive `superseded_at`. New records are inserted alongside.
 
-11. **Anti-goals are architectural constraints.** The following product boundaries are enforced through bounded models and API design: no dashboard UX, no raw-data-first experiences, no multi-sport conversion factors, no athlete-authored training plans. These are not merely product preferences — they are architectural governance boundaries. Future system evolution must be evaluated against these constraints.
+11. **Anti-goals are architectural constraints.** The following product boundaries are enforced through bounded models and API design: no dashboard UX, no raw-data-first experiences, no multi-sport conversion factors, no athlete-authored training plans. These are not merely product preferences — they are architectural governance boundaries. Future system evolution must be evaluated against these constraints. *(The "no multi-sport conversion factors" constraint implements the vision principle "Non-Running Data Does Not Corrupt the Running Model" from `docs/vision/twin/data-philosophy.md`.)*
 
 12. **Premium features require architectural foresight.** Free Coach Chat (conversational agent), Group & Team Training (shared plan, individual twins), and Voice Companion (audio delivery surface) are defined in product vision but have no current architecture. When implemented, they must integrate with existing agent architecture, context budgeting, and coach voice constraints. These features should not bolt on as separate systems.
 
 13. **Peer-similar bootstrap is a Tier 2 onboarding path.** For athletes without importable training history, the twin can bootstrap from anonymised models of similar athletes. This peer-similar model source, selection criteria, and application mechanism must be defined in architecture before implementation. The peer-similar path produces initial physiological estimates that are replaced by real training data as sessions accumulate.
 
-14. **Algorithm improvements reprocess recent history.** When a calibration algorithm improves or a new metric becomes available, the system reprocesses recent calibration-eligible sessions through the new algorithm. This accelerates the benefit of improvements without waiting passively for new data. The current state (`AthletePhysiology`, `AthleteFitness`) updates to reflect the improved algorithm. Historical records (`TwinState`, `PhysiologyMeasurement`) remain untouched — the audit trail is preserved through version strings and append-only writes. The athlete receives a coaching communication explaining what changed and why.
+14. **Algorithm improvements reprocess recent history.** When a calibration algorithm improves or a new metric becomes available, the system reprocesses recent calibration-eligible sessions through the new algorithm. This accelerates the benefit of improvements without waiting passively for new data. The current state (`AthletePhysiology`, `AthleteFitness`) updates to reflect the improved algorithm. Historical records (`TwinState`, `PhysiologyMeasurement`) remain untouched — the audit trail is preserved through version strings and append-only writes. The athlete receives a coaching communication explaining what changed and why. *(Implements vision principle "Continuous Learning From Real Training" from `docs/vision/twin/data-philosophy.md`.)*
 
 ## Five-Layer Separation of Concerns
 
 ```
 ┌──────────────────────────────────────────────────────┐
-│  5. TWIN INTERPRETATION                               │
-│     TwinState recalibration · coaching signals        │
+│  5. TWIN INTERPRETATION                              │
+│     TwinState recalibration · coaching signals       │
 ├──────────────────────────────────────────────────────┤
-│  4. ADAPTATION OBSERVATION                            │
-│     Block-level response · yield profiles             │
+│  4. ADAPTATION OBSERVATION                           │
+│     Block-level response · yield profiles            │
 ├──────────────────────────────────────────────────────┤
-│  3. PHYSIOLOGICAL ANALYSIS                            │
-│     ExecutionObservation · segmentation               │
+│  3. PHYSIOLOGICAL ANALYSIS                           │
+│     ExecutionObservation · segmentation              │
 ├──────────────────────────────────────────────────────┤
-│  2. WORKOUT EXECUTION STRUCTURE                       │
-│     PlannedSegment · DeviceSegment · PhysSegment      │
+│  2. WORKOUT EXECUTION STRUCTURE                      │
+│     PlannedSegment · DeviceSegment · PhysSegment     │
 ├──────────────────────────────────────────────────────┤
-│  1. RAW SENSOR INGESTION                              │
-│     FIT file · stream cleaning · load computation     │
+│  1. RAW SENSOR INGESTION                             │
+│     FIT file · stream cleaning · load computation    │
 └──────────────────────────────────────────────────────┘
 ```
 
@@ -895,6 +1084,67 @@ Lower layers feed upper layers. Upper layers never reach down to read raw data d
 ## Open Questions
 - None. These invariants are settled.
 
+---
+
+## Vision Cross-References
+
+This section maps product vision principles and constraints to their architecture implementations. These cross-references ensure architectural decisions trace back to intentional product philosophy.
+
+### Vision Design Philosophy Mapping
+
+Maps design philosophy from `docs/vision/product/brand-philosophy.md` to architecture enforcement mechanisms.
+
+| Vision Principle | Architecture Implementation | Enforced By |
+|---|---|---|
+| **Blackboard Principle** — minimalist UI, text-driven, no visual noise | No dashboard UX anti-goal; API returns plain-language descriptors | Invariant #11, `form_descriptor` pattern in `athlete-fitness.md` |
+| **Coach Not Dashboard** — athlete sees conclusions, not numbers | Fitness scores are internal; athletes see only `form_descriptor` | `athlete-fitness.md` API contract (raw scores never returned) |
+| **No AI-Feel Communication** — plain language, no bullets/headers/emojis | Agent voice constraints enforce three natural paragraphs, no formatting | `post-workout-agent.md`, `first-message-agent.md` voice rules |
+| **Data Processing Boundary** — Python computes, LLM reasons | Deterministic computation in Python; LLM receives pre-computed metrics | Invariant #2, `02-computations/` service layer |
+| **Coaching Expertise Boundaries** — redirect outside running domain | *Not yet implemented in architecture* | Future: agent prompt constraints |
+
+### Differentiator → Architecture Mapping
+
+Maps differentiators from `docs/vision/product/differentiators.md` to architecture foundations. Each differentiator is a product promise; the architecture delivers it.
+
+| Differentiator | Architecture Foundation | Key Entities |
+|---|---|---|
+| **Running-Specific Model Accuracy** — no cross-modal conversion errors | Running-only twin model; non-running excluded from calibration | `activity.md` invariant, principle #8 |
+| **Three-Dimensional Load Intelligence** — aerobic/neuromuscular/structural tracked separately | Separate load dimensions with individual time constants | `activity.md` (load fields), `athlete-fitness.md` (dimensional scores) |
+| **Women's Cycle-Aware Coaching** — physiological input into twin and coaching | Cycle phase integration into recovery modifier and workout targets | `cycle-phase-log.md`, `athlete-profile.md` (`cycle_personal_model`), `wellness-modifier.md` |
+| **Complexity Hidden, Conclusions Surfaced** — athlete sees coaching insight, not data | Raw scores internal; plain-language `form_descriptor` returned | `athlete-fitness.md` API, agent voice constraints |
+| **Same-Day Workout Generation** — specific workout generated day-of | Workout generated from freshest athlete state, not planned weeks ahead | `workout-generation-agent.md`, `generated-workout.md`, `planned-session.md` |
+| **Personalised Weather Response** — athlete-specific environmental model | Individual weather performance model learned from execution history | `weather-forecast.md`, `wellness-modifier.md` |
+| **Historical Correlation in Coach Messages** — session connected to past patterns | Comparable session matching with phase/fitness context | `comparable-sessions.md`, `execution-observation.md` (`coaching_observations`) |
+| **Rep-Level Analysis** — granular interval execution examination | Per-rep execution analysis with pacing drift detection | `execution-observation.md` (`per_rep_analysis`) |
+| **Coach Voice** — plain language, no tech jargon, reads like a human | Natural language constraints; no AI-feel formatting | Agent voice rules, `voice-and-format.md` vision |
+| **Living Objectives** — sessions connect to bigger picture | Objectives seeded from twin analysis, updated weekly with evidence | `objective.md`, `objective-management.md` |
+
+### Vision Constraints Mapping
+
+Maps constraints from `docs/vision/product/constraints.md` to architecture enforcement. These are hard boundaries — the architecture prevents violation.
+
+| Vision Constraint | Architecture Implementation | Enforced By |
+|---|---|---|
+| **Running-Only Twin Model** — no multi-sport conversion factors | Non-running activities logged in training record but excluded from twin calibration | Principle #8, `activity.md` calibration eligibility |
+| **No Workout Builder** — athletes cannot create/edit workouts | Athletes have three choices: accept, substitute, or skip | Principle #11 (anti-goal), `planned-session.md` status machine |
+| **No Raw Data Surfaces** — no HR/pace/power charts; only twin-context visualisations | Fitness API returns `form_descriptor` only; raw scores never exposed | `athlete-fitness.md` API contract, `form_descriptor` pattern |
+| **Unsynced Workout Handling** — ask before assuming when data gaps occur | `fit_file_key` prerequisite; coach surfaces ambiguity-first check-in | `activity.md` invariant, agent prompt behavior |
+| **Same-Day Training Sessions** — AM/PM slots with primary/secondary | Dual session support with recovery measured primary-to-primary | `planned-session.md` (AM/PM slots), `weekly-plan.md` |
+
+### Vision → Architecture Reference Links
+
+Additional explicit links between vision documents and architecture implementations:
+
+| Vision Document | Architecture Document | Link Type |
+|---|---|---|
+| `docs/vision/twin/data-philosophy.md` | `principles.md` (invariants #8, #9, #11, #14) | Direct inline reference |
+| `docs/vision/twin/womens-cycle.md` | `cycle-phase-log.md` (Vision Phase Mapping table) | Explicit mapping table |
+| `docs/vision/coach/voice-and-format.md` | Agent voice constraints in `03-agents/*.md` | Prompt enforcement |
+| `docs/vision/coach/post-workout.md` | `execution-observation.md` (Post-Workout Message Mapping) | Explicit mapping table |
+| `docs/vision/coach/objectives.md` | `objective-management.md` (Vision ↔ Architecture Alignment) | Explicit mapping table |
+| `docs/vision/coach/first-message.md` | `first-message-agent.md` (First Message Vision Mapping) | Explicit mapping table |
+| `docs/vision/twin/external-modifiers.md` | `wellness-modifier.md` (Vision Signal Mapping) | Explicit mapping table |
+
 ## 00-foundations > terminology
 
 # Terminology — Canonical Domain Definitions
@@ -915,7 +1165,7 @@ An `Activity` that meets the five-rule gate for twin recalibration. See `02-comp
 A pre-computed structured finding produced by the `ExecutionAnalysisService` and stored in `ExecutionObservation.coaching_observations`. The LLM receives this and writes narrative from it. The LLM does not produce the observation.
 
 ### Confidence Level
-An assertion about how much real training data the twin has learned from for a given athlete. Three values: `low`, `medium`, `high`. Affects coaching language precision and whether race predictions are surfaced. See `00-foundations/confidence-model.md`.
+An assertion about how much real training data the twin has learned from for a given athlete. **Per-metric**: each physiological parameter (LT1, LT2, CP) accumulates evidence independently. Global confidence level is derived as the minimum of LT1 HR and LT2 HR confidence for simple consumers. Three values: `low`, `medium`, `high`. Affects coaching language precision and whether race predictions are surfaced. See `00-foundations/confidence-model.md`.
 
 ### Data Tier
 A classification of an athlete's hardware capability that determines which signals are available for load computation and threshold detection. Six tiers from Tier 1 (running power + chest strap RR) to Tier 6 (manual entry only). See `00-foundations/data-tiers.md`.
@@ -948,7 +1198,7 @@ Lactate threshold 1 — the intensity at which blood lactate first begins to ris
 Lactate threshold 2 — the intensity at which lactate accumulation exceeds the body's buffering capacity. Corresponds to the anaerobic threshold / functional threshold. The primary reference for threshold zone workout targets.
 
 ### PhysiologicalIntent
-The canonical enum representing the physiological adaptation a session targets. Eight values: `low_aerobic`, `high_aerobic`, `threshold`, `vo2max`, `race_specific`, `neuromuscular`, `recovery_support`, `calibration`. This is the middle layer of the three-layer hierarchy: MethodologyTraitVector → PhysiologicalIntent → SessionType. See `00-foundations/terminology.md` → Shared Enums.
+The canonical enum representing the physiological adaptation a session targets. Six values: `low_aerobic`, `high_aerobic`, `threshold`, `vo2max`, `neuromuscular`, `recovery`. This is the middle layer of the three-layer hierarchy: MethodologyTraitVector → PhysiologicalIntent → SessionType. See `00-foundations/terminology.md` → Shared Enums.
 
 ### Readiness
 The twin's current assessment of an athlete's capacity for today's training, computed from the combination of TwinState fitness/fatigue scores and Layer 4 wellness modifier. Expressed as GREEN / AMBER / RED in the recovery modifier and as plain language in coaching messages.
@@ -1191,6 +1441,8 @@ type IntentRanges = {
 }
 ```
 Computed on-the-fly from the athlete's current PhysiologyThresholds. Not stored as a separate entity. Architecture owns "intent → physiological region"; exact multiplier constants belong in implementation.
+
+**Vision ↔ Architecture note:** Range width is driven by `PhysiologyParameterState.uncertainty`. As prior observations age (42-day decay in `bayesianUpdate()`), uncertainty increases and ranges widen. This implements the vision principle that "calibration confidence degradation" produces "wider target ranges" without silently expiring evidence. See `docs/vision/twin/training-zones.md` → Calibration Confidence Degradation.
 
 ### ComplianceFamily
 ```typescript
@@ -1478,16 +1730,15 @@ Traces:
 
 ## 01-entities > adaptation-observation
 
-# AdaptationObservation — Window Adaptation Signal
+# Adaptation Observation
 
 ## Purpose
-- ### Purpose
 
 - Records the relationship between training load applied and fitness change produced for an **adaptation observation window** (2-3 quality sessions followed by recovery)
 - The source data for the athlete's adaptation signature and yield profiles
 - Drives plan personalisation in PlanGenerationService once sufficient observations accumulate
-- The source data for the athlete's adaptation signature and yield profiles
-- Drives plan personalisation in PlanGenerationService once sufficient observations accumulate
+
+---
 
 ## TypeScript Schema
 
@@ -1498,15 +1749,76 @@ type AdaptationObservation = {
   adaptation_window_id: string          // UUID, identifies the adaptation observation window (2-3 quality sessions + recovery)
   window_start_date: string           // YYYY-MM-DD
   window_end_date: string               // YYYY-MM-DD
+
+  // Unit classification
+  unit_type: 'hard_window' | 'isolated' | 'recovery'
+    // 'hard_window': 2-3 quality sessions treated as single compound stimulus
+    // 'isolated': single quality session flanked by easy days (cleanest signal, highest analytical weight)
+    // 'recovery': recovery/easy period observation (active observation window, no stimulus to measure fatigue against)
+
+  // Stimulus profile (aggregate load across the window)
   total_aerobic_load: number
   total_neuromuscular_load: number
   total_structural_load: number
+
+  // Response measurements
   fitness_delta: number               // TwinState fitness_score change across window
-  recovery_trajectory: RecoveryTrajectory
+  fatigue_depth: number | null        // Immediate post-window fatigue magnitude (HRV suppression, sleeping HR elevation, sleep quality drop relative to baseline)
+                                      // Null for recovery-period observations (no stimulus to measure fatigue against)
+  recovery_trajectory: RecoveryTrajectory  // How quickly wellness signals return to personal baseline
+  execution_quality_delta: number | null   // Performance change on first quality session after recovery, relative to recent baseline for that session type
+                                           // Null if no quality session occurred after the recovery window
+                                           // The confirmation signal: strong delta + full recovery = adequate window; degraded delta = insufficient window
+
+  // Contextual fields
+  cycle_phase: string | null          // Current menstrual cycle phase during observation window
+                                      // Required for female athletes, null for male athletes
+                                      // All response dimensions are read through this lens — late luteal suppression differs from mid-follicular suppression
+  confidence_level: 'calibration' | 'emerging' | 'established'
+    // 'calibration': < 6 weeks of data, low signal reliability
+    // 'emerging': 6-8 weeks, meaningful individual signal starting to appear
+    // 'established': full training cycle completed, high confidence in signature
+
+  // Structural compliance
+  structurally_compliant: boolean     // Whether observation window satisfied plan structure rules
+                                      // (easy days flanking hard work, rest after long runs)
+  compliance_deviation: string | null // Human-readable description of what deviated from structural rules
+                                      // Null if structurally_compliant = true
+                                      // Examples: "skipped easy day before threshold session",
+                                      //           "extra quality session added between easy days",
+                                      //           "long run not followed by rest day"
+                                      // Downstream weight adjustment scales by deviation severity:
+                                      //   skipped easy day → mild contamination, moderate weight reduction
+                                      //   extra hard session → significant contamination, heavy weight reduction
+                                      //   missed rest after long run → moderate contamination, moderate weight reduction
+
+  // Metadata
   yield_by_intent_state: Partial<Record<PhysiologicalIntentState, number>>
   analysis_version: string
 }
 ```
+
+---
+
+## Vision ↔ Architecture Cross-Reference
+
+This section maps adaptation-signature vision concepts to architecture fields explicitly.
+
+| Vision Concept | Architecture Field(s) | Notes |
+|---|---|---|
+| Adaptation window (2-3 quality sessions as single compound stimulus) | `adaptation_window_id`, `window_start_date`, `window_end_date` | Groups sessions into one observation unit |
+| Three training unit types (hard window, isolated session, recovery period) | `unit_type` | Explicit classification; isolated sessions weighted more heavily |
+| Compound stimulus profile | `total_aerobic_load`, `total_neuromuscular_load`, `total_structural_load` | Aggregate load across all three dimensions |
+| Short-term fatigue depth | `fatigue_depth` | Distinct from recovery speed — deep fatigue with fast recovery is physiologically different from shallow fatigue with slow recovery |
+| Recovery trajectory | `recovery_trajectory` | How quickly wellness signals return to baseline |
+| Execution quality at next session | `execution_quality_delta` | Confirmation signal: was the recovery window sufficient? |
+| Cycle phase lens (female athletes) | `cycle_phase` | All three response dimensions read through this context |
+| Yield per training emphasis | `yield_by_intent_state` | Per-state fitness change per unit load |
+| Confidence accumulation | `confidence_level` | Distinguishes calibration-phase data from reliable signature data |
+| Plan structure as experimental control | `structurally_compliant`, `compliance_deviation` | Flags contaminated observations; deviation text enables scaled weight adjustment |
+| Fitness change produced | `fitness_delta` | Net fitness score change across the window |
+
+---
 
 ## Yield Profiles
 
@@ -1521,38 +1833,79 @@ type AdaptationObservation = {
 }
 ```
 
-Over multiple blocks, these values build the athlete's adaptation signature. An athlete with high threshold yield gets more threshold work in the plan; an athlete with high aerobic volume yield gets more volume. See `02-computations/adaptation-signature.md`.
+Over multiple adaptation windows, these values build the athlete's adaptation signature. An athlete with high threshold yield gets more threshold work in the plan; an athlete with high aerobic volume yield gets more volume. See `02-computations/adaptation-signature.md`.
+
+**Weighting rules:**
+- Observations with `unit_type = 'isolated'` receive higher analytical weight (cleaner experimental conditions)
+- Observations with `structurally_compliant = false` receive reduced weight scaled by deviation severity (see `compliance_deviation` field)
+- Observations with `confidence_level = 'calibration'` receive reduced weight until sufficient data accumulates
+- Observations where `cycle_phase` indicates late luteal should be flagged — fatigue and recovery signals during this phase are partly hormonal, not purely load-response
+
+---
 
 ## Block Boundary Detection
 
-`AdaptationBlockDetectionTask` identifies block boundaries as:
-- 2+ quality sessions (`threshold`, `vo2max`, `tempo`, `hill_repeats`, `fartlek`, `long_run`) in the preceding 5 days followed by 2+ `easy_run` or `rest` sessions — the "hard block + recovery" pattern
+`AdaptationBlockDetectionTask` identifies adaptation window boundaries as:
+- 2+ quality sessions (`threshold`, `vo2max`, `tempo`, `hill_repeats`, `fartlek`, `long_run`) in the preceding 5 days followed by 2+ `easy_run` or `rest` sessions — the "hard adaptation window + recovery" pattern
 - OR: week boundaries in the `TrainingPlan.phases` array
 
+In planned training, `block_id` groups on `PlannedSession` records are the primary input for this detection. The weekly synthesis agent creates `block_id` groups precisely to generate the pattern that `AdaptationBlockDetectionTask` later identifies as adaptation windows. The `block_id` is the planning mechanism; the adaptation window is the observation purpose.
+
+**Unit type detection:**
+- If the detected block contains 2+ quality sessions → `unit_type = 'hard_window'`
+- If the detected block contains exactly 1 quality session flanked by easy days → `unit_type = 'isolated'`
+- Recovery periods between blocks → `unit_type = 'recovery'` (active observation window, no stimulus)
+
+---
+
 ## Invariants
+
 - `AdaptationObservation` is only created for athletes with ≥ 6 weeks of calibration-eligible sessions (earlier data lacks sufficient signal).
 - Records are append-only. Analysis version changes increment `analysis_version` and new records are created alongside old ones (old records receive `superseded_at`).
-- `yield_by_intent_state` only contains keys for states that appeared in the block's `PhysiologicalSegment` records. Missing keys mean no exposure to that state during the block.
+- `yield_by_intent_state` only contains keys for states that appeared in the adaptation window's `PhysiologicalSegment` records. Missing keys mean no exposure to that state during the adaptation window.
+- `unit_type` must match the pattern detected by `AdaptationBlockDetectionTask` — hard window requires 2+ quality sessions, isolated requires exactly 1 quality session flanked by easy days, recovery is not an observation trigger for stimulus measurement.
+- `fatigue_depth` must be null for `unit_type = 'recovery'` observations (no stimulus to measure fatigue against).
+- `execution_quality_delta` must be null if no quality session occurred after the recovery window.
+- `cycle_phase` is required for female athletes, null for male athletes.
+- Observations with `structurally_compliant = false` should be excluded from yield profile computation or flagged with reduced weight in downstream consumers. The `compliance_deviation` text informs the severity of weight adjustment.
+
+---
 
 ## Events
 
 ### Produced
+
 | Event | Trigger | Version | Payload |
 |---|---|---|---|
-| `adaptation_observation_created` | Record inserted | v1 | `{observation_id, training_block_id, fitness_delta, days_to_baseline_return}` |
+| `adaptation_observation_created` | Record inserted | v1 | `{observation_id, adaptation_window_id, fitness_delta, days_to_baseline_return, unit_type, confidence_level}` |
+
+---
 
 ## Storage Model
+
 | Data | Strategy | Consistency | Retention |
 |---|---|---|---|
 | `adaptation_observations` table | append-only | strong | indefinite |
 
+---
+
 ## Runtime Ownership
+
 Owns:
-- Block-level adaptation measurements
+- Adaptation window-level adaptation measurements
 
 Does Not Own:
 - How yield profiles drive plan generation → `02-computations/plan-generation.md`
 - Adaptation signature computation → `02-computations/adaptation-signature.md`
+
+---
+
+## Cross-References
+
+- Adaptation signature entity: `02-computations/adaptation-signature.md`
+- Plan generation consuming adaptation constraints: `02-computations/plan-generation.md`
+- PhysiologicalSegment yield computation (what state was the athlete in): `01-entities/physiological-segment.md`
+- Vision-level description of adaptation learning: `vision/twin/adaptation-signature.md`
 
 ## 01-entities > athlete-auth
 
@@ -1989,6 +2342,21 @@ Logs:
 ## Purpose
 - Stores credentials and sync state for each connected training platform
 - One record per athlete per platform; supports intervals.icu at launch, Garmin Connect planned
+- Serves Tier 1 (Native Platform APIs) and Tier 2 (Aggregator Platforms) integrations per the vision tier structure. Tier 3 (Direct File Ingestion) flows through Activity ingestion, not this entity.
+- All integrations serve the raw data philosophy: Pheidipp processes sensor data internally, never accepting derived metrics from third parties. See `docs/vision/product/integrations.md`.
+
+## Vision Alignment
+
+The vision defines three integration tiers and a separate wellness data category. This entity covers training integrations only.
+
+| Platform | Vision Tier | Type | Architecture Notes |
+|---|---|---|---|
+| `intervals_icu` | Tier 2 — Aggregator | Training | Maintains raw FIT files; Pheidipp processes internally. Launch platform. |
+| `garmin_connect` | Tier 1 — Native API | Training | Direct device manufacturer API; raw sensor streams. Planned. |
+| COROS, Polar, Suunto | Tier 1 — Native API | Training | Planned; not yet in `IntegrationPlatform` enum. |
+| Whoop, Oura | N/A | Wellness | Recovery context providers (sleep, HRV, resting HR). Feed External Modifiers layer, not this entity. |
+
+**Tier 3 — Direct File Ingestion:** Manual FIT file upload provides the highest-fidelity path. It bypasses this entity entirely and flows through `01-entities/activity.md` ingestion. No credentials or sync state required.
 
 ## TypeScript Schema
 
@@ -2161,7 +2529,7 @@ The relationship between CP and LT2:
 ```mermaid
 stateDiagram-v2
     [*] --> bootstrapped : questionnaire_estimate\n(all parameters; low weight)
-    bootstrapped --> training_calibrated : training_hr_deflection or\ntraining_rr_inflection\n(4 sessions → MEDIUM confidence)
+    bootstrapped --> training_calibrated : training_hr_deflection or\ntraining_rr_inflection\n(evidence weight ≥ 4.0 → MEDIUM confidence)
     training_calibrated --> training_calibrated : ongoing training updates\n(slow posterior drift)
     training_calibrated --> field_calibrated : field_test observation\n(dominant source shifts)
     training_calibrated --> lab_calibrated : lab_test observation\n(dominant source shifts strongly)
@@ -2533,6 +2901,8 @@ type CyclePersonalModel = {
     ovulatory: number
     luteal: number
   }
+  luteal_temp_sensitivity: number  // multiplier on LUTEAL_TEMP_OFFSET_C (0.35); population default: 1.0
+  fitted_from_cycles: number       // number of complete cycles used for fitting
   computed_at: string
 }
 ```
@@ -2544,6 +2914,7 @@ type CyclePersonalModel = {
 - `weather_response_model` is only applied when `r_squared >= 0.65`.
 - `banister_constants` stores per-athlete fitted time constants. When set, `AthleteFitness.time_constants` references these values (source='individual_fitted'). When null, `AthleteFitness.time_constants` uses population defaults (source='population_default').
 - `cycle_personal_model.phase_sensitivity` of `0.0` means the model detected no phase correlation — cycle modifier is effectively zeroed for this athlete. This is a valid outcome.
+- `cycle_personal_model.luteal_temp_sensitivity` of `1.0` means the population default thermoregulatory offset applies. Values <1.0 indicate lower-than-average thermal sensitivity; >1.0 indicate higher. When `cycle_personal_model` is null, `LUTEAL_TEMP_OFFSET_C` (0.35) applies at full population weight.
 
 ## Events
 
@@ -2558,6 +2929,36 @@ type CyclePersonalModel = {
 | `activity_ingested` (outdoor, ≥20 sessions) | Triggers `GapCurveFittingTask` | v1 |
 | `activity_ingested` (outdoor, ≥25 sessions, heat_index range ≥10°C) | Triggers `WeatherResponseCurveFittingTask` | v1 |
 | `cycle_day_one_logged` (≥3 complete cycles) | Triggers `CyclePersonalisationTask` | v1 |
+
+## Cycle Personalisation Fitting
+
+`CyclePersonalisationTask` runs when `cycle_day_one_logged` fires and ≥3 complete cycles exist. It produces `cycle_personal_model` — a JSONB field overwritten on each refit.
+
+### Fitting Stages
+
+**Stage 1 — Cycle length:** Compute median interval between consecutive `cycle_day_one_date` entries. Minimum 3 intervals (4 log entries). Stored as `avg_cycle_length_days`.
+
+**Stage 2 — Phase boundaries:** Analyse execution data (pace-at-HR ratio, GAP deviation, RPE) across cycles to detect phase transitions. Fit `menstrual_end`, `follicular_end`, `ovulatory_end` to observed transition points. Fallback: proportional boundaries (`cycle_length * 5/28`, etc.) if execution data is insufficient.
+
+**Stage 3 — Phase sensitivity:** For each phase, compare execution quality in that phase vs overall baseline. Compute `phase_sensitivity[phase]` as a multiplier on the population prior adjustment:
+- `0.0` = no phase correlation detected (adjustment zeroed)
+- `1.0` = full population effect
+- `>1.0` = stronger than population average
+
+**Stage 4 — Luteal thermoregulation:** Compare pace-at-HR in luteal vs follicular phases, controlling for ambient temperature (using `weather_response_model`). Compute `luteal_temp_sensitivity` as a multiplier on `LUTEAL_TEMP_OFFSET_C` (0.35). Population default: 1.0.
+
+### Fitting Prerequisites
+
+| Stage | Minimum data | Graceful fallback |
+|---|---|---|
+| Cycle length | 3 complete cycles (4 log entries) | Use 28-day default |
+| Phase boundaries | 3 cycles + ≥2 quality sessions per phase per cycle | Proportional boundaries from cycle length |
+| Phase sensitivity | 3 cycles + sufficient execution data per phase | `phase_sensitivity` = 1.0 (full population effect) |
+| Luteal thermoregulation | 3 cycles + outdoor sessions in both luteal and follicular at similar ambient temps | `luteal_temp_sensitivity` = 1.0 (population default) |
+
+### Refit Behaviour
+
+`cycle_personal_model` is overwritten on each refit (not accumulated). The fitting task re-runs when new cycle data arrives (≥3 complete cycles). Earlier fits with fewer cycles produce less reliable models; later fits with more cycles produce more reliable models. The system always uses the most recent fit.
 
 ## APIs
 
@@ -2615,9 +3016,12 @@ Does Not Own:
 Metrics:
 - `athlete_profile.gap_curve.fitted`: count of athletes with `r_squared >= 0.70`
 - `athlete_profile.banister_constants.fitted`: count of athletes with individual constants
+- `athlete_profile.cycle_personal_model.fitted`: count of athletes with fitted cycle models
+- `athlete_profile.cycle_personal_model.sensitivity_zeroed`: count of athletes where `phase_sensitivity` = 0.0 for any phase (no correlation detected)
 Logs:
 - `athlete_profile.gap_curve.fitted`: athlete_id, r_squared, session_count
 - `athlete_profile.banister_constants.fitted`: athlete_id, fitted_from_weeks
+- `athlete_profile.cycle_personal_model.fitted`: athlete_id, fitted_from_cycles, avg_cycle_length_days
 
 ## Implementation Notes
 - `date_of_birth` and `sex` are immutable after creation. If an athlete needs to correct them, this requires a support process, not a self-service PATCH.
@@ -2685,13 +3089,16 @@ If `sample_count < 14`, no baseline is written for that signal. The signal is ex
 
 These weights are defined here as the authoritative reference for `WellnessModifierService`:
 
-| Signal | Weight | Direction of concern |
-|---|---|---|
-| `avg_sleeping_hr_bpm` | 0.35 | Elevated above baseline |
-| `hrv_overnight_avg_ms` | 0.30 | Suppressed below baseline |
-| `total_sleep_minutes` | 0.20 | Reduced below baseline |
-| `min_sleeping_hr_bpm` | 0.10 | Elevated above baseline |
-| `deep_sleep_minutes` | 0.05 | Reduced below baseline |
+| Signal | Weight | Direction of concern | Notes |
+|---|---|---|---|
+| `avg_sleeping_hr_bpm` | 0.35 | Elevated above baseline | Primary recovery trend signal |
+| `hrv_overnight_avg_ms` | 0.30 | Suppressed below baseline | Autonomic nervous system recovery indicator |
+| `total_sleep_minutes` | 0.20 | Reduced below baseline | Volume of recovery time |
+| `min_sleeping_hr_bpm` | 0.10 | Elevated above baseline | Physiological floor; more stable than avg HR |
+| `deep_sleep_minutes` | 0.05 | Reduced below baseline | Physical/tissue repair; higher measurement noise |
+| `rem_sleep_minutes` | 0.08 | Reduced below baseline | Cognitive/emotional recovery; higher measurement noise than deep sleep |
+
+**Weight sum:** 1.08. Normalised by `computeCompositeScore` (divides by `weight_total`). The normalisation means absolute weights matter less than relative proportions, but the proportions should reflect the vision's emphasis: HR signals (45%) dominate, sleep signals (33%) are secondary, cognitive recovery (7%) is a meaningful but non-dominant input.
 
 Deviation score formula:
 ```typescript
@@ -2748,7 +3155,8 @@ Does Not Own:
 
 ## Observability
 Metrics:
-- `wellness_baseline.athletes_with_full_coverage`: count of athletes with ≥5 signals baselined
+- `wellness_baseline.athletes_with_full_coverage`: count of athletes with ≥6 signals baselined (avg_hr, hrv, total_sleep, min_hr, deep_sleep, rem_sleep)
+- `wellness_baseline.athletes_with_rem_coverage`: count of athletes with `rem_sleep_minutes` baseline available
 - `wellness_baseline.computation.latency_ms`
 
 ## 01-entities > athlete-wellness
@@ -2931,7 +3339,7 @@ type AthleteResponse = {
 ## Invariants
 
 - `email` is unique across all athletes. Case-insensitive uniqueness enforced at DB level via unique index on `lower(email)`.
-- `onboarding_complete` is set to `true` within the same transaction that creates the first `TrainingBlock`, `TwinState`. If any part fails, it remains `false`.
+- `onboarding_complete` is set to `true` within the same transaction that creates the first `TrainingGoal`, `TwinState`. If any part fails, it remains `false`.
 - An athlete with `onboarding_complete = false` cannot access plan, coaching, or workout endpoints.
 - Authentication credentials are stored in `AthleteAuth`, not in `Athlete`. See `01-entities/athlete-auth.md`.
 
@@ -2952,7 +3360,7 @@ stateDiagram-v2
 | Event | Trigger | Version | Payload |
 |---|---|---|---|
 | `athlete_registered` | Athlete + AthleteAuth created (POST /auth/register or /auth/google) | v1 | `{auth_provider, has_password, profile_completed}` |
-| `onboarding_completed` | Onboarding transaction commits | v1 | `{training_block_id, twin_state_id, data_tier, confidence_level}` |
+| `onboarding_completed` | Onboarding transaction commits | v1 | `{training_goal_id, twin_state_id, data_tier, confidence_level}` |
 
 ### Consumed
 None. `Athlete` is a root entity with no upstream dependencies.
@@ -3056,7 +3464,7 @@ type CheckpointType =
   | 'calibration'        // test workout for specific metric
   | 'benchmark'          // standardised progress measurement
   | 'race_simulation'    // race-pace effort without full stress
-  | 'secondary_race'     // B-race or C-race as assessment
+  | 'secondary_race'     // B-event or C-event as assessment
   | 'progress_review'    // periodic adaptation check
 
 type CheckpointStatus =
@@ -3095,10 +3503,10 @@ type Checkpoint = {
 ## Invariants
 
 - **One checkpoint per PlannedSession.** A PlannedSession may be flagged as a checkpoint, but a checkpoint cannot exist without a corresponding PlannedSession. The `training_plan_id` is derived from the PlannedSession's FK — no redundant FK on Checkpoint.
-- **Checkpoint type determines expected behaviour.** Calibration checkpoints expect metric updates. Benchmark checkpoints expect progress comparison. Race simulation expects race-pace validation. Secondary race expects race performance data. Progress review expects adaptation signal.
+- **Checkpoint type determines expected behaviour.** Calibration checkpoints expect metric updates. Benchmark checkpoints expect progress comparison. Race simulation expects race-pace validation. Secondary event expects event performance data. Progress review expects adaptation signal.
 - **Completion fields set atomically.** `metric_updated`, `confidence_changed`, `replan_triggered`, and `completed_at` are set together when status transitions to completed.
 - **Checkpoint cannot be created retroactively.** Checkpoints are scheduled during plan synthesis, not after session completion.
-- **Overshoot recovery uses static default until individual data is available.** The `+2 day` default applies unless `TwinState.confidence_level = 'high'` AND `AdaptationSignature` has ≥ 3 complete block observations. This prevents premature personalization from noisy data.
+- **Overshoot recovery uses static default until individual data is available.** The `+2 day` default applies unless `TwinState.confidence_level = 'high'` AND `AdaptationSignature` has ≥ 3 complete adaptation window observations. This prevents premature personalization from noisy data.
 
 ---
 
@@ -3136,7 +3544,7 @@ Checkpoints are scheduled during Phase 2 (synthesis) of plan generation based on
 | `calibration` | submaximal_tempo, threshold | Refine specific metric estimate | Yes | Yes (if confidence changes) |
 | `benchmark` | long_run_hr_drift, time_trial | Measure progress against baseline | Yes | Possibly |
 | `race_simulation` | marathon_pace_long_run | Test readiness without full stress | Yes | Possibly |
-| `secondary_race` | (actual race) | Leverage race as assessment | Yes | Yes |
+| `secondary_race` | (actual event) | Leverage event as assessment | Yes | Yes |
 | `progress_review` | weekly_form_check | Periodic adaptation signal | No | No |
 
 ---
@@ -3304,6 +3712,18 @@ Logs:
 - When a checkpoint session completes, `SessionLifecycleService` checks if the PlannedSession is a checkpoint and processes the checkpoint logic accordingly.
 - Checkpoint data flows into the twin update pipeline via the existing `session_completed` event. The checkpoint-specific logic (metric update, confidence assessment, replan trigger) is handled by a dedicated checkpoint completion handler.
 
+---
+
+## Cross-References
+
+- **Vision secondary events:** secondary-events (vision) — describes coaching transitions for B-races and C-races that map to `secondary_race` checkpoint type.
+- **Vision training plan checkpoints:** training-plan-checkpoints (vision) — describes checkpoint hierarchy, scheduling, completion, adaptive recovery, and adaptive evolution that map to this entity's fields, events, and behaviours.
+  - Checkpoint hierarchy → `CheckpointType` enum and `type` field
+  - Checkpoint scheduling → Checkpoint Scheduling Logic section
+  - Checkpoint completion → State Transitions, Events (`checkpoint_completed`)
+  - Adaptive recovery → Overshoot Recovery Rules section
+  - Adaptive evolution → State Transitions, replan triggers, confidence changes
+
 ## 01-entities > coaching-message
 
 # CoachingMessage — LLM-Generated Message to the Athlete
@@ -3317,7 +3737,7 @@ Logs:
 
 ```typescript
 type MessageType =
-  | 'first_message'        // onboarding; one per athlete per block
+  | 'first_message'        // onboarding; one per athlete per goal
   | 'post_workout'         // after session analysis; one per activity
   | 'wellness_alert'       // proactive wellness pattern detection
   | 'phase_transition'     // plan moves to a new phase
@@ -3364,7 +3784,7 @@ Proactive messages (wellness_alert, phase_transition, etc.) are typically one pa
 
 ## Invariants
 - `content` is never modified after creation. Messages are immutable.
-- `first_message` — only one per athlete per active block. A second call to the generation endpoint returns 409.
+- `first_message` — only one per athlete per active goal. A second call to the generation endpoint returns 409.
 - `post_workout` — only one per `activity_id`. Idempotent: second call returns existing message.
 - Proactive messages have frequency guards enforced at the service layer (not DB constraints).
 - Every message creation is preceded by a `GenerationEvent` record. A `CoachingMessage` without a corresponding `GenerationEvent` indicates a recording failure — monitored as an alert.
@@ -3398,7 +3818,7 @@ Response: 200
 Auth: Bearer JWT, require_self
 
 POST /athletes/{athlete_id}/coach/first-message
-Response: 201 | 409 (if already exists for this block)
+Response: 201 | 409 (if already exists for this goal)
   message: CoachingMessageResponse
 Auth: Bearer JWT, require_self
 
@@ -3508,6 +3928,54 @@ function computePhase(
 
 When `AthleteProfile.cycle_personal_model` is set (Phase 4f+), the phase boundaries from the personal model replace `DEFAULT_BOUNDARIES`. The computation logic is identical; only the boundary values change.
 
+### Cycle Length Learning
+
+The default 28-day assumption is a population prior. Individual athletes vary from ~21 to ~35 days. Using the wrong cycle length misclassifies phases — an athlete with a 32-day cycle classified under 28-day boundaries would be marked "luteal" 4 days too early, receiving a readiness penalty (+0.2 to +0.4) during what is actually still her follicular adaptation window (-0.1).
+
+**Learning mechanism:** `CyclePersonalisationTask` (triggered by `cycle_day_one_logged` event when ≥3 complete cycles exist) computes the athlete's actual cycle length from logged data:
+
+```
+cycle_length[i] = cycle_day_one_date[i] - cycle_day_one_date[i-1]
+median_cycle_length = median(cycle_length[1..n])
+```
+
+**Minimum data:** 3 complete cycles (3 intervals → 4 log entries). Until then, `DEFAULT_BOUNDARIES` (28-day assumption) applies.
+
+**Storage:** `AthleteProfile.cycle_personal_model.avg_cycle_length_days`
+
+**Fallback:** When `cycle_personal_model` is null, the 28-day default applies. The day-number calculation (`cycle_day_number = today - cycle_day_one_date + 1`) works regardless of assumed cycle length — the issue is that phase boundaries shift for shorter/longer cycles.
+
+### Phase Boundary Fitting
+
+Cycle length alone doesn't resolve phase boundaries — different athletes have different relative phase proportions. The vision says the model learns "phase durations" (plural), implying per-phase boundary fitting from execution data.
+
+**Approach:** `CyclePersonalisationTask` analyses execution data across multiple cycles to detect phase transitions:
+
+1. For each completed cycle, compute execution quality metrics per day (pace-at-HR ratio, GAP deviation, RPE)
+2. Identify day ranges where execution metrics shift consistently across cycles
+3. Fit phase boundaries to the observed transition points
+4. Store fitted boundaries in `cycle_personal_model.phase_boundaries`
+
+**Minimum data:** 3+ complete cycles with sufficient quality sessions in each phase to detect patterns. A higher bar than cycle-length learning.
+
+**Fallback:** Use cycle-length-proportional boundaries (`menstrual_end = cycle_length * 5/28`, etc.) until individual data is sufficient.
+
+### Execution Correlation Analysis
+
+The vision promises the model learns "how this specific athlete's execution data and wellness signals correlate with each phase." This analysis determines whether the athlete is phase-affected and how strongly.
+
+**Execution correlation:**
+- For each phase, compute average execution quality relative to the athlete's overall baseline
+- If execution is consistently worse in luteal across multiple cycles, the athlete is phase-affected
+- `phase_sensitivity[phase]` scales the population prior adjustment (0.0 = no correlation, 1.0 = full population effect, >1.0 = stronger than population average)
+
+**Wellness correlation (Phase 4f+):**
+- For each wellness signal, check whether HRV, sleeping HR, and sleep quality show phase-dependent patterns
+- If HRV is systematically lower in luteal, the wellness deviation score should use a luteal-adjusted baseline to avoid double-counting (cycle adjustment + wellness deviation)
+- Requires per-phase baselines (one baseline per signal per phase per athlete) — a future extension of `AthleteWellnessBaseline`
+
+**Storage:** `AthleteProfile.cycle_personal_model.phase_sensitivity: Record<CyclePhase, number>`
+
 ## Recovery Modifier Composite Adjustments
 
 These adjustments are applied by `WellnessModifierService` to the composite score before GREEN/AMBER/RED classification. Population priors until `cycle_personal_model` is set.
@@ -3594,6 +4062,33 @@ Does Not Own:
 - How phase feeds recovery modifier → `02-computations/wellness-modifier.md`
 - Cycle personalisation model fitting → `01-entities/athlete-profile.md` (`cycle_personal_model`)
 - Proactive check-in prompt timing → `03-agents/wellness-alert-agent.md`
+
+### Vision Phase Mapping
+
+The following maps vision phase descriptions (`docs/vision/twin/womens-cycle.md`) to architecture computation steps.
+
+| Vision Phase | Architecture Phase | Day Boundaries (Default) | Composite Adjustment | Additional Effects |
+|---|---|---|---|---|
+| Menstrual (days 1-5, "approximately") | `menstrual` | ≤5 (hard cutoff) | +0.40 (day ≤2), +0.20 (day 3-5) | None |
+| Follicular (days 6-13, "approximately") | `follicular` | 6-13 | −0.10 | None |
+| Ovulatory (days 12-16, "approximately") | `ovulatory` | 14-16 | 0.0 | `elevated_laxity_risk` flag |
+| Luteal (days 17-28, "approximately") | `luteal` | 17+ | +0.20 (early), +0.40 (late ≥24) | +0.35°C temp offset in weather adjustment |
+
+**Vision-to-architecture alignment notes:**
+- Vision: "approximately" day ranges → Architecture: hard cutoffs via `DEFAULT_BOUNDARIES`; personal model replaces with fitted boundaries
+- Vision: "first two days weighted highest" in menstrual → Architecture: day ≤2 → +0.40, day 3-5 → +0.20
+- Vision: "lean into quality sessions" in follicular → Architecture: −0.10 composite adjustment (readiness boost)
+- Vision: "performance peak" in ovulatory → Architecture: 0.0 composite = no penalty (peak is implicit, not a positive adjustment); injury risk is explicit via flag
+- Vision: "core temp +0.3-0.5°C in luteal" → Architecture: `LUTEAL_TEMP_OFFSET_C = 0.35` (midpoint); feeds into weather adjustment, not composite
+- Vision: "sleep quality degrades toward end of luteal" → Architecture: late luteal (day ≥24) gets +0.40; compounding with sleep deviation is implicit in weighted sum
+- Vision: "model learns individual pattern" → Architecture: `cycle_personal_model` replaces boundaries and scales adjustments via `phase_sensitivity`
+- Vision: "3 cycles before calibration" → Architecture: `CyclePersonalisationTask` triggered by `cycle_day_one_logged` event when ≥3 complete cycles
+- Vision: "athlete logs day one only" → Architecture: `POST /cycle` accepts `cycle_day_one_date`; no ongoing daily input
+- Vision: "coach references phase only when relevant" → Architecture: coaching agent receives phase context; language guidance is vision-only (correctly out of scope for architecture)
+
+**Unknown phase handling:** Vision doesn't explicitly address missing cycle data. Architecture returns `unknown` with 0.0 adjustment — graceful degradation that preserves composite accuracy when phase data is unavailable.
+
+### Entity References
 
 ## Failure Semantics
 - `POST /cycle` for a non-female athlete → 403 Forbidden (not 422)
@@ -3698,6 +4193,82 @@ type WorkoutComplianceSummary = {
 }
 ```
 
+## Vision Cross-Reference
+
+### Post-Workout Message Mapping
+
+Maps vision message elements from `vision/coach/post-workout.md` to architecture data fields and agent paragraph assignment. The vision defines **what the athlete reads**; the architecture stores **what the agent narrates from**.
+
+| Vision Message Element | Architecture Data Field(s) | Agent Paragraph | Notes |
+|---|---|---|---|
+| Session compliance — did the athlete execute the plan | `intent_compliance[]` (step-level compliance), `session_shape`, `coaching_observations.headline` | Para 1 | Agent context also includes `compliance.duration_delta_pct` and `compliance.session_type_match` |
+| Rep-by-rep story — individual interval examination | `coaching_observations.per_rep_analysis[]`, `coaching_observations.session_type_specific` (cross_rep_trend, final_rep_delta_pct, recovery_quality, etc.), `coaching_observations.flags[]` | Para 2 | Pre-5c: null `per_rep_analysis`; agent falls back to `session_shape` and `session_type_specific` fields |
+| Historical correlation — connection to comparable previous session | `comparable_session` context block (from `ComparableSessionService`); source: `execution_observation.coaching_observations` of the matched activity | Para 2 | If `comparable_session = null` (score < 0.50),Para 2 omits historical comparison entirely |
+| Objective progress — directional movement on relevant objectives | `objective_updates[]` (from `ObjectiveUpdateService`); includes `direction_of_change`, `evidence`, `is_milestone` | Para 3 | If `objective_updates = []`, Para 3 focuses on plan position |
+
+**Reading direction:** An implementer reading `post-workout.md` sees the four message elements. This table traces each element to the architecture fields that produce it and the agent paragraph that delivers it.
+
+### Execution Pattern Detection Mapping
+
+Maps vision concepts from `vision/twin/execution-patterns.md` to `coaching_observations` fields. This table is the authoritative reference for which vision patterns map to which architecture fields.
+
+### Aerobic Session Patterns
+
+| Vision Concept | Architecture Field | Threshold / Logic | Notes |
+|---|---|---|---|
+| Cardiac drift | `cardiac_drift_score` | Positive = HR rising while pace holds | Progressive HR increase during steady-pace effort |
+| Decoupling ratio | `decoupling_ratio` | > 5% = significant divergence | HR-to-pace relationship over session duration |
+| Pace drift | `decoupling_ratio` | Subsumed by decoupling | Pace direction inferred from HR-pace divergence |
+| Zone encroachment | `flags[]` → `'zone_encroachment'` | Any tempo/threshold in easy session | Not a dedicated field; captured in flags array |
+
+### Threshold and Interval Patterns
+
+| Vision Concept | Architecture Field | Threshold / Logic | Notes |
+|---|---|---|---|
+| Cross-rep trend | `cross_rep_trend` | `'even'` / `'progressive_fade'` / `'positive_split'` / `'w_shape'` | Direct mapping to session shape enum |
+| Final rep degradation | `final_rep_delta_pct` | > 8% = notable fade | Percentage deviation from target in final rep |
+| Recovery quality | `recovery_quality` | Categorical: `'good_hr_decline'` / `'flat_hr'` / `'incomplete_pace_pullback'` | Avoids HR zone during recovery (see vision rationale) |
+| HR decline rate | `RecoveryAnalysis.hr_decline_rate_bpm_per_min` | Higher = faster recovery | Fitness signal; rate of HR decline during recovery interval |
+| Pace pullback | `RecoveryAnalysis.pace_pullback_to_target` | `true` = hit recovery pace | Grade-adjusted pace during recovery |
+
+### VO2max Session Patterns
+
+| Vision Concept | Architecture Field | Threshold / Logic | Notes |
+|---|---|---|---|
+| Sandbagging | `sandbagging_flag` | All reps strong, HR well below max, no degradation | Boolean flag; targets likely need revising upward |
+| Positive splitting | `positive_split_flag` | Hard early, fade after rep 3-4 | Pacing discipline becomes coaching objective |
+| Controlled fade | `controlled_fade_score` | 2-3% degradation in final reps = correct intensity | Score indicates fade magnitude |
+
+### Session Shape Classification
+
+| Vision Concept | Architecture Field | Values | Notes |
+|---|---|---|---|
+| Even execution | `session_shape` | `'steady'` | Vision uses "even execution"; architecture uses "steady" |
+| Progressive fade | `session_shape` | `'progressive_fade'` | Consistent degradation across session |
+| Positive split | `session_shape` | `'positive_split'` | Hard early, slow late |
+| W-shape blowup | `session_shape` | `'w_shape'` | Blowup and recovery pattern |
+| Strong finish | `session_shape` | `'strong_finish'` | Faster final segment |
+
+### Longitudinal Behavioural Profile
+
+| Vision Concept | Architecture Field | Notes |
+|---|---|---|
+| Characteristic tendencies under fatigue | `coaching_observations.flags[]` | Recurring patterns surface as flags across sessions |
+| Zone discipline | `intent_compliance[].compliance` | Aggregated across sessions by `ObjectiveUpdateService` |
+| Pacing instincts | `session_shape` distribution | `ComparableSessionService` matches on shape patterns |
+| Recovery patterns | `recovery_analysis[].hr_decline_rate_bpm_per_min` | Trend tracked by `ObjectiveUpdateService` |
+| Recurring patterns → coaching objectives | `ObjectiveUpdateService` | Reads `coaching_observations` to evaluate objective direction |
+
+### Gaps Requiring Implementation Decisions
+
+| Vision Concept | Status | Resolution Needed |
+|---|---|---|
+| Zone encroachment | No dedicated field | Define flag value and trigger threshold |
+| Pace drift direction | Subsumed by `decoupling_ratio` | Confirm decoupling ratio captures both directions |
+| HR decline rate as fitness signal | Stored but not trended | Define aggregation logic in `ObjectiveUpdateService` |
+| Behavioural profile entity | No architecture entity | Either create `BehaviouralProfile` entity or confirm services handle aggregation |
+| Flag value taxonomy | `flags: string[]` is unbounded | Define canonical flag values per session type |
+
 ## Invariants
 - One `ExecutionObservation` per `Activity`. One-to-one.
 - Only created for `calibration_eligible = true` activities with a linked `GeneratedWorkout` (the prescribed intent must be known for compliance assessment). Activities without `planned_session_id` or without `calibration_eligible = true` receive a simplified analysis with null `per_rep_analysis` and `effort_compliance`.
@@ -3781,6 +4352,36 @@ Metrics:
 - The specific, target-bearing workout generated on the day from the athlete's current twin state
 - Stores both theoretical and adjusted targets so the two-column display is always available
 - Parent to WorkoutStep records; owned by a PlannedSession
+
+## Vision ↔ Architecture Mapping
+
+This entity implements the home screen (daily view) and the "Today's Session" element of plan visibility.
+
+| Vision UI Element (Daily View) | Architecture Source | Field(s) | Notes |
+|---|---|---|---|
+| **Today's Workout** — "Full session structure including warmup, main set, and cooldown. Intensity segments colour-coded." | `GeneratedWorkout` + `workout_steps` (child) | `theoretical_targets`, `adjusted_targets`, `workout_steps[]` | Steps provide segment-level structure. Intensity colour-coding is derived from `WorkoutTarget.signal_type` and range values at render time. |
+| **Two-Column Target Display** — "Theoretical targets (what the twin's current intent ranges suggest) and adjusted targets (what the coach recommends today)." | `GeneratedWorkout` | `theoretical_targets: TargetSet`, `adjusted_targets: TargetSet` | Both fields always written, even when identical (GREEN modifier with no weather). This is the core data backing the two-column display. |
+| **Weather Impact** — "Humidity, wind, heat index, and time-of-day conditions. Already factored into adjusted targets, but surfaced so the athlete understands why." | `WeatherForecast` (external entity) | Referenced via `WeatherAdjustmentService` in the computation chain | **Weather explanation text is not stored on this entity.** The adjusted targets reflect the weather impact numerically, but the athlete-facing explanation ("26°C and humid — your adjusted target is around two minutes slower") must be composed at the API response layer using the `WeatherForecast` record linked to this workout's generation context. |
+| **Recovery Status** — "A plain-language summary of the trend over recent days. Not a number or a gauge — a sentence." | `GeneratedWorkout` (partial) | `recovery_modifier_level`, `recovery_modifier_reason` | **Partial mapping.** `recovery_modifier_level` (green/amber/red) is a level indicator — the vision explicitly says "not a number or a gauge." `recovery_modifier_reason` is structured text from a narrated agent, which is closer to the vision's intent. However, the vision describes a *multi-day trend synthesis*, not a per-workout modifier. The multi-day trend aggregation is not owned by this entity; it is a computation concern of the wellness modifier service. The API response layer must compose the trend narrative. |
+| **Relevant Objectives** — "Only the objectives this specific workout is designed to address. Not all objectives." | **Not stored on this entity** | N/A | **Gap.** `GeneratedWorkout` does not link to training objectives or a training purpose field. `WeeklySession.intent_description` captures session-level intent ("threshold development — 4x8min at LT2") but is not the same as specific objectives. The workout generation agent should annotate generated workouts with the objectives they serve, or this must be composed from `PlannedSession` → `WeeklySession` → `PhaseArcEntry.physiological_emphasis` at the API layer. |
+| **Near-Term Session Preview** — "Next four to five planned sessions at headline level: session type, approximate duration, training intent." | `WeeklyPlan.sessions: WeeklySession[]` (not on this entity) | `session_type`, `intent_description`, `approximate_duration_minutes` | Sourced from `WeeklyPlan.WeeklySession[]`, not from `GeneratedWorkout`. The today's-view API (`GET /athletes/{athlete_id}/today`) must compose this from the active `WeeklyPlan`. |
+| **Plan Position** — "Which week and phase the athlete is currently in, how far through the phase." | **Not on this entity** | N/A | Sourced from `TrainingPlan.phases[]` + `WeeklyPlan.week_number`. The today's-view API must compose current phase position from these entities. |
+
+### Headline vs. Precise Boundary
+
+The vision draws a clear boundary: near-term sessions are "headline level" (no specific targets), while today's session has "precise targets." The architecture implements this as:
+
+- **Headline:** `WeeklySession` — `session_type`, `intent_description`, `approximate_duration_minutes`. No targets.
+- **Precise:** `GeneratedWorkout` — `theoretical_targets`, `adjusted_targets`, `workout_steps[]`. Full targets.
+
+`WeeklySession.intent_description` may contain detail like "threshold development — 4x8min at LT2." This is more than a bare headline but does not include target values. The boundary is: intent/description = headline; numeric targets = precise.
+
+### Unmapped Vision Requirements
+
+| Vision Requirement | Status | Owner |
+|---|---|---|
+| "Daily snapshots are saved and the athlete can navigate backward to see what the coach said on any previous day" | `generated_workouts` table is append-only; historical retrieval is possible via `GET /plan/sessions/{session_id}/workout`. No explicit "daily view history" API exists. | API layer — add a `GET /athletes/{athlete_id}/history` endpoint or document that `GET /prediction/history` + session-level queries serve this need |
+| "Phase position always visible on home view" | Not on this entity. Must be composed from `TrainingPlan` + `WeeklyPlan`. | Today's-view API response layer |
 
 ## TypeScript Schema
 
@@ -4105,6 +4706,7 @@ The agent receives pre-computed `ObjectiveUpdate` records — it narrates findin
 ## Invariants
 - `direction_of_change` and `evidence` on `ObjectiveUpdate` are always Python-computed. Never LLM-derived.
 - `Objective.title` and `description` are always LLM-generated (short strings only).
+- Objective `title` and `description` must never reference zone numbers (e.g., "Zone 4"). Use range-based language (e.g., "threshold effort targets") consistent with the vision principle that zones are internal to the system.
 - Objectives are scoped to a `training_goal_id`. When a goal closes, objectives for that goal are not carried to the new goal — new objectives are seeded.
 - `ObjectiveUpdate` is append-only. Updates accumulate as a history.
 - A maximum of 5 active objectives per goal. New objectives supersede old ones when the limit is reached.
@@ -4400,6 +5002,8 @@ type PlannedSession = {
 
 These rules serve dual purposes: they protect training quality (adequate recovery between hard efforts) and they create clean observation windows for adaptation signature learning (uninterrupted recovery signals after compound stimuli).
 
+The `block_id` groups created by these rules are what the adaptation signature layer observes as **adaptation windows** — the atomic unit for adaptation learning. The weekly synthesis agent creates `block_id` groups of 2-3 consecutive quality sessions; the adaptation signature layer then observes the recovery response to those groups. See `01-entities/adaptation-observation.md`.
+
 ---
 
 ## State Transitions
@@ -4583,6 +5187,8 @@ Metrics:
 - `planned_session.skip_rate`: skipped / (completed + skipped) by session_type
 - `planned_session.miss_rate`: missed / (completed + missed + skipped) by phase_label
 - `planned_session.redistribution_rate`
+- `planned_session.rolling_disruption_rate`: rolling 3-week missed rate (fed to pre-week review)
+- `planned_session.disruption_threshold_exceeded`: boolean, per athlete (set by pre-week review)
 Logs:
 - `planned_session.skipped`: session_id, session_type, phase_label
 - `planned_session.missed`: session_id, session_type, target_date
@@ -4606,6 +5212,23 @@ Logs:
 - Updates as fitness evolves; every update creates a new record (the prediction arc)
 - B-race predictions generated for secondary events, providing calibration feedback without target-setting pressure
 - Not surfaced at LOW confidence; not created for open training blocks
+
+## Vision ↔ Architecture Mapping
+
+| Vision Concept | Architecture Field / Formula | Notes |
+|---|---|---|
+| **Baseline Prediction** — "Derived from the twin's current threshold estimates, aerobic capacity indicators, and running economy signals. Assumes standard conditions." | `baseline_prediction_seconds` via `computeBaseline()` | Direct mapping. Uses `observed_pace_at_lt2_sec_per_km`, `lt1_estimate_bpm`, `lt2_estimate_bpm`, `target_distance_km`. |
+| **Weather-Adjusted Prediction** — "The system fetches the race day weather forecast and applies the athlete's personalised weather response." | `weather_adjusted_seconds` via `weatherAdjustment()` | Direct mapping. Only computed within 14 days of `TrainingGoal.goal_event_date`. Uses `WeatherResponseModel.heat_sensitivity_coeff` from `AthleteProfile`. |
+| **Course Profile Adjustment** — "If the race course profile is available, the prediction incorporates elevation data." | `course_adjusted_seconds` via `courseAdjustment()` | Direct mapping. Uses `ElevationProfile` and per-athlete `GapCurveModel`. |
+| **Personalised Weather Response** — "Not how athletes in general respond to heat — how this athlete responds. Individual response curves learned from actual execution data." | `AthleteProfile.weather_response_model.heat_sensitivity_coeff` | Indirect mapping. The coefficient is stored on `AthleteProfile`. The accumulation mechanism (how session-level environmental context refines the coefficient) lives in `02-computations/wellness-modifier.md`, not in this entity. Default population coefficient: `0.006`. |
+| **Prediction Arc** — "Watching it improve as fitness builds through a training plan is one of the most quietly motivating elements." | Append-only `race_predictions` table; `GET /prediction/history` returns ordered arc | Direct mapping. Each update creates a new record; old predictions retained indefinitely. |
+
+### Unmapped Vision Requirements
+
+| Vision Requirement | Status | Owner |
+|---|---|---|
+| "Plain-language explanation of the difference between baseline and weather-adjusted predictions" | **Not stored on entity.** The API response must compose this explanation. | Frontend / API response layer |
+| "Weather response model feeds back into training design — suggests heat exposure sessions if race is in heat but athlete trains in mild conditions" | **Not owned by this entity.** This is a proactive coaching behaviour. | `WorkoutGenerationAgent` — should check weather delta between training conditions and race conditions when generating sessions near a goal event |
 
 ## TypeScript Schema
 
@@ -4846,6 +5469,22 @@ Does Not Own:
 - Holds the athlete's current training goal and self-reported fitness context
 - The temporal container for a TrainingPlan; one active goal per athlete at a time
 - Append-only: semantic fields are immutable after creation; only status transitions
+- `goal_type` drives coaching posture across all consumer agents. See Vision Alignment below and `docs/vision/product/goal-modes.md`.
+
+## Vision Alignment
+
+The vision defines four goal modes, each with a distinct coaching posture, adaptive language, and transition rules. The `goal_type` enum is the architectural trigger for these behaviors.
+
+| `goal_type` | Vision Mode | Coaching Posture | Language Cues | Transition Rules |
+|---|---|---|---|---|
+| `race_event` | Race/Goal Event | Periodised, peaking, tapering, race-specific preparation | "sharpening," "final prep," "race-specific," urgency | → Recovery first, then chosen mode |
+| `fitness_improvement` | Fitness Improvement | Progressive overload, measurable gains, capacity building | "development," "capacity building," measurable gains | → Any mode based on readiness |
+| `maintenance` | Maintenance | Consistency-focused, habit preservation, fitness preservation | "consistency," "gradual progress," patience | → Fitness Improvement when ready |
+| `recovery` | Recovery | Healing-focused, conservative load, protective coaching | "healing," "protective," "gradual return" | → Fitness Improvement after healing markers |
+
+**What never changes between modes:** Analysis quality, coach voice, and physiological modelling are identical in all modes. Non-race modes are not stripped-down experiences.
+
+**Mode transitions** are coaching conversations, not administrative changes. The twin provides rationale; the coach delivers it in the appropriate voice for both current and upcoming mode. Specific transition sequences are defined in `docs/vision/product/goal-modes.md`.
 
 ---
 
@@ -4926,7 +5565,7 @@ type IntermediateGoal = {
 - **Semantic fields are immutable after creation.** `goal_type`, `goal_event_type`, `goal_event_date`, `custom_distance_km`, `weekly_volume_hours`, `weekly_volume_km`, `fitness_level`, `recent_injury`, `injury_severity` cannot be changed via PATCH. Secondary events are mutable and managed via dedicated endpoints.
 - **PATCH is restricted to** `status`, `goal_event_date`, and `goal_description` only. `goal_event_date` is an exception to the immutability rule because races get rescheduled; it triggers plan regeneration if the change is > 7 days.
 - **Secondary events are mutable.** `POST /athletes/{athlete_id}/goals/{goal_id}/secondary-events` creates secondary events. `PATCH` and `DELETE` on these endpoints update/remove them. Max 3 secondary events per goal.
-- **Secondary events cannot conflict with A-race schedule.** Validation constraint prevents scheduling within taper phase or race week of the primary goal.
+- **Secondary events cannot conflict with the primary goal event schedule.** Validation constraint prevents scheduling within taper phase or goal event week.
 - **Recovery mode requires injury_severity.** `injury_severity` is mandatory when `goal_type = 'recovery'`.
 - **Intermediate goal is set by training length gate.** `intermediate_goal` is populated when the training length gate determines the goal is >24 weeks away. The plan then covers only the intermediate duration.
 - No DELETE. Status transitions to `completed` or `abandoned` are the end state.
@@ -5009,7 +5648,7 @@ Response: 200
 Auth: Bearer JWT, require_self
 
 POST /athletes/{athlete_id}/goals/{goal_id}/secondary-events
-Description: Registers a secondary event (B-race or C-race) on an active goal. Returns 422 if validation fails (max 3, conflict with A-race schedule).
+Description: Registers a secondary event (B-event or C-event) on an active goal. Returns 422 if validation fails (max 3, conflict with A-race schedule).
 Request:
   event_type: SecondaryEventType, required
   event_date: string (YYYY-MM-DD), required
@@ -5119,6 +5758,30 @@ Logs:
 - Contains the phase arc (strategic intent per week), strategic rationale (race_event mode), and checkpoint schedule
 - Session-level detail lives on WeeklyPlan records, not on the TrainingPlan itself
 
+## Vision ↔ Architecture Mapping
+
+This entity implements the plan visibility vision — the macro plan view, current position, checkpoint visibility, and phase transitions.
+
+| Vision UI Element (Plan Visibility) | Architecture Source | Field(s) | Notes |
+|---|---|---|---|
+| **Macro Plan View** — "The full architecture of their training plan. Each phase shown with label, duration in weeks, primary training focus." | `TrainingPlan` | `phases: PhaseDescriptor[]` | Direct mapping. `PhaseDescriptor` contains `label`, `weeks`, `primary_focus`. The phase arc (`phase_arc`) provides week-by-week strategic intent beneath the phase-level summary. |
+| **Phase Arc** — "The strategic roadmap the coach created at plan generation. What each phase is about and why." | `TrainingPlan` | `phase_arc: PhaseArcEntry[]` | Direct mapping. Each entry has `phase_label`, `physiological_emphasis`, `intensity_bias`, and optionally `race_considerations` and `checkpoint_intent`. |
+| **Current Position** — "Which week and phase the athlete is currently in, how far through the phase they are, and how many weeks remain." | Derived from `TrainingPlan.phases[]` + `WeeklyPlan.week_number` + `TrainingGoal.goal_event_date` | No single field — **computed at API layer** | The today's-view API must resolve the current date against `PhaseDescriptor.start_date`/`end_date` to determine phase position. The architecture stores the data; the computation is a view-layer concern. |
+| **Near-Term Sessions** — "Next few planned sessions at headline level: session type, approximate duration, training intent." | `WeeklyPlan.sessions: WeeklySession[]` (child entity) | `session_type`, `intent_description`, `approximate_duration_minutes` | Headline-level only — no targets. Targets live on `GeneratedWorkout`, created on the day. |
+| **Today's Session** — "The specific workout with precise targets. Two-column display." | `GeneratedWorkout` (separate entity) | `theoretical_targets`, `adjusted_targets` | Composed into the today's-view API from the `GeneratedWorkout` linked to today's `PlannedSession`. |
+| **Phase Transitions** — "When the plan moves from one phase to the next, the coach acknowledges it explicitly. Brief message explaining the shift." | **Not stored on this entity** | N/A | **Runtime-generated.** Phase transition messages are produced by an agent at the point of transition, not stored on the `TrainingPlan`. The agent reads `PhaseDescriptor` for the new phase and `physiological_emphasis` to compose the message. The message is surfaced in the daily view API response for the transition day. |
+| **Checkpoint Visibility** — "Checkpoints appear as distinct markers. Type, target metric, week." | `TrainingPlan` | `checkpoint_schedule: CheckpointDescriptor[]` | Direct mapping. `CheckpointDescriptor` has `type`, `week_number`, `target_metric`, `session_type`, `planner_message`. |
+| **Checkpoint Framing Messages** — "The coach frames checkpoints explicitly when they approach." | `CheckpointDescriptor` | `planner_message` | Partial mapping. The pre-checkpoint message is stored. The **post-checkpoint message** ("Your half-marathon confirms your threshold is around 4:10/km") is runtime-generated by an agent after checkpoint completion — not stored on this entity. |
+| **B-race / C-race Markers in Macro View** — "Secondary events appear as markers. B-races show reduced load notation." | `PhaseArcEntry` | `race_considerations?: string` | Partial mapping. `race_considerations` stores textual notes ("B-event this week, reduce pre-event"). The vision implies visual markers in the macro view — the API response must compose these from `race_considerations` and secondary event dates on `TrainingGoal`. |
+
+### Unmapped Vision Requirements
+
+| Vision Requirement | Status | Owner |
+|---|---|---|
+| "Post-checkpoint coaching message: what changed, what the twin learned" | **Not stored.** Runtime-generated after `checkpoint_completed` event. | Agent layer — the checkpoint-completion handler should compose a message using updated `TwinState` deltas and surface it in the next daily view |
+| "Raw data charts (HR over time, pace over time, power curves) are never shown" | **Not an entity concern.** This is an architectural design principle. | API layer — ensure no endpoint returns raw activity time-series data. The `GET /plan` and `GET /today` endpoints must not expose raw HR/pace/power arrays. |
+| "B-race reduced load notation before and after the event" | `PhaseArcEntry.race_considerations` captures intent; the visual representation is a view concern. | Weekly synthesis agent should adjust session load around secondary events; the macro view API should render markers from `race_considerations`. |
+
 ## TypeScript Schema
 
 ```typescript
@@ -5141,7 +5804,7 @@ type PhaseArcEntry = {
   methodology: MethodologyTraitVector
   physiological_emphasis: string      // plain English; what this week is about
   intensity_bias: 'easy' | 'balanced' | 'moderate' | 'quality'
-  race_considerations?: string        // "B-race this week, reduce pre-race"
+  race_considerations?: string        // "B-event this week, reduce pre-event"
   checkpoint_intent?: string          // "benchmark aerobic fitness"
   target_session_count: number        // hint, not constraint — weekly planner decides
 }
@@ -5228,7 +5891,7 @@ A new plan is generated (old one superseded) when:
 - TwinState `confidence_level` upgrades (LOW → MEDIUM allows more precise session targets)
 - More than 20% of PlannedSession records within a 3-week window are `skipped` or `missed`
 - `checkpoint_completed` event fires with `replan_triggered = true` (confidence changed materially)
-- `secondary_event_added` or `secondary_event_removed` — when B/C-races change and disruption window cannot be accommodated
+- `secondary_event_added` or `secondary_event_removed` — when B/C-events change and disruption window cannot be accommodated
 
 ## Events
 
@@ -5397,7 +6060,7 @@ This solves:
 - One TwinState per calibration event. Multiple TwinStates per day are possible (e.g. `activity_sync` followed by `wellness_update`).
 - `training_goal_id` is frozen at creation time — it records which goal was active when this snapshot was taken, even if the goal is later superseded.
 - `model_version` is frozen — it identifies the exact computation pipeline version, enabling reproducibility audits.
-- `confidence_level` is recomputed from `AthletePhysiology.lt2.prior_weight` at each snapshot.
+- `confidence_level` is recomputed from `min(AthletePhysiology.lt1.hr.prior_weight, AthletePhysiology.lt2.hr.prior_weight)` at each snapshot — the global signal is the minimum of LT1 HR and LT2 HR confidence.
 
 ## Events
 
@@ -5821,7 +6484,7 @@ Owns:
 
 Does Not Own:
 - How sessions are synthesised → `03-agents/weekly-synthesis-agent.md`
-- How intent is adjusted → `03-agents/pre-week-review-agent.md`
+- How intent is adjusted → `03-agents/pre-week-review-agent.md` (Python service)
 - How individual workouts are generated → `03-agents/workout-generation-agent.md`
 - Plan-level phase arc → `01-entities/training-plan.md`
 
@@ -5848,10 +6511,11 @@ Metrics:
 - `weekly_plan.created.total`: per week number
 - `weekly_plan.sessions_completed.rate`: completed / total per week
 - `weekly_plan.adjustment_rate`: percentage of weeks where pre-week review adjusted intent
+- `weekly_plan.disruption_signal_rate`: percentage of weeks where disruption threshold was exceeded
 
 Logs:
 - `weekly_plan.created`: weekly_plan_id, week_number, session_count, adjustment_made
-- `weekly_plan.completed`: weekly_plan_id, sessions_completed, sessions_missed, accumulated_fatigue_delta
+- `weekly_plan.completed`: weekly_plan_id, sessions_completed, sessions_missed, accumulated_fatigue_delta, disruption_threshold_exceeded
 
 ## 01-entities > workout-library-entry
 
@@ -5962,6 +6626,25 @@ This promotion runs as a nightly task — not immediately.
 Metrics:
 - `workout_library.acceptance_rate.distribution`: histogram by session_type
 - `workout_library.entries.by_source`: seed vs generated counts
+
+## Cross-References
+
+### Vision Implementation
+
+- Vision: `docs/vision/coach/substitution.md` → "Workout Library"
+- The vision describes curated templates that athletes cannot browse — this entity enforces that boundary via `created_by` invariant (`'athlete'` does not exist)
+- Vision learning statement ("sessions that work well surface more frequently") maps to `acceptance_rate` sorting in `find_substitutes()`
+
+### Invocation Chain
+
+- Invoked by: `03-agents/skip-conversation-agent.md` via `SkipFlow 'offer_redistribution'`
+- Agent classifies skip reason → routes to `offer_redistribution` → `WorkoutLibraryService.find_substitutes()` queries this entity
+- Related skip flows (`no_redistribution`, `injury_escalation`, `illness_handling`) do not invoke the library — they route to plan adjustment or regeneration
+
+### Promotion Source
+
+- Promotes from: `GeneratedWorkout` (nightly task, ≥3 offers, ≥0.6 acceptance rate)
+- Promotion logic: `02-computations/workout-promotion.md`
 
 ## 01-entities > workout-step
 
@@ -6077,20 +6760,22 @@ Does Not Own:
 
 ## 02-computations > adaptation-signature
 
-# Adaptation Signature — Block-Level Yield Profiles
+# Adaptation Signature
 
 ## Purpose
-- Defines how the system learns per-athlete adaptation patterns from block-level observations
-- The output drives plan personalisation: recovery buffers, training emphasis, session spacing
 
-## The Training Block as Atomic Unit
+Once sufficient `AdaptationObservation` records exist (≥ 3 complete adaptation windows), the adaptation signature feeds personalised constraints to the weekly synthesis layer.
 
-Individual sessions are not the unit of analysis for adaptation learning. The training block is.
+---
 
-A hard block is 2-3 quality sessions in close succession, treated as a single compound stimulus. The twin does not decompose individual session contributions within a block. One compound stimulus → one clean recovery observation window → one readable response.
+## The Adaptation Window as Atomic Unit
+
+Individual sessions are not the unit of analysis for adaptation learning. The adaptation window is.
+
+A hard adaptation window is 2-3 quality sessions in close succession, treated as a single compound stimulus. The twin does not decompose individual session contributions within an adaptation window. One compound stimulus → one clean recovery observation window → one readable response.
 
 ```typescript
-type HardBlockDefinition = {
+type AdaptationWindowDefinition = {
   // Detected when:
   quality_sessions_in_5_days: number >= 2,  // threshold, vo2max, tempo, long_run
   total_quality_load: number,               // sum of aerobic + neuromuscular load
@@ -6098,56 +6783,40 @@ type HardBlockDefinition = {
 }
 
 type RecoveryWindowDefinition = {
-  // Starts after last quality session in the block
+  // Starts after last quality session in the adaptation window
   // Ends when Layer 4 wellness signals return to personal baseline
   // Measured by: avg_sleeping_hr_bpm and hrv_overnight_avg_ms trends
 }
 ```
 
-## What Gets Measured After Each Block
+Note: `PlannedSession.block_id` (session grouping) and adaptation windows are related but distinct concepts:
+- `block_id` groups consecutive quality sessions within a single week's schedule
+- An adaptation window is a physiological construct spanning 2-3 quality sessions plus recovery time for adaptation measurement
+
+---
+
+## Yield Profiles
+
+`yield_by_intent_state` maps `PhysiologicalIntentState` → `fitness_change_per_unit_load`:
 
 ```typescript
-type AdaptationSignal = {
-  // 1. Short-term fatigue depth
-  hrv_suppression_depth: number  // peak deviation below baseline (units of IQR)
-  hr_elevation_depth: number     // peak elevation above baseline
-  // Measured 24h after last quality session
-
-  // 2. Recovery trajectory
-  days_to_baseline_return: number
-  // The number of days until both HRV and sleeping HR return to within 0.5 IQR of baseline
-  // This directly determines recovery buffer width in plan generation
-
-  // 3. Execution quality at next quality session
-  post_recovery_execution_quality: number  // 0.0–1.0; vs_target_pct from ExecutionObservation
-  // Confirms whether the recovery window was adequate
+// Example observation:
+{
+  threshold: 0.042,     // 0.042 fitness points gained per unit of threshold load
+  low_aerobic: 0.018,   // lower yield from easy aerobic
+  vo2: 0.031
 }
 ```
 
-## Yield Profile Computation
+Over multiple adaptation windows, these values build the athlete's adaptation signature. An athlete with high threshold yield gets more threshold work in the plan; an athlete with high aerobic volume yield gets more volume. See `01-entities/adaptation-observation.md`.
 
-```typescript
-// Per PhysiologicalIntentState: how much fitness change per unit of load?
-// Accumulated across blocks over time → adaptation signature
-
-function computeYieldByState(
-  block_observations: AdaptationObservation[],
-  state: PhysiologicalIntentState
-): number | null {
-  const relevant = block_observations.filter(o =>
-    o.yield_by_intent_state[state] !== undefined
-  )
-  if (relevant.length < 3) return null  // insufficient data
-  // Weighted average: more recent observations weighted higher
-  return weightedMean(relevant.map(o => o.yield_by_intent_state[state]!), relevant.map(o => recencyWeight(o)))
-}
-```
+---
 
 ## Plan Personalisation from Adaptation Signature
 
-Once sufficient `AdaptationObservation` records exist (≥ 3 complete blocks), the adaptation signature feeds personalised constraints to the weekly synthesis layer:
+Once sufficient `AdaptationObservation` records exist (≥ 3 complete adaptation windows), the adaptation signature feeds personalised constraints to the weekly synthesis layer:
 
-- **Pre-week review agent** uses `yield_by_intent_state` to decide if intensity allocation should be adjusted
+- **Pre-week review service** (Python) uses `yield_by_intent_state` to decide if intensity allocation should be adjusted
 - **Weekly synthesis agent** uses `recovery_trajectory` to set appropriate recovery spacing
 - **Plan generation** uses aggregate patterns to inform the phase arc methodology
 
@@ -6158,7 +6827,7 @@ function computePersonalisedPlanConstraints(
   const avg_recovery_days = mean(observations.map(o => o.recovery_trajectory.days_to_baseline_return))
 
   return {
-    // Recovery buffer between hard blocks (default 2 easy days)
+    // Recovery buffer between hard adaptation windows (default 2 easy days)
     min_recovery_days_between_blocks: Math.max(2, Math.ceil(avg_recovery_days)),
 
     // Training emphasis (which state type to prioritise in sessions)
@@ -6170,17 +6839,22 @@ function computePersonalisedPlanConstraints(
 }
 ```
 
+---
+
 ## Plan Structure as Data Collection Strategy
 
 The session distribution structural rules in `02-computations/plan-generation.md` are not just coaching best practice — they create the clean experimental conditions needed for adaptation learning:
 
 - Long run followed by rest → clean 24-48h observation window for structural fatigue response
 - Threshold sandwiched between easy days → pre-session baseline established; post-session recovery window clean
-- Hard blocks deliberate and periodic → one compound stimulus, one recovery window, one response
+- Hard adaptation windows deliberate and periodic → one compound stimulus, one recovery window, one response
 
 These structural rules serve adaptation data collection without any additional overhead.
 
+---
+
 ## Cross-References
+
 - AdaptationObservation entity: `01-entities/adaptation-observation.md`
 - Plan generation consuming adaptation constraints: `02-computations/plan-generation.md`
 - PhysiologicalSegment yield computation (what state was the athlete in): `01-entities/physiological-segment.md`
@@ -6229,6 +6903,8 @@ function banisterUpdate(
 
 This runs independently for each dimension once three-dimensional scoring is active (Phase 6c). Before that, `load` is the combined aerobic + neuromuscular load and only `aggregate` is updated.
 
+> **Recovery timing semantics:** The `days_since_last_update` parameter reflects primary session spacing. Recovery windows are measured from primary session to primary session. Secondary sessions (double-day PM sessions, suggested non-running workouts) do not reset the recovery clock. A morning easy run followed by an evening threshold session provides more recovery between primary efforts than two hard sessions on consecutive days. The weekly plan respects this when scheduling quality sessions. See `docs/vision/twin/load-fatigue.md#recovery-timing-and-session-priority`.
+
 ## Population Defaults
 - `fitness_tau_days = 42` — aerobic fitness decays slowly over ~6 weeks
 - `fatigue_tau_days = 7` — fatigue clears over ~1 week
@@ -6238,6 +6914,8 @@ These defaults apply until individual time constants are fitted (Phase 6d).
 ## Individual Time Constants (Phase 6d+)
 
 Population defaults are `fitness_tau = 42 days, fatigue_tau = 7 days`. Some athletes carry fatigue for 10+ days; others clear in 5. Individual constants are fitted from the athlete's response history by `TimeConstantFittingService` when ≥ 12 weeks of calibration-eligible data exist.
+
+> **Vision rationale:** Population defaults are starting points, not accurate for all athletes. The vision documents that some athletes carry aerobic fatigue for 10+ days while others clear in 5. Individual constants are fitted from observed response patterns to avoid applying population defaults that may be significantly wrong for a given person. The twin learns these individual constants rather than applying population defaults. See `docs/vision/twin/load-fatigue.md#individual-time-constants`.
 
 Once fitted, `BanisterTimeConstants.source` transitions from `population_default` to `individual_fitted` and subsequent updates use the individual values. The `TwinState` `model_version` increments to reflect the change.
 
@@ -6262,6 +6940,7 @@ This descriptor (not the raw number) is what the LLM agent receives. Raw form sc
 - Load scores that feed this formula: `02-computations/load-computation.md`
 - Data tier constraints on load availability: `00-foundations/data-tiers.md`
 - Individual time constant fitting service: `01-entities/athlete-profile.md` (stores fitted constants)
+- **Vision — load fatigue rationale (individual time constants, recovery timing, dimension interaction):** `docs/vision/twin/load-fatigue.md`
 
 ## Version History
 | Version | Change |
@@ -6385,6 +7064,8 @@ When `null` (no comparable found): the key `comparable_session` is absent from t
 - ExecutionObservation schema (key_execution_signals source): `01-entities/execution-observation.md`
 - PostWorkoutAgent context assembly: `03-agents/post-workout-agent.md`
 - Similarity score stored for audit: `01-entities/execution-observation.md` → `coaching_observations.comparable_session_id`
+- Vision historical correlation requirements: `vision/coach/post-workout.md` → "Historical correlation" element
+- Post-workout message mapping (vision element → architecture field → agent paragraph): `01-entities/execution-observation.md` → "Post-Workout Message Mapping"
 
 ## 02-computations > effort-normalisation
 
@@ -6505,6 +7186,75 @@ Every computation that touches pace uses the output of this service:
 - Personalised model storage: `01-entities/athlete-profile.md` → `effort_model_version`
 - Versioning and reprocessing when generation upgrades: `04-platform/versioning-and-reprocessing.md`
 
+## 02-computations > evidence-mapping
+
+# Evidence Source to Metric Mapping
+
+This document maps each evidence source to the specific metrics it contributes to, with weights and conditions.
+
+## Evidence Source → Metric Mapping
+
+| Evidence Source | LT1 HR | LT2 HR | LT1 Power | LT2 Power | CP | LT1 Pace | LT2 Pace | VO2max | Max HR |
+|---|---|---|---|---|---|---|---|---|---|
+| `questionnaire_estimate` | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 |
+| `training_hr_deflection` | 1.0 | 1.0 | — | — | — | — | — | — | 0.5 |
+| `training_rr_inflection` | 2.5 | 2.5 | — | — | — | — | — | — | 0.5 |
+| `training_power_hr_ratio` | — | — | — | — | 1.5 | — | — | — | — |
+| `field_test` (LT1) | 2.0 | — | 1.5 | — | — | 1.5 | — | — | 1.0 |
+| `field_test` (LT2) | — | 4.0 | — | 3.0 | 3.0 | — | 3.0 | — | 1.5 |
+| `field_test` (CP) | — | — | 2.0 | — | 5.0 | — | — | — | 1.0 |
+| `lab_test` (LT1) | 12.0 | — | 10.0 | — | — | 10.0 | — | — | 8.0 |
+| `lab_test` (LT2) | — | 15.0 | — | 12.0 | 12.0 | — | 12.0 | — | 8.0 |
+| `lab_test` (VO2max) | — | — | — | — | — | — | — | 15.0 | 8.0 |
+
+## Key Principles
+
+1. **Per-metric accumulation**: Each evidence source contributes to specific metrics only. A field test for LT2 does not increase LT1 confidence.
+
+2. **Weight hierarchy**: Lab tests (12-15) >> Field tests (2-5) >> Training-derived (0.5-2.5) >> Questionnaire (0.5).
+
+3. **RR inflection carries higher weight**: RR data is richer than HR data alone, so `training_rr_inflection` carries weight 2.5 vs 1.0 for `training_hr_deflection`.
+
+4. **Power-to-HR ratio is supplementary**: `training_power_hr_ratio` only contributes to CP, not LT1/LT2 directly.
+
+5. **Max HR accumulates from all sources**: Max HR is updated from observed maximum HR across all session types.
+
+## Transition Thresholds
+
+Confidence transitions are per-metric and based on accumulated evidence weight:
+
+| Transition | Threshold | Approximate Sessions |
+|---|---|---|
+| LOW → MEDIUM | 4.0 evidence units | ~4 HR deflection sessions, or 1 field test, or 1 lab test |
+| MEDIUM → HIGH | 8.0 evidence units | ~8 HR deflection sessions, or 2 field tests, or 1 lab test |
+
+**Note**: These are initial defaults. Real convergence data should validate these thresholds.
+
+## Example Accumulation Scenarios
+
+### Scenario 1: Athlete with chest strap (Tier 3)
+- Week 1-4: 4 easy runs with HR deflection → 4 × 1.0 = 4.0 weight → LT1 HR reaches MEDIUM
+- Week 5-8: 4 more easy runs + 1 RR session → 4 × 1.0 + 1 × 2.5 = 6.5 weight → LT1 HR approaching HIGH
+- Week 9-12: 4 more easy runs + 2 RR sessions → 4 × 1.0 + 2 × 2.5 = 9.0 weight → LT1 HR reaches HIGH
+
+### Scenario 2: Athlete with power meter (Tier 1)
+- Week 1-2: 1 field test for LT2 → 1 × 4.0 = 4.0 weight → LT2 HR reaches MEDIUM
+- Week 3-6: 4 easy runs with HR deflection → 4 × 1.0 = 4.0 weight → LT1 HR reaches MEDIUM
+- Week 7-8: 1 lab test for LT2 → 1 × 15.0 = 15.0 weight → LT2 HR reaches HIGH
+
+### Scenario 3: Athlete with optical HR (Tier 4)
+- Week 1-8: 8 easy runs with HR deflection → 8 × 1.0 = 8.0 weight → LT1 HR reaches HIGH
+- No RR data, so LT1 HR confidence relies solely on HR deflection
+- LT2 HR confidence accumulates more slowly without RR inflection
+
+## Cross-References
+
+- Confidence model: `00-foundations/confidence-model.md`
+- Observation weights: `02-computations/physiology-update.md`
+- LT1 detection: `02-computations/lt1-detection.md`
+- Threshold detection: `02-computations/threshold-detection.md`
+- Data tiers: `00-foundations/data-tiers.md`
+
 ## 02-computations > load-computation
 
 # Load Computation — Three Load Dimension Formulas
@@ -6513,7 +7263,11 @@ Every computation that touches pace uses the output of this service:
 - Defines the exact formulas for computing aerobic, neuromuscular, and structural load scores from FIT data
 - These scores are written to Activity and drive TwinState Layer 1 fitness/fatigue via Banister model
 
+> **Vision rationale:** The three-dimensional approach implements the physiological principle that different training stresses (cardiovascular, neuromuscular, structural) accumulate and recover on different timelines. A single fitness number cannot distinguish between states where aerobic system is recovered but structural load is excessive — the "heavy legs" phenomenon. The three dimensions are not independent: high structural fatigue degrades neuromuscular output even when the aerobic system is fully recovered. See `docs/vision/twin/load-fatigue.md` for the full physiological rationale.
+
 ## Inputs
+
+> **GAP invariant:** Grade-adjusted pace is always used as the mechanical work proxy. Raw pace without grade adjustment systematically misrepresents effort on varied terrain and corrupts load calculations and historical comparisons. This is an invariant, not a preference. See `docs/vision/twin/load-fatigue.md#grade-adjusted-pace--always-never-raw-pace`.
 
 ```typescript
 type LoadComputationInputs = {
@@ -6567,6 +7321,8 @@ function computeAerobicLoadPower(
 ```
 
 **Tier 5 (pace + GPS only):** Estimated from GAP relative to estimated threshold pace. Low confidence flagged. Tier 6: null.
+
+> **Note on optical HR:** Tier 4 (optical HR + GAP + GPS) is the realistic baseline for the core athlete audience. Optical HR is adequate for zone-based load calculation; its limitation versus chest strap is specifically the absence of RR intervals for threshold detection, not HR accuracy for sustained aerobic efforts. See `docs/vision/twin/load-fatigue.md#data-quality-and-load-computation`.
 
 ## Neuromuscular Load Formula
 
@@ -6630,6 +7386,8 @@ function computeStructuralLoad(inputs: StructuralLoadInputs): number {
 
 Requires GPS (distance + elevation). Available from Tier 3 onward. Tier 6: null.
 
+> **Crossover athlete profile:** The density penalty (`recent_structural_load_72h * 0.12`) is specifically designed to catch athletes transitioning from swimming or cycling who carry high aerobic load tolerance but low structural load tolerance. Without this, a cardiovascular-only model would miss structural stress accumulating at a rate cardiovascular fitness masks. This profile is identified at onboarding and structural capacity development is incorporated as an explicit objective. See `docs/vision/twin/load-fatigue.md#the-crossover-athlete-profile`.
+
 ## Calibration Eligibility Gate
 
 `CalibrationEligibilityService` applies this gate before load scores are used for twin recalibration:
@@ -6648,6 +7406,8 @@ function isCalibrationEligible(activity: Activity, fit_data: FitData): boolean {
   )
 }
 ```
+
+**Note**: Easy runs are calibration-eligible (they meet the five-rule gate) and contribute to fitness/fatigue scores. However, they do NOT provide threshold detection evidence because they lack the intensity variation required for HR deflection/RR inflection algorithms (which need ≥3 distinct intensity steps and ≥8 minutes at each level). Easy runs build fitness, not threshold confidence.
 
 ## Outputs → TwinState Layer 1
 
@@ -6673,6 +7433,131 @@ The three load scores feed the Banister impulse-response model. The full Baniste
 - AthleteFitness Banister model (where load scores are applied): `01-entities/athlete-fitness.md`
 - Data tier capabilities: `00-foundations/data-tiers.md`
 - Calibration eligibility rules (full detail): `01-entities/activity.md`
+- **Vision — load fatigue rationale (three dimensions, data quality tiers, crossover athlete, individual time constants, GAP invariant):** `docs/vision/twin/load-fatigue.md`
+- **Vision — cold start and onboarding tier definitions:** `docs/vision/twin/cold-start.md`
+
+## 02-computations > lt1-detection
+
+# LT1 Detection
+
+LT1 detection is harder than LT2 detection because LT1 is a subtle physiological transition. The system uses a multi-method approach: passive inference from natural training plus optional active tests.
+
+## Detection Methods
+
+### 1. MAF Test (Constant Intensity Validation)
+
+**Protocol**: Run at constant intensity at MAF HR (180 - age) for 20-30 minutes. Measure pace.
+
+**Purpose**: Validate LT1 HR estimate. If the athlete can maintain MAF HR with consistent pace, the LT1 estimate is likely accurate.
+
+**Requirements**:
+- HR data (Tier 1-4)
+- 20+ minutes at steady MAF HR
+- Consistent pace (±5% variation)
+
+**Output**: `training_hr_deflection` observation with weight 1.0
+
+**Note**: This is NOT a progressive intensity test. It is a constant intensity validation. The MAF Test is named after Phil Maffetone's method, not because it detects LT1 directly.
+
+### 2. Controlled Progression Test (Progressive Inflection Detection)
+
+**Protocol**: Progressive intensity steps (e.g., 5 min at each: 120, 130, 140, 150, 160 bpm). Detect HR deflection and RR inflection points.
+
+**Purpose**: Direct LT1 and LT2 detection from structured intensity variation.
+
+**Requirements**:
+- HR data (Tier 1-4)
+- RR intervals for RR inflection (Tier 1-3)
+- ≥3 distinct intensity steps
+- ≥8 minutes at each intensity level
+
+**Output**:
+- `training_hr_deflection` observation (weight 1.0)
+- `training_rr_inflection` observation (weight 2.5) if RR data available
+
+**Note**: This is the most reliable field test for LT1 detection. The progressive intensity profile provides clear inflection points.
+
+### 3. Natural Training Analysis (Passive Inference)
+
+**Protocol**: Analyse easy runs for HR ceiling patterns. If the athlete consistently runs easy at a specific HR ceiling, that ceiling likely approximates LT1.
+
+**Purpose**: Build LT1 confidence passively from the 80% of training that occurs around aerobic intensity.
+
+**Requirements**:
+- HR data (Tier 1-4)
+- ≥3 easy runs with consistent HR patterns
+- Easy runs should be truly easy (below LT1)
+
+**Output**: `training_hr_deflection` observation with weight 0.5 (lower confidence than active tests)
+
+**Algorithm**:
+1. Identify easy runs (session_type = 'easy_run' or 'recovery_run')
+2. Compute mean HR for each easy run
+3. If mean HR is consistent (±5 bpm across 3+ runs), use that HR as LT1 estimate
+4. The consistency itself is evidence of a physiological threshold
+
+### 4. HR Drift (Stability in Steady-State)
+
+**Protocol**: During steady-state running at constant intensity, measure HR drift over time. Significant HR drift (>5 bpm over 30 minutes) suggests the intensity is above LT1.
+
+**Purpose**: Detect whether a given intensity is above or below LT1.
+
+**Requirements**:
+- HR data (Tier 1-4)
+- Steady-state running (≥20 minutes at constant intensity)
+- Consistent pace (±5% variation)
+
+**Output**: `training_hr_deflection` observation with weight 1.0
+
+**Algorithm**:
+1. Identify steady-state segments (constant pace, constant grade)
+2. Compute HR at start (first 5 min) and end (last 5 min) of segment
+3. If HR drift > 5 bpm, intensity is likely above LT1
+4. If HR drift < 2 bpm, intensity is likely below LT1
+
+### 5. HR Recovery (Recovery Speed After Stopping)
+
+**Protocol**: After hard effort, measure HR recovery speed. Faster recovery suggests lower LT1 (better aerobic fitness). Slower recovery suggests higher LT1.
+
+**Purpose**: Supplementary LT1 evidence from recovery kinetics.
+
+**Requirements**:
+- HR data (Tier 1-4)
+- Hard effort (above LT2) followed by easy running or walking
+- ≥2 minutes of recovery data
+
+**Output**: `training_hr_deflection` observation with weight 0.5 (supplementary evidence)
+
+**Algorithm**:
+1. Identify hard efforts (above LT2 or near max HR)
+2. Compute HR at cessation of hard effort
+3. Compute HR at 2 minutes into recovery
+4. HR recovery = HR_start - HR_2min
+5. Faster recovery (>30 bpm in 2 min) suggests lower LT1
+6. Slower recovery (<20 bpm in 2 min) suggests higher LT1
+
+## Evidence Accumulation
+
+LT1 confidence accumulates from multiple methods:
+
+| Method | Weight | Conditions |
+|---|---|---|
+| MAF Test | 1.0 | 20+ min at MAF HR, consistent pace |
+| Controlled Progression | 1.0 (HR) / 2.5 (RR) | ≥3 intensity steps, ≥8 min each |
+| Natural Training | 0.5 | ≥3 easy runs with consistent HR |
+| HR Drift | 1.0 | ≥20 min steady-state, consistent pace |
+| HR Recovery | 0.5 | Hard effort + 2 min recovery |
+
+**Transition thresholds** (same as LT2):
+- LOW → MEDIUM: evidence weight ≥ 4.0
+- MEDIUM → HIGH: evidence weight ≥ 8.0
+
+## Cross-References
+
+- Confidence model: `00-foundations/confidence-model.md`
+- Evidence weights: `02-computations/physiology-update.md`
+- Threshold detection: `02-computations/threshold-detection.md`
+- Data tiers: `00-foundations/data-tiers.md`
 
 ## 02-computations > objective-management
 
@@ -6798,6 +7683,21 @@ function checkAchievement(objective: Objective, updates: ObjectiveUpdate[]): boo
 // PostWorkoutAgent receives milestone flag and explicitly acknowledges
 ```
 
+## Vision ↔ Architecture Alignment
+
+The following maps vision concepts (`docs/vision/coach/objectives.md`) to architecture implementation. This table is the authoritative cross-reference for verifying that the architecture faithfully implements the vision's intent.
+
+| Vision Concept | Architecture Key | Vision Philosophy | Architecture Implementation |
+|---|---|---|---|
+| What Objectives Are | `Objective` entity schema; `ObjectiveCategory` enum | “Bridge between individual sessions and long-term development”; “physiological insights that the twin can see” | 9 categories map to physiological domains; entity purpose states “bridges individual sessions to long-term physiological development” |
+| Initial Seeding | `ObjectiveSeedingService.seedObjectives()`; seeding rules in `objective.md` | “First coach message seeds initial objectives based on twin model analysis”; “strengths explicitly alongside improvement opportunities” | Python logic (`identifyGaps`, `identifyStrengths`) determines categories/directions; invariant: at least one `direction = 'maintain'` always seeded; LLM writes only titles/descriptions |
+| Living Updates (weekly rhythm) | `weeklyReview()` in `objective-management.md` | “Update on slower rhythm than workouts — weekly or after significant sessions” | Nightly task updates objectives not touched by post-session in 7 days |
+| Post-session connection | `evaluateObjectivePostSession()` | “After each relevant workout, coach briefly connects session to applicable objective” | Runs before `PostWorkoutAgent`; creates `ObjectiveUpdate` with Python-computed direction/evidence |
+| Achievement = sustained improvement | `checkAchievement()` | “Achievement determined by sustained improvement, not a single session” | Last 3 post-session updates must all be `improving` |
+| Pre-workout filtering | `filterForSession()` in `objective.md`; `GET /objectives/for-session/{session_id}` API | “Only objectives relevant to today’s workout are surfaced” | Filters by `session_types_relevant`; max 2 in context |
+| Post-workout feedback | `PostWorkoutAgent` receives pre-computed `ObjectiveUpdate` records | “Coach message explicitly addresses movement on those same objectives” | Agent receives milestone flag and pre-computed direction/evidence; writes only narration |
+| Strengths maintained | Seeding invariant: at least one `direction = 'maintain'` | “Strengths surfaced explicitly alongside gaps” | Python-identified strengths always included in initial set |
+
 ## Cross-References
 - Objective entity schema: `01-entities/objective.md`
 - ExecutionObservation (source of evaluation signals): `01-entities/execution-observation.md`
@@ -6862,14 +7762,16 @@ The 42-day time constant is deliberately aligned with the aerobic fitness time c
 
 These weights determine how much each observation shifts the posterior. Higher weight = more authoritative measurement.
 
-| Source | LT1 weight | LT2 weight | FTP weight | VO2max weight | Max HR weight |
-|---|---|---|---|---|---|
-| `questionnaire_estimate` | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 |
-| `training_hr_deflection` | 1.0 | 1.0 | — | — | 0.5 |
-| `training_rr_inflection` | 2.5 | 2.5 | — | — | 0.5 |
-| `training_power_hr_ratio` | — | 1.0 | 1.5 | — | — |
-| `field_test` | 2.0 | 4.0 | 5.0 | 3.0 | 2.0 |
-| `lab_test` | 12.0 | 15.0 | 10.0 | 15.0 | 8.0 |
+| Source | LT1 weight | LT2 weight | FTP weight | VO2max weight | Max HR weight | Confidence Contribution |
+|---|---|---|---|---|---|---|
+| `questionnaire_estimate` | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | All metrics (low weight) |
+| `training_hr_deflection` | 1.0 | 1.0 | — | — | 0.5 | lt1_hr, lt2_hr |
+| `training_rr_inflection` | 2.5 | 2.5 | — | — | 0.5 | lt1_hr, lt2_hr (higher quality) |
+| `training_power_hr_ratio` | — | 1.0 | 1.5 | — | — | cp |
+| `field_test` | 2.0 | 4.0 | 5.0 | 3.0 | 2.0 | Specific metric tested (lt1, lt2, or cp) |
+| `lab_test` | 12.0 | 15.0 | 10.0 | 15.0 | 8.0 | All measured metrics |
+
+**Key insight**: Confidence transitions are per-metric. A source only affects confidence for metrics it provides evidence for. A field test for LT2 (weight 4.0) contributes to LT2 confidence, not LT1 confidence.
 
 A lab test carries observation weight 12–15 depending on the parameter, which dominates a typical accumulated prior of 20–40 weight units built from 2 years of regular training.
 
@@ -6984,7 +7886,7 @@ type PlanGenerationInputs = {
   twin_state: TwinState
   cycle_phase_log: CyclePhaseLog | null  // used to avoid key sessions in late luteal
   today: string  // YYYY-MM-DD
-  secondary_events: SecondaryEvent[]     // B-races and C-races for disruption window calculation
+  secondary_events: SecondaryEvent[]     // B-events and C-events for disruption window calculation
 }
 
 // GoalType determines plan generation approach:
@@ -6995,8 +7897,8 @@ type PlanGenerationInputs = {
 // - recovery: deterministic conservative progression
 
 // Secondary events create disruption windows within the phase arc:
-// - B-races: 4 days pre-race, 3 days post-race (reduced load/recovery focus)
-// - C-races: 2 days pre-race, 1 day post-race (minimal adjustment)
+// - B-events: 4 days pre-event, 3 days post-event (reduced load/recovery focus)
+// - C-events: 2 days pre-event, 1 day post-event (minimal adjustment)
 ```
 
 ---
@@ -7439,7 +8341,11 @@ function persistPlan(
 
 **First Weekly Plan Creation:**
 
-The first weekly plan is always created atomically with the training plan. This ensures the first message can reference specific sessions.
+The first weekly plan is always created atomically with the training plan by PlanGenerationService — not by WeeklySynthesisAgent. This ensures the first message can reference specific sessions.
+
+**Why atomic creation for week 1:** Week 1 has no prior execution data, so the pre-week review would be a no-op pass-through. Creating the first WeeklyPlan atomically avoids an unnecessary async hop through PreWeekReviewService and ensures the plan is immediately actionable.
+
+**Producer distinction:** PlanGenerationService creates week 1. PreWeekReviewService + WeeklySynthesisAgent handle week 2 onward. WeeklySynthesisAgent's contract starts from week 2 — it never receives week 1 as input.
 
 ```typescript
 async function createFirstWeeklyPlan(
@@ -7506,7 +8412,7 @@ The following disruptions are absorbed by weekly synthesis, not plan regeneratio
 | Faster/slower than expected recovery | Weekly synthesis adjusts session count/intensity |
 | Minor schedule disruptions (travel, work) | Weekly synthesis works with new availability |
 | Adaptation yield better/worse than expected | Pre-week review adjusts intensity bias |
-| Session dropout >20% | Next pre-week review reduces load; NOT full regeneration |
+| Persistent disruption (>20% missed over 3 weeks) | Surfaced as coaching signal via `disruption_threshold_exceeded`; coach decides whether to restructure |
 
 #### Checkpoint Completion Flow
 
@@ -7637,7 +8543,7 @@ const MAX_STRUCTURAL_LOAD_PER_WEEK_CROSSOVER = 0.7 * POPULATION_MAX_WEEK_1
 
 ## Intensity Allocation from Adaptation Yield
 
-When the adaptation signature has sufficient data, the session planner adjusts hard training volume based on this athlete's demonstrated intensity yield.
+When the adaptation signature has sufficient data, the weekly synthesis agent adjusts hard training volume based on this athlete's demonstrated intensity yield.
 
 ### Eligibility Gate
 
@@ -7702,7 +8608,7 @@ function computeIntensityAllocation(
 
 ### How It Feeds Session Planning
 
-The computed intensity allocation replaces the `hard_percentage` in the strategic framework's intensity distribution. The session planner agent receives this adjusted allocation and distributes sessions accordingly:
+The computed intensity allocation replaces the `hard_percentage` in the strategic framework's intensity distribution. The weekly synthesis agent receives this adjusted allocation and distributes sessions accordingly:
 
 ```typescript
 // Example:
@@ -7723,7 +8629,7 @@ The computed intensity allocation replaces the `hard_percentage` in the strategi
 
 ## Agent Invocation Flow
 
-For `race_event` mode, the generation pipeline invokes three agents in sequence:
+For `race_event` mode, the generation pipeline invokes two agents and two Python phases in sequence:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -7744,24 +8650,26 @@ For `race_event` mode, the generation pipeline invokes three agents in sequence:
 ┌─────────────────────────────────────────────────────────────────┐
 │  Phase 2: Hypothesis Selector Agent                            │
 │  Input: 3 hypotheses, athlete context                          │
-│  Output: StrategicFramework (with race schedule, checkpoints)   │
+│  Output: StrategicFramework (phase arc, checkpoints, races)    │
 │  Context: ~4k-6k tokens                                        │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  Phase 2b: Session Planner Agent                               │
-│  Input: StrategicFramework, athlete preferences                │
-│  Output: SessionWeek[] (full session schedule)                 │
-│  Context: ~5k-7k tokens                                        │
+│  Phase 3: Validate, Synthesise Week 1, and Persist (Python)    │
+│  Input: StrategicFramework                                     │
+│  Output: TrainingPlan + first WeeklyPlan + Checkpoints         │
+│  Validation: phase arc rules (gaps, ordering, intensity)       │
+│  Week 1: PlanGenerationService synthesises sessions atomically │
+│           using WeeklySynthesisAgent                           │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  Phase 3: Validate and Persist (Python)                        │
-│  Input: StrategicFramework with session_schedule               │
-│  Output: TrainingPlan + PlannedSessions + Checkpoints          │
-│  Validation: 7 rules (available_days, no_back_to_back, etc.)   │
+│  Week 2+: Weekly Synthesis (async, per-week)                   │
+│  Trigger: pre_week_review_completed event                      │
+│  Owner: WeeklySynthesisAgent                                   │
+│  Output: WeeklyPlan for each subsequent week                   │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -7772,17 +8680,17 @@ For `race_event` mode, the generation pipeline invokes three agents in sequence:
 | 0 | Python | TrainingGoal | Gate result | — |
 | 1 | Agent | Athlete context | 3 hypotheses | ~3k-5k |
 | 2 | Agent | 3 hypotheses | StrategicFramework | ~4k-6k |
-| 2b | Agent | Framework + preferences | SessionWeek[] | ~5k-7k |
-| 3 | Python | Framework | Plan + Sessions + Checkpoints | — |
+| 3 | Python + Agent | Framework | Plan + first WeeklyPlan + Checkpoints | ~3k-5k (week 1) |
+| 2+ | Agent (async) | AdjustedWeeklyIntent | WeeklyPlan (per week) | ~3k-5k |
 
-**For `fitness_improvement`, `maintenance`, `recovery` modes:** Skip Phases 1-2b. Phase 3 uses deterministic templates instead of agent-generated schedules.
+**For `fitness_improvement`, `maintenance`, `recovery` modes:** Skip Phases 1-2. Phase 3 uses deterministic templates instead of agent-generated frameworks.
 
 ---
 
 ```typescript
 async function generateRaceEventPlan(
   inputs: PlanGenerationInputs
-): Promise<{ plan: TrainingPlan; sessions: PlannedSession[]; checkpoints: Checkpoint[] }> {
+): Promise<{ plan: TrainingPlan; first_weekly_plan: WeeklyPlan; checkpoints: Checkpoint[] }> {
   
   // Phase 0: Training Length Gate (Python)
   const gateResult = evaluateTrainingLength({
@@ -7822,29 +8730,15 @@ async function generateRaceEventPlan(
     secondary_events: inputs.secondary_events
   })
   
-  // Phase 2b: Generate Session Schedule (Agent)
-  const { session_schedule } = await sessionPlannerAgent.generate({
-    strategic_framework,
-    athlete_preferences: {
-      available_days: inputs.athlete_preferences.available_days,
-      long_workout_day: inputs.athlete_preferences.long_workout_day,
-      weekly_session_count: inputs.athlete_preferences.weekly_session_count
-    },
-    secondary_events: inputs.secondary_events,
-    twin_context: await assembleTwinContext(inputs.twin_state)
-  })
-  
-  strategic_framework.session_schedule = session_schedule
-  
   // Phase 3: Validate (Python)
-  const validation = validateSchedule(strategic_framework, inputs.athlete_preferences)
+  const validation = validatePhaseArc(strategic_framework, inputs)
   
   if (!validation.valid) {
     return handleValidationFailure(validation, inputs)
   }
   
-  // Phase 3b: Persist (Python)
-  return persistPlan(strategic_framework, inputs)
+  // Phase 3b: Persist TrainingPlan + first WeeklyPlan + Checkpoints (Python)
+  return persistPlan(strategic_framework, validation, inputs)
 }
 ```
 
@@ -7854,9 +8748,11 @@ async function generateRaceEventPlan(
 
 After validation passes, creates atomically:
 - One `TrainingPlan` (status=active; old plan superseded) with `phase_arc`, `strategic_rationale`, and `checkpoint_schedule`
-- First `WeeklyPlan` (synthesised from `phase_arc[0]` + current twin state)
+- First `WeeklyPlan` (synthesised from `phase_arc[0]` + current twin state) — created by PlanGenerationService, not WeeklySynthesisAgent
 - `Checkpoint` records (from `checkpoint_schedule`)
 - Fires `training_plan_generated` event
+
+**Note:** The first WeeklyPlan producer is PlanGenerationService. PreWeekReviewService and WeeklySynthesisAgent handle week 2 onward.
 
 ---
 
@@ -7864,7 +8760,7 @@ After validation passes, creates atomically:
 
 ```typescript
 type PlanGenerationFailure = {
-  phase: 'gate' | 'hypothesis' | 'selection' | 'session_planning' | 'validation' | 'persistence'
+  phase: 'gate' | 'hypothesis' | 'selection' | 'validation' | 'persistence'
   error: string
   retry_count: number
   fallback_available: boolean
@@ -7880,8 +8776,8 @@ function handleGateResult(
 function handleValidationFailure(
   validation: ValidationResult,
   inputs: PlanGenerationInputs
-): { plan: TrainingPlan; sessions: PlannedSession[]; checkpoints: Checkpoint[] } | PlanGenerationFailure {
-  // Retry session planner with error feedback
+): { plan: TrainingPlan; first_weekly_plan: WeeklyPlan; checkpoints: Checkpoint[] } | PlanGenerationFailure {
+  // Retry hypothesis selector with error feedback
   // If retry fails, fall back to simpler hypothesis or template
 }
 
@@ -7889,8 +8785,7 @@ function handleValidationFailure(
 // Gate proposes intermediate → return proposal to athlete
 // Hypothesis agent fails → retry once; then fall back to template
 // Selection agent fails → use highest-scored hypothesis
-// Session planner fails → retry once; then fall back to simpler approach
-// Validation fails → return errors to session planner for regeneration
+// Validation fails → return errors to hypothesis selector for regeneration
 // Persistence fails → log error; retry; alert after 3 failures
 ```
 
@@ -7907,7 +8802,7 @@ function handleValidationFailure(
 - Confidence model: `00-foundations/confidence-model.md`
 - Hypothesis agent: `03-agents/hypothesis-agent.md`
 - Hypothesis selector agent: `03-agents/hypothesis-selector-agent.md`
-- Session planner agent: `03-agents/session-planner-agent.md`
+- Weekly synthesis agent: `03-agents/weekly-synthesis-agent.md`
 
 ## 02-computations > segmentation-heuristic
 
@@ -8117,6 +9012,96 @@ Per-athlete fine-tuned model (≥30 labelled segments)
 - Cleaned stream inputs: `02-computations/signal-cleaning.md`
 - PhysiologicalSegment schema (state_probabilities is non-null here): `01-entities/physiological-segment.md`
 - Versioning when Gen 1 records are superseded: `04-platform/versioning-and-reprocessing.md`
+
+## 02-computations > session-count
+
+# Session Count Computation
+
+## Purpose
+
+- Deterministic Python function that computes the number of sessions for a given week
+- Inputs: `AdjustedWeeklyIntent` (or `PhaseArcEntry` for week 1) + `AthletePreferences`
+- Output: integer session count
+- This is pure Python — no LLM reasoning required
+
+---
+
+## Input Type
+
+```python
+@dataclass
+class SessionCountInput:
+    intensity_bias: str  # 'easy' | 'balanced' | 'moderate' | 'quality'
+    max_sessions: int | None  # schedule-constrained override from pre-week review
+    weekly_session_count: int  # athlete preference
+```
+
+---
+
+## Computation
+
+```python
+def compute_session_count(input: SessionCountInput) -> int:
+    """Compute session count for a week.
+
+    Rules:
+    - 'easy' weeks: reduce by 1, floor of 3
+    - 'balanced' weeks: use athlete preference
+    - 'moderate' weeks: use athlete preference
+    - 'quality' weeks: cap at 5
+    - Schedule-constrained override: use lower of computed and max_sessions
+    """
+    base_count = input.weekly_session_count
+
+    # Adjust based on intensity bias
+    match input.intensity_bias:
+        case "easy":
+            computed = max(3, base_count - 1)
+        case "balanced":
+            computed = base_count
+        case "moderate":
+            computed = base_count
+        case "quality":
+            computed = min(5, base_count)
+        case _:
+            computed = base_count
+
+    # Override if schedule-constrained
+    if input.max_sessions is not None and input.max_sessions < computed:
+        return input.max_sessions
+
+    return computed
+```
+
+---
+
+## Invariants
+
+- Session count is always ≥ 1 (even under maximum reduction)
+- Session count respects both adjusted intent and athlete preference — the lower of the two wins when they conflict
+- This function is deterministic: same inputs always produce the same output
+
+---
+
+## How It Feeds the Weekly Synthesis Agent
+
+The weekly synthesis agent receives `session_count` as a pre-computed input, not as something it computes. The flow:
+
+1. `PreWeekReviewService` (or `PlanGenerationService` for week 1) evaluates conditions
+2. `compute_session_count()` runs as part of the review output
+3. `AdjustedWeeklyIntent` includes `session_count` as a field
+4. `WeeklySynthesisAgent` receives `AdjustedWeeklyIntent` and distributes sessions across available days
+
+The agent does not recompute session count — it trusts the pre-computed value.
+
+---
+
+## Cross-References
+
+- Pre-week review: `03-agents/pre-week-review-agent.md`
+- Weekly synthesis: `03-agents/weekly-synthesis-agent.md`
+- AdjustedWeeklyIntent: `03-agents/pre-week-review-agent.md` → Output Contract
+- AthletePreferences: `01-entities/athlete-preferences.md`
 
 ## 02-computations > signal-cleaning
 
@@ -8367,14 +9352,16 @@ type ThresholdPrior = {
 
 ## Confidence Level Transitions
 
-Triggered by `TwinRecalibrationService` after Bayesian update:
+Triggered by `TwinRecalibrationService` after Bayesian update. Transitions are **per-metric**: each parameter accumulates evidence independently.
 
 | Transition | Condition |
 |---|---|
-| LOW → MEDIUM | `prior_weight >= 4.0` (approx 4 HR deflection sessions at default weight) |
-| MEDIUM → HIGH | `prior_weight >= 8.0` OR (≥ 2 RR-based sessions processed, which carry higher weight) |
+| LOW → MEDIUM | Per-metric. When `lt2.hr.prior_weight >= 4.0` OR `lt1.hr.prior_weight >= 4.0` OR `cp.prior_weight >= 4.0` (approx 4 HR deflection sessions at default weight, or 1 field test, or 1 lab test) |
+| MEDIUM → HIGH | Per-metric. When `lt2.hr.prior_weight >= 8.0` OR `lt1.hr.prior_weight >= 8.0` OR `cp.prior_weight >= 8.0` OR (≥ 2 RR-based sessions processed, which carry higher weight) |
 
-See `00-foundations/confidence-model.md` for downstream effects.
+For LT1 specifically: evidence also comes from natural training analysis (HR ceiling, drift analysis, recovery analysis) and optional active tests (MAF test, controlled progression test).
+
+See `00-foundations/confidence-model.md` for downstream effects and evidence weight thresholds.
 
 ## Outputs → AthletePhysiology
 
@@ -8395,7 +9382,7 @@ See `00-foundations/confidence-model.md` for downstream effects.
   cp: PhysiologyParameterState | null
 }
 // A new TwinState is then appended with inline snapshot of the updated threshold values
-// TwinState.confidence_level is recomputed from AthletePhysiology.lt2.hr.prior_weight
+// TwinState.confidence_level is derived from min(AthletePhysiology.lt1.hr.prior_weight, AthletePhysiology.lt2.hr.prior_weight)
 // TwinState.metric_confidence is derived from respective parameter prior weights
 ```
 
@@ -8410,6 +9397,20 @@ See `00-foundations/confidence-model.md` for downstream effects.
 - TwinState confidence transitions: `00-foundations/confidence-model.md`
 - Signal cleaning (produces cleaned RR series input): `02-computations/signal-cleaning.md`
 - Data tier constraints on which algorithm applies: `00-foundations/data-tiers.md`
+
+### Vision ↔ Architecture Mapping
+
+The vision document `docs/vision/twin/training-zones.md` describes the philosophy and user experience. This section maps those concepts to their architecture implementations.
+
+| Vision Concept | Architecture Implementation | Document |
+|---|---|---|
+| **Signal Hierarchy** (RR → HR → Dedicated → Lab → Inference) | Data Tier 1–6 classification determines which algorithms apply. Observation weights by source (`lab_test` = 12–15, `training_rr_inflection` = 2.5, `training_hr_deflection` = 1.0, `questionnaire_estimate` = 0.5) encode signal quality into the Bayesian update. | `00-foundations/data-tiers.md`, `02-computations/physiology-update.md` |
+| **Calibration Confidence Degradation** (staleness → wider ranges) | 42-day prior decay in `bayesianUpdate()`. Older observations lose weight exponentially (`e^(-days/42)`). Increasing `uncertainty` on `PhysiologyParameterState` produces wider intent ranges at workout generation. | `02-computations/physiology-update.md` |
+| **Passive Calibration** (normal training → threshold signal) | Calibration-eligible gate (`02-computations/load-computation.md`) plus algorithm selection based on session characteristics (≥3 intensity steps for HR deflection, ≥8 min/level for RR inflection). Easy runs are calibration-eligible but do NOT produce threshold evidence. | `02-computations/threshold-detection.md`, `00-foundations/data-tiers.md` |
+| **Range-Based Targets** (athlete sees `165-172 bpm`, never "Zone 2") | `IntentRange` computed from `PhysiologyParameterState` posterior mean ± uncertainty. `WorkoutTarget` type carries signal-specific ranges with fallback chains. | `00-foundations/terminology.md` |
+| **Signal-Aware Target Selection** (HR for easy, power for threshold) | `WorkoutTarget.signal_type` selection based on session type, physiological intent, signal availability, and signal quality. Fallback chain when primary signal unavailable. | `00-foundations/terminology.md` |
+| **Multi-Dimensional Physiology** (LT1/LT2 as states with HR/power/pace expressions) | `PhysiologyParameterState` with `hr`, `power`, `pace` sub-fields. Each threshold (LT1, LT2) stored as separate parameter states per signal type. | `01-entities/athlete-physiology.md` |
+| **Confidence Per-Metric** (each parameter accumulates independently) | `TwinMetricConfidence` on `TwinState`. Global confidence = `min(lt1_hr, lt2_hr)`. Transition thresholds: 4.0 for MEDIUM, 8.0 for HIGH (evidence weight units). | `00-foundations/confidence-model.md` |
 
 ## 02-computations > wellness-modifier
 
@@ -8475,7 +9476,8 @@ const SIGNAL_WEIGHTS: Record<WellnessSignal, number> = {
   hrv_overnight_avg_ms: 0.30,
   total_sleep_minutes: 0.20,
   min_sleeping_hr_bpm: 0.10,
-  deep_sleep_minutes: 0.05
+  deep_sleep_minutes: 0.05,
+  rem_sleep_minutes: 0.08
 }
 
 function computeCompositeScore(
@@ -8616,6 +9618,26 @@ function computeWeatherPaceAdjustment(
 
 Note: The luteal thermoregulatory modifier stacks additively with weather because the mechanisms are physiologically distinct. The same formula applies with `luteal_temp_offset_c = 0.0` for non-luteal athletes.
 
+## REM Sleep — Coaching Semantics
+
+REM sleep captures cognitive and emotional recovery — distinct from deep sleep's physical/tissue repair role. The vision defines REM as "relevant for motivation, perceived effort, and decision-making capacity, particularly relevant for race situations."
+
+**Weight rationale (0.08):** REM is more variable night-to-night than deep sleep (sensitive to alcohol, stress, medication, circadian disruption). Higher noise justifies lower weight. Its primary coaching value is pattern detection (sustained REM suppression = cognitive fatigue accumulation) rather than daily composite influence. At 0.08, total weights sum to 1.08; the normalisation in `computeCompositeScore` handles this by dividing by `weight_total`.
+
+**Direction of concern:** Reduced below baseline (same as deep_sleep, total_sleep). REM is not an HR signal, so `computeDeviationScore` applies `-raw_deviation` — negative deviation = worse.
+
+**Coaching message patterns:**
+
+| Pattern | Trigger | Message approach |
+|---|---|---|
+| Low REM (3+ nights) | 3-night rolling avg below baseline | Note cognitive recovery deficit; flag relevance for upcoming quality sessions or race week |
+| Sustained REM suppression (7+ nights) | 7-night rolling avg below baseline | Flag accumulated cognitive load; suggest mindfulness of effort pacing |
+| REM + deep sleep both suppressed | Both signals below baseline simultaneously | Compound recovery deficit; system managing more than it can absorb |
+
+**REM × cycle phase interaction:** Luteal phase degrades sleep quality, likely affecting REM disproportionately (REM is concentrated in latter half of sleep, which is more disrupted by elevated core temperature). The composite score already includes a luteal cycle phase adjustment (+0.2 to +0.4). Adding a REM-specific cycle modifier would double-count the same physiological effect. REM deviation captures the luteal sleep degradation indirectly through the signal itself.
+
+**REM × race preparation:** During race-prep blocks (final 2–3 weeks before a goal race), sustained REM suppression can trigger a cognitive readiness flag in coaching messages — independent of the composite GREEN/AMBER/RED. This is a coaching-layer concern (agent reasoning), not a computation-layer concern. The `WellnessModifierService` computes the composite; the coaching agent receives full wellness context including REM trends and applies race-context interpretation.
+
 ## TwinState wellness_update Trigger
 
 When `WellnessModifierService` produces an AMBER or RED classification that differs from the most recent `TwinState`'s implied modifier:
@@ -8623,12 +9645,36 @@ When `WellnessModifierService` produces an AMBER or RED classification that diff
 - Fitness/fatigue scores are unchanged; the new record captures updated readiness context for agent consumption
 
 ## Cross-References
+
+### Vision Signal Mapping
+
+The following maps vision signal descriptions (`docs/vision/twin/external-modifiers.md`) to architecture computation steps. This table is the authoritative cross-reference for verifying that the architecture faithfully implements the vision's interpretation philosophy.
+
+| Vision Signal | Architecture Key | Weight | Vision Philosophy | Architecture Implementation |
+|---|---|---|---|---|
+| Total sleep duration | `total_sleep_minutes` | 0.20 | "Trends over multiple nights matter more than any single night" | 3-night rolling average; baseline is 28-day median |
+| Deep sleep duration | `deep_sleep_minutes` | 0.05 | "Physical recovery and tissue repair; consistently low is early warning for accumulated fatigue" | Lowest weight — rationale: high wearable measurement noise relative to other signals |
+| REM proportion | `rem_sleep_minutes` | 0.08 | "Cognitive and emotional recovery; relevant for motivation, perceived effort, decision-making, particularly race situations" | Absolute REM minutes (not proportion); proportion refinement deferred to Phase 4f+ |
+| Average sleeping HR | `avg_sleeping_hr_bpm` | 0.35 | "Primary trend signal for recovery state; rising over consecutive nights is most reliable early indicator of overreaching or illness" | Highest weight; matches vision emphasis |
+| Minimum sleeping HR | `min_sleeping_hr_bpm` | 0.10 | "True physiological floor; used as resting HR anchor for zone calculations" | Zone-calculation anchor use is in separate pipeline; wellness weight is secondary |
+| HRV overnight | `hrv_overnight_avg_ms` | 0.30 | "Monitored across rolling 3/7/14 day windows; single-night values never reacted to" | 3-night window for composite; 7-night confirms RED upgrade; 14-day window not implemented |
+| Training time of day | [computed externally] | — | "Adjusts correlation between wellness signals and execution quality based on morning vs afternoon training" | Modifies correlation, not composite score directly; lives in agent reasoning layer |
+| Trend interpretation | IQR-normalised deviation | — | "All signals interpreted as deviations from athlete's own baseline, never absolute values vs population norms" | Stage 2: deviation in IQR units; 3-night patterns trigger adjustments; 7-night patterns confirm RED |
+
+**Vision-to-architecture alignment notes:**
+- Vision: "3-night patterns trigger model adjustments" → Architecture: 3-night composite drives GREEN/AMBER/RED classification
+- Vision: "7-night patterns may trigger proactive coach communication" → Architecture: 7-night composite confirms or upgrades amber→RED
+- Vision: "single-night anomalies treated as noise" → Architecture: 3-night rolling window inherently filters single-night outliers
+- Vision: "patterns across 7+ nights may prompt plan restructuring" → Architecture: RED classification triggers target adjustment (-15%) and wellness_update TwinState
+
+### Entity References
 - AthleteWellness raw records: `01-entities/athlete-wellness.md`
 - AthleteWellnessBaseline storage: `01-entities/athlete-wellness-baseline.md`
 - CyclePhaseLog and phase computation: `01-entities/cycle-phase-log.md`
 - WeatherForecast storage: `01-entities/weather-forecast.md`
 - GeneratedWorkout adjusted_targets: `01-entities/generated-workout.md`
 - Individual weather response curve storage: `01-entities/athlete-profile.md` → `weather_response_model`
+- Vision signal descriptions: `docs/vision/twin/external-modifiers.md`
 
 ## 03-agents > context-budget-service
 
@@ -8647,7 +9693,7 @@ class ContextBudgetService {
   // For FirstMessageAgent
   async buildFirstMessageContext(athlete_id: string): Promise<FirstMessageContext> {
     const twin_state = await TwinStateRepository.get_latest(athlete_id)
-    const training_block = await TrainingBlockRepository.get_active(athlete_id)
+    const training_goal = await TrainingGoalRepository.get_active(athlete_id)
     const preferences = await AthletePreferencesRepository.get(athlete_id)
     const profile = await AthleteProfileRepository.get(athlete_id)
     const plan = await TrainingPlanRepository.get_active(athlete_id)
@@ -8655,7 +9701,7 @@ class ContextBudgetService {
     const context = {
       readiness: TwinContextAssemblerService.assemble(twin_state),
       computed_observations: computeOnboardingObservations(twin_state, preferences),
-      goal_summary: buildGoalSummary(training_block),
+      goal_summary: buildGoalSummary(training_goal),
       profile_summary: buildProfileSummary(profile, preferences),
       plan_overview: buildPlanOverview(plan),
       first_block_preview: buildFirstBlockPreview(plan)
@@ -8823,14 +9869,54 @@ type FirstMessageOutput = {
 }
 ```
 
+### First Message Vision Mapping
+
+Maps `vision/coach/first-message.md` components to output contract paragraphs and context data sources. The vision defines **what the message must contain**; the architecture defines **how it is generated**.
+
+| Vision Component (first-message.md) | Output Paragraph | Context Data Source(s) | Vision Prohibition Enforced |
+|---|---|---|---|
+| **Welcome** — warm, brief; acknowledges athlete has arrived | Para 1 | `readiness_level`, `confidence_level` | No enthusiasm about the coaching journey (product talking, not coach) |
+| **What was found** — specific observations from historical analysis; strengths AND gaps | Para 2 | `computed_observations` (aerobic_base_assessment, structural_risk_flag, training_consistency_signal), `profile_summary` (sport_background) | No generic principles without athlete connection; no numbers without context; no template feel |
+| **The plan** — training plan structure and rationale toward the goal | Para 3 | `plan_overview` (phases, total_weeks), `goal_summary` (goal_type, weeks_to_event) | No acronyms without explanation |
+| **The first block** — concrete preview of weeks 1-3 | Para 4 | `first_block_preview` (session_types_in_week_1/2, primary_focus) | — |
+
+**Reading direction:** An implementer reading `first-message.md` sees the four components and prohibitions. This table traces each component to the output paragraph that delivers it, the context data that feeds it, and the prohibitions that constrain it.
+
 ## Voice Constraints (enforced by prompt)
 
 - No bullets, headers, or emojis
 - No generic affirmations ("Great!", "You're making progress!")
 - No raw numbers without coaching context
 - No acronyms without explanation (HR, LT1, GAP — all must be plain English)
+- No enthusiasm about the coaching journey — the coach does not sell the product
 - Paragraph 2 MUST reference the athlete's specific `sport_background` and `structural_risk_flag` where applicable
 - The message could NOT have been written without reading this athlete's specific data — if it reads as a template, it has failed
+
+### Voice Rules Cross-Reference
+
+Maps `vision/coach/voice-and-format.md` rules to agent-specific constraints. The vision defines the universal voice standard; this agent enforces it for the first message.
+
+| Vision Rule (voice-and-format.md) | Agent Constraint | Enforcement Mechanism | Applies Here? |
+|---|---|---|---|
+| Three natural paragraphs, no bullets/headers/emojis | "No bullets, headers, or emojis" (four paragraphs for first message) | Prompt constraint | ✅ Yes |
+| No acronyms without explanation | "No acronyms without explanation (HR, LT1, GAP — all must be plain English)" | Prompt constraint | ✅ Yes |
+| No raw numbers without context | "No raw numbers without coaching context" | Prompt constraint | ✅ Yes |
+| No generic encouragement | "No generic affirmations ('Great!', 'You're making progress!')" | Prompt constraint | ✅ Yes |
+| Always name specific patterns | "Paragraph 2 MUST reference the athlete's specific `sport_background` and `structural_risk_flag`" | Prompt constraint + context block structure | ✅ Yes |
+| Connect today to the past | Not applicable — no prior sessions at onboarding | N/A | ❌ N/A |
+| Balance recognition with honest coaching | "observations about strengths AND gaps" in Para 2 | Prompt constraint | ✅ Yes |
+| Address session in training context | Not applicable — first message is plan-level, not session-level | N/A | ❌ N/A |
+| Tone: warm but not effusive, direct but not blunt | Not explicitly in agent constraints | Emergent from prompt tone calibration | ⚠️ Verify prompt coverage |
+
+### Onboarding Timing
+
+The vision (`vision/coach/first-message.md` → "Onboarding Time to Value") specifies that the model build takes a few minutes — not instant, not an hour — and this wait communicates that real computation is happening. This constraint is enforced structurally:
+
+- `PlanGenerationService` must complete before `FirstMessageAgent` runs (pre-condition)
+- `TwinState` must exist (any trigger) before agent runs (pre-condition)
+- The `onboarding_completed` event fires after model build, triggering agent execution
+
+The timing is an architectural property of the pipeline, not a prompt constraint.
 
 ## Pre-conditions
 
@@ -8922,7 +10008,7 @@ type StrategicHypothesis = {
   name: string                           // internal label; not surfaced to athlete
   training_philosophy: string            // e.g. "mostly easy running with occasional hard sessions"
   progression_pattern: string            // e.g. "steady gradual increases"
-  recovery_structure: string             // e.g. "recovery weeks every 3-4 blocks"
+  recovery_structure: string             // e.g. "recovery weeks every 3-4 training phases"
   intensity_balance: {
     easy_percentage: number              // 0-100
     moderate_percentage: number
@@ -9009,11 +10095,21 @@ Each hypothesis must differ meaningfully across at least two of the four dimensi
 
 ---
 
+## Decision Authority
+
+Implements the **Hypothesis Selection** authority boundary from `docs/vision/coach/decision-authority.md`.
+
+This agent generates three distinct strategic hypotheses. It does not select — selection is performed by `hypothesis-selector-agent`. The authority boundary it serves: the coach produces genuinely different strategic perspectives, ensuring the hypothesis space is well-defined before the selection step. The athlete never sees these three hypotheses directly. They are an internal coaching exploration, not a menu of options.
+
+---
+
 ## Cross-References
 
+- Decision authority: `docs/vision/coach/decision-authority.md` → "Hypothesis Selection"
+- Strategic hypothesis philosophy: `docs/vision/product/hypothesis-selection.md`
 - Plan generation pipeline: `02-computations/plan-generation.md`
 - Hypothesis selection: `03-agents/hypothesis-selector-agent.md`
-- Session planning: `03-agents/session-planner-agent.md`
+- Weekly synthesis: `03-agents/weekly-synthesis-agent.md`
 - Confidence gaps: `01-entities/twin-state.md`
 - Twin context assembly: `01-entities/twin-state.md` → Context Assembly
 
@@ -9116,7 +10212,7 @@ type PhaseArcEntry = {
 }
 
 type RaceScheduleEntry = {
-  race: string                       // "A-race", "B-race", "C-race"
+  race: string                       // "A-race", "B-event", "C-event"
   type: GoalEventType
   week: number
   role: 'peak' | 'tune_up' | 'training'
@@ -9242,8 +10338,20 @@ Checkpoints are scheduled based on:
 
 ---
 
+## Decision Authority
+
+Implements two authority boundaries from `docs/vision/coach/decision-authority.md`:
+
+**Hypothesis Selection.** The coach selects the best hypothesis. The athlete does not choose between plans. The agent scores hypotheses against twin alignment, goal fit, and injury safety, then selects the highest-scoring valid candidate and synthesises a strategic framework. The athlete receives one plan with a clear rationale. There is no multiple-choice screen, no A/B testing, no negotiation over which hypothesis to use. The athlete's agency is limited to accepting or abandoning the resulting plan.
+
+**Checkpoint Recommendation.** Checkpoints are strongly recommended, not mandatory. The agent schedules checkpoints based on confidence gaps, phase transitions, and race calendar. The athlete can decline a checkpoint. If declined, the plan continues with conservative assumptions and the cost of declining (wider zones, less precision) is communicated transparently. The agent does not enforce checkpoint completion — it surfaces the recommendation and the consequence of declining.
+
+---
+
 ## Cross-References
 
+- Decision authority: `docs/vision/coach/decision-authority.md` → "Hypothesis Selection" and "Checkpoint Recommendation"
+- Selection criteria philosophy: `docs/vision/product/hypothesis-selection.md`
 - Hypothesis generation: `03-agents/hypothesis-agent.md`
 - Weekly synthesis: `03-agents/weekly-synthesis-agent.md`
 - Plan generation pipeline: `02-computations/plan-generation.md`
@@ -9340,6 +10448,22 @@ type PostWorkoutOutput = {
 - Para 3 addresses objective movement with specific signal evidence from `objective_updates[n].evidence`
 - Never fabricates a historical comparison if `comparable_session = null`
 
+### Voice Rules Cross-Reference
+
+Maps `vision/coach/voice-and-format.md` rules to agent-specific constraints. The vision defines the universal voice standard; this agent enforces it for post-workout messages.
+
+| Vision Rule (voice-and-format.md) | Agent Constraint | Enforcement Mechanism | Applies Here? |
+|---|---|---|---|
+| Three natural paragraphs, no bullets/headers/emojis | "Three natural paragraphs; no headers, bullets, emojis" | Prompt constraint | ✅ Yes |
+| No acronyms without explanation | Not explicitly in agent constraints | Prompt (implicit in post_workout_v1.md) | ⚠️ Verify prompt coverage |
+| No raw numbers without context | Not explicitly in agent constraints | Prompt (implicit in post_workout_v1.md) | ⚠️ Verify prompt coverage |
+| No generic encouragement | "never generic ('your pacing was good')" | Prompt constraint | ✅ Yes |
+| Always name specific patterns | "Para 2 names specific execution patterns" | Prompt constraint + context block structure | ✅ Yes |
+| Connect today to the past | "Para 2 names the comparable session with a specific observation" | Prompt constraint + `comparable_session` context | ✅ Yes |
+| Balance recognition with honest coaching | Not explicitly in agent constraints | Emergent from prompt tone calibration | ⚠️ Verify prompt coverage |
+| Address session in training context | `readiness_summary.phase_position` in context block | Context block provides training position | ✅ Yes (structural) |
+| Tone: warm but not effusive, direct but not blunt | Not explicitly in agent constraints | Emergent from prompt tone calibration | ⚠️ Verify prompt coverage |
+
 ## Pre-conditions (must all be true before agent runs)
 1. `Activity` exists and is ingested
 2. `ExecutionObservation` created (or null; never pending)
@@ -9372,13 +10496,14 @@ type PostWorkoutOutput = {
 
 ## Purpose
 
-- Reviews the plan's intent for the upcoming week against accumulated execution data and current athlete state
-- Adjusts the intent if the plan's assumptions no longer match reality
+- Evaluates the plan's intent for the upcoming week against accumulated execution data and current athlete state
+- Adjusts the intent deterministically if the plan's assumptions no longer match reality
 - Acts as a strategic quality gate before the weekly synthesis agent commits to sessions
+- This is a Python service, not an LLM agent — all decision logic is deterministic
 
 ---
 
-## Context Budget: ~2k–4k tokens
+## Input Contract
 
 ---
 
@@ -9390,7 +10515,7 @@ Runs weekly, before the weekly synthesis agent. Triggered by:
 
 ---
 
-## Context Type
+## Input Type
 
 ```typescript
 type PreWeekReviewInput = {
@@ -9401,7 +10526,7 @@ type PreWeekReviewInput = {
   prior_weeks_summary: PriorWeekSummary[]
   // - sessions completed vs planned
   // - accumulated fatigue delta
-  // - adaptation observations (if any new blocks completed)
+  // - adaptation observations (if any new adaptation windows completed)
   // - checkpoint results (if any completed this cycle)
   
   // Current athlete state
@@ -9439,34 +10564,120 @@ type AdjustedWeeklyIntent = {
   max_sessions: number | null         // override from plan if schedule constrained
   session_types_preferred: SessionType[] | null  // shift emphasis if needed
   avoid_session_types: SessionType[] | null      // e.g., avoid long runs if RED
+  
+  // Disruption signal (coaching only — no automatic plan adjustment)
+  disruption_threshold_exceeded: boolean
+  disruption_window_weeks: number                 // rolling window size (default: 3)
+  disruption_rate: number                         // 0.0–1.0, rolling missed rate
+  disruption_rationale: string | null             // plain-language explanation
 }
 ```
 
 ---
 
-## Prompt Structure
+## Implementation
 
-### System Prompt
-- Coaching methodology principles
-- Phase definitions and what each phase prioritises
-- Adjustment rules (fatigue correction, schedule constraint, adaptation acceleration)
-- Hard invariants (cannot change phase, cannot add/remove weeks)
+The review is a pure Python function. All inputs are pre-computed; no LLM reasoning is required.
 
-### Context
-- Phase arc entry for this week
-- Prior weeks summary (execution data, fatigue, checkpoint results)
-- Current twin state and wellness
-- Athlete schedule preferences
-- Adaptation signature (if available)
+```python
+def review_weekly_intent(input: PreWeekReviewInput) -> AdjustedWeeklyIntent:
+    base = input.phase_arc_entry
 
-### Instructions
-1. Read the plan's intent for this week
-2. Compare against accumulated execution data
-3. Check recovery state and fatigue trajectory
-4. Check adaptation yield and checkpoint results
-5. Determine if adjustment is needed
-6. If adjusting, select the appropriate adjustment source and modify intensity bias / session preferences
-7. Return AdjustedWeeklyIntent with reasoning
+    # 1. Check recovery state
+    if input.current_wellness == "red":
+        return AdjustedWeeklyIntent(
+            **base,
+            adjustment_made=True,
+            adjustment_reason="Wellness state RED — reducing intensity emphasis",
+            adjustment_source="fatigue_correction",
+            intensity_bias="easy",
+            avoid_session_types=["threshold", "vo2max"],
+        )
+
+    # 2. Check accumulated fatigue vs plan expectation
+    expected_fatigue = compute_expected_fatigue(input.phase_arc_entry)
+    actual_fatigue = (input.prior_weeks_summary[-1].accumulated_fatigue_delta if input.prior_weeks_summary else 0)
+    if actual_fatigue > expected_fatigue * 1.2:
+        return AdjustedWeeklyIntent(
+            **base,
+            adjustment_made=True,
+            adjustment_reason="Accumulated fatigue exceeds plan expectation by >20%",
+            adjustment_source="fatigue_correction",
+            intensity_bias="easy",
+        )
+
+    # 3. Check if adaptation signature suggests acceleration
+    if input.adaptation_signature and len(input.adaptation_signature) >= 3:
+        yield_data = compute_yield_by_state(input.adaptation_signature)
+        if yield_data.threshold > POPULATION_MEDIAN * 1.2 and base.intensity_bias != "quality":
+            return AdjustedWeeklyIntent(
+                **base,
+                adjustment_made=True,
+                adjustment_reason="Threshold adaptation yield above median — can progress earlier",
+                adjustment_source="adaptation_acceleration",
+                intensity_bias="moderate",
+            )
+
+    # 4. Check checkpoint results
+    recent_checkpoint = find_recent_checkpoint(input.prior_weeks_summary)
+    if recent_checkpoint and recent_checkpoint.confidence_changed and recent_checkpoint.new_level == "high":
+        return AdjustedWeeklyIntent(
+            **base,
+            adjustment_made=True,
+            adjustment_reason="Confidence upgraded — enabling more precise targets",
+            adjustment_source="checkpoint_result",
+        )
+
+    # 5. Check rolling disruption rate (coaching signal — no automatic adjustment)
+    disruption_rate = compute_rolling_disruption_rate(input.prior_weeks_summary)
+    disruption_exceeded = disruption_rate > DISRUPTION_THRESHOLD  # 0.20
+
+    # 6. No adjustment needed
+    return AdjustedWeeklyIntent(
+        **base,
+        adjustment_made=False,
+        adjustment_reason=None,
+        adjustment_source="plan_unchanged",
+        disruption_threshold_exceeded=disruption_exceeded,
+        disruption_window_weeks=DISRUPTION_WINDOW_WEEKS,  # 3
+        disruption_rate=disruption_rate,
+        disruption_rationale=(
+            f"{disruption_rate:.0%} of sessions missed over {DISRUPTION_WINDOW_WEEKS} weeks"
+            if disruption_exceeded else None
+        ),
+    )
+```
+
+### Disruption Computation
+
+```python
+# Configurable parameters
+DISRUPTION_THRESHOLD = 0.20  # 20% of sessions missed
+DISRUPTION_WINDOW_WEEKS = 3  # rolling window
+
+def compute_rolling_disruption_rate(prior_weeks_summary: list[PriorWeekSummary]) -> float:
+    """Compute rolling disruption rate over the configured window.
+
+    Only considers weeks with data. If fewer than DISRUPTION_WINDOW_WEEKS
+    have data, uses whatever is available.
+
+    Returns: float between 0.0 and 1.0
+    """
+    if not prior_weeks_summary:
+        return 0.0
+
+    window = prior_weeks_summary[-DISRUPTION_WINDOW_WEEKS:]
+
+    total_missed = sum(w.sessions_missed for w in window)
+    total_completed = sum(w.sessions_completed for w in window)
+    total_skipped = sum(w.sessions_skipped for w in window)
+
+    denominator = total_completed + total_missed + total_skipped
+    if denominator == 0:
+        return 0.0
+
+    return total_missed / denominator
+```
 
 ---
 
@@ -9526,12 +10737,22 @@ function reviewWeeklyIntent(input: PreWeekReviewInput): AdjustedWeeklyIntent {
     }
   }
   
-  // 5. No adjustment needed
+  // 5. Check rolling disruption rate (coaching signal — no automatic adjustment)
+  const disruptionRate = computeRollingDisruptionRate(input.prior_weeks_summary)
+  const disruptionExceeded = disruptionRate > DISRUPTION_THRESHOLD
+  
+  // 6. No adjustment needed
   return {
     ...base,
     adjustment_made: false,
     adjustment_reason: null,
-    adjustment_source: 'plan_unchanged'
+    adjustment_source: 'plan_unchanged',
+    disruption_threshold_exceeded: disruptionExceeded,
+    disruption_window_weeks: DISRUPTION_WINDOW_WEEKS,
+    disruption_rate: disruptionRate,
+    disruption_rationale: disruptionExceeded
+      ? `${(disruptionRate * 100).toFixed(0)}% of sessions missed over ${DISRUPTION_WINDOW_WEEKS} weeks`
+      : null
   }
 }
 ```
@@ -9548,6 +10769,8 @@ function reviewWeeklyIntent(input: PreWeekReviewInput): AdjustedWeeklyIntent {
 | `adaptation_acceleration` | Adaptation yield above median, phase allows progression | Increase intensity bias, shift toward quality |
 | `checkpoint_result` | Confidence upgraded or metric updated | Enable more precise targets |
 
+**Note:** `disruption_threshold_exceeded` is a coaching signal, not an adjustment source. It does not change the plan's tactical direction. It surfaces in the output for the coach to act on — typically initiating a conversation about workload, motivation, or external factors. See `weekly-coaching-rhythm.md` for the behavioral contract.
+
 ---
 
 ## Constraints
@@ -9556,6 +10779,7 @@ function reviewWeeklyIntent(input: PreWeekReviewInput): AdjustedWeeklyIntent {
 - **Cannot add or remove weeks.** It only adjusts the content of the upcoming week.
 - **Cannot change race schedule.** Secondary events and taper timing are plan-level decisions.
 - **Adjustment reason is surfaced to the athlete.** Always in plain language, never jargon.
+- **Disruption signal does not trigger automatic restructuring.** When `disruption_threshold_exceeded` is true, the system surfaces a coaching signal. The coach decides whether to initiate a conversation and potentially adjust the plan. The weekly synthesis agent receives this signal but does not act on it automatically.
 
 ---
 
@@ -9563,16 +10787,16 @@ function reviewWeeklyIntent(input: PreWeekReviewInput): AdjustedWeeklyIntent {
 
 | Scenario | Behaviour |
 |---|---|
-| LLM failure | Fall back to plan's original intent (no adjustment) |
-| Invalid output | Fall back to plan's original intent |
+| Service unavailable | Fall back to plan's original intent (no adjustment) |
+| Invalid input data | Fall back to plan's original intent |
 | No prior weeks data (week 1) | Pass through plan intent unchanged |
 
 ---
 
 ## Idempotency
 
-- **Not idempotent.** Different inputs may produce different adjustments.
-- Same input + same state → same adjustment (deterministic for same context).
+- **Deterministic.** Same inputs always produce the same output.
+- Different inputs may produce different adjustments.
 
 ---
 
@@ -9582,65 +10806,43 @@ function reviewWeeklyIntent(input: PreWeekReviewInput): AdjustedWeeklyIntent {
 
 | Event | Trigger | Version | Payload |
 |---|---|---|---|
-| `pre_week_review_completed` | Review finished | v1 | `{training_plan_id, week_number, adjustment_made, adjustment_source}` |
+| `pre_week_review_completed` | Review finished | v1 | `{training_plan_id, week_number, adjustment_made, adjustment_source, disruption_threshold_exceeded}` |
 
-Note: The payload contains `training_plan_id` and `week_number`, not `weekly_plan_id`. The WeeklyPlan does not exist yet at the time of the review. The weekly synthesis agent uses these fields to look up the phase arc entry and create the WeeklyPlan.
+Note: The payload contains `training_plan_id` and `week_number`, not `weekly_plan_id`. The WeeklyPlan does not exist yet at the time of the review. The weekly synthesis agent uses these fields to look up the phase arc entry and create the WeeklyPlan. The `disruption_threshold_exceeded` field is a boolean coaching signal — it does not trigger automatic plan changes.
 
 ### Consumed
 
 | Event | Action | Version |
 |---|---|---|
 | `week_completed` | Trigger review for next week | v1 |
-| `training_plan_generated` | First weekly plan is created directly by plan-generation (no pre-week review for week 1). Pre-week reviews start at week 2. | v1 |
+| `training_plan_generated` | Subscribed but does NOT trigger a review for week 1. Week 1 has no prior execution data, so review is unnecessary. PlanGenerationService creates the first WeeklyPlan atomically with the plan. PreWeekReviewAgent begins acting on `week_completed` events starting from week 1's completion (i.e., reviews start at week 2). | v1 |
+
+---
+
+## Decision Authority
+
+Implements the **Plan Modification Authority** authority boundary from `docs/vision/coach/decision-authority.md`.
+
+Plan modifications are coach decisions, not athlete requests. The athlete sees the adjustment and understands the rationale, but does not initiate replanning. This agent adjusts weekly intent deterministically based on fatigue, adaptation, and checkpoint data. The constraints it respects — cannot change phase label, cannot add or remove weeks, cannot change race schedule — enforce the boundary between weekly tactical adjustment and strategic plan modification. The disruption signal (`disruption_threshold_exceeded`) is surfaced as a coaching signal for the coach to act on, not as an automatic plan change. Most day-to-day adjustments (missed sessions, schedule changes, slower-than-expected recovery) are absorbed by the weekly coaching rhythm without modifying the plan itself.
 
 ---
 
 ## Cross-References
 
+- Decision authority: `docs/vision/coach/decision-authority.md` → "Plan Modification Authority"
 - Plan phase arc: `01-entities/training-plan.md` → `phase_arc`
 - Weekly synthesis: `03-agents/weekly-synthesis-agent.md`
 - Wellness state: `02-computations/wellness-modifier.md`
 - Adaptation signature: `01-entities/adaptation-signature.md`
 - Confidence model: `00-foundations/confidence-model.md`
 - Prior weeks summary: `01-entities/weekly-plan.md`
+- Disruption threshold semantics: `docs/vision/product/weekly-coaching-rhythm.md` → "What Changes and What Doesn't"
 
-## 03-agents > session-planner-agent
+## Design Notes
 
-# Session Planner Agent
-
-## Purpose
-
-- **DEPRECATED** — This agent's role has been split between:
-  - `02-computations/plan-generation.md` — produces the phase arc (strategic intent per week)
-  - `03-agents/weekly-synthesis-agent.md` — produces actual sessions for each week
-  - `03-agents/pre-week-review-agent.md` — reviews and adjusts weekly intent before synthesis
-
-This document is retained for reference only. New development should use the weekly synthesis layer.
-
----
-
-## Historical Role
-
-This agent generated the complete session schedule from a strategic framework. In the current architecture, this responsibility is distributed across the weekly synthesis layer:
-
-| Concern | New Owner |
-|---|---|
-| Phase arc (strategic intent) | `plan-generation.md` → hypothesis-selector-agent |
-| Weekly intent review | `pre-week-review-agent.md` |
-| Session schedule (per week) | `weekly-synthesis-agent.md` |
-| Session validation | `weekly-synthesis-agent.md` (inherited rules) |
-
----
-
-## Cross-References (Historical)
-
-- Hypothesis generation: `03-agents/hypothesis-agent.md`
-- Hypothesis selection: `03-agents/hypothesis-selector-agent.md`
-- Plan generation pipeline: `02-computations/plan-generation.md`
-- **Current session planning: `03-agents/weekly-synthesis-agent.md`**
-- PlannedSession entity: `01-entities/planned-session.md`
-- Checkpoint entity: `01-entities/checkpoint.md`
-- Session types: `00-foundations/terminology.md` → SessionType
+- Week 1 has no prior execution data, so the pre-week review is unnecessary. PlanGenerationService creates the first WeeklyPlan atomically with the phase arc.
+- The adjustment explanation surfaced to the athlete is generated via templates, not LLM narration.
+- The deterministic rule hierarchy (wellness → fatigue → adaptation → checkpoint) is a design decision. If the priority order needs adjustment, update the rules directly.
 
 ## 03-agents > skip-conversation-agent
 
@@ -9723,7 +10925,36 @@ function routeSkipFlow(classification: SkipClassification): void {
 ## Performance Constraints
 - p95 < 3s (small context; fast classification)
 
+## Decision Authority
+
+Implements the **Workout Acceptance** authority boundary from `docs/vision/coach/decision-authority.md`.
+
+The athlete has three options for a scheduled workout: accept the planned workout, substitute from coach-suggested alternatives, or skip with the system proposing to reschedule or adjust the plan. The athlete cannot create, edit, or customise workouts. This agent classifies the reason for a skip and routes to the appropriate flow (redistribution, injury escalation, illness handling, or no redistribution). It does not generate alternative workouts — that is the workout library's role. The authority boundary is enforced by the absence of a "create workout" path in this agent's output contract.
+
+---
+
 ## Cross-References
+
+### Vision → Architecture Flow Mapping
+
+| SkipFlow | Vision Flow (`substitution.md`) | Behaviour |
+|---|---|---|
+| `no_redistribution` | Rest Days (no availability in week) | Load dropped; plan adjusts forward |
+| `offer_redistribution` | Workout Substitution Flow + Rest Days (with availability) | Find redistribution window + library substitutes |
+| `injury_escalation` | Injury Flow | Plan restructured around constraint; cross-training where possible |
+| `illness_handling` | Illness Flow | Conservative return ramp; forced detraining adjustment |
+
+### Vision Flows Not Covered by This Agent
+
+| Vision Flow | Ownership | Notes |
+|---|---|---|
+| Unsynced Workout Handling | *(see substitution.md)* | Check-in when expected data missing; distinct from skip flow |
+| Post-hoc Detection | *(see substitution.md)* | Mismatch detection after upload; distinct from skip flow |
+| Non-Running Session Suggestions | *(see substitution.md)* | Prescription layer; not part of skip classification |
+
+### Related Architecture Entities
+
+- Decision authority: `docs/vision/coach/decision-authority.md` → "Workout Acceptance"
 - PlannedSession lifecycle: `01-entities/planned-session.md`
 - Session redistribution algorithm: `02-computations/plan-generation.md`
 - WorkoutLibraryEntry substitution query: `01-entities/workout-library-entry.md`
@@ -9826,7 +11057,7 @@ type WeeklySessionPlacement = {
 - Checkpoint descriptors this week
 
 ### Instructions
-1. Determine session count from adjusted intent and athlete preference
+1. Receive session count as a pre-computed input (from `PreWeekReviewService` or `PlanGenerationService`)
 2. Identify which days are available (including doubles capacity)
 3. Place long run on long_workout_day (if available)
 4. Place checkpoints if scheduled this week (checkpoint_schedule is pre-filtered to this week by caller)
@@ -9845,7 +11076,7 @@ type WeeklySessionPlacement = {
 
 ## Session Placement Rules
 
-### Inherited from Session Planner Agent
+### Session Placement Rules
 
 - Long run on `long_workout_day` (if available)
 - Long run always followed by rest or `recovery_run`
@@ -9856,30 +11087,9 @@ type WeeklySessionPlacement = {
 
 ### Weekly-Level Rules
 
-```typescript
-function computeSessionCount(intent: AdjustedWeeklyIntent, athlete_pref: AthletePreferences): number {
-  const base_count = athlete_pref.weekly_session_count
-  
-  // Adjust based on intensity bias
-  switch (intent.intensity_bias) {
-    case 'easy':
-      return Math.max(3, base_count - 1)  // reduce by 1, floor of 3
-    case 'balanced':
-      return base_count
-    case 'moderate':
-      return base_count
-    case 'quality':
-      return Math.min(5, base_count)  // cap at 5 for quality weeks
-  }
-  
-  // Override if schedule-constrained
-  if (intent.max_sessions && intent.max_sessions < base_count) {
-    return intent.max_sessions
-  }
-  
-  return base_count
-}
-```
+Session count is computed deterministically by `PreWeekReviewService` (or `PlanGenerationService` for week 1) and provided as a pre-computed input. See `02-computations/session-count.md` for the computation logic.
+
+The weekly synthesis agent receives `session_count` as part of `AdjustedWeeklyIntent` and distributes sessions across available days.
 
 ### Intensity Bias → Session Type Distribution
 
@@ -9940,6 +11150,8 @@ function assignBlockMetadata(
 - Advanced athletes with high training load
 - Schedule constraints requiring compressed quality
 - When adaptation signature learning benefits from compound stimuli
+
+Note: When assigning `block_id` to consecutive quality sessions, the agent is creating what the adaptation signature layer later observes as an adaptation window. The `block_id` is the planning mechanism; the adaptation window is the observation purpose.
 
 **When NOT to create blocks:**
 - Beginners or athletes with low training load
@@ -10021,33 +11233,32 @@ If a checkpoint is scheduled this week:
 
 When the LLM cannot produce a valid weekly plan:
 
-```typescript
-function templateFallback(
-  intent: AdjustedWeeklyIntent,
-  athlete_pref: AthletePreferences
-): WeeklySessionPlacement[] {
-  const sessions = []
-  const available_days = athlete_pref.available_days
-  const session_count = computeSessionCount(intent, athlete_pref)
-  
-  // Distribute: easy sessions first, then quality
-  const easy_count = Math.ceil(session_count * 0.7)
-  const quality_count = session_count - easy_count
-  
-  // Place long run on long_workout_day
-  sessions.push({
-    target_date: nextDate(athlete_pref.long_workout_day),
-    session_type: 'long_run',
-    intent_description: intent.physiological_emphasis,
-    approximate_duration_minutes: 90,
-    is_checkpoint: false
-  })
-  
-  // Fill remaining sessions across available days
-  // ... (simplified)
-  
-  return sessions
-}
+```python
+def template_fallback(
+    intent: AdjustedWeeklyIntent,
+    athlete_pref: AthletePreferences,
+    session_count: int,
+) -> list[WeeklySessionPlacement]:
+    sessions = []
+    available_days = athlete_pref.available_days
+
+    # Distribute: easy sessions first, then quality
+    easy_count = math.ceil(session_count * 0.7)
+    quality_count = session_count - easy_count
+
+    # Place long run on long_workout_day
+    sessions.append(WeeklySessionPlacement(
+        target_date=next_date(athlete_pref.long_workout_day),
+        session_type="long_run",
+        intent_description=intent.physiological_emphasis,
+        approximate_duration_minutes=90,
+        is_checkpoint=False,
+    ))
+
+    # Fill remaining sessions across available days
+    # ... (simplified)
+
+    return sessions
 ```
 
 ---
@@ -10084,15 +11295,30 @@ function templateFallback(
 
 ---
 
+## Decision Authority
+
+Implements the **Plan Modification Authority** authority boundary from `docs/vision/coach/decision-authority.md`.
+
+The weekly rhythm is the coach's decision, not the athlete's. This agent produces the actual session schedule within the adjusted intent constraints. The athlete sees the result — a week of sessions that fits their current state — but does not approve or negotiate the schedule. The invariant "weekly synthesis cannot change the plan's phase or strategic direction" enforces the boundary between tactical weekly scheduling and strategic plan modification. Session count, intensity bias, and session types are determined by the pre-week review (coach decision), not by athlete request.
+
+---
+
 ## Cross-References
 
+- Decision authority: `docs/vision/coach/decision-authority.md` → "Plan Modification Authority"
 - Weekly plan entity: `01-entities/weekly-plan.md`
-- Pre-week review: `03-agents/pre-week-review-agent.md`
+- Pre-week review: `03-agents/pre-week-review-agent.md` (Python service)
+- Session count computation: `02-computations/session-count.md`
 - Plan phase arc: `01-entities/training-plan.md` → `phase_arc`
-- Session planner (base rules): `03-agents/session-planner-agent.md`
+- Session placement rules: session placement rules section below
 - Workout generation: `03-agents/workout-generation-agent.md`
 - Checkpoint scheduling: `01-entities/checkpoint.md`
 - Secondary events: `01-entities/secondary-event.md` (if exists)
+
+## Design Notes
+
+- Week 1 is handled by PlanGenerationService (first WeeklyPlan created atomically). This agent starts from week 2 onward via `pre_week_review_completed`.
+- Session count is a deterministic Python computation, not an LLM judgment call. The agent receives it as a pre-computed input.
 
 ## 03-agents > wellness-alert-agent
 
@@ -10187,7 +11413,17 @@ type PlanRegenerationContext = {
 ## Performance Constraints
 - p95 < 4s (small context; short output)
 
+## Decision Authority
+
+Implements the **Plan Modification Authority** authority boundary from `docs/vision/coach/decision-authority.md`.
+
+Plan modifications are coach decisions, not athlete requests. This agent generates proactive coach messages (wellness alerts, phase transitions, plan regeneration notifications) that surface coaching signals to the athlete. These messages communicate what has been observed and what adjustments have been made — they do not request athlete approval. The wellness alert specifically surfaces recovery state and target adjustments already applied. The athlete sees the result of the coach's assessment, not a request for permission. The frequency gates prevent noise while preserving the coach's authority to speak up unprompted when the data warrants it.
+
+---
+
 ## Cross-References
+
+- Decision authority: `docs/vision/coach/decision-authority.md` → "Plan Modification Authority"
 - Recovery modifier computation: `02-computations/wellness-modifier.md`
 - TrainingPlan phase structure: `01-entities/training-plan.md`
 - CoachingMessage frequency gate logic: `01-entities/coaching-message.md`
@@ -10336,7 +11572,17 @@ Generating a workout for a `planned_session_id` that already has a `GeneratedWor
 - p95 < 5s (LLM latency)
 - Pre-generated workout retrieval: p95 < 50ms
 
+## Decision Authority
+
+Implements the **Workout Acceptance** authority boundary from `docs/vision/coach/decision-authority.md`.
+
+The athlete cannot create, edit, or customise workouts. This boundary prevents complexity spiral, maintains coaching quality control, and keeps the product honest about what it is — a coaching system, not a training tool. This agent generates the specific structured workout from pre-computed modifiers (twin state, wellness, weather, cycle phase). The athlete never provides input to workout generation. The agent's design — receiving pre-computed readiness data, producing fixed workout steps, no athlete-facing customisation path — enforces this authority boundary at the architecture level.
+
+---
+
 ## Cross-References
+
+- Decision authority: `docs/vision/coach/decision-authority.md` → "Workout Acceptance"
 - WorkoutStep schema: `01-entities/workout-step.md`
 - GeneratedWorkout schema: `01-entities/generated-workout.md`
 - Modifier computation chain: `02-computations/wellness-modifier.md`
@@ -10675,9 +11921,9 @@ twin_confidence_upgraded ──────────┐
                                    │
                                    ▼
                     ┌─────────────────────────┐
-                    │ PreWeekReviewAgent      │
-                    │ (reviews next week's    │
-                    │  intent)                │
+                    │ PreWeekReviewService    │
+                    │ (evaluates next week's  │
+                    │  intent — deterministic)│
                     └─────────────────────────┘
                                    │
                                    ▼
@@ -11084,8 +12330,8 @@ CREATE INDEX idx_planned_sessions_plan_date ON planned_sessions (training_plan_i
 CREATE INDEX idx_planned_sessions_status_date ON planned_sessions (athlete_id, status, target_date)
   WHERE status IN ('pending', 'generated');
 
--- Active training block (one-per-athlete partial unique index)
-CREATE UNIQUE INDEX idx_training_blocks_active ON training_blocks (athlete_id)
+-- Active training goal (one-per-athlete partial unique index)
+CREATE UNIQUE INDEX idx_training_goals_active ON training_goals (athlete_id)
   WHERE status = 'active';
 
 -- Recent activities for twin recalibration (rolling 90-day window)
@@ -11230,7 +12476,7 @@ When a pipeline version improves, recent history is reprocessed rather than wait
 ### Reprocessing Window
 
 - **Default window:** Recent calibration-eligible sessions (typically 90 days)
-- **Rationale:** Covers approximately one full training block cycle, providing sufficient data for the Bayesian posterior to benefit from improved observations without reprocessing the entire athlete history
+- **Rationale:** Covers approximately one full training cycle, providing sufficient data for the Bayesian posterior to benefit from improved observations without reprocessing the entire athlete history
 
 ### What Gets Updated
 
@@ -11304,9 +12550,9 @@ When this architecture conflicts with the release plan on technical design, this
 | Activity model | Lean index only — no averages, no lap dumps | `principles.md` |
 | `fit_file_key` | Required before Activity commits; never null for non-manual | `principles.md`, `01-entities/activity.md` |
 | TwinState | Append-only; insert only; no UPDATE or DELETE | `01-entities/twin-state.md` |
-| LLM role | Narrates pre-computed findings; never derives analytical conclusions | `principles.md` |
+| LLM role | Reasons about strategy from pre-computed metrics; never processes raw data | `principles.md` |
 | LLM context | 2k–6k tokens per agent; `ContextBudgetService` enforces before call | `03-agents/context-budget-service.md` |
-| `PhysiologicalIntent` | Shared enum across all layers; 8 values; session-level adaptation target | `00-foundations/terminology.md` |
+| `PhysiologicalIntent` | Shared enum across all layers; 6 values; session-level adaptation target | `00-foundations/terminology.md` |
 | `PhysiologicalSegment` | Stable interface across all segmentation generations | `01-entities/physiological-segment.md` |
 | Old analytical records | Never deleted; `superseded_at` on superseded records | `04-platform/versioning-and-reprocessing.md` |
 | GAP | Always grade-adjusted pace; never raw pace | `02-computations/effort-normalisation.md` |
@@ -11315,6 +12561,7 @@ When this architecture conflicts with the release plan on technical design, this
 | Calibration eligibility | Five-rule gate; always Python; never overridden manually | `02-computations/load-computation.md` |
 | Confidence level | Ratchets up only; never decreases | `00-foundations/confidence-model.md` |
 | Active TrainingGoal | One per athlete; partial unique index enforces | `01-entities/training-goal.md` |
+| `block_id` = adaptation window | `block_id` groups on PlannedSession are the planning-level implementation of adaptation windows; `AdaptationBlockDetectionTask` detects the same pattern for observation | `01-entities/planned-session.md`, `01-entities/adaptation-observation.md` |
 | AthletePhysiology | Mutable one-per-athlete; PhysiologyMeasurement is append-only history | `01-entities/athlete-physiology.md` |
 | AthleteFitness | Mutable one-per-athlete; historical state via TwinState FK chain | `01-entities/athlete-fitness.md` |
 | Bayesian update | PhysiologyUpdateService applies observation weights and prior decay | `02-computations/physiology-update.md` |
@@ -11324,14 +12571,15 @@ When this architecture conflicts with the release plan on technical design, this
 | Comparable session | Backend Python selects; LLM never chooses | `02-computations/comparable-sessions.md` |
 | Race prediction | Not written at LOW confidence; not created for open training | `01-entities/race-prediction.md` |
 | GenerationEvent | Written for every LLM call attempt including failures | `01-entities/generation-event.md` |
+| Vision cross-references | Design philosophy, differentiators, and constraints mapped to architecture | `00-foundations/principles.md` (Vision Cross-References section) |
 
 ---
 
 ## 00-foundations/
 
 ### `00-foundations/principles.md`
-The ten architectural invariants every engineer must internalise. The five-layer separation of concerns diagram with layer independence rule. Processing is always async.
-**Read for:** the non-negotiable rules; what the five layers are; the core activity-as-observation principle.
+The fourteen architectural invariants every engineer must internalise. The five-layer separation of concerns diagram with layer independence rule. Processing is always async. Vision cross-references mapping design philosophy, differentiators, and constraints to architecture implementations.
+**Read for:** the non-negotiable rules; what the five layers are; the core activity-as-observation principle; how product vision maps to architecture.
 
 ### `00-foundations/terminology.md`
 Canonical definitions for every domain term, with TypeScript schemas for all shared enums: `PhysiologicalIntentState`, `TwinConfidenceLevel`, `RecoveryModifierLevel`, `SessionType`, `PhaseLabel`, `CyclePhase`, `DataTier`.
@@ -11508,6 +12756,10 @@ Generation 1 threshold-based segmentation. HR zone classification. Confidence co
 Generation 3 HMM. Why HMM fits (four reasons). Architecture: 7 states, feature vectors, transition matrix, Gaussian emissions. Viterbi + forward-backward inference. Population vs per-athlete model. Fallback chain.
 **Read for:** HMM architecture; why HMM was chosen; inference algorithms; model training and fallback.
 
+### `02-computations/session-count.md`
+Deterministic session count computation from intensity bias and athlete preference. Pure Python function — no LLM reasoning required.
+**Read for:** session count rules; how intensity bias affects session count; invariant: lower of computed and preference wins.
+
 ### `02-computations/plan-generation.md`
 Phase arc formulas for race and open training. Session distribution structural rules. Crossover athlete ramp. Regeneration trigger conditions.
 **Read for:** phase arc percentages; session distribution rules and their rationale; crossover ramp; regeneration gates.
@@ -11531,7 +12783,7 @@ Seeding rules (max 5, ≥1 maintain, tier-based categories). Post-session evalua
 One document per LLM agent. Context inputs, output contract, voice constraints, idempotency, failure semantics.
 
 ### `03-agents/first-message-agent.md`
-Context budget ~3k–5k tokens. Full context type. Output: four paragraphs. Must reference `sport_background` and `structural_risk_flag`. One per block; 409 on second call.
+Context budget ~3k–5k tokens. Full context type. Output: four paragraphs. Must reference `sport_background` and `structural_risk_flag`. One per goal; 409 on second call.
 **Read for:** first message context structure; four-paragraph output contract; idempotency; quality bar.
 
 ### `03-agents/workout-generation-agent.md`
@@ -11559,24 +12811,15 @@ Context budget ~3k–5k tokens. Generates three strategic approaches using four 
 Context budget ~4k–6k tokens. Scores and selects best approach. Synthesizes strategic framework with phase arc, race schedule, checkpoint schedule, intensity balance. Scoring: twin alignment (50%), goal fit (30%), injury safety (10%).
 **Read for:** scoring criteria; constraint-first validation; framework synthesis with phase arc; checkpoint scheduling logic.
 
-### `03-agents/pre-week-review-agent.md`
+### `03-agents/pre-week-review-agent.md` (Python service)
 
-Context budget ~2k–4k tokens. Reviews the plan's intent for the upcoming week against accumulated execution data and current athlete state. Adjusts intent if plan assumptions no longer match reality. Acts as strategic quality gate before weekly synthesis.
-**Read for:** adjustment sources (fatigue correction, schedule constraint, adaptation acceleration); decision logic; constraints on what can/cannot be adjusted.
+**Python service, not an LLM agent.** Evaluates the plan's intent for the upcoming week against accumulated execution data and current athlete state. All decision logic is deterministic — no LLM reasoning required.
+**Read for:** adjustment sources (fatigue correction, schedule constraint, adaptation acceleration); deterministic decision logic; constraints on what can/cannot be adjusted.
 
 ### `03-agents/weekly-synthesis-agent.md`
 
-Context budget ~3k–5k tokens. Produces the actual session schedule for a single week. Reads adjusted intent from pre-week review and current athlete state. Outputs WeeklyPlan with session count, types, days, and approximate duration. Inherits all session placement rules from the deprecated session-planner-agent.
+Context budget ~3k–5k tokens. Produces the actual session schedule for a single week. Reads adjusted intent from pre-week review (Python service) and current athlete state. Outputs WeeklyPlan with session count, types, days, and approximate duration. Inherits all session placement rules from the deprecated session-planner-agent. Session count is a pre-computed input — the agent does not compute it.
 **Read for:** session placement rules; intensity bias → session type distribution; race week handling; template fallback.
-
-### `03-agents/session-planner-agent.md` (DEPRECATED)
-
-**Deprecated** — replaced by the weekly synthesis layer:
-- `03-agents/weekly-synthesis-agent.md` — produces weekly session schedules
-- `03-agents/pre-week-review-agent.md` — reviews and adjusts weekly intent
-- `02-computations/plan-generation.md` — produces phase arc (strategic intent)
-
-Retained for historical reference only.
 
 ### `03-agents/context-budget-service.md`
 `ContextBudgetService` implementation for all three primary agents. Token budget enforcement before API call. Priority truncation ordering per agent.

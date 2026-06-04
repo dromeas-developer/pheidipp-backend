@@ -67,14 +67,54 @@ type FirstMessageOutput = {
 }
 ```
 
+### First Message Vision Mapping
+
+Maps `vision/coach/first-message.md` components to output contract paragraphs and context data sources. The vision defines **what the message must contain**; the architecture defines **how it is generated**.
+
+| Vision Component (first-message.md) | Output Paragraph | Context Data Source(s) | Vision Prohibition Enforced |
+|---|---|---|---|
+| **Welcome** — warm, brief; acknowledges athlete has arrived | Para 1 | `readiness_level`, `confidence_level` | No enthusiasm about the coaching journey (product talking, not coach) |
+| **What was found** — specific observations from historical analysis; strengths AND gaps | Para 2 | `computed_observations` (aerobic_base_assessment, structural_risk_flag, training_consistency_signal), `profile_summary` (sport_background) | No generic principles without athlete connection; no numbers without context; no template feel |
+| **The plan** — training plan structure and rationale toward the goal | Para 3 | `plan_overview` (phases, total_weeks), `goal_summary` (goal_type, weeks_to_event) | No acronyms without explanation |
+| **The first block** — concrete preview of weeks 1-3 | Para 4 | `first_block_preview` (session_types_in_week_1/2, primary_focus) | — |
+
+**Reading direction:** An implementer reading `first-message.md` sees the four components and prohibitions. This table traces each component to the output paragraph that delivers it, the context data that feeds it, and the prohibitions that constrain it.
+
 ## Voice Constraints (enforced by prompt)
 
 - No bullets, headers, or emojis
 - No generic affirmations ("Great!", "You're making progress!")
 - No raw numbers without coaching context
 - No acronyms without explanation (HR, LT1, GAP — all must be plain English)
+- No enthusiasm about the coaching journey — the coach does not sell the product
 - Paragraph 2 MUST reference the athlete's specific `sport_background` and `structural_risk_flag` where applicable
 - The message could NOT have been written without reading this athlete's specific data — if it reads as a template, it has failed
+
+### Voice Rules Cross-Reference
+
+Maps `vision/coach/voice-and-format.md` rules to agent-specific constraints. The vision defines the universal voice standard; this agent enforces it for the first message.
+
+| Vision Rule (voice-and-format.md) | Agent Constraint | Enforcement Mechanism | Applies Here? |
+|---|---|---|---|
+| Three natural paragraphs, no bullets/headers/emojis | "No bullets, headers, or emojis" (four paragraphs for first message) | Prompt constraint | ✅ Yes |
+| No acronyms without explanation | "No acronyms without explanation (HR, LT1, GAP — all must be plain English)" | Prompt constraint | ✅ Yes |
+| No raw numbers without context | "No raw numbers without coaching context" | Prompt constraint | ✅ Yes |
+| No generic encouragement | "No generic affirmations ('Great!', 'You're making progress!')" | Prompt constraint | ✅ Yes |
+| Always name specific patterns | "Paragraph 2 MUST reference the athlete's specific `sport_background` and `structural_risk_flag`" | Prompt constraint + context block structure | ✅ Yes |
+| Connect today to the past | Not applicable — no prior sessions at onboarding | N/A | ❌ N/A |
+| Balance recognition with honest coaching | "observations about strengths AND gaps" in Para 2 | Prompt constraint | ✅ Yes |
+| Address session in training context | Not applicable — first message is plan-level, not session-level | N/A | ❌ N/A |
+| Tone: warm but not effusive, direct but not blunt | Not explicitly in agent constraints | Emergent from prompt tone calibration | ⚠️ Verify prompt coverage |
+
+### Onboarding Timing
+
+The vision (`vision/coach/first-message.md` → "Onboarding Time to Value") specifies that the model build takes a few minutes — not instant, not an hour — and this wait communicates that real computation is happening. This constraint is enforced structurally:
+
+- `PlanGenerationService` must complete before `FirstMessageAgent` runs (pre-condition)
+- `TwinState` must exist (any trigger) before agent runs (pre-condition)
+- The `onboarding_completed` event fires after model build, triggering agent execution
+
+The timing is an architectural property of the pipeline, not a prompt constraint.
 
 ## Pre-conditions
 

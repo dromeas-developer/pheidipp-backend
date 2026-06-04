@@ -3,6 +3,21 @@
 ## Purpose
 - Stores credentials and sync state for each connected training platform
 - One record per athlete per platform; supports intervals.icu at launch, Garmin Connect planned
+- Serves Tier 1 (Native Platform APIs) and Tier 2 (Aggregator Platforms) integrations per the vision tier structure. Tier 3 (Direct File Ingestion) flows through Activity ingestion, not this entity.
+- All integrations serve the raw data philosophy: Pheidipp processes sensor data internally, never accepting derived metrics from third parties. See `docs/vision/product/integrations.md`.
+
+## Vision Alignment
+
+The vision defines three integration tiers and a separate wellness data category. This entity covers training integrations only.
+
+| Platform | Vision Tier | Type | Architecture Notes |
+|---|---|---|---|
+| `intervals_icu` | Tier 2 — Aggregator | Training | Maintains raw FIT files; Pheidipp processes internally. Launch platform. |
+| `garmin_connect` | Tier 1 — Native API | Training | Direct device manufacturer API; raw sensor streams. Planned. |
+| COROS, Polar, Suunto | Tier 1 — Native API | Training | Planned; not yet in `IntegrationPlatform` enum. |
+| Whoop, Oura | N/A | Wellness | Recovery context providers (sleep, HRV, resting HR). Feed External Modifiers layer, not this entity. |
+
+**Tier 3 — Direct File Ingestion:** Manual FIT file upload provides the highest-fidelity path. It bypasses this entity entirely and flows through `01-entities/activity.md` ingestion. No credentials or sync state required.
 
 ## TypeScript Schema
 

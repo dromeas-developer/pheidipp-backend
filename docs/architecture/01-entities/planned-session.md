@@ -267,6 +267,8 @@ Metrics:
 - `planned_session.skip_rate`: skipped / (completed + skipped) by session_type
 - `planned_session.miss_rate`: missed / (completed + missed + skipped) by phase_label
 - `planned_session.redistribution_rate`
+- `planned_session.rolling_disruption_rate`: rolling 3-week missed rate (fed to pre-week review)
+- `planned_session.disruption_threshold_exceeded`: boolean, per athlete (set by pre-week review)
 Logs:
 - `planned_session.skipped`: session_id, session_type, phase_label
 - `planned_session.missed`: session_id, session_type, target_date

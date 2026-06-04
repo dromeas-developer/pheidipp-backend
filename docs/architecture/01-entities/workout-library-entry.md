@@ -105,3 +105,22 @@ This promotion runs as a nightly task — not immediately.
 Metrics:
 - `workout_library.acceptance_rate.distribution`: histogram by session_type
 - `workout_library.entries.by_source`: seed vs generated counts
+
+## Cross-References
+
+### Vision Implementation
+
+- Vision: `docs/vision/coach/substitution.md` → "Workout Library"
+- The vision describes curated templates that athletes cannot browse — this entity enforces that boundary via `created_by` invariant (`'athlete'` does not exist)
+- Vision learning statement ("sessions that work well surface more frequently") maps to `acceptance_rate` sorting in `find_substitutes()`
+
+### Invocation Chain
+
+- Invoked by: `03-agents/skip-conversation-agent.md` via `SkipFlow 'offer_redistribution'`
+- Agent classifies skip reason → routes to `offer_redistribution` → `WorkoutLibraryService.find_substitutes()` queries this entity
+- Related skip flows (`no_redistribution`, `injury_escalation`, `illness_handling`) do not invoke the library — they route to plan adjustment or regeneration
+
+### Promotion Source
+
+- Promotes from: `GeneratedWorkout` (nightly task, ≥3 offers, ≥0.6 acceptance rate)
+- Promotion logic: `02-computations/workout-promotion.md`

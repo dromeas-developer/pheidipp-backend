@@ -1,5 +1,4 @@
 # Brand Philosophy
-*Foundation identity and design principles that define Pheidipp's character*
 
 ## The Name
 
@@ -25,6 +24,13 @@ The role model is a great human coach, not a fitness app. A real coach doesn't s
 
 ### No AI-Feel Communication
 All coach communication is in plain, natural language. No emojis, bullet points, headers, or generic AI-style output. The coach writes in paragraphs, the way a real coach speaks. The athlete should never feel like they are reading generated text.
+
+### Data Processing Boundary
+The LLM is a reasoning engine, not a data processor. All analytical computation — fitness scoring, threshold estimation, execution classification, load accumulation, trend analysis — is performed deterministically in Python before the LLM ever sees it. The LLM receives pre-computed metrics and structured summaries, then reasons about what they mean strategically.
+
+Strategic planning is legitimate LLM territory: generating training hypotheses, evaluating methodology fit, selecting periodisation approaches, structuring weekly progression. These are reasoning tasks that benefit from natural language understanding and coaching philosophy.
+
+What the LLM never does is take raw or semi-processed data and try to make sense of it. Calculations, cleanup, statistical analysis, and derived metrics are always pre-computed. The LLM reasons from conclusions, never from raw inputs.
 
 ## Coaching Expertise Boundaries
 

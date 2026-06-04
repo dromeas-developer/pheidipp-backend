@@ -70,6 +70,8 @@ type CyclePersonalModel = {
     ovulatory: number
     luteal: number
   }
+  luteal_temp_sensitivity: number  // multiplier on LUTEAL_TEMP_OFFSET_C (0.35); population default: 1.0
+  fitted_from_cycles: number       // number of complete cycles used for fitting
   computed_at: string
 }
 ```
@@ -81,6 +83,7 @@ type CyclePersonalModel = {
 - `weather_response_model` is only applied when `r_squared >= 0.65`.
 - `banister_constants` stores per-athlete fitted time constants. When set, `AthleteFitness.time_constants` references these values (source='individual_fitted'). When null, `AthleteFitness.time_constants` uses population defaults (source='population_default').
 - `cycle_personal_model.phase_sensitivity` of `0.0` means the model detected no phase correlation — cycle modifier is effectively zeroed for this athlete. This is a valid outcome.
+- `cycle_personal_model.luteal_temp_sensitivity` of `1.0` means the population default thermoregulatory offset applies. Values <1.0 indicate lower-than-average thermal sensitivity; >1.0 indicate higher. When `cycle_personal_model` is null, `LUTEAL_TEMP_OFFSET_C` (0.35) applies at full population weight.
 
 ## Events
 
@@ -95,6 +98,36 @@ type CyclePersonalModel = {
 | `activity_ingested` (outdoor, ≥20 sessions) | Triggers `GapCurveFittingTask` | v1 |
 | `activity_ingested` (outdoor, ≥25 sessions, heat_index range ≥10°C) | Triggers `WeatherResponseCurveFittingTask` | v1 |
 | `cycle_day_one_logged` (≥3 complete cycles) | Triggers `CyclePersonalisationTask` | v1 |
+
+## Cycle Personalisation Fitting
+
+`CyclePersonalisationTask` runs when `cycle_day_one_logged` fires and ≥3 complete cycles exist. It produces `cycle_personal_model` — a JSONB field overwritten on each refit.
+
+### Fitting Stages
+
+**Stage 1 — Cycle length:** Compute median interval between consecutive `cycle_day_one_date` entries. Minimum 3 intervals (4 log entries). Stored as `avg_cycle_length_days`.
+
+**Stage 2 — Phase boundaries:** Analyse execution data (pace-at-HR ratio, GAP deviation, RPE) across cycles to detect phase transitions. Fit `menstrual_end`, `follicular_end`, `ovulatory_end` to observed transition points. Fallback: proportional boundaries (`cycle_length * 5/28`, etc.) if execution data is insufficient.
+
+**Stage 3 — Phase sensitivity:** For each phase, compare execution quality in that phase vs overall baseline. Compute `phase_sensitivity[phase]` as a multiplier on the population prior adjustment:
+- `0.0` = no phase correlation detected (adjustment zeroed)
+- `1.0` = full population effect
+- `>1.0` = stronger than population average
+
+**Stage 4 — Luteal thermoregulation:** Compare pace-at-HR in luteal vs follicular phases, controlling for ambient temperature (using `weather_response_model`). Compute `luteal_temp_sensitivity` as a multiplier on `LUTEAL_TEMP_OFFSET_C` (0.35). Population default: 1.0.
+
+### Fitting Prerequisites
+
+| Stage | Minimum data | Graceful fallback |
+|---|---|---|
+| Cycle length | 3 complete cycles (4 log entries) | Use 28-day default |
+| Phase boundaries | 3 cycles + ≥2 quality sessions per phase per cycle | Proportional boundaries from cycle length |
+| Phase sensitivity | 3 cycles + sufficient execution data per phase | `phase_sensitivity` = 1.0 (full population effect) |
+| Luteal thermoregulation | 3 cycles + outdoor sessions in both luteal and follicular at similar ambient temps | `luteal_temp_sensitivity` = 1.0 (population default) |
+
+### Refit Behaviour
+
+`cycle_personal_model` is overwritten on each refit (not accumulated). The fitting task re-runs when new cycle data arrives (≥3 complete cycles). Earlier fits with fewer cycles produce less reliable models; later fits with more cycles produce more reliable models. The system always uses the most recent fit.
 
 ## APIs
 
@@ -152,9 +185,12 @@ Does Not Own:
 Metrics:
 - `athlete_profile.gap_curve.fitted`: count of athletes with `r_squared >= 0.70`
 - `athlete_profile.banister_constants.fitted`: count of athletes with individual constants
+- `athlete_profile.cycle_personal_model.fitted`: count of athletes with fitted cycle models
+- `athlete_profile.cycle_personal_model.sensitivity_zeroed`: count of athletes where `phase_sensitivity` = 0.0 for any phase (no correlation detected)
 Logs:
 - `athlete_profile.gap_curve.fitted`: athlete_id, r_squared, session_count
 - `athlete_profile.banister_constants.fitted`: athlete_id, fitted_from_weeks
+- `athlete_profile.cycle_personal_model.fitted`: athlete_id, fitted_from_cycles, avg_cycle_length_days
 
 ## Implementation Notes
 - `date_of_birth` and `sex` are immutable after creation. If an athlete needs to correct them, this requires a support process, not a self-service PATCH.

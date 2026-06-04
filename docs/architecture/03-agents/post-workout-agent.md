@@ -86,6 +86,22 @@ type PostWorkoutOutput = {
 - Para 3 addresses objective movement with specific signal evidence from `objective_updates[n].evidence`
 - Never fabricates a historical comparison if `comparable_session = null`
 
+### Voice Rules Cross-Reference
+
+Maps `vision/coach/voice-and-format.md` rules to agent-specific constraints. The vision defines the universal voice standard; this agent enforces it for post-workout messages.
+
+| Vision Rule (voice-and-format.md) | Agent Constraint | Enforcement Mechanism | Applies Here? |
+|---|---|---|---|
+| Three natural paragraphs, no bullets/headers/emojis | "Three natural paragraphs; no headers, bullets, emojis" | Prompt constraint | ✅ Yes |
+| No acronyms without explanation | Not explicitly in agent constraints | Prompt (implicit in post_workout_v1.md) | ⚠️ Verify prompt coverage |
+| No raw numbers without context | Not explicitly in agent constraints | Prompt (implicit in post_workout_v1.md) | ⚠️ Verify prompt coverage |
+| No generic encouragement | "never generic ('your pacing was good')" | Prompt constraint | ✅ Yes |
+| Always name specific patterns | "Para 2 names specific execution patterns" | Prompt constraint + context block structure | ✅ Yes |
+| Connect today to the past | "Para 2 names the comparable session with a specific observation" | Prompt constraint + `comparable_session` context | ✅ Yes |
+| Balance recognition with honest coaching | Not explicitly in agent constraints | Emergent from prompt tone calibration | ⚠️ Verify prompt coverage |
+| Address session in training context | `readiness_summary.phase_position` in context block | Context block provides training position | ✅ Yes (structural) |
+| Tone: warm but not effusive, direct but not blunt | Not explicitly in agent constraints | Emergent from prompt tone calibration | ⚠️ Verify prompt coverage |
+
 ## Pre-conditions (must all be true before agent runs)
 1. `Activity` exists and is ingested
 2. `ExecutionObservation` created (or null; never pending)

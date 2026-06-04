@@ -3,6 +3,22 @@
 - Holds the athlete's current training goal and self-reported fitness context
 - The temporal container for a TrainingPlan; one active goal per athlete at a time
 - Append-only: semantic fields are immutable after creation; only status transitions
+- `goal_type` drives coaching posture across all consumer agents. See Vision Alignment below and `docs/vision/product/goal-modes.md`.
+
+## Vision Alignment
+
+The vision defines four goal modes, each with a distinct coaching posture, adaptive language, and transition rules. The `goal_type` enum is the architectural trigger for these behaviors.
+
+| `goal_type` | Vision Mode | Coaching Posture | Language Cues | Transition Rules |
+|---|---|---|---|---|
+| `race_event` | Race/Goal Event | Periodised, peaking, tapering, race-specific preparation | "sharpening," "final prep," "race-specific," urgency | → Recovery first, then chosen mode |
+| `fitness_improvement` | Fitness Improvement | Progressive overload, measurable gains, capacity building | "development," "capacity building," measurable gains | → Any mode based on readiness |
+| `maintenance` | Maintenance | Consistency-focused, habit preservation, fitness preservation | "consistency," "gradual progress," patience | → Fitness Improvement when ready |
+| `recovery` | Recovery | Healing-focused, conservative load, protective coaching | "healing," "protective," "gradual return" | → Fitness Improvement after healing markers |
+
+**What never changes between modes:** Analysis quality, coach voice, and physiological modelling are identical in all modes. Non-race modes are not stripped-down experiences.
+
+**Mode transitions** are coaching conversations, not administrative changes. The twin provides rationale; the coach delivers it in the appropriate voice for both current and upcoming mode. Specific transition sequences are defined in `docs/vision/product/goal-modes.md`.
 
 ---
 
@@ -83,7 +99,7 @@ type IntermediateGoal = {
 - **Semantic fields are immutable after creation.** `goal_type`, `goal_event_type`, `goal_event_date`, `custom_distance_km`, `weekly_volume_hours`, `weekly_volume_km`, `fitness_level`, `recent_injury`, `injury_severity` cannot be changed via PATCH. Secondary events are mutable and managed via dedicated endpoints.
 - **PATCH is restricted to** `status`, `goal_event_date`, and `goal_description` only. `goal_event_date` is an exception to the immutability rule because races get rescheduled; it triggers plan regeneration if the change is > 7 days.
 - **Secondary events are mutable.** `POST /athletes/{athlete_id}/goals/{goal_id}/secondary-events` creates secondary events. `PATCH` and `DELETE` on these endpoints update/remove them. Max 3 secondary events per goal.
-- **Secondary events cannot conflict with A-race schedule.** Validation constraint prevents scheduling within taper phase or race week of the primary goal.
+- **Secondary events cannot conflict with the primary goal event schedule.** Validation constraint prevents scheduling within taper phase or goal event week.
 - **Recovery mode requires injury_severity.** `injury_severity` is mandatory when `goal_type = 'recovery'`.
 - **Intermediate goal is set by training length gate.** `intermediate_goal` is populated when the training length gate determines the goal is >24 weeks away. The plan then covers only the intermediate duration.
 - No DELETE. Status transitions to `completed` or `abandoned` are the end state.
@@ -166,7 +182,7 @@ Response: 200
 Auth: Bearer JWT, require_self
 
 POST /athletes/{athlete_id}/goals/{goal_id}/secondary-events
-Description: Registers a secondary event (B-race or C-race) on an active goal. Returns 422 if validation fails (max 3, conflict with A-race schedule).
+Description: Registers a secondary event (B-event or C-event) on an active goal. Returns 422 if validation fails (max 3, conflict with A-race schedule).
 Request:
   event_type: SecondaryEventType, required
   event_date: string (YYYY-MM-DD), required
@@ -219,7 +235,7 @@ Owns:
 - Active goal enforcement (one per athlete)
 
 Does Not Own:
-- Plan generation logic → `02-computations/plan-generation.md`
+- Plan generation logic → `02-computations/plan-generation.md` (hub), `02-computations/plan-generation-race.md` (race mode), `02-computations/plan-generation-fitness-improvement.md` (fitness improvement), `02-computations/plan-generation-maintenance.md` (maintenance), `02-computations/plan-generation-recovery.md` (recovery)
 - TwinState bootstrap values → `02-computations/load-computation.md`
 - TrainingPlan that belongs to this goal → `01-entities/training-plan.md`
 

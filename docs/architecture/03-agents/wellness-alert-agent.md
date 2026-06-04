@@ -89,7 +89,17 @@ type PlanRegenerationContext = {
 ## Performance Constraints
 - p95 < 4s (small context; short output)
 
+## Decision Authority
+
+Implements the **Plan Modification Authority** authority boundary from `docs/vision/coach/decision-authority.md`.
+
+Plan modifications are coach decisions, not athlete requests. This agent generates proactive coach messages (wellness alerts, phase transitions, plan regeneration notifications) that surface coaching signals to the athlete. These messages communicate what has been observed and what adjustments have been made — they do not request athlete approval. The wellness alert specifically surfaces recovery state and target adjustments already applied. The athlete sees the result of the coach's assessment, not a request for permission. The frequency gates prevent noise while preserving the coach's authority to speak up unprompted when the data warrants it.
+
+---
+
 ## Cross-References
+
+- Decision authority: `docs/vision/coach/decision-authority.md` → "Plan Modification Authority"
 - Recovery modifier computation: `02-computations/wellness-modifier.md`
 - TrainingPlan phase structure: `01-entities/training-plan.md`
 - CoachingMessage frequency gate logic: `01-entities/coaching-message.md`

@@ -162,7 +162,8 @@ Metrics:
 - `weekly_plan.created.total`: per week number
 - `weekly_plan.sessions_completed.rate`: completed / total per week
 - `weekly_plan.adjustment_rate`: percentage of weeks where pre-week review adjusted intent
+- `weekly_plan.disruption_signal_rate`: percentage of weeks where disruption threshold was exceeded
 
 Logs:
 - `weekly_plan.created`: weekly_plan_id, week_number, session_count, adjustment_made
-- `weekly_plan.completed`: weekly_plan_id, sessions_completed, sessions_missed, accumulated_fatigue_delta
+- `weekly_plan.completed`: weekly_plan_id, sessions_completed, sessions_missed, accumulated_fatigue_delta, disruption_threshold_exceeded

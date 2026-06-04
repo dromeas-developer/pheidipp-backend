@@ -139,7 +139,17 @@ Generating a workout for a `planned_session_id` that already has a `GeneratedWor
 - p95 < 5s (LLM latency)
 - Pre-generated workout retrieval: p95 < 50ms
 
+## Decision Authority
+
+Implements the **Workout Acceptance** authority boundary from `docs/vision/coach/decision-authority.md`.
+
+The athlete cannot create, edit, or customise workouts. This boundary prevents complexity spiral, maintains coaching quality control, and keeps the product honest about what it is — a coaching system, not a training tool. This agent generates the specific structured workout from pre-computed modifiers (twin state, wellness, weather, cycle phase). The athlete never provides input to workout generation. The agent's design — receiving pre-computed readiness data, producing fixed workout steps, no athlete-facing customisation path — enforces this authority boundary at the architecture level.
+
+---
+
 ## Cross-References
+
+- Decision authority: `docs/vision/coach/decision-authority.md` → "Workout Acceptance"
 - WorkoutStep schema: `01-entities/workout-step.md`
 - GeneratedWorkout schema: `01-entities/generated-workout.md`
 - Modifier computation chain: `02-computations/wellness-modifier.md`

@@ -27,7 +27,7 @@ type WeeklySynthesisInput = {
   
   // Current athlete state
   twin_state: TwinState
-  athlete_preferences: AthletePreferences  // available days, long_workout_day, weekly_session_count preference
+  athlete_preferences: AthletePreferences  // available days, long_workout_day
   
   // Prior context
   prior_weeks_summary: PriorWeekSummary[]  // for continuity
@@ -94,7 +94,7 @@ type WeeklySessionPlacement = {
 - Checkpoint descriptors this week
 
 ### Instructions
-1. Receive session count as a pre-computed input (from `PreWeekReviewService` or `PlanGenerationService`)
+1. Read `session_count` from `AdjustedWeeklyIntent` (pre-computed by PreWeekReviewService)
 2. Identify which days are available (including doubles capacity)
 3. Place long run on long_workout_day (if available)
 4. Place checkpoints if scheduled this week (checkpoint_schedule is pre-filtered to this week by caller)
@@ -113,7 +113,7 @@ type WeeklySessionPlacement = {
 
 ## Session Placement Rules
 
-### Inherited from Session Planner Agent
+### Session Placement Rules
 
 - Long run on `long_workout_day` (if available)
 - Long run always followed by rest or `recovery_run`
@@ -124,9 +124,9 @@ type WeeklySessionPlacement = {
 
 ### Weekly-Level Rules
 
-Session count is computed deterministically by `PreWeekReviewService` (or `PlanGenerationService` for week 1) and provided as a pre-computed input. See `02-computations/session-count.md` for the computation logic.
+Session count is computed deterministically by `PreWeekReviewService` (or `PlanGenerationService` for week 1) and provided as a pre-computed input in `AdjustedWeeklyIntent.session_count`. See `02-computations/session-count.md` for the computation logic.
 
-The weekly synthesis agent receives `session_count` as part of `AdjustedWeeklyIntent` and distributes sessions across available days.
+The weekly synthesis agent reads `session_count` from `AdjustedWeeklyIntent` and distributes sessions across available days.
 
 ### Intensity Bias → Session Type Distribution
 
@@ -274,9 +274,9 @@ When the LLM cannot produce a valid weekly plan:
 def template_fallback(
     intent: AdjustedWeeklyIntent,
     athlete_pref: AthletePreferences,
-    session_count: int,
 ) -> list[WeeklySessionPlacement]:
     sessions = []
+    session_count = intent.session_count  # from AdjustedWeeklyIntent
     available_days = athlete_pref.available_days
 
     # Distribute: easy sessions first, then quality
@@ -305,7 +305,7 @@ def template_fallback(
 - **Weekly synthesis cannot change the plan's phase or strategic direction.** It only produces sessions within the adjusted intent's constraints.
 - **Output is validated against hard invariants** before persistence: no back-to-back quality, 48h recovery, available days, long run recovery.
 - **WeeklyPlan is created atomically.** All sessions are persisted together. Partial creation is rolled back.
-- **Session count respects both adjusted intent and athlete preference.** The lower of the two wins when they conflict.
+- **Session count is pre-computed by PreWeekReviewService.** The weekly synthesis agent reads `AdjustedWeeklyIntent.session_count` and distributes sessions — it does not recompute.
 
 ---
 
@@ -332,13 +332,22 @@ def template_fallback(
 
 ---
 
+## Decision Authority
+
+Implements the **Plan Modification Authority** authority boundary from `docs/vision/coach/decision-authority.md`.
+
+The weekly rhythm is the coach's decision, not the athlete's. This agent produces the actual session schedule within the adjusted intent constraints. The athlete sees the result — a week of sessions that fits their current state — but does not approve or negotiate the schedule. The invariant "weekly synthesis cannot change the plan's phase or strategic direction" enforces the boundary between tactical weekly scheduling and strategic plan modification. Session count, intensity bias, and session types are determined by the pre-week review (coach decision), not by athlete request.
+
+---
+
 ## Cross-References
 
+- Decision authority: `docs/vision/coach/decision-authority.md` → "Plan Modification Authority"
 - Weekly plan entity: `01-entities/weekly-plan.md`
 - Pre-week review: `03-agents/pre-week-review-agent.md` (Python service)
 - Session count computation: `02-computations/session-count.md`
 - Plan phase arc: `01-entities/training-plan.md` → `phase_arc`
-- Session planner (base rules): `03-agents/session-planner-agent.md`
+- Session placement rules: session placement rules section below
 - Workout generation: `03-agents/workout-generation-agent.md`
 - Checkpoint scheduling: `01-entities/checkpoint.md`
 - Secondary events: `01-entities/secondary-event.md` (if exists)
@@ -346,4 +355,4 @@ def template_fallback(
 ## Design Notes
 
 - Week 1 is handled by PlanGenerationService (first WeeklyPlan created atomically). This agent starts from week 2 onward via `pre_week_review_completed`.
-- Session count is a deterministic Python computation, not an LLM judgment call. The agent receives it as a pre-computed input.
+- Session count is a deterministic Python computation, not an LLM judgment call. PreWeekReviewService computes it via `compute_session_count()` and includes it in `AdjustedWeeklyIntent.session_count`. The weekly synthesis agent reads this value and distributes sessions — it does not recompute.

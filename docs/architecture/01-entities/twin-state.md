@@ -79,7 +79,7 @@ This solves:
 - One TwinState per calibration event. Multiple TwinStates per day are possible (e.g. `activity_sync` followed by `wellness_update`).
 - `training_goal_id` is frozen at creation time — it records which goal was active when this snapshot was taken, even if the goal is later superseded.
 - `model_version` is frozen — it identifies the exact computation pipeline version, enabling reproducibility audits.
-- `confidence_level` is recomputed from `AthletePhysiology.lt2.prior_weight` at each snapshot.
+- `confidence_level` is recomputed from `min(AthletePhysiology.lt1.hr.prior_weight, AthletePhysiology.lt2.hr.prior_weight)` at each snapshot — the global signal is the minimum of LT1 HR and LT2 HR confidence.
 
 ## Events
 

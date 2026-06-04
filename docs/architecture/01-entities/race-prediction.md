@@ -6,6 +6,23 @@
 - B-race predictions generated for secondary events, providing calibration feedback without target-setting pressure
 - Not surfaced at LOW confidence; not created for open training blocks
 
+## Vision ↔ Architecture Mapping
+
+| Vision Concept | Architecture Field / Formula | Notes |
+|---|---|---|
+| **Baseline Prediction** — "Derived from the twin's current threshold estimates, aerobic capacity indicators, and running economy signals. Assumes standard conditions." | `baseline_prediction_seconds` via `computeBaseline()` | Direct mapping. Uses `observed_pace_at_lt2_sec_per_km`, `lt1_estimate_bpm`, `lt2_estimate_bpm`, `target_distance_km`. |
+| **Weather-Adjusted Prediction** — "The system fetches the race day weather forecast and applies the athlete's personalised weather response." | `weather_adjusted_seconds` via `weatherAdjustment()` | Direct mapping. Only computed within 14 days of `TrainingGoal.goal_event_date`. Uses `WeatherResponseModel.heat_sensitivity_coeff` from `AthleteProfile`. |
+| **Course Profile Adjustment** — "If the race course profile is available, the prediction incorporates elevation data." | `course_adjusted_seconds` via `courseAdjustment()` | Direct mapping. Uses `ElevationProfile` and per-athlete `GapCurveModel`. |
+| **Personalised Weather Response** — "Not how athletes in general respond to heat — how this athlete responds. Individual response curves learned from actual execution data." | `AthleteProfile.weather_response_model.heat_sensitivity_coeff` | Indirect mapping. The coefficient is stored on `AthleteProfile`. The accumulation mechanism (how session-level environmental context refines the coefficient) lives in `02-computations/wellness-modifier.md`, not in this entity. Default population coefficient: `0.006`. |
+| **Prediction Arc** — "Watching it improve as fitness builds through a training plan is one of the most quietly motivating elements." | Append-only `race_predictions` table; `GET /prediction/history` returns ordered arc | Direct mapping. Each update creates a new record; old predictions retained indefinitely. |
+
+### Unmapped Vision Requirements
+
+| Vision Requirement | Status | Owner |
+|---|---|---|
+| "Plain-language explanation of the difference between baseline and weather-adjusted predictions" | **Not stored on entity.** The API response must compose this explanation. | Frontend / API response layer |
+| "Weather response model feeds back into training design — suggests heat exposure sessions if race is in heat but athlete trains in mild conditions" | **Not owned by this entity.** This is a proactive coaching behaviour. | `WorkoutGenerationAgent` — should check weather delta between training conditions and race conditions when generating sessions near a goal event |
+
 ## TypeScript Schema
 
 ```typescript

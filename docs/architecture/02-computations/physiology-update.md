@@ -55,14 +55,16 @@ The 42-day time constant is deliberately aligned with the aerobic fitness time c
 
 These weights determine how much each observation shifts the posterior. Higher weight = more authoritative measurement.
 
-| Source | LT1 weight | LT2 weight | FTP weight | VO2max weight | Max HR weight |
-|---|---|---|---|---|---|
-| `questionnaire_estimate` | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 |
-| `training_hr_deflection` | 1.0 | 1.0 | — | — | 0.5 |
-| `training_rr_inflection` | 2.5 | 2.5 | — | — | 0.5 |
-| `training_power_hr_ratio` | — | 1.0 | 1.5 | — | — |
-| `field_test` | 2.0 | 4.0 | 5.0 | 3.0 | 2.0 |
-| `lab_test` | 12.0 | 15.0 | 10.0 | 15.0 | 8.0 |
+| Source | LT1 weight | LT2 weight | FTP weight | VO2max weight | Max HR weight | Confidence Contribution |
+|---|---|---|---|---|---|---|
+| `questionnaire_estimate` | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | All metrics (low weight) |
+| `training_hr_deflection` | 1.0 | 1.0 | — | — | 0.5 | lt1_hr, lt2_hr |
+| `training_rr_inflection` | 2.5 | 2.5 | — | — | 0.5 | lt1_hr, lt2_hr (higher quality) |
+| `training_power_hr_ratio` | — | 1.0 | 1.5 | — | — | cp |
+| `field_test` | 2.0 | 4.0 | 5.0 | 3.0 | 2.0 | Specific metric tested (lt1, lt2, or cp) |
+| `lab_test` | 12.0 | 15.0 | 10.0 | 15.0 | 8.0 | All measured metrics |
+
+**Key insight**: Confidence transitions are per-metric. A source only affects confidence for metrics it provides evidence for. A field test for LT2 (weight 4.0) contributes to LT2 confidence, not LT1 confidence.
 
 A lab test carries observation weight 12–15 depending on the parameter, which dominates a typical accumulated prior of 20–40 weight units built from 2 years of regular training.
 

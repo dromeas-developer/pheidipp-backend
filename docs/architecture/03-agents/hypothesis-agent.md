@@ -54,14 +54,7 @@ type HypothesisAgentOutput = {
 
 type StrategicHypothesis = {
   name: string                           // internal label; not surfaced to athlete
-  training_philosophy: string            // e.g. "mostly easy running with occasional hard sessions"
-  progression_pattern: string            // e.g. "steady gradual increases"
-  recovery_structure: string             // e.g. "recovery weeks every 3-4 training phases"
-  intensity_balance: {
-    easy_percentage: number              // 0-100
-    moderate_percentage: number
-    hard_percentage: number
-  }
+  dimensions: HypothesisDimensions       // the four reasoning dimensions
   phase_emphasis: {
     name: string
     weeks: number
@@ -76,6 +69,20 @@ type StrategicHypothesis = {
   rationale: string                      // why this approach suits this athlete
   risk_notes: string[]
 }
+
+type HypothesisDimensions = {
+  trait_vector: MethodologyTraitVector    // coaching philosophy expression (0.0–1.0 per trait)
+  load_distribution: {
+    low_aerobic: number                   // percentage of session time (0-1)
+    high_aerobic: number
+    threshold: number
+    vo2max: number
+    neuromuscular: number
+    recovery: number
+  }
+  approach: 'linear' | 'non_linear' | 'block' | 'undulating' | 'step' | 'exponential'
+  recovery_cycle: 'frequent' | 'infrequent' | 'micro_cycles' | 'macro_cycles'
+}
 ```
 
 ---
@@ -84,9 +91,10 @@ type StrategicHypothesis = {
 
 ### System Prompt
 - Coaching methodology principles
-- Four reasoning dimensions (training philosophy, progression pattern, recovery structure, intensity balance)
+- Four reasoning dimensions: trait_vector (MethodologyTraitVector), load_distribution (PhysiologicalIntent allocation), approach (progression pattern), recovery_cycle
+- The trait_vector uses 10 fixed traits describing coaching philosophy expression. Each trait ranges from 0.0 to 1.0. Highest layer of the three-layer hierarchy: MethodologyTraitVector → PhysiologicalIntent → SessionType.
 - Hard invariants (no back-to-back hard sessions, 48h recovery, etc.)
-- Distinctness rule: each hypothesis must differ in ≥2 dimensions
+- Distinctness rule: generate 3 hypotheses by varying at least 2 of the 4 dimensions. Each hypothesis should represent a genuinely different coaching approach for this athlete's specific objectives and race type.
 
 ### Context
 - Athlete twin state and context summary
@@ -110,18 +118,18 @@ type StrategicHypothesis = {
 
 ## Reasoning Dimensions
 
-| Dimension | Options | Purpose |
-|-----------|---------|---------|
-| Training Philosophy | Mostly easy, threshold-focused, balanced, high-frequency | Overall approach |
-| Progression Pattern | Linear, undulating, block, step | How load advances |
-| Recovery Structure | Frequent, periodic, extended | Recovery cadence |
-| Intensity Balance | Easy-heavy, balanced, moderate-heavy | Intent distribution |
+| Dimension | Type | Purpose |
+|-----------|------|---------|
+| trait_vector | MethodologyTraitVector | Coaching philosophy expression — 10 fixed traits (0.0–1.0) describing training methodology emphasis |
+| load_distribution | PhysiologicalIntent allocation | How session time is distributed across intensity zones |
+| approach | progression pattern | How load advances over time (linear, undulating, block, etc.) |
+| recovery_cycle | recovery cadence | Frequency and structure of recovery periods |
 
 ---
 
 ## Core Rule for Distinctness
 
-Each hypothesis must differ meaningfully across at least two of the four dimensions, while respecting all twin constraints and the race calendar.
+Each hypothesis must differ in at least 2 of the 4 dimensions (trait_vector, load_distribution, approach, recovery_cycle), while respecting all twin constraints and the race calendar.
 
 ---
 
@@ -143,10 +151,20 @@ Each hypothesis must differ meaningfully across at least two of the four dimensi
 
 ---
 
+## Decision Authority
+
+Implements the **Hypothesis Selection** authority boundary from `docs/vision/coach/decision-authority.md`.
+
+This agent generates three distinct strategic hypotheses. It does not select — selection is performed by `hypothesis-selector-agent`. The authority boundary it serves: the coach produces genuinely different strategic perspectives, ensuring the hypothesis space is well-defined before the selection step. The athlete never sees these three hypotheses directly. They are an internal coaching exploration, not a menu of options.
+
+---
+
 ## Cross-References
 
-- Plan generation pipeline: `02-computations/plan-generation.md`
+- Decision authority: `docs/vision/coach/decision-authority.md` → "Hypothesis Selection"
+- Strategic hypothesis philosophy: `docs/vision/product/hypothesis-selection.md`
+- Plan generation pipeline: `02-computations/plan-generation-race.md` (race mode hypothesis generation)
 - Hypothesis selection: `03-agents/hypothesis-selector-agent.md`
-- Session planning: `03-agents/session-planner-agent.md`
+- Weekly synthesis: `03-agents/weekly-synthesis-agent.md`
 - Confidence gaps: `01-entities/twin-state.md`
 - Twin context assembly: `01-entities/twin-state.md` → Context Assembly

@@ -27,11 +27,11 @@ Each entry defines what a document covers, its dependencies, boundaries, and usa
 
 - id: product.constraints
   path: product/constraints.md
-  summary: Enforces three deliberate constraints: running-only twin model, no workout builder, and no raw data surfaces.
+  summary: Enforces four deliberate constraints: running-only twin model, no workout builder, no raw data surfaces, and unsynced workout handling.
   tags: [constraints, running-only, data-quality, unsynced-workouts]
   depends_on: [twin.core]
-  read_for: what Pheidipp deliberately does not do and why; the raw data visualisation rule.
-  scope_boundary: Non-running activities excluded from twin calibration; athletes cannot create/edit workouts; no Garmin/Strava-style charts.
+  read_for: what Pheidipp deliberately does not do and why; the raw data visualisation rule; unsynced workout handling protocol.
+  scope_boundary: Non-running activities excluded from twin calibration; athletes cannot create/edit workouts; no Garmin/Strava-style charts; unsynced workouts ask before assuming.
 
 - id: product.differentiators
   path: product/differentiators.md
@@ -75,10 +75,10 @@ Each entry defines what a document covers, its dependencies, boundaries, and usa
 
 - id: product.plan-generation
   path: product/plan-generation.md
-  summary: Defines how Pheidipp generates a strategic roadmap (phase arc) for training — not a session schedule. Covers the four-tier coaching model, hypothesis selection, first-week atomic creation, and gating on twin readiness.
+  summary: Defines how Pheidipp generates a strategic roadmap (phase arc) for training — not a session schedule. Covers hypothesis selection, first-week atomic creation, and gating on twin readiness.
   tags: [plan-generation, strategic-roadmap, phase-arc, weekly-coaching]
   depends_on: [product.global-invariants, product.secondary-events, twin.confidence-and-uncertainty]
-  read_for: how training plans are generated; the strategic roadmap concept; why sessions are not generated upfront; the four-tier coaching model.
+  read_for: how training plans are generated; the strategic roadmap concept; why sessions are not generated upfront; hypothesis selection process.
   scope_boundary: Plan generation produces a phase arc; sessions are produced by the weekly coaching rhythm; coach decides, athlete accepts or abandons.
 
 - id: product.hypothesis-selection
@@ -91,10 +91,10 @@ Each entry defines what a document covers, its dependencies, boundaries, and usa
 
 - id: product.weekly-coaching-rhythm
   path: product/weekly-coaching-rhythm.md
-  summary: Defines the three-timescale coaching model (plan → weekly rhythm → daily workout) and how the weekly review adjusts emphasis based on accumulated reality without breaking the strategic roadmap.
-  tags: [weekly-coaching, adaptive-planning, three-timescales, disruption-absorption]
+  summary: Defines the three-timescale coaching model (plan → weekly rhythm → daily workout) and how the weekly review adjusts emphasis based on accumulated reality without breaking the strategic roadmap. Accounts for total athlete availability including doubles capacity.
+  tags: [weekly-coaching, adaptive-planning, three-timescales, disruption-absorption, total-availability]
   depends_on: [product.plan-generation]
-  read_for: how the weekly rhythm works; what changes and what doesn't; how disruptions are absorbed; coach authority at the weekly level.
+  read_for: how the weekly rhythm works; what changes and what doesn't; how disruptions are absorbed; coach authority at the weekly level; load based on total availability.
   scope_boundary: Weekly rhythm adjusts emphasis within the current phase; cannot change the strategic direction; most adaptation happens here, not through plan regeneration.
 
 - id: product.training-plan-checkpoints
@@ -108,10 +108,10 @@ Each entry defines what a document covers, its dependencies, boundaries, and usa
 
 - id: twin.adaptation-signature
   path: twin/adaptation-signature.md
-  summary: Learns individual adaptation patterns by treating training blocks (not sessions) as atomic stimulus units with controlled recovery observation windows.
-  tags: [adaptation, training-blocks, periodisation, data-collection]
+  summary: Learns individual adaptation patterns by treating adaptation windows (not sessions) as atomic stimulus units with controlled recovery observation windows.
+  tags: [adaptation, adaptation-windows, periodisation, data-collection]
   depends_on: [twin.load-fatigue, twin.training-zones, twin.external-modifiers]
-  read_for: how the twin learns per-athlete adaptation; plan structural rules; data requirements.
+  read_for: how the twin learns per-athlete adaptation; plan structural rules; data requirements; three training unit types.
   scope_boundary: Requires 6-8 weeks for meaningful signal; female cycle phase controlled for in adaptation measurements.
 
 - id: twin.confidence-and-uncertainty
@@ -124,15 +124,15 @@ Each entry defines what a document covers, its dependencies, boundaries, and usa
 
 - id: twin.core
   path: twin/core.md
-  summary: Establishes the Digital Twin as a running-only physiological model that excludes non-running activities from calibration.
-  tags: [twin, running-only, honesty-invariant]
+  summary: Establishes the Digital Twin as the central intelligence layer that models the athlete's physiological state based on all available data, with a running-only calibration boundary.
+  tags: [twin, running-only, honesty-invariant, source-of-truth]
   depends_on: []
-  read_for: the fundamental scope of the twin; why non-running activities are excluded.
+  read_for: the fundamental scope of the twin; why non-running activities are excluded; the honesty invariant.
   scope_boundary: Non-running activities logged but excluded from all twin learning; twin never pretends to know more than it does.
 
 - id: twin.cold-start
   path: twin/cold-start.md
-  summary: Initializes twin from three confidence tiers with honest uncertainty communication. Lab/test uploads elevate threshold confidence within Tier 1 (with training history) or serve as Tier 2 foundation (without training history).
+  summary: Initializes twin from three confidence tiers with honest uncertainty communication. Tier 1 uses imported training history, Tier 2 uses peer-similar athletes or lab/test uploads, Tier 3 uses questionnaire inputs only.
   tags: [cold-start, onboarding, confidence-tiers, lab-upload]
   depends_on: [twin.core]
   read_for: how the twin initialises; lab/test upload handling; what Tier 2 is and when it becomes available; the model build UX decision.
@@ -148,18 +148,18 @@ Each entry defines what a document covers, its dependencies, boundaries, and usa
 
 - id: twin.external-modifiers
   path: twin/external-modifiers.md
-  summary: Uses passive wellness signals (sleep, HRV, menstrual cycle, time-of-day) as trend-based modifiers to readiness without subjective input.
-  tags: [wellness, sleep, hrv, womens-cycle, time-of-day]
+  summary: Uses passive wellness signals (sleep metrics, HRV, menstrual cycle, time-of-day) as trend-based modifiers to readiness without subjective input. All signals captured passively from wearable data.
+  tags: [wellness, sleep, hrv, womens-cycle, time-of-day, passive-collection]
   depends_on: [twin.load-fatigue]
-  read_for: all sleep and wellness signal detail; resting HR definition; trend thresholds.
+  read_for: all sleep and wellness signal detail; resting HR definition; trend thresholds; time-of-day modifier.
   scope_boundary: Single-night anomalies ignored; overnight min HR used (not morning spot checks); cycle phase weighted by individual correlation.
 
 - id: twin.execution-patterns
   path: twin/execution-patterns.md
-  summary: Analyzes rep-level execution patterns (drift, fade, sandbagging) and session shapes to build behavioural profiles from actual training data.
-  tags: [execution-analysis, rep-level, session-shape, behavioural-profile]
+  summary: Analyzes execution patterns across sessions, from macro consistency to rep-level details (drift, fade, sandbagging) and session shapes, building behavioural profiles from actual training data.
+  tags: [execution-analysis, macro-consistency, rep-level, session-shape, behavioural-profile]
   depends_on: [twin.load-fatigue, twin.training-zones]
-  read_for: how execution is analysed by session type; recovery interval analysis rules.
+  read_for: how execution is analysed by session type; recovery interval analysis rules; macro consistency foundation.
   scope_boundary: Recovery intervals analyzed via pace/power pullback or HR trajectory—not HR zone; macro consistency required for valid comparisons.
 
 - id: twin.layers
@@ -180,7 +180,7 @@ Each entry defines what a document covers, its dependencies, boundaries, and usa
 
 - id: twin.training-zones
   path: twin/training-zones.md
-  summary: Tracks dynamic physiological thresholds using signal hierarchy (RR intervals > HR > lab/test uploads > calibration sessions > inference) with passive updates from normal training. Handles confidence degradation and execution-data divergence for lab-provided values.
+  summary: Tracks dynamic physiological thresholds using signal hierarchy (RR intervals > HR > calibration sessions > lab/test uploads > inference) with passive updates from normal training. Handles confidence degradation and execution-data divergence for lab-provided values.
   tags: [zones, thresholds, rr-intervals, calibration, lab-upload]
   depends_on: [twin.core, twin.data-philosophy]
   read_for: how thresholds are detected and updated; signal hierarchy; lab/test upload handling; two-column display rationale.
@@ -197,10 +197,10 @@ Each entry defines what a document covers, its dependencies, boundaries, and usa
 
 - id: coach.daily-view
   path: coach/daily-view.md
-  summary: Presents a living pre-session briefing showing today's workout, weather impact, recovery status, and relevant objectives with two-column targets.
-  tags: [daily-view, home-screen, two-column-targets, weather-adjustment]
+  summary: Presents a living pre-session briefing showing today's workout, weather impact, recovery status, relevant objectives with two-column targets, plan position visibility, and near-term session preview.
+  tags: [daily-view, home-screen, two-column-targets, weather-adjustment, plan-position, near-term-preview]
   depends_on: [twin.load-fatigue, twin.external-modifiers, coach.plan-visibility]
-  read_for: home screen structure and content; navigation model; what appears and when.
+  read_for: home screen structure and content; navigation model; plan position visibility; near-term session preview.
   scope_boundary: Future sessions show intent only (no specific targets); navigation is backward snapshots, not scroll feed.
 
 - id: coach.decision-authority
@@ -229,11 +229,11 @@ Each entry defines what a document covers, its dependencies, boundaries, and usa
 
 - id: coach.plan-visibility
   path: coach/plan-visibility.md
-  summary: Shows the macro plan view (phase arc), near-term sessions from the weekly plan, today's session with two-column targets, and checkpoint visibility. Data sources are clearly separated: phase arc for the big picture, weekly plan for near-term sessions.
-  tags: [plan-visibility, phase-arc, near-term-sessions, checkpoint-visibility, data-sources]
+  summary: Shows the macro plan view (phase arc), current position (week/phase progress), near-term sessions from the weekly plan, today's session with two-column targets, and checkpoint visibility. Data sources are clearly separated: phase arc for the big picture, weekly plan for near-term sessions.
+  tags: [plan-visibility, phase-arc, current-position, near-term-sessions, checkpoint-visibility, data-sources]
   depends_on: [product.plan-generation, product.weekly-coaching-rhythm]
   read_for: what the athlete can see of their plan; how data sources are separated; phase transitions as coaching moments; why raw data is not shown.
-  scope_boundary: Macro view shows phase arc; near-term sessions come from weekly plan; daily targets generated on the day; no raw data charts.
+  scope_boundary: Macro view shows phase arc; current position shows week/phase progress; near-term sessions come from weekly plan; daily targets generated on the day; no raw data charts.
 
 - id: coach.post-workout
   path: coach/post-workout.md

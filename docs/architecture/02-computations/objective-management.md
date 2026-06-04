@@ -120,7 +120,24 @@ function checkAchievement(objective: Objective, updates: ObjectiveUpdate[]): boo
 // PostWorkoutAgent receives milestone flag and explicitly acknowledges
 ```
 
+## Vision ↔ Architecture Alignment
+
+The following maps vision concepts (`docs/vision/coach/objectives.md`) to architecture implementation. This table is the authoritative cross-reference for verifying that the architecture faithfully implements the vision's intent.
+
+| Vision Concept | Architecture Key | Vision Philosophy | Architecture Implementation |
+|---|---|---|---|
+| What Objectives Are | `Objective` entity schema; `ObjectiveCategory` enum | “Bridge between individual sessions and long-term development”; “physiological insights that the twin can see” | 9 categories map to physiological domains; entity purpose states “bridges individual sessions to long-term physiological development” |
+| Initial Seeding | `ObjectiveSeedingService.seedObjectives()`; seeding rules in `objective.md` | “First coach message seeds initial objectives based on twin model analysis”; “strengths explicitly alongside improvement opportunities” | Python logic (`identifyGaps`, `identifyStrengths`) determines categories/directions; invariant: at least one `direction = 'maintain'` always seeded; LLM writes only titles/descriptions |
+| Living Updates (weekly rhythm) | `weeklyReview()` in `objective-management.md` | “Update on slower rhythm than workouts — weekly or after significant sessions” | Nightly task updates objectives not touched by post-session in 7 days |
+| Post-session connection | `evaluateObjectivePostSession()` | “After each relevant workout, coach briefly connects session to applicable objective” | Runs before `PostWorkoutAgent`; creates `ObjectiveUpdate` with Python-computed direction/evidence |
+| Achievement = sustained improvement | `checkAchievement()` | “Achievement determined by sustained improvement, not a single session” | Last 3 post-session updates must all be `improving` |
+| Pre-workout filtering | `filterForSession()` in `objective.md`; `GET /objectives/for-session/{session_id}` API | “Only objectives relevant to today’s workout are surfaced” | Filters by `session_types_relevant`; max 2 in context |
+| Post-workout feedback | `PostWorkoutAgent` receives pre-computed `ObjectiveUpdate` records | “Coach message explicitly addresses movement on those same objectives” | Agent receives milestone flag and pre-computed direction/evidence; writes only narration |
+| Strengths maintained | Seeding invariant: at least one `direction = 'maintain'` | “Strengths surfaced explicitly alongside gaps” | Python-identified strengths always included in initial set |
+
 ## Cross-References
+
 - Objective entity schema: `01-entities/objective.md`
 - ExecutionObservation (source of evaluation signals): `01-entities/execution-observation.md`
 - Post-workout agent that narrates updates: `03-agents/post-workout-agent.md`
+- Plan generation (block renewal calls `ObjectiveSeedingService.seedObjectives()`): `02-computations/plan-generation-fitness-improvement.md`

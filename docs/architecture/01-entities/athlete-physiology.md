@@ -10,11 +10,12 @@
 ```typescript
 type ThresholdDimension = 'hr' | 'power' | 'pace'
 
-type ThresholdState = {
-  value: number
-  confidence: number
-  source: MeasurementSource
-  last_observed: string
+type PhysiologyParameterState = {
+  value: number                        // posterior mean estimate
+  uncertainty: number                  // posterior uncertainty (drives range width)
+  prior_weight: number                 // accumulated evidence weight (drives confidence transitions)
+  dominant_source: MeasurementSource   // source currently dominating the posterior
+  last_observation_date: string        // date of most recent observation
 }
 
 type AthletePhysiology = {
@@ -22,25 +23,25 @@ type AthletePhysiology = {
   athlete_id: string                   // UUID, FK → Athlete, one-to-one
   
   lt1: {
-    hr: ThresholdState | null
-    power: ThresholdState | null
-    pace: ThresholdState | null
+    hr: PhysiologyParameterState | null
+    power: PhysiologyParameterState | null
+    pace: PhysiologyParameterState | null
   }
   
   lt2: {
-    hr: ThresholdState | null
-    power: ThresholdState | null
-    pace: ThresholdState | null
+    hr: PhysiologyParameterState | null
+    power: PhysiologyParameterState | null
+    pace: PhysiologyParameterState | null
   }
   
-  cp: ThresholdState | null           // Critical Power (running)
+  cp: PhysiologyParameterState | null           // Critical Power (running)
   
   vo2max: {
-    ml_kg_min: ThresholdState | null
-    power: ThresholdState | null
+    ml_kg_min: PhysiologyParameterState | null
+    power: PhysiologyParameterState | null
   }
   
-  max_hr: ThresholdState | null
+  max_hr: PhysiologyParameterState | null
   
   updated_at: string
 }
@@ -89,7 +90,7 @@ The relationship between CP and LT2:
 ```mermaid
 stateDiagram-v2
     [*] --> bootstrapped : questionnaire_estimate\n(all parameters; low weight)
-    bootstrapped --> training_calibrated : training_hr_deflection or\ntraining_rr_inflection\n(4 sessions → MEDIUM confidence)
+    bootstrapped --> training_calibrated : training_hr_deflection or\ntraining_rr_inflection\n(evidence weight ≥ 4.0 → MEDIUM confidence)
     training_calibrated --> training_calibrated : ongoing training updates\n(slow posterior drift)
     training_calibrated --> field_calibrated : field_test observation\n(dominant source shifts)
     training_calibrated --> lab_calibrated : lab_test observation\n(dominant source shifts strongly)

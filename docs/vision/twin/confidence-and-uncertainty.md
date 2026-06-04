@@ -22,7 +22,9 @@ Evidence confidence grows through accumulated real training data. The twin start
 
 The rate of evidence confidence growth depends on data quality. Athletes with chest straps and power meters accumulate evidence faster than those with optical HR only. Lab tests accelerate the process significantly. The twin is transparent about which data quality tier it is working with.
 
-Evidence confidence transitions are quality-weighted, not session-count-based. A single lab test carries more evidence than four easy sessions with optical HR. The system weighs observation quality when determining when to upgrade evidence confidence levels.
+Evidence confidence is **per-metric**: each physiological parameter (LT1, LT2, CP, VO2max) accumulates evidence independently. A field test for LT2 increases LT2 confidence, not LT1 confidence. A lab test for LT1 increases LT1 confidence, not LT2 confidence. The system tracks accumulated evidence weight per metric, not just session count.
+
+Evidence confidence transitions are quality-weighted. A single lab test carries more evidence than four easy sessions with optical HR. The system weighs observation quality when determining when to upgrade evidence confidence levels. For LT1 specifically, the system infers confidence from natural training patterns — HR ceiling in easy runs, HR drift analysis, and HR recovery analysis — building LT1 confidence passively from the 80% of training that occurs around aerobic intensity.
 
 ---
 

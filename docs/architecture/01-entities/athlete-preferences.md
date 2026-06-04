@@ -63,7 +63,7 @@ type AthletePreferences = {
 - One `AthletePreferences` per `Athlete`. Created during onboarding. Enforced by unique constraint on `(athlete_id)`.
 - `years_structured_training >= 0`. CHECK constraint at DB level.
 - No DELETE endpoint. Preferences are always present once onboarding completes.
-- `sport_background` not `running_primary` activates the crossover athlete structural capacity ramp in plan generation. See `02-computations/plan-generation.md`.
+- `sport_background` not `running_primary` activates the crossover athlete structural capacity ramp in plan generation. See `02-computations/plan-generation.md` (shared types) and `02-computations/plan-generation-race.md` (race mode ramp).
 - `training_time_of_day` feeds the time-of-day modifier in `WellnessModifierService`. See `02-computations/wellness-modifier.md`.
 - `hr_source` is the primary input for data tier inference. See `00-foundations/data-tiers.md`.
 - Changes to `hr_source` or `power_source` affect the data tier of the next ingested Activity but do not retroactively alter historical Activities.

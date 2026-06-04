@@ -16,7 +16,7 @@ An `Activity` that meets the five-rule gate for twin recalibration. See `02-comp
 A pre-computed structured finding produced by the `ExecutionAnalysisService` and stored in `ExecutionObservation.coaching_observations`. The LLM receives this and writes narrative from it. The LLM does not produce the observation.
 
 ### Confidence Level
-An assertion about how much real training data the twin has learned from for a given athlete. Three values: `low`, `medium`, `high`. Affects coaching language precision and whether race predictions are surfaced. See `00-foundations/confidence-model.md`.
+An assertion about how much real training data the twin has learned from for a given athlete. **Per-metric**: each physiological parameter (LT1, LT2, CP) accumulates evidence independently. Global confidence level is derived as the minimum of LT1 HR and LT2 HR confidence for simple consumers. Three values: `low`, `medium`, `high`. Affects coaching language precision and whether race predictions are surfaced. See `00-foundations/confidence-model.md`.
 
 ### Data Tier
 A classification of an athlete's hardware capability that determines which signals are available for load computation and threshold detection. Six tiers from Tier 1 (running power + chest strap RR) to Tier 6 (manual entry only). See `00-foundations/data-tiers.md`.
@@ -49,7 +49,7 @@ Lactate threshold 1 — the intensity at which blood lactate first begins to ris
 Lactate threshold 2 — the intensity at which lactate accumulation exceeds the body's buffering capacity. Corresponds to the anaerobic threshold / functional threshold. The primary reference for threshold zone workout targets.
 
 ### PhysiologicalIntent
-The canonical enum representing the physiological adaptation a session targets. Eight values: `low_aerobic`, `high_aerobic`, `threshold`, `vo2max`, `race_specific`, `neuromuscular`, `recovery_support`, `calibration`. This is the middle layer of the three-layer hierarchy: MethodologyTraitVector → PhysiologicalIntent → SessionType. See `00-foundations/terminology.md` → Shared Enums.
+The canonical enum representing the physiological adaptation a session targets. Six values: `low_aerobic`, `high_aerobic`, `threshold`, `vo2max`, `neuromuscular`, `recovery`. This is the middle layer of the three-layer hierarchy: MethodologyTraitVector → PhysiologicalIntent → SessionType. See `00-foundations/terminology.md` → Shared Enums.
 
 ### Readiness
 The twin's current assessment of an athlete's capacity for today's training, computed from the combination of TwinState fitness/fatigue scores and Layer 4 wellness modifier. Expressed as GREEN / AMBER / RED in the recovery modifier and as plain language in coaching messages.
@@ -293,6 +293,8 @@ type IntentRanges = {
 ```
 Computed on-the-fly from the athlete's current PhysiologyThresholds. Not stored as a separate entity. Architecture owns "intent → physiological region"; exact multiplier constants belong in implementation.
 
+**Vision ↔ Architecture note:** Range width is driven by `PhysiologyParameterState.uncertainty`. As prior observations age (42-day decay in `bayesianUpdate()`), uncertainty increases and ranges widen. This implements the vision principle that "calibration confidence degradation" produces "wider target ranges" without silently expiring evidence. See `docs/vision/twin/training-zones.md` → Calibration Confidence Degradation.
+
 ### ComplianceFamily
 ```typescript
 type ComplianceFamily =
@@ -348,10 +350,11 @@ type AdjustedWeeklyIntent = {
   methodology: MethodologyTraitVector
   physiological_emphasis: string
   intensity_bias: 'easy' | 'balanced' | 'moderate' | 'quality'
+  session_count: number               // computed by PreWeekReviewService; weekly planner reads this
   adjustment_made: boolean
   adjustment_reason: string | null
   adjustment_source: 'plan_unchanged' | 'fatigue_correction' | 'schedule_constraint' | 'adaptation_acceleration' | 'checkpoint_result'
-  max_sessions: number | null
+  max_sessions: number | null         // audit: override value if one was applied (for observability)
   session_types_preferred: SessionType[] | null
   avoid_session_types: SessionType[] | null
 }

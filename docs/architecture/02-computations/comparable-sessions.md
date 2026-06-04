@@ -111,3 +111,5 @@ When `null` (no comparable found): the key `comparable_session` is absent from t
 - ExecutionObservation schema (key_execution_signals source): `01-entities/execution-observation.md`
 - PostWorkoutAgent context assembly: `03-agents/post-workout-agent.md`
 - Similarity score stored for audit: `01-entities/execution-observation.md` → `coaching_observations.comparable_session_id`
+- Vision historical correlation requirements: `vision/coach/post-workout.md` → "Historical correlation" element
+- Post-workout message mapping (vision element → architecture field → agent paragraph): `01-entities/execution-observation.md` → "Post-Workout Message Mapping"

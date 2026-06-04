@@ -4,7 +4,11 @@
 - Defines the exact formulas for computing aerobic, neuromuscular, and structural load scores from FIT data
 - These scores are written to Activity and drive TwinState Layer 1 fitness/fatigue via Banister model
 
+> **Vision rationale:** The three-dimensional approach implements the physiological principle that different training stresses (cardiovascular, neuromuscular, structural) accumulate and recover on different timelines. A single fitness number cannot distinguish between states where aerobic system is recovered but structural load is excessive — the "heavy legs" phenomenon. The three dimensions are not independent: high structural fatigue degrades neuromuscular output even when the aerobic system is fully recovered. See `docs/vision/twin/load-fatigue.md` for the full physiological rationale.
+
 ## Inputs
+
+> **GAP invariant:** Grade-adjusted pace is always used as the mechanical work proxy. Raw pace without grade adjustment systematically misrepresents effort on varied terrain and corrupts load calculations and historical comparisons. This is an invariant, not a preference. See `docs/vision/twin/load-fatigue.md#grade-adjusted-pace--always-never-raw-pace`.
 
 ```typescript
 type LoadComputationInputs = {
@@ -58,6 +62,8 @@ function computeAerobicLoadPower(
 ```
 
 **Tier 5 (pace + GPS only):** Estimated from GAP relative to estimated threshold pace. Low confidence flagged. Tier 6: null.
+
+> **Note on optical HR:** Tier 4 (optical HR + GAP + GPS) is the realistic baseline for the core athlete audience. Optical HR is adequate for zone-based load calculation; its limitation versus chest strap is specifically the absence of RR intervals for threshold detection, not HR accuracy for sustained aerobic efforts. See `docs/vision/twin/load-fatigue.md#data-quality-and-load-computation`.
 
 ## Neuromuscular Load Formula
 
@@ -121,6 +127,8 @@ function computeStructuralLoad(inputs: StructuralLoadInputs): number {
 
 Requires GPS (distance + elevation). Available from Tier 3 onward. Tier 6: null.
 
+> **Crossover athlete profile:** The density penalty (`recent_structural_load_72h * 0.12`) is specifically designed to catch athletes transitioning from swimming or cycling who carry high aerobic load tolerance but low structural load tolerance. Without this, a cardiovascular-only model would miss structural stress accumulating at a rate cardiovascular fitness masks. This profile is identified at onboarding and structural capacity development is incorporated as an explicit objective. See `docs/vision/twin/load-fatigue.md#the-crossover-athlete-profile`.
+
 ## Calibration Eligibility Gate
 
 `CalibrationEligibilityService` applies this gate before load scores are used for twin recalibration:
@@ -139,6 +147,8 @@ function isCalibrationEligible(activity: Activity, fit_data: FitData): boolean {
   )
 }
 ```
+
+**Note**: Easy runs are calibration-eligible (they meet the five-rule gate) and contribute to fitness/fatigue scores. However, they do NOT provide threshold detection evidence because they lack the intensity variation required for HR deflection/RR inflection algorithms (which need ≥3 distinct intensity steps and ≥8 minutes at each level). Easy runs build fitness, not threshold confidence.
 
 ## Outputs → TwinState Layer 1
 
@@ -164,3 +174,5 @@ The three load scores feed the Banister impulse-response model. The full Baniste
 - AthleteFitness Banister model (where load scores are applied): `01-entities/athlete-fitness.md`
 - Data tier capabilities: `00-foundations/data-tiers.md`
 - Calibration eligibility rules (full detail): `01-entities/activity.md`
+- **Vision — load fatigue rationale (three dimensions, data quality tiers, crossover athlete, individual time constants, GAP invariant):** `docs/vision/twin/load-fatigue.md`
+- **Vision — cold start and onboarding tier definitions:** `docs/vision/twin/cold-start.md`

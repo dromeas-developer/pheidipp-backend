@@ -94,6 +94,7 @@ These structural rules serve adaptation data collection without any additional o
 ## Cross-References
 
 - AdaptationObservation entity: `01-entities/adaptation-observation.md`
-- Plan generation consuming adaptation constraints: `02-computations/plan-generation.md`
+- Plan generation consuming adaptation constraints: `02-computations/plan-generation.md` (shared types and regeneration triggers)
+- Plan generation fitness improvement mode: `02-computations/plan-generation-fitness-improvement.md` (volume/intensity progression uses yield data)
 - PhysiologicalSegment yield computation (what state was the athlete in): `01-entities/physiological-segment.md`
 - Vision-level description of adaptation learning: `vision/twin/adaptation-signature.md`

@@ -5,6 +5,36 @@
 - Stores both theoretical and adjusted targets so the two-column display is always available
 - Parent to WorkoutStep records; owned by a PlannedSession
 
+## Vision ↔ Architecture Mapping
+
+This entity implements the home screen (daily view) and the "Today's Session" element of plan visibility.
+
+| Vision UI Element (Daily View) | Architecture Source | Field(s) | Notes |
+|---|---|---|---|
+| **Today's Workout** — "Full session structure including warmup, main set, and cooldown. Intensity segments colour-coded." | `GeneratedWorkout` + `workout_steps` (child) | `theoretical_targets`, `adjusted_targets`, `workout_steps[]` | Steps provide segment-level structure. Intensity colour-coding is derived from `WorkoutTarget.signal_type` and range values at render time. |
+| **Two-Column Target Display** — "Theoretical targets (what the twin's current intent ranges suggest) and adjusted targets (what the coach recommends today)." | `GeneratedWorkout` | `theoretical_targets: TargetSet`, `adjusted_targets: TargetSet` | Both fields always written, even when identical (GREEN modifier with no weather). This is the core data backing the two-column display. |
+| **Weather Impact** — "Humidity, wind, heat index, and time-of-day conditions. Already factored into adjusted targets, but surfaced so the athlete understands why." | `WeatherForecast` (external entity) | Referenced via `WeatherAdjustmentService` in the computation chain | **Weather explanation text is not stored on this entity.** The adjusted targets reflect the weather impact numerically, but the athlete-facing explanation ("26°C and humid — your adjusted target is around two minutes slower") must be composed at the API response layer using the `WeatherForecast` record linked to this workout's generation context. |
+| **Recovery Status** — "A plain-language summary of the trend over recent days. Not a number or a gauge — a sentence." | `GeneratedWorkout` (partial) | `recovery_modifier_level`, `recovery_modifier_reason` | **Partial mapping.** `recovery_modifier_level` (green/amber/red) is a level indicator — the vision explicitly says "not a number or a gauge." `recovery_modifier_reason` is structured text from a narrated agent, which is closer to the vision's intent. However, the vision describes a *multi-day trend synthesis*, not a per-workout modifier. The multi-day trend aggregation is not owned by this entity; it is a computation concern of the wellness modifier service. The API response layer must compose the trend narrative. |
+| **Relevant Objectives** — "Only the objectives this specific workout is designed to address. Not all objectives." | **Not stored on this entity** | N/A | **Gap.** `GeneratedWorkout` does not link to training objectives or a training purpose field. `WeeklySession.intent_description` captures session-level intent ("threshold development — 4x8min at LT2") but is not the same as specific objectives. The workout generation agent should annotate generated workouts with the objectives they serve, or this must be composed from `PlannedSession` → `WeeklySession` → `PhaseArcEntry.physiological_emphasis` at the API layer. |
+| **Near-Term Session Preview** — "Next four to five planned sessions at headline level: session type, approximate duration, training intent." | `WeeklyPlan.sessions: WeeklySession[]` (not on this entity) | `session_type`, `intent_description`, `approximate_duration_minutes` | Sourced from `WeeklyPlan.WeeklySession[]`, not from `GeneratedWorkout`. The today's-view API (`GET /athletes/{athlete_id}/today`) must compose this from the active `WeeklyPlan`. |
+| **Plan Position** — "Which week and phase the athlete is currently in, how far through the phase." | **Not on this entity** | N/A | Sourced from `TrainingPlan.phases[]` + `WeeklyPlan.week_number`. The today's-view API must compose current phase position from these entities. |
+
+### Headline vs. Precise Boundary
+
+The vision draws a clear boundary: near-term sessions are "headline level" (no specific targets), while today's session has "precise targets." The architecture implements this as:
+
+- **Headline:** `WeeklySession` — `session_type`, `intent_description`, `approximate_duration_minutes`. No targets.
+- **Precise:** `GeneratedWorkout` — `theoretical_targets`, `adjusted_targets`, `workout_steps[]`. Full targets.
+
+`WeeklySession.intent_description` may contain detail like "threshold development — 4x8min at LT2." This is more than a bare headline but does not include target values. The boundary is: intent/description = headline; numeric targets = precise.
+
+### Unmapped Vision Requirements
+
+| Vision Requirement | Status | Owner |
+|---|---|---|
+| "Daily snapshots are saved and the athlete can navigate backward to see what the coach said on any previous day" | `generated_workouts` table is append-only; historical retrieval is possible via `GET /plan/sessions/{session_id}/workout`. No explicit "daily view history" API exists. | API layer — add a `GET /athletes/{athlete_id}/history` endpoint or document that `GET /prediction/history` + session-level queries serve this need |
+| "Phase position always visible on home view" | Not on this entity. Must be composed from `TrainingPlan` + `WeeklyPlan`. | Today's-view API response layer |
+
 ## TypeScript Schema
 
 ```typescript

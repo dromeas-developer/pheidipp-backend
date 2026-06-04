@@ -11,18 +11,20 @@ Pheidipp does not compete with those platforms on raw data display. Its role is 
 
 ## What Pheidipp Shows
 
-**Comparative session overlay.** A simplified shape comparison of this session against the most recent comparable one — same session type, similar phase of training, similar target intensity. Not raw data plotted twice: an abstracted view of execution shape. Did the athlete hold pace better through the back half? Did effort distribute more evenly across reps? Where did the fade begin versus last time?
+**Comparative session overlay.** A narrative comparison of this session against the most recent comparable one — same session type, similar phase of training, similar target intensity. Not raw data plotted twice: a coaching description of execution shape. Did the athlete hold pace better through the back half? Did effort distribute more evenly across reps? Where did the fade begin versus last time?
 
-This requires the twin to identify which previous session is actually comparable — not just any previous threshold session, but one in similar training context and at a similar fitness level. That identification is what makes this view impossible for Garmin to show.
+This requires the twin to identify which previous session is actually comparable — not just any previous threshold session, but one in similar training context and at a similar fitness level. That identification is what makes this comparison impossible for Garmin to show. The comparison is surfaced through the coach voice, not as a separate visual component.
 
-**Session shape classification.** Rather than an HR or pace chart, a single visual summarising how the session unfolded: even execution, progressive fade, positive split, W-shape blowup, strong finish. The same pattern the coach describes in words, rendered as a visual shape. Derived from the raw signal but not the raw signal itself.
+**Session shape classification.** A single coaching observation summarising how the session unfolded: even execution, progressive fade, positive split, W-shape blowup, strong finish. The same pattern the coach describes in words, computed from the raw signal but not the raw signal itself. The athlete receives this as a sentence in their post-workout message, not as a chart.
 
-**Zone compliance in context.** Not a time-in-zone pie chart — that exists in Garmin already. Instead: a simple view of whether the athlete landed where they were meant to for this specific session intent. A threshold session where 40% of time was spent in Zone 2 tells a different story to an easy aerobic run with the same distribution. The context that makes the number meaningful comes from the twin's understanding of what the session was for.
+**Zone compliance in context.** Not a time-in-zone pie chart — that exists in Garmin already. Instead: a coaching note on whether the athlete landed where they were meant to for this specific session intent. A threshold session where 40% of time was spent in Zone 2 tells a different story to an easy aerobic run with the same distribution. The context that makes the number meaningful comes from the twin's understanding of what the session was for. This appears as part of the coach's narrative, not as a separate metric display.
 
-**Fitness and fatigue trend with session marked.** The rolling twin state over the last six to eight weeks — a single line representing the athlete's form arc — with today's session placed on it. Shows the athlete where this session sits in the block: early build, mid-block accumulation, pre-race sharpening. This perspective requires weeks of data and is invisible in any single-session view.
+**Fitness and fatigue trend with session marked.** The rolling twin state over the last six to eight weeks — a coaching description of the athlete's form arc — with today's session placed in context. Shows the athlete where this session sits in the block: early build, mid-block accumulation, pre-race sharpening. This perspective requires weeks of data and is invisible in any single-session view. The trend is communicated through the coach's voice as part of the ongoing training narrative.
 
 ## The Principle
 
-Raw data belongs in the athlete's existing tools. Pheidipp shows only what requires coaching intelligence to produce — comparisons that need the twin to identify what is actually comparable, abstractions that need the twin to know what the session was for, trends that need the twin's longitudinal model to be meaningful.
+Raw data belongs in the athlete's existing tools. Pheidipp surfaces only what requires coaching intelligence to produce — comparisons that need the twin to identify what is actually comparable, abstractions that need the twin to know what the session was for, trends that need the twin's longitudinal model to be meaningful.
+
+These insights are delivered through the coach voice as natural language, not as separate visual components or UI widgets. The architecture computes these signals deterministically; the coach narrative presents them to the athlete in context.
 
 If it could be a screenshot from Strava, it should not exist in Pheidipp.

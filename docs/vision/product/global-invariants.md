@@ -65,7 +65,7 @@ These invariants preserve the integrity of the athlete's primary goal when secon
 
 These invariants define the boundaries of what the system will and will not plan.
 
-**Training length gate.** Goals beyond the configurable planning horizon trigger an intermediate goal proposal. The 24-week default is parameterised by goal type, athlete experience, and fitness level. The system does not attempt to plan training horizons where too many variables remain uncertain. See plan-generation for the full gate logic.
+**Training length gate.** Goals beyond the planning horizon for their goal type and experience level trigger an intermediate goal proposal. Each race distance has a maximum planning window — longer horizons produce unreliable plans because too many variables remain uncertain. See plan-generation for the full gate logic.
 
 **Running-only twin model.** Non-running activities are excluded from twin calibration. This is an accuracy decision. Cross-modal conversions — swim sessions translated into equivalent running stress, strength sessions assigned arbitrary scores — introduce errors that compound over time. The twin holds its judgement on non-running sessions and waits for the next run.
 

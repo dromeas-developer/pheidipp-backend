@@ -60,7 +60,8 @@ const SIGNAL_WEIGHTS: Record<WellnessSignal, number> = {
   hrv_overnight_avg_ms: 0.30,
   total_sleep_minutes: 0.20,
   min_sleeping_hr_bpm: 0.10,
-  deep_sleep_minutes: 0.05
+  deep_sleep_minutes: 0.05,
+  rem_sleep_minutes: 0.08
 }
 
 function computeCompositeScore(
@@ -201,6 +202,26 @@ function computeWeatherPaceAdjustment(
 
 Note: The luteal thermoregulatory modifier stacks additively with weather because the mechanisms are physiologically distinct. The same formula applies with `luteal_temp_offset_c = 0.0` for non-luteal athletes.
 
+## REM Sleep — Coaching Semantics
+
+REM sleep captures cognitive and emotional recovery — distinct from deep sleep's physical/tissue repair role. The vision defines REM as "relevant for motivation, perceived effort, and decision-making capacity, particularly relevant for race situations."
+
+**Weight rationale (0.08):** REM is more variable night-to-night than deep sleep (sensitive to alcohol, stress, medication, circadian disruption). Higher noise justifies lower weight. Its primary coaching value is pattern detection (sustained REM suppression = cognitive fatigue accumulation) rather than daily composite influence. At 0.08, total weights sum to 1.08; the normalisation in `computeCompositeScore` handles this by dividing by `weight_total`.
+
+**Direction of concern:** Reduced below baseline (same as deep_sleep, total_sleep). REM is not an HR signal, so `computeDeviationScore` applies `-raw_deviation` — negative deviation = worse.
+
+**Coaching message patterns:**
+
+| Pattern | Trigger | Message approach |
+|---|---|---|
+| Low REM (3+ nights) | 3-night rolling avg below baseline | Note cognitive recovery deficit; flag relevance for upcoming quality sessions or race week |
+| Sustained REM suppression (7+ nights) | 7-night rolling avg below baseline | Flag accumulated cognitive load; suggest mindfulness of effort pacing |
+| REM + deep sleep both suppressed | Both signals below baseline simultaneously | Compound recovery deficit; system managing more than it can absorb |
+
+**REM × cycle phase interaction:** Luteal phase degrades sleep quality, likely affecting REM disproportionately (REM is concentrated in latter half of sleep, which is more disrupted by elevated core temperature). The composite score already includes a luteal cycle phase adjustment (+0.2 to +0.4). Adding a REM-specific cycle modifier would double-count the same physiological effect. REM deviation captures the luteal sleep degradation indirectly through the signal itself.
+
+**REM × race preparation:** During race-prep blocks (final 2–3 weeks before a goal race), sustained REM suppression can trigger a cognitive readiness flag in coaching messages — independent of the composite GREEN/AMBER/RED. This is a coaching-layer concern (agent reasoning), not a computation-layer concern. The `WellnessModifierService` computes the composite; the coaching agent receives full wellness context including REM trends and applies race-context interpretation.
+
 ## TwinState wellness_update Trigger
 
 When `WellnessModifierService` produces an AMBER or RED classification that differs from the most recent `TwinState`'s implied modifier:
@@ -208,9 +229,33 @@ When `WellnessModifierService` produces an AMBER or RED classification that diff
 - Fitness/fatigue scores are unchanged; the new record captures updated readiness context for agent consumption
 
 ## Cross-References
+
+### Vision Signal Mapping
+
+The following maps vision signal descriptions (`docs/vision/twin/external-modifiers.md`) to architecture computation steps. This table is the authoritative cross-reference for verifying that the architecture faithfully implements the vision's interpretation philosophy.
+
+| Vision Signal | Architecture Key | Weight | Vision Philosophy | Architecture Implementation |
+|---|---|---|---|---|
+| Total sleep duration | `total_sleep_minutes` | 0.20 | "Trends over multiple nights matter more than any single night" | 3-night rolling average; baseline is 28-day median |
+| Deep sleep duration | `deep_sleep_minutes` | 0.05 | "Physical recovery and tissue repair; consistently low is early warning for accumulated fatigue" | Lowest weight — rationale: high wearable measurement noise relative to other signals |
+| REM proportion | `rem_sleep_minutes` | 0.08 | "Cognitive and emotional recovery; relevant for motivation, perceived effort, decision-making, particularly race situations" | Absolute REM minutes (not proportion); proportion refinement deferred to Phase 4f+ |
+| Average sleeping HR | `avg_sleeping_hr_bpm` | 0.35 | "Primary trend signal for recovery state; rising over consecutive nights is most reliable early indicator of overreaching or illness" | Highest weight; matches vision emphasis |
+| Minimum sleeping HR | `min_sleeping_hr_bpm` | 0.10 | "True physiological floor; used as resting HR anchor for zone calculations" | Zone-calculation anchor use is in separate pipeline; wellness weight is secondary |
+| HRV overnight | `hrv_overnight_avg_ms` | 0.30 | "Monitored across rolling 3/7/14 day windows; single-night values never reacted to" | 3-night window for composite; 7-night confirms RED upgrade; 14-day window not implemented |
+| Training time of day | [computed externally] | — | "Adjusts correlation between wellness signals and execution quality based on morning vs afternoon training" | Modifies correlation, not composite score directly; lives in agent reasoning layer |
+| Trend interpretation | IQR-normalised deviation | — | "All signals interpreted as deviations from athlete's own baseline, never absolute values vs population norms" | Stage 2: deviation in IQR units; 3-night patterns trigger adjustments; 7-night patterns confirm RED |
+
+**Vision-to-architecture alignment notes:**
+- Vision: "3-night patterns trigger model adjustments" → Architecture: 3-night composite drives GREEN/AMBER/RED classification
+- Vision: "7-night patterns may trigger proactive coach communication" → Architecture: 7-night composite confirms or upgrades amber→RED
+- Vision: "single-night anomalies treated as noise" → Architecture: 3-night rolling window inherently filters single-night outliers
+- Vision: "patterns across 7+ nights may prompt plan restructuring" → Architecture: RED classification triggers target adjustment (-15%) and wellness_update TwinState
+
+### Entity References
 - AthleteWellness raw records: `01-entities/athlete-wellness.md`
 - AthleteWellnessBaseline storage: `01-entities/athlete-wellness-baseline.md`
 - CyclePhaseLog and phase computation: `01-entities/cycle-phase-log.md`
 - WeatherForecast storage: `01-entities/weather-forecast.md`
 - GeneratedWorkout adjusted_targets: `01-entities/generated-workout.md`
 - Individual weather response curve storage: `01-entities/athlete-profile.md` → `weather_response_model`
+- Vision signal descriptions: `docs/vision/twin/external-modifiers.md`

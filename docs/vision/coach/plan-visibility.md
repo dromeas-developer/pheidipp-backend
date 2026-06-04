@@ -8,9 +8,15 @@ The athlete should always understand where they are in their training journey �
 
 ## The Macro Plan View
 
-The athlete can always see the full architecture of their training plan — not just today, but the entire journey to their goal. Each phase is shown with its label (base building, threshold development, race specific, taper, race week), its duration in weeks, and its primary training focus.
+The athlete can always see the full architecture of their training plan — not just today, but the entire journey to their goal. Each phase is shown with its label, its duration in weeks, and its primary training focus.
 
 This is the phase arc — the strategic roadmap the coach created at plan generation. It shows what each phase is about and why, without committing to specific sessions that will be decided closer to the time.
+
+The macro view adapts to the goal mode:
+- **Race event:** Phase labels reflect race preparation stages (base building, threshold development, race specific, taper, race week)
+- **Fitness improvement:** Each phase shows the objectives being targeted (e.g., "5K PR", "Half Marathon Sub-1:45") with progress indicators
+- **Maintenance:** The view emphasises consistency streaks and recent benchmark trends
+- **Recovery:** The view shows healing assessment progress and phase progression toward full training
 
 When secondary events (B-races, C-races) are registered, they appear as markers within the macro view. B-races show their date and a notation of reduced load before and after. C-races appear as subtle indicators that the athlete's training rhythm may shift slightly. This visibility helps the athlete understand why certain weeks are structured differently.
 

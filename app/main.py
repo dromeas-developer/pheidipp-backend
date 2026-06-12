@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from app.config import settings
-from app.api.routes.health import health_router
+from app.api.v1 import api_router
 from contextlib import asynccontextmanager
 
 
@@ -14,5 +14,4 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan, openapi_url="/openapi.json", docs_url="/docs")
 
-app.include_router(health_router)
-
+app.include_router(api_router)

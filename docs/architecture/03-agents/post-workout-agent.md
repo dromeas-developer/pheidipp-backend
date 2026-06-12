@@ -111,10 +111,10 @@ Maps `vision/coach/voice-and-format.md` rules to agent-specific constraints. The
 
 ## Idempotency
 `POST /athletes/{id}/activities/{id}/analyse` when analysis already exists → returns existing `CoachingMessage` (200). LLM not called.
-
 ## Prompt Location
-`app/core/prompts/post_workout_v1.md` (Phase 4a)
-`app/core/prompts/post_workout_v2_segments.md` (Phase 5c — updated for segment-level findings)
+
+`app/core/prompts/post_workout_v1.md` (lap-based analysis)
+`app/core/prompts/post_workout_v2_segments.md` (segment-based analysis)
 
 ## Performance Constraints
 - p95 < 8s (LLM latency)

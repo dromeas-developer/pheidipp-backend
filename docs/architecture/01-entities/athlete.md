@@ -65,7 +65,7 @@ Description: Creates Athlete + AthleteAuth + AthleteProfile atomically. See 01-e
 Request:
   email: string, required, valid email
   password: string, required, min 8 chars
-  profile: { date_of_birth, sex, height_cm?, weight_kg? }
+  profile: { date_of_birth, sex, height_cm? }
 Response: 201
   athlete: AthleteResponse
   access_token: string

@@ -93,9 +93,40 @@ Setback messages maintain the protective stance:
 
 - "Your wellness signals have dipped this week. Let's maintain the current load and monitor closely."
 
+**Target Performance mode.** The athlete specifies a distance and target time. The system determines the appropriate training date via gap analysis. Plan generation uses race-like periodisation (hypothesis generation, taper, checkpoints) but with an inverted training length gate that ensures sufficient training duration. Coaching focuses on trajectory validation, benchmarking, and systematic progression toward the measurable target.
+
+The plan begins with gap analysis: the system estimates the athlete's current performance for the target distance, calculates the gap to the target time, and classifies it as small (≤3%), medium (3-8%), large (8-15%), or very large (>15%). Small/medium/large gaps proceed with target_performance planning; very large gaps propose a fitness_improvement goal first to build capacity before attempting the target.
+
+The training length gate for target_performance is inverted: instead of checking if the goal is too far away, it checks if the gap is too large. The system estimates weeks to target based on gap classification and fitness level, then sets the target date (coach-driven, not athlete-set). The athlete cannot PATCH the target date — only coach-driven regeneration can change it.
+
+When the timeline is appropriate, the coach generates three distinct strategic approaches using the same hypothesis generation pipeline as race mode. Objectives inform hypothesis generation: the system seeds objectives based on race type (marathon, 10K, 5K, etc.) and gap classification, then the hypothesis agent generates approaches that address those objectives.
+
+Secondary events are supported identically to race mode: B-events create 4-day pre/post disruption windows; C-events create 2-day pre/post windows. The phase arc includes base, build, race-specific, and sharpen phases, with optional taper if the target is a race.
+
+Checkpoints in target_performance mode include trajectory validation. When a checkpoint completes, the system computes whether the athlete is ahead of schedule, on track, behind, or at risk. If ahead, the coach can propose pulling the date forward or stretching the target. If at risk, the coach can propose extending the date or adjusting the target. Both require coach judgment — the system proposes; the coach decides.
+
+Coaching messages in target_performance mode reference objectives by name and frame trajectory status:
+
+```
+Target Performance Plan (weeks 1-8)
+  Objectives: Aerobic base quality, Threshold quality, Pacing discipline
+  Target: 10K in 50 minutes by [date]
+  Trajectory: On track — current estimate 52 minutes
+```
+
+Daily view messages connect sessions to objectives and trajectory:
+
+- "Today's session serves your threshold quality objective — 4x8min at target pace to develop your 10K capacity"
+- "You're 65% toward your target. Your recent 5K race confirms you're on track for 50 minutes."
+
+Checkpoint messages validate trajectory:
+
+- "Your 10K time trial confirms you're ahead of schedule. We could hit your target 2 weeks earlier."
+- "Your threshold session was below target. Let's extend the timeline by 1 week to ensure we hit your goal."
+
 ## Adaptive Coaching Language
 
-In race mode: "sharpening," "final prep," "race-specific," urgency where it serves. In fitness improvement mode: "development," "progressive overload," "capacity building," measurable gains. In maintenance mode: "consistency," "gradual progress," "sustainable habits," patience where the athlete might otherwise feel pressure. In recovery mode: "healing," "protective," "gradual return," monitoring where the athlete might otherwise push too hard.
+In race mode: "sharpening," "final prep," "race-specific," urgency where it serves. In fitness improvement mode: "development," "progressive overload," "capacity building," measurable gains. In maintenance mode: "consistency," "gradual progress," "sustainable habits," patience where the athlete might otherwise feel pressure. In recovery mode: "healing," "protective," "gradual return," monitoring where the athlete might otherwise push too hard. In target performance mode: "trajectory," "target pace," "gap closing," "benchmark," "current estimate," "projected time," "ahead of schedule," "on track," "behind pace."
 
 The athlete should never have to tell the coach which mode they're in day to day — the coach already knows and speaks from that context.
 
@@ -111,6 +142,9 @@ When an athlete sets a new goal event mid-cycle, the plan restructures according
 - From Recovery to Fitness Improvement: Coach monitors healing markers before recommending progression.
 - From Maintenance to Fitness Improvement: Coach detects readiness signals and proposes development phase.
 - From any mode to Maintenance: Natural fallback when athlete wants consistency without specific targets.
+- From Target Performance to Recovery: After goal event or if at_risk trajectory requires reduced load.
+- From Target Performance to Fitness Improvement: If gap is too large (>15%), system proposes fitness_improvement first.
+- From any mode to Target Performance: When athlete wants to target a specific time.
 
 Transitions are always framed as coaching conversations, not administrative changes. The twin provides the rationale while the coach delivers it in the appropriate voice for both the current and upcoming mode.
 

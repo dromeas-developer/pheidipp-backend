@@ -29,25 +29,26 @@ API Layer (FastAPI)
     │                    ▼                     │   SegmentationTask
     │             twin_recalibrated            │         │
     │                    │                     ▼         ▼
-    │           twin_confidence_upgraded  ExecutionObservation  PhysiologicalSegments
-    │                    │                     │
-    │           ┌─────────┴──────────┐         │
-    │           ▼                    ▼         │
-    │   PlanGenerationService  ProactiveMsg    │
-    │                               │         │
-    │                               ▼         ▼
-    │                        session_completed event
-    │                               │
-    │                    ┌──────────┴──────────┐
-    │                    ▼                     ▼
-    │          ObjectiveUpdateService  ComparableSessionService
-    │                    │                     │
-    │                    └──────────┬──────────┘
-    │                               ▼
-    │                        PostWorkoutTask
-    │                               │
-    │                               ▼
-    │                        CoachingMessage created
+     │           twin_confidence_upgraded  execution_analysis_completed  PhysiologicalSegments
+     │                    │                     │
+     │           ┌─────────┴──────────┐         │
+     │           ▼                    ▼         │
+     │   PlanGenerationService  ProactiveMsg    │
+     │                               │         │
+     │                               ▼         ▼
+     │                        session_completed event
+     │                               │
+     │                    ┌──────────┴──────────┐
+     │                    ▼                     ▼
+     │          ObjectiveUpdateService  ComparableSessionService
+     │                    │                     │
+     │                    └──────────┬──────────┘
+     │                               ▼
+     │                        PostWorkoutTask
+     │                         (waits on execution_analysis_completed)
+     │                               │
+     │                               ▼
+     │                        CoachingMessage created
     │
     ├── POST /onboarding ──────────────────────► onboarding_completed
     │                                                    │
@@ -89,7 +90,7 @@ Events that trigger multiple consumers:
 **`activity_calibration_eligible`:**
 1. `TwinRecalibrationTask` (parallel)
 2. `ExecutionAnalysisTask` (parallel)
-Both run concurrently. `PostWorkoutTask` waits for both to complete.
+Both run concurrently. `PostWorkoutTask` is not triggered by this event — it waits for `execution_analysis_completed` instead.
 
 **`twin_recalibrated`:**
 1. `RacePredictionService.compute()` (if confidence ≥ medium)
@@ -119,10 +120,13 @@ Both run concurrently. `PostWorkoutTask` waits for both to complete.
 1. `WeeklyPlanService.update_session_status()` (update WeeklyPlan session counts)
 2. Next `PreWeekReviewAgent` run reads accumulated data (NOT full plan regeneration)
 
+**`execution_analysis_completed`:**
+1. `PostWorkoutTask` (waits for this event before proceeding)
+
 **`session_completed`:**
 1. `ObjectiveUpdateService.evaluate_post_session()` (must complete first)
 2. `ComparableSessionService.find()` (can run in parallel with ObjectiveUpdateService)
-3. `PostWorkoutTask` (waits for both above)
+3. `PostWorkoutTask` (waits for both above + `execution_analysis_completed`)
 
 **`week_completed`:**
 1. `PreWeekReviewAgent` reviews next week's intent
@@ -139,11 +143,11 @@ Both run concurrently. `PostWorkoutTask` waits for both to complete.
 
 ```typescript
 // PostWorkoutTask must wait for:
-// - ExecutionObservation to exist (or 3 retries exhausted)
+// - execution_analysis_completed event (or 2-minute timeout)
 // - ObjectiveUpdateService.evaluate_post_session() to complete
 // - ComparableSessionService.find() to complete
-// Order guaranteed by: PostWorkoutTask polls for ExecutionObservation existence
-// with 5s intervals, up to 60s total wait
+// Order guaranteed by: PostWorkoutTask receives execution_analysis_completed event
+// via async pipeline; 2-minute timeout if event never arrives (degrades gracefully)
 
 // PlanGenerationService on confidence_upgrade must:
 // - Complete before the next WorkoutGenerationAgent call reads plan context
@@ -164,8 +168,9 @@ twin_model_ready ──────────────────┐
                                    ▼
                     ┌─────────────────────────┐
                     │ PlanGenerationService   │
-                    │ (phase arc + first      │
-                    │  WeeklyPlan created)     │
+                    │ (phase definitions +   │
+                    │  first WeeklyPlan       │
+                    │  created)              │
                     └─────────────────────────┘
                                    │
                                    ▼
@@ -185,7 +190,7 @@ twin_confidence_upgraded ──────────┐
                     ┌─────────────────────────┐
                     │ PlanGenerationService   │
                     │ (re-runs hypothesis +   │
-                    │  phase arc synthesis)    │
+                    │  phase definitions)     │
                     └─────────────────────────┘
                                    │
                                    ▼

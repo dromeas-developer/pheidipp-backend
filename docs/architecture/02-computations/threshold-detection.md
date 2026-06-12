@@ -121,12 +121,12 @@ See `00-foundations/confidence-model.md` for downstream effects and evidence wei
 // TwinState.confidence_level is derived from min(AthletePhysiology.lt1.hr.prior_weight, AthletePhysiology.lt2.hr.prior_weight)
 // TwinState.metric_confidence is derived from respective parameter prior weights
 ```
-
 ## Version History
+
 | Version | Change |
 |---|---|
 | `threshold-v1` | HR deflection only |
-| `threshold-v2-rr` | RR inflection added (Phase 2d) |
+| `threshold-v2-rr` | RR inflection added |
 
 ## Cross-References
 - AthletePhysiology (where posterior estimates are stored): `01-entities/athlete-physiology.md`

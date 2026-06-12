@@ -71,11 +71,18 @@ These weights are defined here as the authoritative reference for `WellnessModif
 Deviation score formula:
 ```typescript
 deviation[signal] = (rolling_avg_3night[signal] - baseline_value) / baseline_variability
-// Positive deviation on HR signals = worse than baseline
-// Negative deviation on HRV/sleep signals = worse than baseline
+
+// Signal classification for normalisation:
+const HR_SIGNALS = ['avg_sleeping_hr_bpm', 'min_sleeping_hr_bpm', 'hrv_overnight_avg_ms', 'hrv_overnight_min_ms']
+const SLEEP_SIGNALS = ['total_sleep_minutes', 'deep_sleep_minutes', 'rem_sleep_minutes']
+
+// Positive deviation on HR signals = worse than baseline (higher HR, lower HRV)
+// Negative deviation on sleep signals = worse than baseline (less sleep)
 // Both directions normalised to: negative = worse
-normalised_deviation[signal] = signal_is_hr ? deviation : -deviation
+normalised_deviation[signal] = HR_SIGNALS.includes(signal) ? deviation : -deviation
 ```
+
+**Note:** `hrv_overnight_avg_ms` is classified as an HR signal because higher HRV = better recovery. Therefore suppressed HRV (lower value) produces a negative deviation, which after normalisation remains negative = "worse than baseline." This is correct.
 
 ## Invariants
 - Unique constraint on `(athlete_id, signal)` — one row per signal per athlete. Recomputed values **overwrite** the existing row (unlike `AthleteWellness` which is additive). The baseline is always a fresh window computation, not cumulative.

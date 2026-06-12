@@ -34,7 +34,7 @@ type WorkoutGenerationContext = {
 
   // Data tier — determines which target type to produce
   data_tier: DataTier
-  target_type: 'power' | 'pace' | 'effort_description'
+  target_type: 'power' | 'gap' | 'effort_description'
 
   // Objectives relevant to this session (max 2; filtered by session_types_relevant)
   relevant_objectives: {
@@ -64,19 +64,16 @@ type WorkoutGenerationOutput = {
 }
 ```
 
-## Target Type Rules by Data Tier
+## Target Type Selection
 
-```typescript
-const TARGET_RULES_BY_TIER: Record<DataTier, TargetTypeRule> = {
-  1: { primary: 'power',    secondary: 'gap' },
-  2: { primary: 'power',    secondary: 'gap' },
-  3: { primary: 'gap',      secondary: 'hr' },
-  4: { primary: 'gap',      secondary: 'hr' },
-  5: { primary: 'description_only',      secondary: null },
-  6: { primary: 'description_only',      secondary: null }
-}
-// Tier 5-6: all numeric targets null; description carries all intent
-```
+Target type selection (`power`, `gap`, or `description`) is handled by `TwinContextAssemblerService` based on the athlete's data tier.
+
+**Logic:** See `02-computations/twin-context-assembler.md` → "Data Tier → Target Type Mapping".
+
+**Usage:** The agent reads `context.target_type` from the assembled `TwinContextSummary` and generates targets accordingly:
+- **Power:** Populates `target_power_watts`
+- **GAP:** Populates `target_gap_sec_per_km`
+- **Description:** All numeric targets null; `description` carries all intent
 
 ## PhysiologicalIntentState by Step Type
 

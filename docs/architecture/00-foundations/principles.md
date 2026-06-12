@@ -1,9 +1,10 @@
-# Principles — Architectural Invariants & Core Decisions
+# Principles
 
-## Purpose
 - Defines the non-negotiable rules every engineer must internalise before touching any part of the system
 - Establishes the five-layer separation of concerns that governs all data flow
 - Several invariants below implement philosophical commitments from `docs/vision/twin/data-philosophy.md` — see inline references in invariants #8, #9, #11, #14
+
+---
 
 ## Invariants
 
@@ -29,34 +30,40 @@
 
 11. **Anti-goals are architectural constraints.** The following product boundaries are enforced through bounded models and API design: no dashboard UX, no raw-data-first experiences, no multi-sport conversion factors, no athlete-authored training plans. These are not merely product preferences — they are architectural governance boundaries. Future system evolution must be evaluated against these constraints. *(The "no multi-sport conversion factors" constraint implements the vision principle "Non-Running Data Does Not Corrupt the Running Model" from `docs/vision/twin/data-philosophy.md`.)*
 
-12. **Premium features require architectural foresight.** Free Coach Chat (conversational agent), Group & Team Training (shared plan, individual twins), and Voice Companion (audio delivery surface) are defined in product vision but have no current architecture. When implemented, they must integrate with existing agent architecture, context budgeting, and coach voice constraints. These features should not bolt on as separate systems.
+12. **Premium features require architectural foresight.** Free Coach Chat (conversational agent), Group & Team Training (shared plan, individual twins), and Voice Companion (audio delivery surface) are defined in product vision but have no current architecture. When implemented, they must integrate with existing agent architecture, context budgeting, and coach voice constraints. These features should not bolt on as separate systems. No architectural design exists for these features yet. Each requires a dedicated architecture document before implementation begins.
 
-13. **Peer-similar bootstrap is a Tier 2 onboarding path.** For athletes without importable training history, the twin can bootstrap from anonymised models of similar athletes. This peer-similar model source, selection criteria, and application mechanism must be defined in architecture before implementation. The peer-similar path produces initial physiological estimates that are replaced by real training data as sessions accumulate.
+13. **Peer-similar bootstrap is a Tier 2 onboarding path.** For athletes without importable training history, the twin can bootstrap from anonymised models of similar athletes. This capability is not yet architecturally specified. Implementation requires a dedicated architecture document covering similarity dimensions, model selection criteria, application mechanism, and privacy constraints. Until that document exists, this invariant serves as a product intent marker, not an enforceable runtime constraint. The peer-similar path produces initial physiological estimates that are replaced by real training data as sessions accumulate.
 
 14. **Algorithm improvements reprocess recent history.** When a calibration algorithm improves or a new metric becomes available, the system reprocesses recent calibration-eligible sessions through the new algorithm. This accelerates the benefit of improvements without waiting passively for new data. The current state (`AthletePhysiology`, `AthleteFitness`) updates to reflect the improved algorithm. Historical records (`TwinState`, `PhysiologyMeasurement`) remain untouched — the audit trail is preserved through version strings and append-only writes. The athlete receives a coaching communication explaining what changed and why. *(Implements vision principle "Continuous Learning From Real Training" from `docs/vision/twin/data-philosophy.md`.)*
+
+15. **Race prediction is the only internal metric surfaced to athletes as a number.** All other internal metrics (fitness, fatigue, load dimensions, threshold estimates) remain hidden behind plain-language descriptors (`form_descriptor`, effort descriptions, range estimates). The prediction is surfaced with confidence context, not as a model transparency exercise. This is a deliberate product choice — see `01-entities/race-prediction.md` "Product Decision" and `docs/vision/coach/race-prediction.md`.
+
+---
 
 ## Five-Layer Separation of Concerns
 
 ```
-┌──────────────────────────────────────────────────────┐
-│  5. TWIN INTERPRETATION                              │
-│     TwinState recalibration · coaching signals       │
-├──────────────────────────────────────────────────────┤
-│  4. ADAPTATION OBSERVATION                           │
-│     Block-level response · yield profiles            │
-├──────────────────────────────────────────────────────┤
-│  3. PHYSIOLOGICAL ANALYSIS                           │
-│     ExecutionObservation · segmentation              │
-├──────────────────────────────────────────────────────┤
-│  2. WORKOUT EXECUTION STRUCTURE                      │
-│     PlannedSegment · DeviceSegment · PhysSegment     │
-├──────────────────────────────────────────────────────┤
-│  1. RAW SENSOR INGESTION                             │
-│     FIT file · stream cleaning · load computation    │
-└──────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│  5. TWIN INTERPRETATION                                      │
+│     TwinState recalibration · coaching signals               │
+├──────────────────────────────────────────────────────────────┤
+│  4. ADAPTATION OBSERVATION                                   │
+│     Block-level response · yield profiles                    │
+├──────────────────────────────────────────────────────────────┤
+│  3. PHYSIOLOGICAL ANALYSIS                                   │
+│     ExecutionObservation · segmentation                      │
+├──────────────────────────────────────────────────────────────┤
+│  2. WORKOUT EXECUTION STRUCTURE                              │
+│     PlannedSegment · DeviceSegment · PhysSegment             │
+├──────────────────────────────────────────────────────────────┤
+│  1. RAW SENSOR INGESTION                                     │
+│     FIT file · stream cleaning · load computation            │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 Lower layers feed upper layers. Upper layers never reach down to read raw data directly. Each layer can be upgraded independently as long as its output interface remains stable.
+
+---
 
 ## Runtime Ownership
 
@@ -70,12 +77,18 @@ Lower layers feed upper layers. Upper layers never reach down to read raw data d
 - Agent architecture → `03-agents/`
 - Platform concerns → `04-platform/`
 
+---
+
 ## Implementation Notes
+
 - The layer independence invariant is what makes segmentation algorithm upgrades (Gen 1 → Gen 3) safe — `PhysiologicalSegment` schema is stable; only `segmentation_version` changes
 - The append-only TwinState invariant is what makes it possible to explain any historical coaching decision
 - The LLM narration rule keeps context windows small (2k–6k tokens) and keeps analytical logic auditable in Python
 
+---
+
 ## Open Questions
+
 - None. These invariants are settled.
 
 ---
@@ -91,7 +104,7 @@ Maps design philosophy from `docs/vision/product/brand-philosophy.md` to archite
 | Vision Principle | Architecture Implementation | Enforced By |
 |---|---|---|
 | **Blackboard Principle** — minimalist UI, text-driven, no visual noise | No dashboard UX anti-goal; API returns plain-language descriptors | Invariant #11, `form_descriptor` pattern in `athlete-fitness.md` |
-| **Coach Not Dashboard** — athlete sees conclusions, not numbers | Fitness scores are internal; athletes see only `form_descriptor` | `athlete-fitness.md` API contract (raw scores never returned) |
+| **Coach Not Dashboard** — athlete sees conclusions, not numbers | Fitness scores are internal; athletes see only `form_descriptor`; race prediction is the sole exposed number | `athlete-fitness.md` API contract, `race-prediction.md` product decision, invariant #15 |
 | **No AI-Feel Communication** — plain language, no bullets/headers/emojis | Agent voice constraints enforce three natural paragraphs, no formatting | `post-workout-agent.md`, `first-message-agent.md` voice rules |
 | **Data Processing Boundary** — Python computes, LLM reasons | Deterministic computation in Python; LLM receives pre-computed metrics | Invariant #2, `02-computations/` service layer |
 | **Coaching Expertise Boundaries** — redirect outside running domain | *Not yet implemented in architecture* | Future: agent prompt constraints |

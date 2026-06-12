@@ -53,21 +53,17 @@ type StrategicFramework = {
   
   macrocycle_structure: string       // plain English description
   
-  // Phase arc — strategic intent per week, no session-level detail
-  phase_arc: PhaseArcEntry[]
+  // Phase definitions — the adaptation strategy (from selected hypothesis)
+  phase_definitions: PhaseDefinition[]
+  
+  // Derived: per-week distributions (computed by deterministic expansion)
+  weekly_distributions: WeeklyDistribution[]
   
   race_schedule: RaceScheduleEntry[]
   checkpoint_schedule: CheckpointDescriptor[]
   phase_adjustments: PhaseAdjustment[]
   
-  intensity_distribution: {
-    low_aerobic: number            // percentage of session time (0-1)
-    high_aerobic: number
-    threshold: number
-    vo2max: number
-    neuromuscular: number
-    recovery: number
-  }
+  // Note: intensity_distribution removed — replaced by per-phase distributions
   
   progression_model: {
     volume: string
@@ -83,16 +79,8 @@ type StrategicFramework = {
   risk_mitigations: string[]
 }
 
-type PhaseArcEntry = {
-  week_number: number
-  phase_label: PhaseLabel
-  methodology: MethodologyTraitVector
-  physiological_emphasis: string
-  intensity_bias: 'easy' | 'balanced' | 'moderate' | 'quality'
-  race_considerations?: string
-  checkpoint_intent?: string
-  target_session_count: number
-}
+// PhaseDefinition: see 00-foundations/terminology.md
+// WeeklyDistribution: see 00-foundations/terminology.md
 
 type RaceScheduleEntry = {
   race: string                       // "A-race", "B-event", "C-event"
@@ -124,37 +112,46 @@ type PhaseAdjustment = {
 ## Prompt Structure
 
 ### System Prompt
-- Scoring criteria: twin alignment (50%), goal fit (30%), injury safety (10%)
-- Constraint-first validation rules
-- Strategic framework structure
+- Scoring criteria: twin alignment (35%), goal fit (25%), objective alignment (25%), injury safety (15%)
+- Constraint-first validation rules (phase ordering, distribution sums, hard invariants)
+- Strategic framework structure (phase_definitions, weekly_distributions, race_schedule, checkpoints)
+- PhaseDefinition validation: distribution sums ≤ 1.0, specificity 0.0-1.0, valid PhaseLabel values
 - Race schedule formatting
 - Checkpoint scheduling logic
+- Deterministic expansion: phase_definitions → weekly_distributions (pure function, applied after selection)
 
 ### Context
-- Three hypotheses with rationale and risk notes
+- Three hypotheses with trait_vector, phase_definitions, rationale and risk notes
 - Athlete twin context summary
 - Athlete preferences
+- Athlete objectives (shared ObjectiveCategory enum with phase objectives)
 - Goal definition
 - Race calendar
 
 ### Instructions
-1. **Validate each hypothesis** against hard invariants
-   - Discard invalid hypotheses immediately
-   - No scoring, no partial credit
+1. **Validate each hypothesis** against hard invariants:
+   - Phase ordering is physiologically coherent (base before specificity, etc.)
+   - Distribution values sum to ≤ 1.0 per phase
+   - Specificity values are 0.0-1.0
+   - Phase objectives use valid ObjectiveCategory values
+   - Hard training constraints respected (no back-to-back quality, 48h recovery)
+   - Discard invalid hypotheses immediately — no scoring, no partial credit
 
-2. **Score valid hypotheses** on three criteria:
-   - Twin Alignment (50%): addresses strengths/weaknesses
-   - Goal Fit (30%): aligns with goal type and race calendar
-   - Injury Safety (10%): mitigates identified risks
+2. **Score valid hypotheses** on four criteria:
+   - Twin Alignment (35%): addresses strengths/weaknesses identified in twin analysis
+   - Goal Fit (25%): aligns with goal type, distance, and race calendar
+   - Objective Alignment (25%): phase objectives address the athlete's active objectives
+   - Injury Safety (15%): mitigates twin-identified structural and recovery risks
 
 3. **Select the best hypothesis** based on scores
 
 4. **Synthesise strategic framework** from selected hypothesis:
-   - Derive macrocycle structure
+   - Copy phase_definitions from selected hypothesis
+   - Apply deterministic expansion: phase_definitions → weekly_distributions
+   - Derive macrocycle structure (plain English description)
    - Integrate race schedule with taper/recovery windows
    - Schedule checkpoints based on confidence gaps and phase transitions
-   - Define intensity balance
-   - Specify progression model
+   - Specify progression model (volume and intensity trajectory)
    - Define recovery model
    - Identify risk mitigations
 
@@ -168,7 +165,7 @@ type PhaseAdjustment = {
 |-----------|--------|-------------|
 | Twin Alignment | 35% | Addresses strengths and weaknesses identified in twin analysis |
 | Goal Fit | 25% | Aligns with goal type, distance, and race calendar |
-| Objective Alignment | 25% | Addresses the athlete's active objectives (e.g., aerobic_base improve, threshold_quality maintain) |
+| Objective Alignment | 25% | Phase objectives address the athlete's active objectives (from athlete_objectives input) |
 | Injury Safety | 15% | Mitigates twin-identified structural and recovery risks |
 
 ---
@@ -238,7 +235,8 @@ Implements two authority boundaries from `docs/vision/coach/decision-authority.m
 - Selection criteria philosophy: `docs/vision/product/hypothesis-selection.md`
 - Hypothesis generation: `03-agents/hypothesis-agent.md`
 - Weekly synthesis: `03-agents/weekly-synthesis-agent.md`
-- Plan generation pipeline: `02-computations/plan-generation-race.md` (race mode hypothesis validation and synthesis)
+- Plan generation pipeline: `02-computations/plan-generation-race.md` (race mode hypothesis validation and synthesis, includes target_performance preprocessing)
 - Shared types and persistence: `02-computations/plan-generation.md`
+- Deterministic expansion: `00-foundations/terminology.md` → PhaseDefinition → WeeklyDistribution
 - Validation logic: `02-computations/plan-generation-race.md` → validatePhaseArc
 - Checkpoint types: `01-entities/checkpoint.md`

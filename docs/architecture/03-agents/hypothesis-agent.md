@@ -54,12 +54,8 @@ type HypothesisAgentOutput = {
 
 type StrategicHypothesis = {
   name: string                           // internal label; not surfaced to athlete
-  dimensions: HypothesisDimensions       // the four reasoning dimensions
-  phase_emphasis: {
-    name: string
-    weeks: number
-    focus: string[]
-  }[]
+  trait_vector: MethodologyTraitVector   // coaching philosophy expression (0.0–1.0 per trait)
+  phase_definitions: PhaseDefinition[]   // adaptation strategy — the core output
   checkpoints: {
     type: CheckpointType
     week: number
@@ -70,19 +66,22 @@ type StrategicHypothesis = {
   risk_notes: string[]
 }
 
-type HypothesisDimensions = {
-  trait_vector: MethodologyTraitVector    // coaching philosophy expression (0.0–1.0 per trait)
-  load_distribution: {
-    low_aerobic: number                   // percentage of session time (0-1)
-    high_aerobic: number
-    threshold: number
-    vo2max: number
-    neuromuscular: number
-    recovery: number
-  }
-  approach: 'linear' | 'non_linear' | 'block' | 'undulating' | 'step' | 'exponential'
-  recovery_cycle: 'frequent' | 'infrequent' | 'micro_cycles' | 'macro_cycles'
-}
+// PhaseDefinition (from 00-foundations/terminology.md):
+// {
+//   phase: PhaseLabel
+//   objective: ObjectiveCategory[]
+//   weeks: number
+//   distribution: {
+//     low_aerobic: number
+//     high_aerobic: number
+//     threshold: number
+//     vo2max: number
+//     neuromuscular: number
+//   }
+//   specificity: number
+//   approach: 'linear' | 'undulating' | 'block' | 'step'
+//   recovery_cycle: 'frequent' | 'moderate' | 'infrequent'
+// }
 ```
 
 ---
@@ -90,28 +89,35 @@ type HypothesisDimensions = {
 ## Prompt Structure
 
 ### System Prompt
-- Coaching methodology principles
-- Four reasoning dimensions: trait_vector (MethodologyTraitVector), load_distribution (PhysiologicalIntent allocation), approach (progression pattern), recovery_cycle
-- The trait_vector uses 10 fixed traits describing coaching philosophy expression. Each trait ranges from 0.0 to 1.0. Highest layer of the three-layer hierarchy: MethodologyTraitVector → PhysiologicalIntent → SessionType.
-- Hard invariants (no back-to-back hard sessions, 48h recovery, etc.)
-- Distinctness rule: generate 3 hypotheses by varying at least 2 of the 4 dimensions. Each hypothesis should represent a genuinely different coaching approach for this athlete's specific objectives and race type.
+- **Three-layer model:** TraitVector (identity) → PhaseDefinition[] (adaptation strategy) → WeeklyDistribution[] (generated later by deterministic expansion)
+- **TraitVector:** 10 fixed traits describing coaching philosophy expression. Each trait ranges from 0.0 to 1.0. Highest layer of the three-layer hierarchy: MethodologyTraitVector → PhysiologicalIntent → SessionType.
+- **PhaseDefinition:** The core reasoning unit. Each phase has a label (methodology-specific), objectives (shared ObjectiveCategory enum), distribution (6 zones), specificity (independent attribute), approach (linear/undulating/block/step), and recovery_cycle (frequent/moderate/infrequent).
+- **Hybrid methodology:** You are NOT limited to a single coaching methodology. You may draw from different methodologies for different phases based on the athlete's specific gaps and objectives. For example: Lydiard-style aerobic accumulation for base phases, Canova-specificity progression for race-specific phases, Norwegian threshold concentration for threshold development, Daniels-style multi-system balance for sharpening. The trait_vector represents the OVERALL coaching identity, not rigid adherence to one methodology.
+- **Specificity is separate from distribution.** Specificity is a property of the stimulus, not a training zone. It overlaps with every load type (a marathon-pace threshold session has threshold distribution AND high specificity). Model it as a separate `specificity` number on each PhaseDefinition, not as part of the distribution.
+- **Phase objectives share the athlete objectives enum.** Use the same ObjectiveCategory values (aerobic_base, threshold_quality, pacing_discipline, etc.) that the athlete's objectives use. This ensures the plan directly addresses athlete goals.
+- **Hard invariants** (no back-to-back hard sessions, 48h recovery, etc.)
+- **Distinctness rule:** Generate 3 hypotheses by varying methodology approach across phases. Each hypothesis should represent a genuinely different coaching strategy — not just different numbers, but different phase sequences, different methodology combinations, different specificity trajectories.
 
 ### Context
 - Athlete twin state and context summary
 - Athlete preferences (available days, long_workout_day)
+- Athlete objectives (from objective management — same ObjectiveCategory enum used in phase objectives)
 - Goal definition (event type, date, description)
 - Race calendar (secondary events)
 - Confidence gaps (which metrics need calibration)
 
 ### Instructions
 1. Analyse athlete profile: strengths, weaknesses, constraints, race priorities
-2. Select three distinct combinations of reasoning dimensions
+2. Review athlete objectives — these should directly inform phase objectives
 3. For each hypothesis:
-   - Justify the approach choice
-   - Address how it targets athlete weaknesses
-   - Ensure all hard constraints are respected
-   - Incorporate race calendar
-   - Schedule checkpoints at optimal times
+   a. Select a methodology approach (single tradition or hybrid)
+   b. Design 4-5 phases using methodology-specific labels (e.g., 'aerobic_base', 'threshold_peak', 'specific_endurance')
+   c. Assign objectives to each phase (from ObjectiveCategory enum, addressing athlete gaps)
+   d. Define distribution, specificity, approach, and recovery_cycle per phase
+   e. Ensure the overall trajectory makes physiological sense (base before specificity, etc.)
+   f. Ensure hard constraints are respected
+   g. Incorporate race calendar and secondary events
+   h. Schedule checkpoints at optimal times
 4. Return three hypotheses with rationale and risk notes
 
 ---
@@ -120,10 +126,11 @@ type HypothesisDimensions = {
 
 | Dimension | Type | Purpose |
 |-----------|------|---------|
-| trait_vector | MethodologyTraitVector | Coaching philosophy expression — 10 fixed traits (0.0–1.0) describing training methodology emphasis |
-| load_distribution | PhysiologicalIntent allocation | How session time is distributed across intensity zones |
-| approach | progression pattern | How load advances over time (linear, undulating, block, etc.) |
-| recovery_cycle | recovery cadence | Frequency and structure of recovery periods |
+| trait_vector | MethodologyTraitVector | Coaching philosophy identity — 10 fixed traits (0.0–1.0) describing overall methodology emphasis. Static per hypothesis. |
+| phase_definitions | PhaseDefinition[] | Adaptation strategy — 4-5 phases, each with distribution, specificity, approach, recovery_cycle, and objectives. The core output. |
+| checkpoints | CheckpointDescriptor[] | Progress measurement points — scheduled based on confidence gaps, phase transitions, and race calendar |
+
+**Note:** The former four dimensions (trait_vector, load_distribution, approach, recovery_cycle) are consolidated into two: trait_vector (identity) and phase_definitions (strategy). Approach and recovery_cycle are now per-phase attributes within PhaseDefinition, not independent hypothesis dimensions. Distribution is per-phase, not plan-wide.
 
 ---
 

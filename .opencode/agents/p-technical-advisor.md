@@ -1,5 +1,5 @@
 ---
-model: litellm-proxy/poolside/laguna-m.1-reasoning
+model: litellm-proxy/nvidia/qwen3.5-397b
 temperature: 0.5
 
 permission:
@@ -49,8 +49,6 @@ tools:
   "pheidipp-codebase-context_get_files":                false
   "pheidipp-codebase-context_find_files":               false
   "pheidipp-codebase-context_grep_files":               false
-  "pheidipp-codebase-context_write_plan":               false
-  "pheidipp-codebase-context_write_report":             false
 ---
 
 # Pheidipp — Technical Advisor

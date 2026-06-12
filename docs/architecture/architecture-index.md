@@ -181,6 +181,10 @@ Block-level adaptation signal. `yield_by_intent_state` JSONB. Recovery trajector
 Scheduled assessment point within a training plan. Five types: calibration, benchmark, race_simulation, secondary_race, progress_review. One-to-one with PlannedSession. Status lifecycle: scheduled → completed/skipped. Completion fields set atomically. Produces `checkpoint_completed` event.
 **Read for:** checkpoint types; scheduling logic; completion flow; event contract.
 
+### `01-entities/regeneration-task.md`
+Two-step Propose→Confirm flow for target_performance date changes. Enforces coach authority boundary via distinct API endpoints. One pending proposal per training_goal_id (unique partial index). 14-day expiration window. Plain English rationale stored with each proposal.
+**Read for:** regeneration trigger conditions; proposal/confirm/decline API contracts; authority boundary enforcement; expiration handling.
+
 ---
 
 ## 02-computations/
@@ -192,7 +196,7 @@ Aerobic, neuromuscular, and structural load formulas. Calibration eligibility fi
 **Read for:** exact load formulas; calibration eligibility rules.
 
 ### `02-computations/banister-update.md`
-Banister impulse-response update formula. Population default time constants (fitness τ = 42 days, fatigue τ = 7 days). Individual time constant fitting (Phase 6d). Form-to-descriptor mapping for LLM agents. How load scores from Activity feed into fitness/fatigue scores.
+Banister impulse-response update formula. Population default time constants (fitness τ = 42 days, fatigue τ = 7 days). Individual time constant fitting. Form-to-descriptor mapping for LLM agents. How load scores from Activity feed into fitness/fatigue scores.
 **Read for:** Banister update formula; time constant semantics; individual fitting; form descriptor mapping.
 
 ### `02-computations/threshold-detection.md`
@@ -224,8 +228,8 @@ Generation 3 HMM. Why HMM fits (four reasons). Architecture: 7 states, feature v
 **Read for:** HMM architecture; why HMM was chosen; inference algorithms; model training and fallback.
 
 ### `02-computations/session-count.md`
-Deterministic session count computation from intensity bias and athlete preference. Pure Python function — no LLM reasoning required.
-**Read for:** session count rules; how intensity bias affects session count; invariant: lower of computed and preference wins.
+Deterministic session count computation from target distribution and athlete preference. Pure Python function — no LLM reasoning required.
+**Read for:** session count rules; how target distribution intensity profile affects session count; invariant: lower of computed and preference wins.
 
 ### `02-computations/plan-generation.md`
 Hub document for plan generation. Defines shared types (PhaseArcEntry, CheckpointDescriptor), inputs (PlanGenerationInputs), persistence logic (persistPlan, createFirstWeeklyPlan), and regeneration triggers. Mode-specific computation is split across four files:
@@ -279,7 +283,7 @@ Context budget ~3k–5k tokens. Generates three strategic approaches using four 
 
 ### `03-agents/hypothesis-selector-agent.md`
 
-Context budget ~4k–6k tokens. Scores and selects best approach. Synthesizes strategic framework with phase arc, race schedule, checkpoint schedule, intensity balance. Scoring: twin alignment (50%), goal fit (30%), injury safety (10%).
+Context budget ~4k–6k tokens. Scores and selects best approach. Synthesizes strategic framework with phase arc, race schedule, checkpoint schedule, intensity balance. Scoring: twin alignment (35%), goal fit (25%), objective alignment (25%), injury safety (15%).
 **Read for:** scoring criteria; constraint-first validation; framework synthesis with phase arc; checkpoint scheduling logic.
 
 ### `03-agents/pre-week-review-agent.md` (Python service)
@@ -309,8 +313,8 @@ End-to-end event flow diagram from athlete action to coach message. Scheduled ta
 **Read for:** the full pipeline wiring; which events trigger which tasks; ordering guarantees.
 
 ### `04-platform/versioning-and-reprocessing.md`
-Version string format and registry. The reprocessing test. Supersession protocol (insert new, mark old `superseded_at`). Exception for Activity load score updates. Offline reprocessing guarantees.
-**Read for:** version string format; when to persist vs not; supersession protocol; load score exception.
+Version string format and registry. The reprocessing test. Supersession protocol (insert new, mark old `superseded_at`). Alternative pattern for Activity load scores (in-place update with version tracking). Offline reprocessing guarantees.
+**Read for:** version string format; when to persist vs not; supersession protocol; load score design rationale.
 
 ### `04-platform/storage-topology.md`
 PostgreSQL table classification (append-only vs mutable). Object storage key patterns. Redis usage (queue + cache). JSONB usage rationale. All critical indexes.

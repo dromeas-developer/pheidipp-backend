@@ -31,7 +31,7 @@ type DataTierCapabilities = {
 | 2 | Running power meter + optical HR | ✓ | ✗ | ✓ | ✓ | ✓ | HR deflection + power-to-HR ratio only | Very strong for load. No RR for inflection detection. |
 | 3 | Chest strap (RR) + GAP + GPS | ✗ | ✓ | ✓ | ✓ | ✓ | HR deflection + RR inflection | RR data available. GAP as mechanical proxy. |
 | 4 | Optical HR + GAP + GPS | ✗ | ✗ | ✓ | ✓ | ✓ | HR deflection only | Realistic baseline for core audience. Fully usable. |
-| 5 | GAP + GPS only (no HR) | ✗ | ✗ | ✓ | ✓ | ✗ | None (no HR signal) | Logged for record. Excluded from twin calibration. |
+| 5 | GAP + GPS only (no HR) | ✗ | ✗ | ✗ | ✓ | ✗ | None (no HR signal) | Logged for record. Excluded from twin calibration. |
 | 6 | Manual entry only | ✗ | ✗ | ✗ | ✗ | ✗ | None | Training record only. No analytical value. |
 
 **Key insight**: Threshold detection requires intensity variation, not just HR accuracy. Easy runs are calibration-eligible (meet the five-rule gate) but do NOT provide threshold detection evidence because they lack the intensity variation needed for HR deflection/RR inflection algorithms. A calibration-eligible easy run contributes to fitness/fatigue scores, not threshold confidence.

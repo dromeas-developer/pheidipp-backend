@@ -1,9 +1,9 @@
 # Segmentation — Generation 1 Heuristic
-
 ## Purpose
-- Defines the threshold-based heuristic segmentation algorithm (Generation 1)
+
+- Defines the threshold-based heuristic segmentation algorithm
 - Produces PhysiologicalSegment records with segmentation_version = 'heuristic-v1'
-- The simplest segmentation pipeline; used until Generation 3 HMM supersedes it
+- The simplest segmentation pipeline; used when HMM model is not yet trained or when per-athlete fine-tuning is unavailable
 
 ## Algorithm
 

@@ -106,6 +106,44 @@ CREATE INDEX idx_athlete_auths_provider_user ON athlete_auths
   WHERE provider_user_id IS NOT NULL;
 ```
 
+## Query Pattern Enforcement: Denormalized Foreign Keys
+
+### Context
+`PlannedSession` contains a denormalized `training_plan_id` FK for query performance. This field is **stale** when a plan is superseded. The authoritative reference is always `WeeklyPlan.training_plan_id`.
+
+### Invariant
+**Never filter `PlannedSession` directly by `training_plan_id`.** Always join through `WeeklyPlan`.
+
+### ❌ Incorrect Pattern
+```sql
+-- WRONG: May return sessions from superseded plans
+SELECT * FROM planned_sessions
+WHERE training_plan_id = 'uuid-here';
+```
+
+### ✅ Correct Pattern
+```sql
+-- CORRECT: Joins through WeeklyPlan (authoritative)
+SELECT ps.*
+FROM planned_sessions ps
+JOIN weekly_plans wp ON ps.weekly_plan_id = wp.id
+WHERE wp.training_plan_id = 'uuid-here';
+```
+
+### Lint Rule
+A custom lint rule (`disallow_denormalized_fk_query`) must be enforced in code review:
+- **Pattern:** Detects `WHERE training_plan_id =` on `PlannedSession` table
+- **Action:** Block merge unless query is read-only historical audit (explicitly annotated)
+- **Rationale:** Prevents accidental data staleness bugs in production queries
+
+### Exception
+Historical audit queries (e.g., "show me sessions as they were originally planned") may use the denormalized field, but must include a comment:
+```sql
+-- INTENTIONAL: Auditing historical plan snapshot, not current state
+SELECT * FROM planned_sessions
+WHERE training_plan_id = 'uuid-here';
+```
+
 ## Cross-References
 - Append-only invariant: `00-foundations/principles.md`
 - Versioning and supersession: `04-platform/versioning-and-reprocessing.md`

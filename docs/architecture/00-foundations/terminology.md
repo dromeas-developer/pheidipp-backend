@@ -86,6 +86,22 @@ type PhysiologicalIntent =
 ```
 The physiological adaptation a session targets. Each workout step has exactly one intent. This is the primary coaching abstraction — the system works directly with intents, not zones. Many:1 mapping from SessionType (16 sessions → 6 intents).
 
+### PhysiologyParameter
+```typescript
+type PhysiologyParameter =
+  | 'lt1.hr'
+  | 'lt1.power'
+  | 'lt1.pace'
+  | 'lt2.hr'
+  | 'lt2.power'
+  | 'lt2.pace'
+  | 'cp'
+  | 'vo2max.ml_kg_min'
+  | 'vo2max.power'
+  | 'max_hr'
+```
+Identifies a specific physiological parameter in event payloads and computation contexts. Dot notation reflects the nested structure of `AthletePhysiology` (e.g., `lt1.hr` is the HR-based LT1 threshold estimate). Used in `physiology_updated` and `physiology_lab_test_ingested` event payloads to specify which parameters were updated.
+
 **Compliance families:**
 - **Aerobic family** (intensity ladder): `recovery` → `low_aerobic` → `high_aerobic` → `threshold` → `vo2max`
 - **Neuromuscular family** (orthogonal): `neuromuscular`
@@ -162,6 +178,7 @@ Used when `goal_type = 'recovery'` to determine phase duration and load progress
 ```typescript
 type GoalType =
   | 'race_event'        // periodised toward specific goal; peaking, tapering, race-specific preparation
+  | 'target_performance' // gap-analysis driven; athlete sets target time; system determines date
   | 'fitness_improvement' // active development; progressive overload; measurable gains
   | 'maintenance'       // consistency-focused; habit preservation; fitness preservation
   | 'recovery'          // healing-focused; conservative load; protective coaching
@@ -170,14 +187,59 @@ type GoalType =
 ### PhaseLabel
 ```typescript
 type PhaseLabel =
-  | 'base_building'
-  | 'threshold_development'
-  | 'race_specific'
+  // Aerobic development
+  | 'aerobic_base'
+  | 'aerobic_foundation'
+  | 'aerobic_accumulation'
+  | 'aerobic_build'
+  
+  // Structural
+  | 'hill_phase'
+  | 'structural_tolerance'
+  
+  // Threshold
+  | 'threshold_build'
+  | 'threshold_peak'
+  | 'threshold_consolidation'
+  
+  // VO2max
+  | 'vo2max_development'
+  | 'vo2max_sharpening'
+  
+  // Race-specific
+  | 'special_endurance'
+  | 'specific_endurance'
+  | 'race_rehearsal'
+  
+  // Integration
+  | 'sharpening'
   | 'taper'
   | 'race_week'
+  
+  // Recovery
   | 'recovery'
+  | 'transition'
+  
+  // Maintenance
   | 'rolling_block'
+
+  // Legacy aliases (mapped to canonical labels by expansion layer)
+  | 'base_building'        // → 'aerobic_base'
+  | 'threshold_development' // → 'threshold_build'
+  | 'race_specific'        // → 'specific_endurance'
 ```
+
+Closed ontology — methodology-specific phase labels. The hypothesis agent selects from these labels to express methodology-specific phase intent. Legacy aliases (`base_building`, `threshold_development`, `race_specific`) are mapped to canonical labels by the deterministic expansion layer; new plans should use canonical labels directly.
+
+**Methodology mapping:**
+| Methodology | Typical Phase Sequence |
+|---|---|
+| Lydiard | `aerobic_base` → `hill_phase` → `anaerobic_phase` → `sharpening` |
+| Norwegian | `aerobic_foundation` → `threshold_build` → `threshold_peak` → `taper` |
+| Canova | `aerobic_build` → `special_endurance` → `specific_endurance` → `taper` |
+| Daniels | `aerobic_base` → `threshold_build` → `vo2max_development` → `sharpening` |
+| Pfitzinger | `aerobic_base` → `threshold_build` → `specific_endurance` → `taper` |
+| Hybrid | Any combination of the above, as long as the trajectory is coherent |
 
 ### CyclePhase
 ```typescript
@@ -331,34 +393,192 @@ type WorkoutComplianceSummary = {
 ```
 Session-level compliance aggregation. Combines step-level results into an overall workout assessment.
 
+### PhaseDefinition (Three-Layer Model — Adaptation Strategy Layer)
+
+The core structure that defines how a training plan progresses through phases. Replaces the former `PhaseArcEntry` as the plan-level adaptation strategy. The hypothesis agent generates 4–5 of these per hypothesis; a deterministic expansion function converts them to weekly distributions.
+
+```typescript
+type PhaseDefinition = {
+  phase: PhaseLabel                    // expanded enum — methodology-specific label
+  objective: ObjectiveCategory[]       // shared with athlete objectives (same enum)
+  weeks: number
+  distribution: {
+    low_aerobic: number                // percentage of session time (0–1)
+    high_aerobic: number
+    threshold: number
+    vo2max: number
+    neuromuscular: number
+  }
+  specificity: number                  // independent attribute (0.0–1.0); see below
+  approach: 'linear' | 'undulating' | 'block' | 'step'
+  recovery_cycle: 'frequent' | 'moderate' | 'infrequent'
+}
+```
+
+**Specificity as a separate attribute:** Specificity is a property of the stimulus, not a training zone. A marathon-pace threshold session and a generic threshold session are both threshold work but have different specificity values. It overlaps with every load type and must not be included in `distribution`.
+
+| Session | Load Type | Specificity |
+|---|---|---|
+| Easy run | low_aerobic | 0.1 |
+| Marathon pace long run | high_aerobic | 0.9 |
+| Generic threshold intervals | threshold | 0.3 |
+| Race-pace threshold | threshold | 0.9 |
+| Hill sprints | neuromuscular | 0.2 |
+
+**Approach and recovery_cycle** operate at the within-phase timescale, not the weekly timescale. They control how sessions are arranged across weeks within the phase (ascending, undulating, clustered) and how recovery windows are spaced.
+
+**ObjectiveCategory values (shared with athlete objectives):**
+```typescript
+type ObjectiveCategory =
+  | 'aerobic_base'
+  | 'threshold_quality'
+  | 'pacing_discipline'
+  | 'intensity_distribution'
+  | 'structural_tolerance'
+  | 'neuromuscular_sharpness'
+  | 'durability'
+  | 'intensity_compliance'
+  | 'recovery_efficiency'
+```
+
+**Distribution invariant:** `distribution` values across all five zones must sum to ≤ 1.0 per phase. The remaining budget is implicitly unallocated time (warmup, cooldown, transitions).
+
+### Weekly Distribution (Deterministic Expansion Output)
+
+Per-week distribution derived from phase definitions by the deterministic expansion layer. The weekly synthesis agent and pre-week review consume this, not the phase definitions directly.
+
+```typescript
+type WeeklyDistribution = {
+  week_number: number
+  distribution: {
+    low_aerobic: number
+    high_aerobic: number
+    threshold: number
+    vo2max: number
+    neuromuscular: number
+  }
+  specificity: number
+  objective: ObjectiveCategory[]
+  is_recovery_week: boolean            // derived from recovery_cycle
+}
+```
+
 ### Weekly Synthesis Types
 
 ```typescript
-type PhaseArcEntry = {
-  week_number: number
-  phase_label: PhaseLabel
-  methodology: MethodologyTraitVector
-  physiological_emphasis: string
-  intensity_bias: 'easy' | 'balanced' | 'moderate' | 'quality'
-  race_considerations?: string
-  checkpoint_intent?: string
-  target_session_count: number
+type TargetDistribution = {
+  low_aerobic: number
+  high_aerobic: number
+  threshold: number
+  vo2max: number
+  neuromuscular: number
 }
 
 type AdjustedWeeklyIntent = {
   phase_label: PhaseLabel
   methodology: MethodologyTraitVector
   physiological_emphasis: string
-  intensity_bias: 'easy' | 'balanced' | 'moderate' | 'quality'
-  session_count: number               // computed by PreWeekReviewService; weekly planner reads this
+  target_distribution: TargetDistribution  // replaces intensity_bias enum
+  target_specificity: number           // from weekly distribution
+  objective: ObjectiveCategory[]       // from phase definition
+  session_count: number                // computed by PreWeekReviewService
   adjustment_made: boolean
   adjustment_reason: string | null
   adjustment_source: 'plan_unchanged' | 'fatigue_correction' | 'schedule_constraint' | 'adaptation_acceleration' | 'checkpoint_result'
-  max_sessions: number | null         // audit: override value if one was applied (for observability)
+  distribution_adjusted: boolean       // did pre-week review modify the distribution?
+  distribution_adjustment_reason: string | null
+  max_sessions: number | null
   session_types_preferred: SessionType[] | null
   avoid_session_types: SessionType[] | null
 }
+```
 
+**Backward compatibility:** The former `intensity_bias: 'easy' | 'balanced' | 'moderate' | 'quality'` enum is replaced by `target_distribution`. The weekly synthesis agent reads the continuous distribution instead of mapping an enum to session type ratios. The `intensity_bias` values can be derived from the distribution if needed for backward-compatible consumers: `easy` ↔ `low_aerobic ≥ 0.70`, `balanced` ↔ `low_aerobic 0.60–0.70`, `moderate` ↔ `low_aerobic 0.50–0.60`, `quality` ↔ `low_aerobic < 0.50`.
+
+### Strategic Framework (Hypothesis Selector Output)
+
+```typescript
+type StrategicFramework = {
+  strategic_rationale: {
+    primary_driver: string
+    methodology_summary: string
+    risk_notes: string[]
+  }
+  
+  macrocycle_structure: string         // plain English description
+  
+  // Phase definitions — the adaptation strategy
+  phase_definitions: PhaseDefinition[]
+  
+  // Derived: weekly distributions (computed by deterministic expansion)
+  weekly_distributions: WeeklyDistribution[]
+  
+  race_schedule: RaceScheduleEntry[]
+  checkpoint_schedule: CheckpointDescriptor[]
+  phase_adjustments: PhaseAdjustment[]
+  
+  progression_model: {
+    volume: string
+    intensity: string
+  }
+  
+  recovery_model: {
+    type: string
+    structure: string
+    race_recovery: Record<string, string>
+  }
+  
+  risk_mitigations: string[]
+}
+```
+
+**Note:** `StrategicRationale.intensity_distribution` (the former static plan-wide distribution) is removed. Per-phase distributions on `PhaseDefinition[]` replace it. The rationale still explains the methodology choice and risk mitigation in plain English.
+
+### Deterministic Expansion
+
+Converts phase definitions to weekly distributions. This is a pure function — same input always produces same output.
+
+```typescript
+function expandPhasesToWeekly(phases: PhaseDefinition[]): WeeklyDistribution[] {
+  const weekly: WeeklyDistribution[] = []
+  let weekOffset = 0
+  
+  for (const phase of phases) {
+    const phaseWeeks = expandSinglePhase(phase, weekOffset)
+    weekly.push(...phaseWeeks)
+    weekOffset += phase.weeks
+  }
+  
+  return weekly
+}
+
+function expandSinglePhase(phase: PhaseDefinition, startOffset: number): WeeklyDistribution[] {
+  const weeks: WeeklyDistribution[] = []
+  
+  for (let i = 0; i < phase.weeks; i++) {
+    const weekNum = startOffset + i + 1
+    const isRecovery = isRecoveryWeek(i, phase.weeks, phase.recovery_cycle)
+    
+    weeks.push({
+      week_number: weekNum,
+      distribution: applyApproach(phase.distribution, i, phase.weeks, phase.approach, isRecovery),
+      specificity: phase.specificity,
+      objective: phase.objective,
+      is_recovery_week: isRecovery,
+    })
+  }
+  
+  return weeks
+}
+
+// approach → how distribution shifts across weeks within phase
+// recovery_cycle → which weeks are recovery weeks
+// is_recovery → shifts distribution toward easy, reduces quality proportion
+```
+
+### Weekly Plan Types
+
+```typescript
 type WeeklyPlanStatus = 'synthesised' | 'active' | 'completed'
 
 type PriorWeekSummary = {
@@ -377,8 +597,15 @@ type PriorWeekSummary = {
     confidence_changed: boolean
   }
   session_type_distribution: Record<SessionType, number>
+  actual_distribution?: {              // NEW — observed distribution for trajectory comparison
+    low_aerobic: number
+    high_aerobic: number
+    threshold: number
+    vo2max: number
+    neuromuscular: number
+  }
+  actual_specificity?: number          // NEW — observed specificity
 }
-
 ```
 
 ## Implementation Notes

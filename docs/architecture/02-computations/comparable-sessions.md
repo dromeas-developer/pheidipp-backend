@@ -42,8 +42,8 @@ function findComparableSession(
   const scored = candidates.map(candidate => {
     const candidate_twin = getTwinStateAtDate(candidate.activity_date)  // closest prior twin state
     const fitness_proximity = 1 - Math.abs(
-      candidate_twin.fitness_score - current_twin_state.fitness_score
-    ) / current_twin_state.fitness_score
+      candidate_twin.fitness - current_twin_state.fitness
+    ) / current_twin_state.fitness
 
     const duration_similarity = 1 - Math.abs(
       candidate.duration_seconds - current_activity.duration_seconds

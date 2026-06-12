@@ -93,41 +93,34 @@ function evaluateTrainingLength(input: TrainingLengthGateInput): TrainingLengthG
 
 ## Phase 1: Generate Strategic Hypotheses
 
-The LLM generates three distinct hypotheses using four primary dimensions.
+The LLM generates three distinct hypotheses using the three-layer model: trait_vector (identity) + phase_definitions (adaptation strategy).
 
 ```typescript
-type HypothesisDimensions = {
-  trait_vector: MethodologyTraitVector    // coaching philosophy expression (0.0–1.0 per trait)
-  load_distribution: {
-    low_aerobic: number                   // percentage of session time (0-1)
-    high_aerobic: number
-    threshold: number
-    vo2max: number
-    neuromuscular: number
-    recovery: number
-  }
-  approach: 'linear' | 'non_linear' | 'block' | 'undulating' | 'step' | 'exponential'
-  recovery_cycle: 'frequent' | 'infrequent' | 'micro_cycles' | 'macro_cycles'
-}
-
-// trait_vector uses the 10 fixed traits from MethodologyTraitVector (00-foundations/terminology.md)
-// Highest layer of the three-layer hierarchy: MethodologyTraitVector → PhysiologicalIntent → SessionType
-// Phase-level evolution, not weekly
-
 type StrategicHypothesis = {
   name: string
-  dimensions: HypothesisDimensions
-  phase_emphasis: PhaseDescriptor[]
-  race_considerations: RaceConsiderations
+  trait_vector: MethodologyTraitVector   // coaching philosophy identity
+  phase_definitions: PhaseDefinition[]   // adaptation strategy — 4-5 phases
   checkpoints: CheckpointDescriptor[]
   rationale: string
   risk_notes: string[]
 }
 
+// PhaseDefinition (from 00-foundations/terminology.md):
+// {
+//   phase: PhaseLabel                    // methodology-specific label
+//   objective: ObjectiveCategory[]       // shared with athlete objectives
+//   weeks: number
+//   distribution: { low_aerobic, high_aerobic, threshold, vo2max, neuromuscular }
+//   specificity: number                  // independent attribute (0.0-1.0)
+//   approach: 'linear' | 'undulating' | 'block' | 'step'
+//   recovery_cycle: 'frequent' | 'moderate' | 'infrequent'
+// }
+
 type HypothesisGenerationInput = {
   twin_state: TwinState
   twin_context: TwinContextSummary
   athlete_preferences: AthletePreferences
+  athlete_objectives: Objective[]       // from objective management — informs phase objectives
   goal: {
     description: string
     event_type: GoalEventType
@@ -145,132 +138,125 @@ type ConfidenceGap = {
 ```
 
 **Distinctness Rule:**
-Each hypothesis must differ in at least 2 of the 4 dimensions (trait_vector, load_distribution, approach, recovery_cycle).
-
-```typescript
-// How to measure difference in trait_vector:
-function traitVectorDistance(a: MethodologyTraitVector, b: MethodologyTraitVector): number {
-  const keys: (keyof MethodologyTraitVector)[] = [
-    'high_aerobic_volume', 'low_intensity_dominant', 'threshold_density',
-    'high_intensity_sparse', 'high_frequency', 'structural_durability',
-    'race_specificity', 'variety_emphasis', 'neuromuscular_support',
-    'conservative_progression'
-  ]
-  
-  return Math.sqrt(
-    keys.reduce((sum, key) => sum + Math.pow(a[key] - b[key], 2), 0)
-  )
-}
-
-function areHypothesesDistinct(
-  h1: HypothesisDimensions,
-  h2: HypothesisDimensions,
-  threshold: number = 0.5
-): boolean {
-  const trait_diff = traitVectorDistance(h1.trait_vector, h2.trait_vector)
-  const load_diff = loadDistributionDistance(h1.load_distribution, h2.load_distribution)
-  const approach_diff = h1.approach !== h2.approach ? 1 : 0
-  const recovery_diff = h1.recovery_cycle !== h2.recovery_cycle ? 1 : 0
-  
-  // At least 2 dimensions must differ significantly
-  const significant_diffs = [
-    trait_diff > threshold,
-    load_diff > threshold,
-    approach_diff > 0,
-    recovery_diff > 0
-  ].filter(Boolean).length
-  
-  return significant_diffs >= 2
-}
-```
+Each hypothesis must differ in methodology approach and phase structure, not just numeric values. At minimum:
+- Different phase labels (e.g., one uses 'threshold_build', another uses 'special_endurance')
+- Different methodology combinations (e.g., one is pure Norwegian, another is Lydiard + Canova hybrid)
+- Different specificity trajectories (e.g., one builds specificity gradually, another concentrates it in late phases)
+- Different approach patterns within phases (e.g., one uses linear progression, another uses undulating)
 
 **Generation Process:**
 1. Analyse athlete profile: strengths, weaknesses, constraints, race priorities, confidence gaps
-2. Select three distinct combinations by varying at least 2 of the 4 dimensions. Each hypothesis should represent a genuinely different coaching approach for this athlete's specific objectives and race type.
-3. For each hypothesis: justify trait_vector choices, address weaknesses, respect constraints, incorporate race calendar, schedule checkpoints
-4. Validate logical coherence: trait_vector + approach + recovery_cycle must be compatible
+2. Review athlete objectives — these should directly inform phase objectives
+3. For each hypothesis:
+   a. Select a methodology approach (single tradition or hybrid)
+   b. Design 4-5 phases using methodology-specific labels (e.g., 'aerobic_base', 'threshold_peak', 'specific_endurance')
+   c. Assign objectives to each phase (from ObjectiveCategory enum, addressing athlete gaps)
+   d. Define distribution, specificity, approach, and recovery_cycle per phase
+   e. Ensure the overall trajectory makes physiological sense (base before specificity, etc.)
+   f. Ensure hard constraints are respected
+   g. Incorporate race calendar and secondary events
+   h. Schedule checkpoints at optimal times
+4. Validate logical coherence: trait_vector should reflect the overall emphasis across all phases
 
 **Example Hypotheses for Marathon Athlete:**
 
 *Athlete Context:* Weak aerobic base (aerobic_base: improve), moderate threshold (threshold_quality: maintain), good structural tolerance (structural_tolerance: maintain), goal: marathon in 16 weeks.
 
 ```typescript
-// Hypothesis 1: "Aerobic Emphasis"
+// Hypothesis 1: "Norwegian Threshold"
 {
   trait_vector: {
-    high_aerobic_volume: 0.8,
-    low_intensity_dominant: 0.7,
-    threshold_density: 0.3,
+    threshold_density: 0.8,
+    high_frequency: 0.9,
+    high_aerobic_volume: 0.7,
+    low_intensity_dominant: 0.6,
     high_intensity_sparse: 0.1,
-    high_frequency: 0.5,
-    structural_durability: 0.4,
-    race_specificity: 0.6,
-    variety_emphasis: 0.2,
-    neuromuscular_support: 0.1,
-    conservative_progression: 0.6
-  },
-  load_distribution: {
-    low_aerobic: 0.45,
-    high_aerobic: 0.30,
-    threshold: 0.15,
-    vo2max: 0.05,
-    neuromuscular: 0.05,
-    recovery: 0.00
-  },
-  approach: 'linear',
-  recovery_cycle: 'frequent'
-}
-
-// Hypothesis 2: "Balanced Development"
-{
-  trait_vector: {
-    high_aerobic_volume: 0.6,
-    low_intensity_dominant: 0.5,
-    threshold_density: 0.5,
-    high_intensity_sparse: 0.2,
-    high_frequency: 0.6,
     structural_durability: 0.5,
     race_specificity: 0.5,
     variety_emphasis: 0.3,
     neuromuscular_support: 0.2,
-    conservative_progression: 0.5
+    conservative_progression: 0.7
   },
-  load_distribution: {
-    low_aerobic: 0.40,
-    high_aerobic: 0.25,
-    threshold: 0.20,
-    vo2max: 0.10,
-    neuromuscular: 0.05,
-    recovery: 0.00
-  },
-  approach: 'undulating',
-  recovery_cycle: 'frequent'
+  phase_definitions: [
+    { phase: 'aerobic_foundation', objective: ['aerobic_base'], weeks: 4,
+      distribution: { low_aerobic: 0.70, high_aerobic: 0.15, threshold: 0.10, vo2max: 0.03, neuromuscular: 0.02 },
+      specificity: 0.1, approach: 'linear', recovery_cycle: 'infrequent' },
+    { phase: 'threshold_build', objective: ['threshold_quality', 'aerobic_base'], weeks: 6,
+      distribution: { low_aerobic: 0.55, high_aerobic: 0.10, threshold: 0.25, vo2max: 0.05, neuromuscular: 0.05 },
+      specificity: 0.3, approach: 'undulating', recovery_cycle: 'moderate' },
+    { phase: 'threshold_peak', objective: ['threshold_quality', 'pacing_discipline'], weeks: 4,
+      distribution: { low_aerobic: 0.50, high_aerobic: 0.10, threshold: 0.30, vo2max: 0.05, neuromuscular: 0.05 },
+      specificity: 0.6, approach: 'block', recovery_cycle: 'frequent' },
+    { phase: 'taper', objective: ['pacing_discipline'], weeks: 2,
+      distribution: { low_aerobic: 0.65, high_aerobic: 0.10, threshold: 0.10, vo2max: 0.05, neuromuscular: 0.10 },
+      specificity: 0.5, approach: 'linear', recovery_cycle: 'frequent' },
+  ]
 }
 
-// Hypothesis 3: "Threshold-Forward"
+// Hypothesis 2: "Lydiard + Canova Hybrid"
 {
   trait_vector: {
-    high_aerobic_volume: 0.5,
-    low_intensity_dominant: 0.4,
-    threshold_density: 0.7,
-    high_intensity_sparse: 0.3,
+    high_aerobic_volume: 0.9,
+    race_specificity: 0.8,
+    structural_durability: 0.8,
+    low_intensity_dominant: 0.7,
+    threshold_density: 0.4,
+    high_intensity_sparse: 0.2,
+    high_frequency: 0.6,
+    variety_emphasis: 0.5,
+    neuromuscular_support: 0.4,
+    conservative_progression: 0.6
+  },
+  phase_definitions: [
+    { phase: 'aerobic_base', objective: ['aerobic_base', 'structural_tolerance'], weeks: 5,
+      distribution: { low_aerobic: 0.80, high_aerobic: 0.10, threshold: 0.05, vo2max: 0.03, neuromuscular: 0.02 },
+      specificity: 0.1, approach: 'linear', recovery_cycle: 'infrequent' },
+    { phase: 'hill_phase', objective: ['structural_tolerance', 'aerobic_base'], weeks: 3,
+      distribution: { low_aerobic: 0.65, high_aerobic: 0.15, threshold: 0.10, vo2max: 0.05, neuromuscular: 0.05 },
+      specificity: 0.2, approach: 'block', recovery_cycle: 'moderate' },
+    { phase: 'special_endurance', objective: ['threshold_quality', 'durability'], weeks: 4,
+      distribution: { low_aerobic: 0.50, high_aerobic: 0.15, threshold: 0.20, vo2max: 0.05, neuromuscular: 0.10 },
+      specificity: 0.6, approach: 'undulating', recovery_cycle: 'moderate' },
+    { phase: 'specific_endurance', objective: ['pacing_discipline', 'durability'], weeks: 3,
+      distribution: { low_aerobic: 0.40, high_aerobic: 0.15, threshold: 0.15, vo2max: 0.05, neuromuscular: 0.25 },
+      specificity: 0.9, approach: 'block', recovery_cycle: 'frequent' },
+    { phase: 'taper', objective: ['pacing_discipline'], weeks: 1,
+      distribution: { low_aerobic: 0.60, high_aerobic: 0.10, threshold: 0.10, vo2max: 0.10, neuromuscular: 0.10 },
+      specificity: 0.7, approach: 'linear', recovery_cycle: 'frequent' },
+  ]
+}
+
+// Hypothesis 3: "Daniels Multi-System"
+{
+  trait_vector: {
+    threshold_density: 0.6,
+    high_aerobic_volume: 0.7,
+    variety_emphasis: 0.7,
+    low_intensity_dominant: 0.5,
+    high_intensity_sparse: 0.4,
     high_frequency: 0.5,
     structural_durability: 0.5,
-    race_specificity: 0.7,
-    variety_emphasis: 0.4,
+    race_specificity: 0.5,
     neuromuscular_support: 0.3,
-    conservative_progression: 0.4
+    conservative_progression: 0.5
   },
-  load_distribution: {
-    low_aerobic: 0.35,
-    high_aerobic: 0.20,
-    threshold: 0.25,
-    vo2max: 0.15,
-    neuromuscular: 0.05,
-    recovery: 0.00
-  },
-  approach: 'block',
-  recovery_cycle: 'micro_cycles'
+  phase_definitions: [
+    { phase: 'aerobic_base', objective: ['aerobic_base'], weeks: 4,
+      distribution: { low_aerobic: 0.70, high_aerobic: 0.15, threshold: 0.10, vo2max: 0.03, neuromuscular: 0.02 },
+      specificity: 0.1, approach: 'linear', recovery_cycle: 'moderate' },
+    { phase: 'threshold_build', objective: ['threshold_quality', 'aerobic_base'], weeks: 4,
+      distribution: { low_aerobic: 0.55, high_aerobic: 0.15, threshold: 0.20, vo2max: 0.05, neuromuscular: 0.05 },
+      specificity: 0.3, approach: 'undulating', recovery_cycle: 'moderate' },
+    { phase: 'vo2max_development', objective: ['threshold_quality', 'neuromuscular_sharpness'], weeks: 4,
+      distribution: { low_aerobic: 0.50, high_aerobic: 0.10, threshold: 0.15, vo2max: 0.15, neuromuscular: 0.10 },
+      specificity: 0.5, approach: 'undulating', recovery_cycle: 'moderate' },
+    { phase: 'sharpening', objective: ['pacing_discipline', 'neuromuscular_sharpness'], weeks: 3,
+      distribution: { low_aerobic: 0.45, high_aerobic: 0.10, threshold: 0.15, vo2max: 0.15, neuromuscular: 0.15 },
+      specificity: 0.7, approach: 'block', recovery_cycle: 'frequent' },
+    { phase: 'taper', objective: ['pacing_discipline'], weeks: 1,
+      distribution: { low_aerobic: 0.60, high_aerobic: 0.10, threshold: 0.10, vo2max: 0.10, neuromuscular: 0.10 },
+      specificity: 0.7, approach: 'linear', recovery_cycle: 'frequent' },
+  ]
 }
 ```
 
@@ -394,45 +380,44 @@ type StrategicFramework = {
     risk_notes: string[]
   }
   
-  macrocycle_structure: string    // plain English description
+  macrocycle_structure: string       // plain English description
   
-  // Phase arc from LLM — strategic intent per week, no session-level detail
-  phase_arc: PhaseArcEntry[]
+  // Phase definitions — the adaptation strategy (from selected hypothesis)
+  phase_definitions: PhaseDefinition[]
+  
+  // Derived: per-week distributions (computed by deterministic expansion)
+  weekly_distributions: WeeklyDistribution[]
   
   race_schedule: RaceScheduleEntry[]
   checkpoint_schedule: CheckpointDescriptor[]
   phase_adjustments: PhaseAdjustment[]
   
-  intensity_distribution: {
-    low_aerobic: number            // percentage of session time (0-1)
-    high_aerobic: number
-    threshold: number
-    vo2max: number
-    neuromuscular: number
-    recovery: number
-  }
+  // Note: intensity_distribution removed — replaced by per-phase distributions on phase_definitions
   
   progression_model: {
-    volume: string    // plain English progression rules
+    volume: string
     intensity: string
   }
   
   recovery_model: {
-    type: string      // recovery cycle type
-    structure: string // standard structure
-    race_recovery: Record<string, string>  // per-race-type recovery
+    type: string
+    structure: string
+    race_recovery: Record<string, string>
   }
   
   risk_mitigations: string[]
 }
 
+// PhaseDefinition: see 00-foundations/terminology.md
+// WeeklyDistribution: see 00-foundations/terminology.md
+
 type RaceScheduleEntry = {
-  race: string                    // "A-race", "B-race", "C-race"
+  race: string                       // "A-race", "B-event", "C-event"
   type: GoalEventType
   week: number
   role: 'peak' | 'tune_up' | 'training'
-  taper: string                   // "2 weeks", "3 days", "none"
-  recovery: string                // "2 weeks", "5 days", "3 days"
+  taper: string
+  recovery: string
 }
 
 type PhaseAdjustment = {
@@ -446,9 +431,9 @@ type PhaseAdjustment = {
 
 ## Phase 3: Validate and Persist (Python)
 
-Python validates the LLM's phase arc against hard invariants. If valid, persists TrainingPlan and the first WeeklyPlan atomically. If invalid, returns errors for regeneration.
+Python validates the LLM's phase definitions against hard invariants. If valid, persists TrainingPlan and the first WeeklyPlan atomically. If invalid, returns errors for regeneration.
 
-The LLM owns strategic decisions — methodology, phase emphasis, intensity bias. Python only enforces non-negotiable safety rules.
+The LLM owns strategic decisions — methodology, phase emphasis, distribution. Python only enforces non-negotiable safety rules.
 
 ```typescript
 type ValidationResult = {
@@ -457,71 +442,74 @@ type ValidationResult = {
 }
 
 type ValidationError = {
-  rule: string           // e.g. "phase_arc_gap"
+  rule: string           // e.g. "phase_definitions_gap"
   description: string    // human-readable explanation
 }
 
-function validatePhaseArc(
+function validatePhaseDefinitions(
   framework: StrategicFramework,
   inputs: PlanGenerationInputs
 ): ValidationResult {
   const errors: ValidationError[] = []
   
-  // 1. Validate phase arc covers full duration without gaps or excess
-  const totalWeeks = weeksUntilGoal(inputs.training_block.goal_event_date, inputs.today)
-  const arcWeeks = framework.phase_arc.length
-  if (arcWeeks < totalWeeks) {
+  // 1. Validate phase definitions cover full duration without gaps or excess
+  const totalWeeks = weeksUntilGoal(inputs.training_goal.goal_event_date, inputs.today)
+  const definitionWeeks = framework.phase_definitions.reduce((sum, p) => sum + p.weeks, 0)
+  if (definitionWeeks < totalWeeks) {
     errors.push({
-      rule: 'phase_arc_incomplete',
-      description: `Phase arc covers ${arcWeeks} weeks but plan needs ${totalWeeks}`
+      rule: 'phase_definitions_incomplete',
+      description: `Phase definitions cover ${definitionWeeks} weeks but plan needs ${totalWeeks}`
     })
   }
-  if (arcWeeks > totalWeeks) {
+  if (definitionWeeks > totalWeeks) {
     errors.push({
-      rule: 'phase_arc_too_long',
-      description: `Phase arc covers ${arcWeeks} weeks but plan only needs ${totalWeeks}`
+      rule: 'phase_definitions_too_long',
+      description: `Phase definitions cover ${definitionWeeks} weeks but plan needs ${totalWeeks}`
     })
   }
   
-  // 2. Validate phase labels are non-overlapping and ordered
-  for (let i = 1; i < framework.phase_arc.length; i++) {
-    if (framework.phase_arc[i].week_number <= framework.phase_arc[i-1].week_number) {
+  // 2. Validate distribution sums ≤ 1.0 per phase
+  for (const phase of framework.phase_definitions) {
+    const distSum = Object.values(phase.distribution).reduce((a, b) => a + b, 0)
+    if (distSum > 1.0) {
       errors.push({
-        rule: 'phase_arc_ordering',
-        description: `Week ${framework.phase_arc[i].week_number} follows week ${framework.phase_arc[i-1].week_number}`
+        rule: 'distribution_sum_exceeded',
+        description: `Phase '${phase.phase}' distribution sums to ${distSum.toFixed(2)} (max 1.0)`
       })
     }
   }
   
-  // 3. Validate race schedule fits within phase arc
-  for (const race of framework.race_schedule) {
-    if (race.week > arcWeeks) {
+  // 3. Validate specificity range per phase
+  for (const phase of framework.phase_definitions) {
+    if (phase.specificity < 0.0 || phase.specificity > 1.0) {
       errors.push({
-        rule: 'race_outside_arc',
-        description: `${race.race} scheduled week ${race.week} but arc only covers ${arcWeeks} weeks`
+        rule: 'specificity_out_of_range',
+        description: `Phase '${phase.phase}' specificity is ${phase.specificity} (must be 0.0-1.0)`
       })
     }
   }
   
-  // 4. Validate checkpoint schedule fits within phase arc
-  for (const cp of framework.checkpoint_schedule) {
-    if (cp.week_number > arcWeeks) {
-      errors.push({
-        rule: 'checkpoint_outside_arc',
-        description: `Checkpoint at week ${cp.week_number} but arc only covers ${arcWeeks} weeks`
-      })
-    }
+  // 4. Validate phase ordering is physiologically coherent
+  // Base phases should come before race-specific phases
+  const phaseOrder = framework.phase_definitions.map(p => p.phase)
+  const lastBasePhase = phaseOrder.findLastIndex(p => 
+    p.includes('base') || p.includes('foundation') || p.includes('hill')
+  )
+  const firstSpecificPhase = phaseOrder.findIndex(p => 
+    p.includes('specific') || p.includes('sharpening')
+  )
+  if (lastBasePhase > firstSpecificPhase && firstSpecificPhase !== -1) {
+    errors.push({
+      rule: 'phase_ordering_incoherent',
+      description: 'Base/foundation phases appear after race-specific phases'
+    })
   }
   
-  // 5. Validate intensity bias is consistent with phase label
-  for (const entry of framework.phase_arc) {
-    if (entry.phase_label === 'taper' && entry.intensity_bias === 'quality') {
-      errors.push({
-        rule: 'taper_intensity_conflict',
-        description: `Taper week ${entry.week_number} cannot have quality intensity bias`
-      })
-    }
-  }
+  // 5. Validate hard training constraints
+  // (no back-to-back quality, 48h recovery — enforced at weekly synthesis level)
+  
+  // 6. Validate secondary events don't conflict with A-race taper
+  // (handled by race schedule integration)
   
   return { valid: errors.length === 0, errors }
 }
@@ -539,8 +527,8 @@ function validatePhaseArc(
 
 ## Cross-References
 
-- **Shared types and inputs:** `plan-generation.md` — PlanGenerationInputs, PhaseArcEntry, CheckpointDescriptor, persistPlan(), createFirstWeeklyPlan()
-- **TrainingPlan entity:** `01-entities/training-plan.md` — produces TrainingPlan with phase_arc, strategic_rationale, checkpoint_schedule
+- **Shared types and inputs:** `plan-generation.md` — PlanGenerationInputs, PhaseDefinition, CheckpointDescriptor, persistPlan(), createFirstWeeklyPlan()
+- **TrainingPlan entity:** `01-entities/training-plan.md` — produces TrainingPlan with phase_definitions, strategic_rationale, checkpoint_schedule
 - **Checkpoint entity:** `01-entities/checkpoint.md` — produces Checkpoint records from checkpoint_schedule
 - **WeeklyPlan entity:** `01-entities/weekly-plan.md` — first WeeklyPlan created atomically with TrainingPlan
 - **Vision plan generation:** `docs/vision/product/plan-generation.md` — strategic roadmap concept

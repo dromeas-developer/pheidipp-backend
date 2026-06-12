@@ -38,6 +38,24 @@ The vision draws a clear boundary: near-term sessions are "headline level" (no s
 ## TypeScript Schema
 
 ```typescript
+// Intermediate types used by TwinContextAssemblerService during target computation.
+// These are NOT stored — they are transient values that feed into WorkoutTarget.
+type IntentRange = {
+  signal_type: 'power' | 'gap' | 'hr'   // carries units: watts, sec/km, bpm
+  min: number | null
+  max: number | null
+  unit: string                           // 'watts', 'sec/km', 'bpm'
+  uncertainty: number                    // from PhysiologyParameterState.uncertainty; drives range width
+}
+
+// Per-threshold target ranges, keyed by threshold parameter.
+// Each IntentRange carries its own signal_type so consumers always know the unit.
+type IntentRanges = {
+  lt1: IntentRange | null   // null if lt1 confidence is LOW or no threshold data
+  lt2: IntentRange | null   // null if lt2 confidence is LOW or no threshold data
+  cp: IntentRange | null    // null if cp confidence is LOW or no critical power data
+}
+
 type TargetSet = {
   targets: WorkoutTarget[]
   description: string  // plain English; always present
@@ -56,6 +74,13 @@ type GeneratedWorkout = {
 
 type WorkoutTarget = {
   signal_type: 'power' | 'gap' | 'hr' | 'description'
+  // Modifier behaviour by signal_type:
+  //   'power'       — scaled by recovery modifier and weather adjustment
+  //   'gap'         — scaled by recovery modifier and weather adjustment (inversely: higher sec/km = slower)
+  //   'hr'          — UNCHANGED by all modifiers (HR is relative to current physiology, not to pace/power output)
+  //   'description' — UNCHANGED by all modifiers (plain language, not numeric)
+  // The two-column display (theoretical vs. adjusted) will show identical HR values when only
+  // HR targets are present — this is correct, not a bug. See wellness-modifier.md and weather-forecast.md.
   primary: {
     min: number | null
     max: number | null
@@ -72,6 +97,15 @@ type WorkoutTarget = {
 - `pace_sec_per_km` in both target sets uses GAP values only. Never raw pace.
 - `recovery_modifier_level` defaults to `green`. It is set to `amber` or `red` only when `WellnessModifierService` produces that classification.
 - `twin_state_id` records which twin version drove target generation. If the twin is recalibrated after a workout is generated, the generated workout is not retroactively updated.
+- **Idempotency over Freshness (Deliberate Tradeoff)** — Generation is idempotent for `(planned_session_id, date)`. If the twin recalibrates after workout generation, the generated workout is **not retroactively updated**. The athlete receives a workout based on the twin state at generation time.
+
+  **Rationale:** Stability — the athlete sees a consistent plan for the day. Regeneration is triggered explicitly (confidence upgrade, checkpoint completion, coach action), not on every twin update.
+
+  **Operational impact:** An athlete may execute a workout based on slightly outdated thresholds. This is acceptable because:
+  - Threshold estimates shift gradually (Bayesian posterior, prior decay 42 days)
+  - Regeneration triggers cover material changes (confidence transitions, checkpoint replans)
+  - Daily workout stability outweighs marginal threshold freshness
+  - `twin_state_id` on each `GeneratedWorkout` records which twin version drove generation, enabling staleness detection in monitoring and debugging
 
 ## Target Computation Chain
 

@@ -1,12 +1,12 @@
 # Plan Generation — Fitness Improvement Mode
-*Objective-driven rolling blocks with phase arc construction from seeded objectives.*
+*Objective-driven rolling blocks with phase definitions construction from seeded objectives.*
 
 ---
 
 ## Purpose
 
-- Defines the deterministic phase arc construction for fitness_improvement mode
-- Phase arc is constructed from the athlete's seeded objectives using `OBJECTIVE_TO_PHASE` mapping
+- Defines the deterministic phase definitions construction for fitness_improvement mode
+- Phase definitions are constructed from the athlete's seeded objectives using `OBJECTIVE_TO_PHASE` mapping
 - Block duration (6–12 weeks) is computed from objective count and twin confidence
 - See `plan-generation.md` for shared types, inputs, and regeneration triggers
 
@@ -14,80 +14,96 @@
 
 ## Objective-to-Phase Mapping
 
-Each objective category maps to a phase label, primary focus, intensity bias, and set of relevant session types:
+Each objective category maps to a phase label, distribution template, and set of relevant session types:
 
 ```typescript
 const OBJECTIVE_TO_PHASE: Record<ObjectiveCategory, {
   phase_label: PhaseLabel
   primary_focus: string
-  intensity_bias: 'easy' | 'balanced' | 'moderate' | 'quality'
+  distribution: {
+    low_aerobic: number
+    high_aerobic: number
+    threshold: number
+    vo2max: number
+    neuromuscular: number
+  }
+  specificity: number
   relevant_session_types: SessionType[]
 }> = {
   aerobic_base: {
-    phase_label: 'base_building',
+    phase_label: 'aerobic_base',
     primary_focus: 'Aerobic foundation development',
-    intensity_bias: 'easy',
-    relevant_session_types: ['easy', 'long_run', 'recovery_run']
+    distribution: { low_aerobic: 0.75, high_aerobic: 0.15, threshold: 0.05, vo2max: 0.03, neuromuscular: 0.02 },
+    specificity: 0.1,
+    relevant_session_types: ['easy_run', 'long_run', 'recovery_run']
   },
   threshold_quality: {
-    phase_label: 'threshold_development',
+    phase_label: 'threshold_build',
     primary_focus: 'Threshold capacity development',
-    intensity_bias: 'quality',
+    distribution: { low_aerobic: 0.55, high_aerobic: 0.15, threshold: 0.20, vo2max: 0.05, neuromuscular: 0.05 },
+    specificity: 0.3,
     relevant_session_types: ['threshold', 'tempo', 'fartlek']
   },
   structural_tolerance: {
-    phase_label: 'base_building',
+    phase_label: 'hill_phase',
     primary_focus: 'Structural resilience building',
-    intensity_bias: 'moderate',
-    relevant_session_types: ['easy', 'long_run', 'hill_repeats']
+    distribution: { low_aerobic: 0.65, high_aerobic: 0.15, threshold: 0.10, vo2max: 0.05, neuromuscular: 0.05 },
+    specificity: 0.2,
+    relevant_session_types: ['easy_run', 'long_run', 'hill_repeats']
   },
   pacing_discipline: {
-    phase_label: 'threshold_development',
+    phase_label: 'specific_endurance',
     primary_focus: 'Pacing consistency under fatigue',
-    intensity_bias: 'quality',
-    relevant_session_types: ['threshold', 'tempo', 'race_pace']
+    distribution: { low_aerobic: 0.50, high_aerobic: 0.15, threshold: 0.20, vo2max: 0.05, neuromuscular: 0.10 },
+    specificity: 0.7,
+    relevant_session_types: ['threshold', 'tempo', 'long_run']
   },
   neuromuscular_sharpness: {
-    phase_label: 'threshold_development',
+    phase_label: 'vo2max_development',
     primary_focus: 'Neuromuscular activation and speed',
-    intensity_bias: 'quality',
+    distribution: { low_aerobic: 0.50, high_aerobic: 0.10, threshold: 0.15, vo2max: 0.15, neuromuscular: 0.10 },
+    specificity: 0.4,
     relevant_session_types: ['vo2max', 'strides', 'hill_repeats']
   },
   durability: {
-    phase_label: 'base_building',
+    phase_label: 'aerobic_build',
     primary_focus: 'Sustained effort capacity',
-    intensity_bias: 'moderate',
+    distribution: { low_aerobic: 0.60, high_aerobic: 0.20, threshold: 0.10, vo2max: 0.05, neuromuscular: 0.05 },
+    specificity: 0.5,
     relevant_session_types: ['long_run', 'steady_state', 'medium_long_run']
   },
   intensity_distribution: {
     phase_label: 'rolling_block',
     primary_focus: 'Training load balance',
-    intensity_bias: 'balanced',
-    relevant_session_types: ['easy', 'threshold', 'vo2max']
+    distribution: { low_aerobic: 0.60, high_aerobic: 0.15, threshold: 0.15, vo2max: 0.05, neuromuscular: 0.05 },
+    specificity: 0.3,
+    relevant_session_types: ['easy_run', 'threshold', 'vo2max']
   },
   recovery_efficiency: {
     phase_label: 'rolling_block',
     primary_focus: 'Recovery and adaptation optimisation',
-    intensity_bias: 'easy',
-    relevant_session_types: ['recovery_run', 'easy', 'rest']
+    distribution: { low_aerobic: 0.80, high_aerobic: 0.10, threshold: 0.05, vo2max: 0.03, neuromuscular: 0.02 },
+    specificity: 0.1,
+    relevant_session_types: ['recovery_run', 'easy_run', 'rest']
   },
-  zone_compliance: {
+  intensity_compliance: {
     phase_label: 'rolling_block',
     primary_focus: 'Intensity discipline and targeting',
-    intensity_bias: 'balanced',
-    relevant_session_types: ['threshold', 'tempo', 'easy']
+    distribution: { low_aerobic: 0.60, high_aerobic: 0.15, threshold: 0.15, vo2max: 0.05, neuromuscular: 0.05 },
+    specificity: 0.3,
+    relevant_session_types: ['threshold', 'tempo', 'easy_run']
   }
 }
 ```
 
 ---
 
-## Block Duration Computation
+## Mesocycle Duration Computation
 
-Block duration is computed from the objective set and twin confidence level, clamped to 6–12 weeks:
+Mesocycle duration is computed from the objective set and twin confidence level, clamped to 6–12 weeks:
 
 ```typescript
-function computeBlockWeeks(
+function computeMesocycleWeeks(
   objectives: Objective[],
   confidence: TwinConfidenceLevel
 ): number {
@@ -111,15 +127,15 @@ function computeBlockWeeks(
 The block is divided into phase groups based on objective clustering. Objectives mapping to the same phase label are grouped together. Each phase group receives 2–4 weeks, with an integration phase at the end that consolidates across all objectives.
 
 ```typescript
-function buildFitnessImprovementArc(
+function buildFitnessImprovementPhases(
   objectives: Objective[],
   total_weeks: number,
   twin_state: TwinState
-): PhaseArcEntry[] {
+): PhaseDefinition[] {
 
   // Group objectives by phase compatibility
-  // aerobic_base + structural_tolerance + durability = base_building phase
-  // threshold_quality + pacing_discipline + neuromuscular_sharpness = threshold_development phase
+  // aerobic_base + structural_tolerance + durability = aerobic_base phase
+  // threshold_quality + pacing_discipline + neuromuscular_sharpness = threshold_build phase
   // Others are rolling_block (distributed across the plan)
 
   const phase_groups = groupObjectivesByPhase(objectives)
@@ -131,31 +147,32 @@ function buildFitnessImprovementArc(
 
   const week_allocation = allocateWeeks(phase_groups, total_weeks, twin_state)
 
-  // Build PhaseArcEntry for each week
-  return week_allocation.flatMap(group =>
-    Array.from({ length: group.weeks }, (_, i) => ({
-      week_number: group.start_week + i,
-      phase_label: group.phase_label,
-      methodology: deriveMethodology(group),
-      physiological_emphasis: group.objectives.map(o => o.title).join('; '),
-      intensity_bias: group.intensity_bias,
-      checkpoint_intent: i === group.weeks - 1
-        ? `Assess progress on ${group.objectives.map(o => o.title).join(', ')}`
-        : undefined,
-      target_session_count: deriveSessionCount(group, twin_state)
-    }))
-  )
+  // Build PhaseDefinition for each phase group
+  return week_allocation.map(group => {
+    const group_objectives = group.objectives.map(o => o.category as ObjectiveCategory)
+    const template = OBJECTIVE_TO_PHASE[group_objectives[0]]
+    
+    return {
+      phase: group.phase_label,
+      objective: group_objectives,
+      weeks: group.weeks,
+      distribution: template.distribution,
+      specificity: template.specificity,
+      approach: group.weeks > 4 ? 'undulating' : 'linear',
+      recovery_cycle: group.weeks > 6 ? 'moderate' : 'infrequent'
+    }
+  })
 }
 ```
 
 ---
 
-## Block Structure
+## Mesocycle Structure
 
-A block is 6–12 weeks organised into three phase groups:
+A mesocycle is 6–12 weeks organised into three phase groups:
 
 ```
-Block N (6-12 weeks, computed from objectives and confidence level)
+Mesocycle N (6-12 weeks, computed from objectives and confidence level)
   ├── Phase Group 1: Addresses objective group A (2-4 weeks)
   │   ├── Week 1-2: Introduction / adaptation
   │   └── Week 3-4: Development / consolidation
@@ -164,7 +181,7 @@ Block N (6-12 weeks, computed from objectives and confidence level)
   │   └── Week 7: Development / consolidation
   └── Phase Group 3: Integration (1-2 weeks)
       └── Week 8: Consolidation across all objectives
-      → Block N+1 begins with adjusted objectives based on Block N outcomes
+      → Mesocycle N+1 begins with adjusted objectives based on Mesocycle N outcomes
 ```
 
 ---
@@ -176,15 +193,16 @@ Checkpoints in fitness improvement mode are driven by objectives, not race calen
 ```typescript
 function generateObjectiveCheckpoints(
   objectives: Objective[],
-  phase_arc: PhaseArcEntry[]
+  phase_definitions: PhaseDefinition[]
 ): CheckpointDescriptor[] {
   const checkpoints: CheckpointDescriptor[] = []
+  const totalWeeks = phase_definitions.reduce((sum, p) => sum + p.weeks, 0)
 
   // 1. Calibration checkpoints for confidence gaps
   const confidence_gaps = identifyConfidenceGaps(twin_state)
   for (const gap of confidence_gaps) {
     if (gap.priority === 'high') {
-      const target_week = findWeekForMetric(phase_arc, gap.metric)
+      const target_week = findWeekForMetric(phase_definitions, gap.metric)
       checkpoints.push({
         type: 'calibration',
         week_number: target_week,
@@ -197,15 +215,17 @@ function generateObjectiveCheckpoints(
   }
 
   // 2. Benchmark checkpoints at phase transitions
-  for (let i = 1; i < phase_arc.length; i++) {
-    if (phase_arc[i].phase_label !== phase_arc[i-1].phase_label) {
-      const relevant_objectives = objectives.filter(o =>
-        OBJECTIVE_TO_PHASE[o.category].phase_label === phase_arc[i].phase_label
-      )
+  let running_week = 0
+  for (let i = 1; i < phase_definitions.length; i++) {
+    running_week += phase_definitions[i - 1].weeks
+    const relevant_objectives = objectives.filter(o =>
+      phase_definitions[i].objective.includes(o.category as ObjectiveCategory)
+    )
+    if (relevant_objectives.length > 0) {
       checkpoints.push({
         type: 'benchmark',
-        week_number: phase_arc[i].week_number,
-        target_date: computeDateForWeek(phase_arc[i].week_number),
+        week_number: running_week,
+        target_date: computeDateForWeek(running_week),
         target_objective_id: relevant_objectives[0]?.id,
         target_metric: deriveObjectiveMetric(relevant_objectives[0]),
         session_type: deriveBenchmarkSessionType(relevant_objectives[0]),
@@ -215,7 +235,7 @@ function generateObjectiveCheckpoints(
   }
 
   // 3. Progress review checkpoints every 3-4 weeks
-  for (let week = 4; week <= phase_arc.length; week += 3) {
+  for (let week = 4; week <= totalWeeks; week += 3) {
     checkpoints.push({
       type: 'progress_review',
       week_number: week,
@@ -319,19 +339,19 @@ function computeIntensityAllocation(
 
 ## Early Achievement Handling
 
-When all objectives are achieved mid-block, the next block is seeded immediately:
+When all objectives are achieved mid-mesocycle, the next mesocycle is seeded immediately:
 
 ```typescript
 function handleEarlyAchievement(
   objectives: Objective[],
   current_week: number,
-  block_end_week: number
+  mesocycle_end_week: number
 ): { action: 'continue' | 'renew_early'; new_objectives?: Objective[] } {
   const all_achieved = objectives.every(o => o.status === 'achieved')
 
-  if (all_achieved && current_week < block_end_week) {
-    // All objectives achieved before block ends
-    // Seed new objectives immediately and start next block
+  if (all_achieved && current_week < mesocycle_end_week) {
+    // All objectives achieved before mesocycle ends
+    // Seed new objectives immediately and start next mesocycle
     return { action: 'renew_early' }
   }
 
@@ -341,16 +361,16 @@ function handleEarlyAchievement(
 
 ---
 
-## Block Renewal
+## Mesocycle Renewal
 
-When a block completes, achieved objectives are replaced and the next block is constructed from the combined set:
+When a mesocycle completes, achieved objectives are replaced and the next mesocycle is constructed from the combined set:
 
 ```typescript
-function renewBlock(
+function renewMesocycle(
   athlete_id: string,
-  completed_block: BlockSummary,
+  completed_mesocycle: MesocycleSummary,
   current_twin: TwinState
-): { next_block: PhaseArcEntry[]; new_objectives: Objective[]; carried_objectives: Objective[] } {
+): { next_mesocycle: PhaseArcEntry[]; new_objectives: Objective[]; carried_objectives: Objective[] } {
 
   // 1. Evaluate which objectives were achieved
   const all_objectives = getActiveObjectives(athlete_id)
@@ -368,10 +388,10 @@ function renewBlock(
   // 3. Combine remaining + new (max 5 active)
   const combined = [...remaining, ...new_objectives].slice(0, 5)
 
-  // 4. Build next block from combined objectives
-  const next_block = buildFitnessImprovementArc(combined, BLOCK_SIZE_WEEKS, current_twin)
+  // 4. Build next mesocycle from combined objectives
+  const next_mesocycle = buildFitnessImprovementArc(combined, MESOCYCLE_SIZE_WEEKS, current_twin)
 
-  return { next_block, new_objectives, carried_objectives: remaining }
+  return { next_mesocycle, new_objectives, carried_objectives: remaining }
 }
 ```
 
@@ -381,8 +401,8 @@ function renewBlock(
 
 | Trigger | Condition |
 |---|---|
-| block_completed | Normal block renewal |
-| progress_plateau | 2+ consecutive blocks with no metric improvement |
+| mesocycle_completed | Normal mesocycle renewal |
+| progress_plateau | 2+ consecutive mesocycles with no metric improvement |
 | confidence_upgrade | LOW→MEDIUM or MEDIUM→HIGH |
 | persistent_disruption | >20% missed over 3 weeks |
 
@@ -390,10 +410,10 @@ function renewBlock(
 
 ## Cross-References
 
-- **Shared types and inputs:** `plan-generation.md` — PlanGenerationInputs, PhaseArcEntry, CheckpointDescriptor, persistPlan(), createFirstWeeklyPlan()
+- **Shared types and inputs:** `plan-generation.md` — PlanGenerationInputs, PhaseDefinition, CheckpointDescriptor, persistPlan(), createFirstWeeklyPlan()
 - **Objective entity:** `01-entities/objective.md` — Objective and ObjectiveUpdate schemas, seeding rules
 - **Objective management:** `02-computations/objective-management.md` — ObjectiveSeedingService.seedObjectives(), post-session evaluation
-- **TrainingPlan entity:** `01-entities/training-plan.md` — produces TrainingPlan with phase_arc, checkpoint_schedule
+- **TrainingPlan entity:** `01-entities/training-plan.md` — produces TrainingPlan with phase_definitions, weekly_distributions, checkpoint_schedule
 - **Checkpoint entity:** `01-entities/checkpoint.md` — produces Checkpoint records from checkpoint_schedule
 - **Vision goal modes:** `docs/vision/product/goal-modes.md` — coaching posture for fitness improvement mode
 - **Vision plan generation:** `docs/vision/product/plan-generation.md` — strategic roadmap concept

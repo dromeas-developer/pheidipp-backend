@@ -28,8 +28,20 @@ type AthleteAuth = {
 type AuthTokens = {
   access_token: string                // provider access token
   refresh_token: string | null        // provider refresh token
-  expires_at: string | null           // ISO 8601; when access_token expires
+  expires_at: string | null           // ISO 8601; when access_token expires; null for providers without expiry
   scope: string | null                // granted scopes
+}
+
+type RefreshToken = {
+  id: string                          // UUID, PK
+  athlete_id: string                  // UUID, FK → Athlete
+  token_hash: string                  // one-way hash; never returned or logged
+  expires_at: string                  // ISO 8601; 30 days from issuance (always set, never null)
+  revoked_at: string | null           // ISO 8601; null until rotation/revocation
+  replaced_by_refresh_token_id: string | null  // UUID of new token; populated atomically during rotation to link old→new
+  created_at: string                  // ISO 8601
+  user_agent: string | null
+  ip_address: string | null
 }
 
 type AthleteAuthCreateRequest = {
@@ -66,7 +78,11 @@ type AthleteAuthResponse = {
 - `hashed_password` is never returned by any API endpoint or included in any log. Encrypted at rest.
 - `provider_tokens` is never returned by any API endpoint or included in any log. Encrypted at rest.
 - `provider_user_id` is never returned in API responses. Used for OAuth account matching only.
+- `ip_address` in `RefreshToken` records is stored for audit only; if used for security analysis, it must be anonymized or hashed before logging.
 - Exactly one `AthleteAuth` record per athlete must have `is_primary = true`. Primary cannot be removed without reassigning.
+- Refresh tokens are rotated on every use — old token is revoked atomically with new token creation.
+- `RefreshToken` records are append-only revocation records; rotation revokes the old token and inserts a new token record.
+- Refresh tokens expire 30 days after issuance (`expires_at = created_at + 30 days`). Expired tokens are rejected even if not revoked.
 - Email provider requires `hashed_password` (bcrypt). Google provider requires `provider_tokens`. Strava provider requires both `provider_tokens` and `provider_user_id`.
 - OAuth tokens are refreshed transparently. A failed refresh marks the provider as requiring re-authentication.
 
@@ -97,6 +113,8 @@ stateDiagram-v2
 ### Consumed
 None.
 
+**Note on `refresh_token_rotated` event:** Token rotation does not emit an event. This is intentional: refresh token rotation is a high-frequency operational concern (occurs on every access token refresh) and emitting events would create unnecessary event volume. Security-relevant authentication events (`athlete_logged_in`, `auth_method_added`, `auth_method_removed`) are emitted; routine token rotation is observable via the `athlete_refresh_tokens` table audit trail and the `athlete.auth.oauth.refresh.failures.total` metric.
+
 ## APIs
 
 ```yaml
@@ -105,7 +123,7 @@ POST /auth/register
 Request:
   email: string, required, valid email
   password: string, required, min 8 chars
-  profile: { date_of_birth, sex, height_cm?, weight_kg? }
+  profile: { date_of_birth, sex, height_cm? }
 Response: 201
   athlete: AthleteResponse
   access_token: string
@@ -115,7 +133,7 @@ Note: Creates Athlete, AthleteAuth (provider=email), and AthleteProfile in singl
 POST /auth/google
 Request:
   id_token: string, required  # Google ID token from client-side OAuth flow
-  profile: { date_of_birth, sex, height_cm?, weight_kg? }
+  profile: { date_of_birth, sex, height_cm? }
 Response: 201
   athlete: AthleteResponse
   access_token: string
@@ -125,7 +143,7 @@ Note: Validates id_token with Google, extracts email/sub, creates Athlete + Athl
 POST /auth/strava
 Request:
   code: string, required  # Strava authorization code from client-side OAuth flow
-  profile: { date_of_birth, sex, height_cm?, weight_kg? }
+  profile: { date_of_birth, sex, height_cm? }
 Response: 201
   athlete: AthleteResponse
   access_token: string
@@ -159,6 +177,7 @@ Request:
 Response: 200
   access_token: string
   refresh_token: string
+Note: Rotates the refresh token atomically; the old token is invalid after response.
 
 # Account linking (requires authenticated athlete)
 POST /athletes/{athlete_id}/auth/link
@@ -207,9 +226,12 @@ Note: Only for email provider. Returns 404 if no email provider linked.
 | Data | Strategy | Consistency | Retention |
 |---|---|---|---|
 | `athlete_auths` table | mutable | strong | indefinite |
+| `athlete_refresh_tokens` table | append-only revocation ledger | strong | 30 days after `revoked_at` or `expires_at` |
 
 **Indexes:**
 - `UNIQUE (athlete_id, provider)` — one record per provider per athlete
+- `UNIQUE (token_hash)` — refresh token lookup without storing plaintext tokens
+- `INDEX (athlete_id, expires_at)` — session cleanup and audit
 - `INDEX (provider_user_id)` — OAuth account lookup (nullable; only set for OAuth providers)
 
 ## Mutation Rules

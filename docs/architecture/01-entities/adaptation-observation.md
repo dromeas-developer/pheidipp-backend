@@ -11,6 +11,13 @@
 ## TypeScript Schema
 
 ```typescript
+type RecoveryTrajectory = {
+  days_to_baseline_return: number     // Days for HRV/sleeping HR to return to personal baseline
+  hrv_suppression_depth: number       // Maximum HRV reduction magnitude (0.0-1.0 relative to baseline)
+  sleeping_hr_elevation_days: number  // Days of elevated sleeping HR above baseline
+  recovery_completeness: number       // 0.0-1.0, how fully baseline was restored (1.0 = full restoration)
+}
+
 type AdaptationObservation = {
   id: string                          // UUID, PK
   athlete_id: string                  // UUID, FK → Athlete
@@ -30,7 +37,7 @@ type AdaptationObservation = {
   total_structural_load: number
 
   // Response measurements
-  fitness_delta: number               // TwinState fitness_score change across window
+  fitness_delta: number               // TwinState fitness change across window
   fatigue_depth: number | null        // Immediate post-window fatigue magnitude (HRV suppression, sleeping HR elevation, sleep quality drop relative to baseline)
                                       // Null for recovery-period observations (no stimulus to measure fatigue against)
   recovery_trajectory: RecoveryTrajectory  // How quickly wellness signals return to personal baseline
@@ -42,6 +49,11 @@ type AdaptationObservation = {
   cycle_phase: string | null          // Current menstrual cycle phase during observation window
                                       // Required for female athletes, null for male athletes
                                       // All response dimensions are read through this lens — late luteal suppression differs from mid-follicular suppression
+  cycle_phase_computation_basis: 'default_boundaries' | 'personal_model' | null
+                                      // How cycle_phase was derived at observation time
+                                      // 'default_boundaries': 28-day population boundaries (no personal model yet)
+                                      // 'personal_model': AthleteProfile.cycle_personal_model was used
+                                      // null: male athlete or cycle_phase is null
   confidence_level: 'calibration' | 'emerging' | 'established'
     // 'calibration': < 6 weeks of data, low signal reliability
     // 'emerging': 6-8 weeks, meaningful individual signal starting to appear
@@ -101,6 +113,8 @@ This section maps adaptation-signature vision concepts to architecture fields ex
 }
 ```
 
+**Clarification:** `cycle_phase` is a contextual field on the observation, not a dimension in the yield profile. The yield profile keys are strictly `PhysiologicalIntentState` values. For female athletes, the `cycle_phase` field allows downstream consumers to weight or filter observations by phase when building the aggregate adaptation signature. For male athletes, `cycle_phase` is null and the lens is simply absent — no special handling required in the yield profile structure itself.
+
 Over multiple adaptation windows, these values build the athlete's adaptation signature. An athlete with high threshold yield gets more threshold work in the plan; an athlete with high aerobic volume yield gets more volume. See `02-computations/adaptation-signature.md`.
 
 **Weighting rules:**
@@ -117,7 +131,7 @@ Over multiple adaptation windows, these values build the athlete's adaptation si
 - 2+ quality sessions (`threshold`, `vo2max`, `tempo`, `hill_repeats`, `fartlek`, `long_run`) in the preceding 5 days followed by 2+ `easy_run` or `rest` sessions — the "hard adaptation window + recovery" pattern
 - OR: week boundaries in the `TrainingPlan.phases` array
 
-In planned training, `block_id` groups on `PlannedSession` records are the primary input for this detection. The weekly synthesis agent creates `block_id` groups precisely to generate the pattern that `AdaptationBlockDetectionTask` later identifies as adaptation windows. The `block_id` is the planning mechanism; the adaptation window is the observation purpose.
+In planned training, `block_id` groups on `PlannedSession` records are the primary input for this detection. The adaptation layer observes the recovery response to compound stimuli that Layer 2 structures through its block rules. The `block_id` is a training-structure output; the adaptation window is an observation consequence.
 
 **Unit type detection:**
 - If the detected block contains 2+ quality sessions → `unit_type = 'hard_window'`
@@ -135,17 +149,8 @@ In planned training, `block_id` groups on `PlannedSession` records are the prima
 - `fatigue_depth` must be null for `unit_type = 'recovery'` observations (no stimulus to measure fatigue against).
 - `execution_quality_delta` must be null if no quality session occurred after the recovery window.
 - `cycle_phase` is required for female athletes, null for male athletes.
+- `cycle_phase_computation_basis` is set to `'default_boundaries'` when `cycle_phase` was derived from 28-day population boundaries, `'personal_model'` when `AthleteProfile.cycle_personal_model` was used, and `null` for male athletes. This field is an audit trail — if `CyclePhaseLog` is corrected after observation creation, the stored `cycle_phase` remains stale but `cycle_phase_computation_basis` indicates which model produced it.
 - Observations with `structurally_compliant = false` should be excluded from yield profile computation or flagged with reduced weight in downstream consumers. The `compliance_deviation` text informs the severity of weight adjustment.
-
----
-
-## Events
-
-### Produced
-
-| Event | Trigger | Version | Payload |
-|---|---|---|---|
-| `adaptation_observation_created` | Record inserted | v1 | `{observation_id, adaptation_window_id, fitness_delta, days_to_baseline_return, unit_type, confidence_level}` |
 
 ---
 

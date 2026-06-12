@@ -50,13 +50,28 @@ type AthleteFitness = {
   last_activity_id: string | null     // FK → Activity; the session that last updated this record
   updated_at: string                  // ISO 8601
 }
+
+type AthleteFitnessResponse = {
+  form_descriptor: string              // plain-language readiness (e.g., "fresh", "moderate fatigue")
+  form_trend: 'improving' | 'stable' | 'declining'  // 7-day trend
+  dimensional_readiness: {
+    aerobic: string                    // plain-language descriptor
+    neuromuscular: string | null       // null if dimensional scoring not active
+    structural: string | null          // null if dimensional scoring not active
+  }
+  last_updated: string                 // ISO 8601
+}
+// This is the ONLY fitness response type. The internal AthleteFitness entity
+// (with raw scores) is NEVER serialized to athletes.
 ```
 
 ## Invariants
 - One `AthleteFitness` record per athlete. **Mutable current-state entity** — scores are updated in place on every calibration-eligible activity. Historical state is captured in `TwinState` (inline values).
 - `aggregate` is always populated. `aerobic`, `neuromuscular`, `structural` are populated when data quality permits dimension-specific scoring.
 - `form` is always a computed field (`fitness - fatigue`). It is stored for query convenience but derived value — it must always equal `fitness - fatigue`.
-- `time_constants.source` starts as `population_default`. It transitions to `individual_fitted` only once, when `TimeConstantFittingService` produces a fit with sufficient data quality. It never reverts to `population_default`.
+- `time_constants.source` starts as `population_default`. It transitions to `individual_fitted` **once** when `TimeConstantFittingService` produces a fit with sufficient data quality (≥ 12 weeks calibration-eligible data, R² threshold met). **It never reverts to `population_default`.**
+  
+  `BanisterTimeConstants.fit_quality_score` tracks R², residual variance, and prediction error on holdout. If `fit_quality_score` degrades below threshold over consecutive fittings, an alert is raised for manual review. A manual override endpoint allows admins to force `source = 'population_default'` when individual fitting produces poor results.
 - Negative `form` is valid and normal. It indicates the athlete is in a training load phase. An athlete with `form = -20` is heavily loaded but not necessarily overreached.
 
 ## Events
@@ -78,8 +93,9 @@ type AthleteFitness = {
 GET /athletes/{athlete_id}/fitness
 Response: 200
   fitness: AthleteFitnessResponse
-  # form_descriptor: string (plain language readiness; not raw scores)
-  # raw scores are not included in the response — they are internal
+  # Contains ONLY descriptors and trends — raw scores (fitness, fatigue, form numbers) are never included
+  # The numerical values are internal to the twin model
+  # Enforced by the API layer — the repository returns the full entity but the response serializer strips raw scores
 Auth: Bearer JWT, require_self
 
 GET /athletes/{athlete_id}/fitness/history
@@ -92,7 +108,7 @@ Response: 200
 Auth: Bearer JWT, require_self
 ```
 
-Note: Raw fitness/fatigue scores are never returned as numbers to the athlete. `GET /fitness` returns only the `form_descriptor` and contextual information. The numerical values are internal to the twin model.
+Note: Raw fitness/fatigue scores are never returned as numbers to the athlete. `GET /fitness` returns only the `form_descriptor`, `form_trend`, and `dimensional_readiness`. The numerical values are internal to the twin model.
 
 ## Storage Model
 | Data | Strategy | Consistency | Retention |

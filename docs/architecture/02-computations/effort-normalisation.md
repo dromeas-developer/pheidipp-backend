@@ -28,6 +28,8 @@ function computeGAP_v1(
 
 **Limitations:** Applies the same correction to every athlete regardless of individual terrain response, fatigue state, or biomechanics. A systematic approximation acknowledged throughout the system.
 
+**Known Limitation (Violates "Real Signals, Not Assumptions"):** Gen 1 remains active indefinitely for athletes who never accumulate 20+ outdoor sessions with elevation data (indoor-only athletes, treadmill runners, athletes in flat terrain). For athletes on hilly terrain, Gen 1 systematically misrepresents effort — the direction of misrepresentation depends on how the athlete's individual grade-response differs from the population mean. An athlete who loses more pace on hills than average will have uphill effort under-estimated; an athlete who handles grades better than average will have uphill effort over-estimated. Until Gen 2 activates, the system cannot distinguish between these cases. This is an accepted trade-off: the population model is a reasonable default for flat terrain but a known distortion for hilly terrain. The system prioritises not pretending to know more than it does over providing false precision. Athletes in this state should understand their GAP-adjusted paces are population approximations, not personalised measurements.
+
 ## Generation 2 — Per-Athlete Grade Response Curve
 
 **Active for:** Athletes with ≥ 20 outdoor activities with meaningful elevation data AND `AthleteProfile.gap_curve_model.r_squared >= 0.70`.
@@ -82,11 +84,28 @@ type EffortCostOutput = {
 
 ```typescript
 function selectGeneration(profile: AthleteProfile): EffortNormalisationGeneration {
-  if (profile.effort_model_version === 'personalised-v1') return 3
-  if (profile.gap_curve_model?.r_squared >= 0.70) return 2
+  // HYSTERESIS: Prevent flip-flopping at boundary
+  const gapR2 = profile.gap_curve_model?.r_squared ?? 0
+  const currentGen = profile.current_effort_generation ?? 1
+
+  if (currentGen === 3) return 3  // Never downgrade from personalised
+
+  if (currentGen === 2) {
+    if (gapR2 < 0.65) return 1    // Downgrade only if clearly worse
+    return 2
+  }
+
+  // currentGen === 1
+  if (gapR2 >= 0.70) return 2
   return 1
 }
 ```
+
+> **Documented Cliff Effect:** The original binary threshold (0.70) created jarring transitions. A model with R² = 0.69 is likely better than population defaults. The hysteresis above (upgrade at 0.70, downgrade at 0.65) provides a 0.05 buffer. This should be validated against real athlete data — the thresholds are initial defaults.
+>
+> **Gen 1 Persistence Reality:** Athletes who never meet the 20-session elevation threshold remain on Gen 1 indefinitely. There is no "timeout" or fallback to a terrain-aware heuristic. This is intentional — the system does not fabricate a per-athlete curve from insufficient data. The coach communication layer should convey this honestly when asked about pace accuracy on hills.
+
+**State ownership:** `current_effort_generation` is maintained by `GapCurveFittingService` after each fitting attempt. Consumers call `selectGeneration()` to read the current state — they do not evaluate R² directly. See `01-entities/athlete-profile.md` for the `current_effort_generation` field.
 
 ## Downstream Consumers
 
@@ -105,9 +124,9 @@ Every computation that touches pace uses the output of this service:
 
 | Version | Active when | ingestion_pipeline_version |
 |---|---|---|
-| Gen 1 static | Default | `v1-heuristic`, `v2-threshold-referenced` |
-| Gen 2 per-athlete | ≥20 outdoor sessions, R²≥0.70 | `v2-per-athlete-gap` |
-| Gen 3 personalised | ≥40 varied terrain sessions | `v3-personalised` |
+| Population | Default | `v1-heuristic`, `v2-threshold-referenced` |
+| Per-athlete | ≥20 outdoor sessions, R²≥0.70 | `v2-per-athlete-gap` |
+| Personalised | ≥40 varied terrain sessions | `v3-personalised` |
 
 ## Cross-References
 - Load computation that uses GAP: `02-computations/load-computation.md`

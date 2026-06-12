@@ -51,16 +51,41 @@ function bayesianUpdate(
 
 The 42-day time constant is deliberately aligned with the aerobic fitness time constant in the Banister model. As fitness drifts, so does the reliability of older threshold observations.
 
+### `computePosteriorUncertainty`
+
+Called by `bayesianUpdate()` to compute the `uncertainty` field on the returned `PhysiologyParameterState`. This uncertainty value drives `IntentRange` width — as evidence accumulates, ranges narrow; as evidence ages and decays, ranges widen.
+
+```typescript
+function computePosteriorUncertainty(
+  current_uncertainty: number,
+  observation_weight: number,
+  total_weight: number
+): number {
+  // Posterior uncertainty decreases as evidence accumulates
+  // Formula: σ_posterior = σ_prior * √(prior_weight / total_weight)
+  //
+  // As total_weight grows (more observations), uncertainty shrinks.
+  // A lab_test (weight 12–15) reduces uncertainty faster than
+  // training_hr_deflection (weight 1.0).
+  //
+  // Floor: uncertainty never drops below 0.5 — even with massive
+  // evidence, there is irreducible measurement noise.
+  const prior_weight = total_weight - observation_weight
+  const scaled = current_uncertainty * Math.sqrt(prior_weight / total_weight)
+  return Math.max(scaled, 0.5)
+}
+```
+
 ## Observation Weights by Source
 
 These weights determine how much each observation shifts the posterior. Higher weight = more authoritative measurement.
 
-| Source | LT1 weight | LT2 weight | FTP weight | VO2max weight | Max HR weight | Confidence Contribution |
+| Source | LT1 weight | LT2 weight | CP weight | VO2max weight | Max HR weight | Confidence Contribution |
 |---|---|---|---|---|---|---|
 | `questionnaire_estimate` | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | All metrics (low weight) |
 | `training_hr_deflection` | 1.0 | 1.0 | — | — | 0.5 | lt1_hr, lt2_hr |
 | `training_rr_inflection` | 2.5 | 2.5 | — | — | 0.5 | lt1_hr, lt2_hr (higher quality) |
-| `training_power_hr_ratio` | — | 1.0 | 1.5 | — | — | cp |
+| `training_power_hr_ratio` | — | — | 1.5 | — | — | cp |
 | `field_test` | 2.0 | 4.0 | 5.0 | 3.0 | 2.0 | Specific metric tested (lt1, lt2, or cp) |
 | `lab_test` | 12.0 | 15.0 | 10.0 | 15.0 | 8.0 | All measured metrics |
 

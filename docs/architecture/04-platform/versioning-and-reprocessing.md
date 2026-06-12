@@ -1,8 +1,9 @@
 # Versioning and Reprocessing
 
-## Purpose
 - Defines how analytical records are versioned so algorithms can improve without breaking history
 - Establishes the reprocessing protocol for upgrading historical records
+
+---
 
 ## Version Fields
 
@@ -11,13 +12,15 @@ Every analytical record carries version strings identifying the exact pipeline t
 ```typescript
 type VersionedRecord = {
   ingestion_pipeline_version: string | null   // on Activity
-  cleaning_pipeline_version: string | null    // on Activity; set after Phase 5a
+  cleaning_pipeline_version: string | null    // on Activity; set after signal cleaning runs
   segmentation_version: string | null         // on PhysiologicalSegment
   analysis_version: string | null             // on ExecutionObservation, AdaptationObservation
   model_version: string | null                // on TwinState
   prediction_method_version: string | null    // on RacePrediction
 }
 ```
+
+---
 
 ## Version String Format
 
@@ -32,6 +35,8 @@ Examples:
 
 A version string is a frozen, reproducible pipeline snapshot. It is not a mutable label.
 
+---
+
 ## The Reprocessing Test
 
 Before persisting any computed field, apply this test:
@@ -43,6 +48,8 @@ If **yes** and it is queried frequently across history windows → persist it wi
 If **no** (derived from inputs not in the FIT file, e.g. wellness signals) → persist it.
 
 Fields that pass the performance justification test: `aerobic_load`, `neuromuscular_load`, `structural_load` (queried by TwinRecalibrationService across rolling 90-day windows).
+
+---
 
 ## Supersession Protocol
 
@@ -74,6 +81,8 @@ async function reprocessActivity(
 }
 ```
 
+---
+
 ## Reprocessing Is Offline
 
 Pipeline upgrades and historical reprocessing run as offline batch jobs:
@@ -82,11 +91,49 @@ Pipeline upgrades and historical reprocessing run as offline batch jobs:
 - Once validated, new records become the primary version (old records superseded)
 - No cutover required; consuming systems read by version string
 
-## Exception: Load Score Updates
+---
 
-Load scores on `Activity` are an exception to the "insert new, supersede old" rule. Load scores are a computed field that passes the performance test, but they are not analytical outputs in the same sense as `PhysiologicalSegment` records. When the load formula improves (e.g. Gen 2 per-athlete GAP), load scores are updated in place on `Activity`. The `ingestion_pipeline_version` records which formula produced the current values.
+## Alternative Pattern: In-Place Updates with Version Tracking
 
-Rationale: load scores are frequently aggregated (rolling sums for twin recalibration). Two sets of load scores per activity (old and new) would complicate every query. The version string is the audit trail.
+Most analytical records follow the supersession pattern (insert new, mark old as superseded). Load scores on `Activity` use an **alternative pattern**: in-place updates with version tracking via `ingestion_pipeline_version`.
+
+**When to Use Each Pattern:**
+
+| Pattern | Use When | Example |
+|---------|----------|---------|
+| **Supersession** (insert new, supersede old) | Historical fidelity matters; consumers need to query "what did we believe at time T?" | `PhysiologicalSegment`, `ExecutionObservation`, `TwinState` |
+| **In-place update** (update current, track version) | Current state only matters; historical values are reconstructible from source data | `Activity` load scores, `AthletePhysiology` posterior estimates |
+
+### Load Scores: Design Rationale
+
+Load scores (`aerobic_load`, `neuromuscular_load`, `structural_load`) are updated in place on `Activity` when the formula improves. The `ingestion_pipeline_version` field records which formula produced the current values.
+
+**Why In-Place Updates for Load Scores?**
+
+1.  **Query Simplicity**: Consumers (e.g., `TwinRecalibrationService`) query rolling 90-day windows. In-place updates avoid the need for `WHERE superseded_at IS NULL` filters or joins to a history table on every query.
+2.  **Reconstructibility**: Load scores pass the reprocessing test — they can be recomputed from the FIT file (`fit_file_key`). The version string is the audit trail; the raw data is the source of truth.
+3.  **Audit Trail Integrity**: Coaching decisions are audited through `TwinState` (append-only), not through load scores. Load scores are intermediate derived values, not final analytical outputs.
+4.  **Change Frequency**: Load formula improvements are rare (once or twice per year). The marginal auditability gain of database-stored history doesn't justify permanent query complexity.
+
+**Re-Evaluation Triggers:**
+
+This pattern should be reconsidered if:
+- Load formula changes become frequent (quarterly+)
+- Regulatory/compliance requirements mandate database-stored historical values
+- Query patterns evolve to require historical load score comparison (e.g., "show me how load estimates changed over time")
+
+**Compatibility with Append-Only Principles:**
+
+This pattern is compatible with Invariant #10 ("Old analytical records are never deleted") because:
+- `TwinState` (the authoritative audit trail for coaching decisions) remains append-only
+- Load scores are intermediate computations, not final analytical records
+- The `ingestion_pipeline_version` field preserves provenance and enables reconstruction
+
+**Migration Behavior:**
+
+Existing `Activity` records have `ingestion_pipeline_version` set to the version that produced their current load scores. No backfill is required when formula versions change — new computations simply use the new version string.
+
+---
 
 ## Version Registry
 
@@ -103,6 +150,8 @@ CURRENT_VERSIONS = {
 ```
 
 When a new version is released, the constant is updated here and all subsequent records use the new version. Historical records retain their original version string.
+
+---
 
 ## Automatic Reprocessing on Algorithm Improvement
 
@@ -159,7 +208,10 @@ Coaching recommendations are always made using the best understanding available 
 
 This is analogous to how a human coach operates. A coach who learns something new about their athlete doesn't regret their previous advice — they apply the new knowledge to future decisions. The twin does the same.
 
+---
+
 ## Cross-References
+
 - fit_file_key as reprocessing anchor: `00-foundations/principles.md`
 - Version fields per entity: `01-entities/activity.md`, `01-entities/physiological-segment.md`, `01-entities/twin-state.md`
 - Ingestion pipeline task: `04-platform/async-pipeline.md`

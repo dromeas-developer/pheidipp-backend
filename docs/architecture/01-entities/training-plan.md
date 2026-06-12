@@ -4,7 +4,7 @@
 
 - The generated periodised training structure for an active TrainingGoal
 - One active plan per goal at a time; old plans are superseded, never deleted
-- Contains the phase arc (strategic intent per week), strategic rationale (race_event mode), and checkpoint schedule
+- Contains the phase definitions (adaptation strategy), weekly distributions (deterministic expansion), strategic rationale (race_event mode), and checkpoint schedule
 - Session-level detail lives on WeeklyPlan records, not on the TrainingPlan itself
 
 ## Vision ↔ Architecture Mapping
@@ -13,15 +13,15 @@ This entity implements the plan visibility vision — the macro plan view, curre
 
 | Vision UI Element (Plan Visibility) | Architecture Source | Field(s) | Notes |
 |---|---|---|---|
-| **Macro Plan View** — "The full architecture of their training plan. Each phase shown with label, duration in weeks, primary training focus." | `TrainingPlan` | `phases: PhaseDescriptor[]` | Direct mapping. `PhaseDescriptor` contains `label`, `weeks`, `primary_focus`. The phase arc (`phase_arc`) provides week-by-week strategic intent beneath the phase-level summary. |
-| **Phase Arc** — "The strategic roadmap the coach created at plan generation. What each phase is about and why." | `TrainingPlan` | `phase_arc: PhaseArcEntry[]` | Direct mapping. Each entry has `phase_label`, `physiological_emphasis`, `intensity_bias`, and optionally `race_considerations` and `checkpoint_intent`. |
+| **Macro Plan View** — "The full architecture of their training plan. Each phase shown with label, duration in weeks, primary training focus." | `TrainingPlan` | `phases: PhaseDescriptor[]` | Direct mapping. `PhaseDescriptor` contains `label`, `weeks`, `primary_focus`. Phase definitions (`phase_definitions`) provide the detailed adaptation strategy beneath the phase-level summary. |
+| **Phase Definitions** — "The strategic roadmap the coach created at plan generation. What each phase is about, how load is distributed, and why." | `TrainingPlan` | `phase_definitions: PhaseDefinition[]` | Direct mapping. Each entry has `phase` (label), `distribution`, `specificity`, `approach`, `recovery_cycle`, and `objective[]`. Weekly distributions (`weekly_distributions`) are derived by deterministic expansion. |
 | **Current Position** — "Which week and phase the athlete is currently in, how far through the phase they are, and how many weeks remain." | Derived from `TrainingPlan.phases[]` + `WeeklyPlan.week_number` + `TrainingGoal.goal_event_date` | No single field — **computed at API layer** | The today's-view API must resolve the current date against `PhaseDescriptor.start_date`/`end_date` to determine phase position. The architecture stores the data; the computation is a view-layer concern. |
 | **Near-Term Sessions** — "Next few planned sessions at headline level: session type, approximate duration, training intent." | `WeeklyPlan.sessions: WeeklySession[]` (child entity) | `session_type`, `intent_description`, `approximate_duration_minutes` | Headline-level only — no targets. Targets live on `GeneratedWorkout`, created on the day. |
 | **Today's Session** — "The specific workout with precise targets. Two-column display." | `GeneratedWorkout` (separate entity) | `theoretical_targets`, `adjusted_targets` | Composed into the today's-view API from the `GeneratedWorkout` linked to today's `PlannedSession`. |
-| **Phase Transitions** — "When the plan moves from one phase to the next, the coach acknowledges it explicitly. Brief message explaining the shift." | **Not stored on this entity** | N/A | **Runtime-generated.** Phase transition messages are produced by an agent at the point of transition, not stored on the `TrainingPlan`. The agent reads `PhaseDescriptor` for the new phase and `physiological_emphasis` to compose the message. The message is surfaced in the daily view API response for the transition day. |
+| **Phase Transitions** — "When the plan moves from one phase to the next, the coach acknowledges it explicitly. Brief message explaining the shift." | **Not stored on this entity** | N/A | **Runtime-generated.** Phase transition messages are produced by an agent at the point of transition, not stored on the `TrainingPlan`. The agent reads `PhaseDescriptor` for the new phase and `phase_definitions` for the objectives and distribution to compose the message. The message is surfaced in the daily view API response for the transition day. |
 | **Checkpoint Visibility** — "Checkpoints appear as distinct markers. Type, target metric, week." | `TrainingPlan` | `checkpoint_schedule: CheckpointDescriptor[]` | Direct mapping. `CheckpointDescriptor` has `type`, `week_number`, `target_metric`, `session_type`, `planner_message`. |
 | **Checkpoint Framing Messages** — "The coach frames checkpoints explicitly when they approach." | `CheckpointDescriptor` | `planner_message` | Partial mapping. The pre-checkpoint message is stored. The **post-checkpoint message** ("Your half-marathon confirms your threshold is around 4:10/km") is runtime-generated by an agent after checkpoint completion — not stored on this entity. |
-| **B-race / C-race Markers in Macro View** — "Secondary events appear as markers. B-races show reduced load notation." | `PhaseArcEntry` | `race_considerations?: string` | Partial mapping. `race_considerations` stores textual notes ("B-event this week, reduce pre-event"). The vision implies visual markers in the macro view — the API response must compose these from `race_considerations` and secondary event dates on `TrainingGoal`. |
+| **B-race / C-race Markers in Macro View** — "Secondary events appear as markers. B-races show reduced load notation." | `PhaseDefinition` (via `weekly_distributions`) | `race_considerations?: string` on `PhaseDescriptor` | Partial mapping. `race_considerations` on `PhaseDescriptor` stores textual notes ("B-event this week, reduce pre-event"). The weekly distributions reflect reduced load around secondary events. The vision implies visual markers in the macro view — the API response must compose these from `race_considerations` and secondary event dates on `TrainingGoal`. |
 
 ### Unmapped Vision Requirements
 
@@ -42,50 +42,45 @@ type PhaseDescriptor = {
   end_date: string        // YYYY-MM-DD
   weeks: number
   primary_focus: string   // plain English; surfaced in plan visibility API
-  weekly_session_count: number
+  weekly_session_count: number  // static plan-time value; does NOT reflect
+                                // per-week adjustments from pre-week review.
+                                // Source of truth for per-week count:
+                                // AdjustedWeeklyIntent.session_count (computed at runtime
+                                // by PreWeekReviewService via compute_session_count())
 }
 
 // PhaseLabel values: see 00-foundations/terminology.md
-
-type PhaseArcEntry = {
-  week_number: number
-  phase_label: PhaseLabel
-  methodology: MethodologyTraitVector
-  physiological_emphasis: string      // plain English; what this week is about
-  intensity_bias: 'easy' | 'balanced' | 'moderate' | 'quality'
-  race_considerations?: string        // "B-event this week, reduce pre-event"
-  checkpoint_intent?: string          // "benchmark aerobic fitness"
-  target_session_count: number        // coach's hint; availability and pre-week review may reduce
-}
 
 type TrainingPlan = {
   id: string                      // UUID, PK
   training_goal_id: string       // UUID, FK → TrainingGoal
   twin_state_id: string           // UUID, FK → TwinState (the twin version that generated this plan)
   phases: PhaseDescriptor[]       // ordered array; non-overlapping; covers full duration
-  phase_arc: PhaseArcEntry[]      // strategic intent per week; no session-level detail
+  
+  // Phase definitions — the adaptation strategy (replaces phase_arc)
+  phase_definitions: PhaseDefinition[]
+  
+  // Derived: per-week distributions (computed by deterministic expansion from phase_definitions)
+  weekly_distributions: WeeklyDistribution[]
+  
   status: TrainingPlanStatus
   superseded_at: string | null    // set when a newer plan is created for the same goal
   created_at: string              // ISO 8601
 
-  // Strategic rationale (set for race_event mode; null for other modes)
+  // Strategic rationale (set for race_event/target_performance modes; null for other modes)
   strategic_rationale: StrategicRationale | null
   
-  // Checkpoint schedule (race_event: race-calibrated; fitness_improvement: objective-targeted; maintenance: benchmark + progress_review; recovery: healing-focused progress_review + calibration)
+  // Checkpoint schedule
   checkpoint_schedule: CheckpointDescriptor[]
 }
+
+// PhaseDefinition: see 00-foundations/terminology.md
+// WeeklyDistribution: see 00-foundations/terminology.md
 
 type StrategicRationale = {
   primary_driver: string           // plain English; why this approach suits the athlete
   methodology_summary: string      // high-level approach description (internal reasoning summary)
-  intensity_distribution: {
-    low_aerobic: number            // percentage of session time (0-1)
-    high_aerobic: number
-    threshold: number
-    vo2max: number
-    neuromuscular: number
-    recovery: number
-  }
+  // Note: intensity_distribution removed — replaced by per-phase distributions on phase_definitions
   risk_notes: string[]
 }
 
@@ -96,6 +91,9 @@ type CheckpointDescriptor = {
   target_metric: string
   session_type: SessionType
   planner_message: string
+  // Target-performance mode additions:
+  trajectory_status?: 'ahead' | 'on_track' | 'behind' | 'at_risk'
+  proposal?: string              // coach-driven proposal when trajectory changes
 }
 ```
 
@@ -103,18 +101,18 @@ type CheckpointDescriptor = {
 - **One active plan per TrainingGoal at any time.** When a new plan is generated for a goal, the previous plan's `status` → `superseded` and `superseded_at` is set, atomically with the new plan's creation.
 - **Old plans are never deleted.** `superseded_at` is the only mutation on an inactive plan.
 - **`phases` is a non-overlapping, ordered array.** The combined date range covers from the plan start date to `TrainingGoal.goal_event_date` without gaps.
-- **`phase_arc` contains strategic intent only.** No session-level detail. Session schedules live on `WeeklyPlan` records. The phase arc provides the methodology, physiological emphasis, and intensity bias for each week; the weekly synthesis agent produces the actual sessions.
+- **`phase_definitions` contains the adaptation strategy.** No session-level detail. Session schedules live on `WeeklyPlan` records. Each phase definition provides the methodology, distribution, specificity, approach, recovery cycle, and objectives for the phase; the deterministic expansion converts these to weekly distributions; the weekly synthesis agent produces the actual sessions from those distributions.
 - **`twin_state_id` records which twin version produced this plan.** A plan produced at LOW confidence will have different phase structures than one produced at MEDIUM or HIGH.
-- **`strategic_rationale` is set only for `race_event` mode plans.** Contains the coach's rationale and resulting intensity distribution. Internal hypothesis exploration names are not persisted. For `fitness_improvement`, `maintenance`, and `recovery` modes, it is null.
+- **`strategic_rationale` is set only for `race_event` and `target_performance` mode plans.** Contains the coach's rationale. Internal hypothesis exploration names are not persisted. For `fitness_improvement`, `maintenance`, and `recovery` modes, it is null. The former `intensity_distribution` field on `StrategicRationale` is removed — per-phase distributions on `phase_definitions` replace it.
 - **`checkpoint_schedule` contains all checkpoints for the plan.** In `race_event` mode, checkpoints are race-calibrated. In `fitness_improvement` mode, checkpoints are objective-targeted (calibration, benchmark at phase transitions, progress review every 3–4 weeks). In `maintenance` mode, benchmarks every 8–12 weeks and progress reviews every 4 weeks. In `recovery` mode, progress reviews at each phase transition and a calibration checkpoint at Phase 3.
 
-## Phase Arc Computation
+## Phase Definitions Construction
 
-The phase arc is computed differently depending on `goal_type`:
+The phase definitions are computed differently depending on `goal_type`:
 
 ### `race_event` mode
 
-Phase structure is **LLM-derived**, not deterministic. The `PlanStructureAgent` generates strategic hypotheses that determine phase emphasis, duration, and focus areas. The resulting phase arc is synthesised from the selected hypothesis and stored in `phases`. See `02-computations/plan-generation-race.md` for the full pipeline.
+Phase structure is **LLM-derived**, not deterministic. The `HypothesisAgent` generates strategic hypotheses that determine phase emphasis, duration, and focus areas. The resulting phase definitions are synthesised from the selected hypothesis and stored in `phase_definitions`. See `02-computations/plan-generation-race.md` for the full pipeline.
 
 The strategic framework determines:
 - Phase durations and emphasis (base, build, race-specific, taper)
@@ -126,7 +124,7 @@ The strategic framework determines:
 
 Computed by `PlanGenerationService` from `TrainingBlock`. Each mode has its own computation file:
 
-**`fitness_improvement`:** Objective-driven rolling blocks. Phase arc is constructed from seeded objectives using `OBJECTIVE_TO_PHASE` mapping. Block duration (6–12 weeks) is computed from objective count and twin confidence. Blocks renew with adjusted objectives based on outcomes. See `02-computations/plan-generation-fitness-improvement.md` for the full construction pipeline.
+**`fitness_improvement`:** Objective-driven rolling blocks. Phase definitions are constructed from seeded objectives using `OBJECTIVE_TO_PHASE` mapping. Block duration (6–12 weeks) is computed from objective count and twin confidence. Blocks renew with adjusted objectives based on outcomes. See `02-computations/plan-generation-fitness-improvement.md` for the full construction pipeline.
 
 **`maintenance`:** Rolling 4-week block (weeks 1–3 consistent aerobic at easy intensity, week 4 recovery/consolidation at 60–70% volume). Hard training capped at 5–10%. No progression. Consistency metrics tracked for transition detection. See `02-computations/plan-generation-maintenance.md` for the full construction.
 
@@ -147,7 +145,7 @@ A new plan is generated (old one superseded) when:
 ### Produced
 | Event | Trigger | Version | Payload |
 |---|---|---|---|
-| `training_plan_generated` | Plan inserted | v1 | `{training_plan_id, training_goal_id, phase_count, total_weeks, supersedes_plan_id, trigger}` |
+| `training_plan_generated` | Plan inserted | v1 | `{training_plan_id, training_goal_id, phase_definitions_count, total_weeks, supersedes_plan_id, trigger}` |
 
 ### Consumed
 
@@ -171,6 +169,9 @@ Auth: Bearer JWT, require_self
 GET /athletes/{athlete_id}/plan/sessions
 Response: 200
   sessions: PlannedSessionResponse[]  # sessions from the ACTIVE WeeklyPlan (resolves through WeeklyPlan FK)
+  # Note: Only returns sessions with a non-null planned_session_id. Sessions that haven't been
+  # promoted to PlannedSession (workout not yet generated) are not included. To get the full
+  # weekly schedule including ungenerated sessions, query WeeklyPlan.sessions directly.
 Auth: Bearer JWT, require_self
 
 GET /athletes/{athlete_id}/plan/upcoming
@@ -198,13 +199,14 @@ Note: `planned_sessions` are children of `weekly_plans`, not `training_plans` di
 ## Runtime Ownership
 
 Owns:
-- Phase arc structure (strategic intent per week)
+- Phase definitions structure (adaptation strategy per phase)
+- Weekly distributions (deterministic expansion from phase definitions)
 - Supersession chain between plans
 - Strategic rationale (race_event mode only)
 - Checkpoint schedule (race_event: race-calibrated; fitness_improvement: objective-targeted; maintenance: benchmark + progress_review; recovery: healing-focused progress_review + calibration)
 
 Does Not Own:
-- Phase arc computation → `02-computations/plan-generation.md`
+- Phase definitions computation → `02-computations/plan-generation.md`
 - Strategic framework synthesis (race_event mode) → `03-agents/hypothesis-selector-agent.md`
 - Hypothesis generation (race_event mode) → `03-agents/hypothesis-agent.md`
 - Weekly session schedule → `01-entities/weekly-plan.md` and `03-agents/weekly-synthesis-agent.md`

@@ -108,6 +108,21 @@ Global Confidence Level
 
 The global `confidence_level` on TwinState is derived as the **minimum confidence of LT1 HR and LT2 HR**. This provides a simple signal for consumers that don't need per-metric detail.
 
+> ⚠️ **Design Note — When to Use Global vs Per-Metric Confidence**
+>
+> `confidence_level` (global) = `min(LT1 HR, LT2 HR)`. This is a convenience
+> signal for consumers that need a single readiness gate — plan structure,
+> race prediction availability, first-message language tier.
+>
+> `metric_confidence` (per-metric) is the primary mechanism. Use it when the
+> consumer acts on a specific metric: workout targeting (uses LT2 pace/power
+> confidence), checkpoint scheduling (targets weak metrics), post-workout
+> analysis (names exact thresholds).
+>
+> **Decision rule:** If the consumer's behaviour changes based on which
+> metric is uncertain, use per-metric. If the consumer needs a single
+> "is this athlete ready for precise coaching?" gate, use global.
+
 | Global Level | Meaning | Used By |
 |--------------|---------|---------|
 | LOW | At least one of LT1/LT2 is LOW | Plan structure, race prediction gate |

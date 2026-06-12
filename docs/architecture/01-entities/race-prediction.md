@@ -8,6 +8,14 @@
 
 ## Vision ↔ Architecture Mapping
 
+> **Product Decision — Race Prediction Is Explicitly Exposed**
+> 
+> The "coach not dashboard" principle applies to **internal physiological metrics** (CTL/ATL, fitness/fatigue scores, load breakdowns). Race prediction is an **outcome prediction** — the one number a coach *would* tell an athlete: "You're on track for 3:45."
+> 
+> This is a deliberate exception documented in `docs/vision/coach/race-prediction.md`: *"Watching it improve is one of the most quietly motivating elements."*
+> 
+> **Boundary:** The prediction is surfaced as a **single number with context** (confidence level, weather adjustment, course adjustment), not as a dashboard of internal model state. The athlete sees the *outcome*, not the *machinery*.
+
 | Vision Concept | Architecture Field / Formula | Notes |
 |---|---|---|
 | **Baseline Prediction** — "Derived from the twin's current threshold estimates, aerobic capacity indicators, and running economy signals. Assumes standard conditions." | `baseline_prediction_seconds` via `computeBaseline()` | Direct mapping. Uses `observed_pace_at_lt2_sec_per_km`, `lt1_estimate_bpm`, `lt2_estimate_bpm`, `target_distance_km`. |
@@ -126,7 +134,7 @@ function weatherAdjustment(
 ### Produced
 | Event | Trigger | Version | Payload |
 |---|---|---|---|
-| `race_prediction_updated` | New record created | v1 | `{race_prediction_id, training_block_id, baseline_prediction_seconds, confidence_level, update_trigger}` |
+| `race_prediction_updated` | New record created | v1 | `{race_prediction_id, training_goal_id, baseline_prediction_seconds, confidence_level, update_trigger}` |
 
 ### Consumed
 | Event | Action | Version |

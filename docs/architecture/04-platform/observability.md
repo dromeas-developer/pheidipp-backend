@@ -94,6 +94,8 @@ All log events use structured JSON format. Key fields on every log:
 | Condition | Threshold | Meaning |
 |---|---|---|
 | `activity.ingestion.latency_ms` p95 | > 60s | Ingestion pipeline degraded |
+| `activity.load_compute.failures` spike | > 10 in 15 minutes | Load computation systemic issue |
+| `activity.load_compute.stuck.count` | > 0 | Activities in DLQ — manual intervention needed |
 | `athlete.auth.logins.failed.total` | > 10 in 5 minutes | Possible brute force or credential stuffing |
 | `athlete.auth.oauth.refresh.failures.total` | > 5 consecutive for same provider | OAuth provider token refresh broken |
 | `intervals_icu.sync.failures` | > 5 consecutive for same athlete | Integration broken |

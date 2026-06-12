@@ -21,29 +21,136 @@ const TIER3_CATEGORIES: ObjectiveCategory[] = [
 const ALL_CATEGORIES: ObjectiveCategory[] = [
   'aerobic_base', 'threshold_quality', 'pacing_discipline',
   'intensity_distribution', 'structural_tolerance', 'neuromuscular_sharpness',
-  'durability', 'zone_compliance', 'recovery_efficiency'
+  'durability', 'intensity_compliance', 'recovery_efficiency'
 ]
+
+// Race-Type-Aware Objective Priority
+const RACE_TYPE_OBJECTIVE_PRIORITY: Record<GoalEventType, {
+  critical: ObjectiveCategory[]
+  important: ObjectiveCategory[]
+  optional: ObjectiveCategory[]
+}> = {
+  marathon: {
+    critical: ['aerobic_base', 'durability', 'pacing_discipline'],
+    important: ['threshold_quality', 'intensity_distribution'],
+    optional: ['structural_tolerance', 'intensity_compliance']
+  },
+  half_marathon: {
+    critical: ['aerobic_base', 'threshold_quality', 'pacing_discipline'],
+    important: ['intensity_distribution', 'durability'],
+    optional: ['structural_tolerance', 'neuromuscular_sharpness']
+  },
+  '10k': {
+    critical: ['threshold_quality', 'pacing_discipline', 'intensity_distribution'],
+    important: ['aerobic_base', 'neuromuscular_sharpness'],
+    optional: ['structural_tolerance', 'durability']
+  },
+  '5k': {
+    critical: ['threshold_quality', 'neuromuscular_sharpness', 'pacing_discipline'],
+    important: ['aerobic_base', 'intensity_distribution'],
+    optional: ['structural_tolerance', 'durability']
+  },
+  ultra: {
+    critical: ['aerobic_base', 'durability', 'recovery_efficiency'],
+    important: ['structural_tolerance', 'pacing_discipline'],
+    optional: ['threshold_quality', 'intensity_compliance']
+  },
+  trail_race: {
+    critical: ['aerobic_base', 'structural_tolerance', 'durability'],
+    important: ['pacing_discipline', 'recovery_efficiency'],
+    optional: ['threshold_quality', 'intensity_distribution']
+  },
+  custom: {
+    critical: ['aerobic_base', 'pacing_discipline'],
+    important: ['threshold_quality', 'structural_tolerance'],
+    optional: ['durability', 'intensity_distribution']
+  }
+}
+
+function seedTargetPerformanceObjectives(inputs: SeedingInputs): ObjectiveSeed[] {
+  const { training_goal, twin_state } = inputs
+  const race_type_priority = RACE_TYPE_OBJECTIVE_PRIORITY[training_goal.goal_event_type]
+  
+  const selected: ObjectiveSeed[] = []
+  
+  // 1. Always include critical objectives (if twin state flags them)
+  for (const category of race_type_priority.critical) {
+    if (isCategoryRelevant(category, twin_state)) {
+      selected.push({
+        category,
+        direction: getDirectionForCategory(category, twin_state),
+        session_types_relevant: deriveRelevantSessionTypes(category)
+      })
+    }
+  }
+  
+  // 2. Add important objectives if space allows (max 5 total)
+  for (const category of race_type_priority.important) {
+    if (selected.length >= 5) break
+    if (isCategoryRelevant(category, twin_state)) {
+      selected.push({
+        category,
+        direction: getDirectionForCategory(category, twin_state),
+        session_types_relevant: deriveRelevantSessionTypes(category)
+      })
+    }
+  }
+  
+  // 3. Add optional objectives if still under limit
+  for (const category of race_type_priority.optional) {
+    if (selected.length >= 5) break
+    if (isCategoryRelevant(category, twin_state)) {
+      selected.push({
+        category,
+        direction: getDirectionForCategory(category, twin_state),
+        session_types_relevant: deriveRelevantSessionTypes(category)
+      })
+    }
+  }
+  
+  // 4. Ensure at least 1 strength (maintain) objective
+  if (!selected.some(s => s.direction === 'maintain')) {
+    const strength = identifyStrength(twin_state)
+    if (strength) {
+      selected.push({
+        category: strength.category,
+        direction: 'maintain',
+        session_types_relevant: deriveRelevantSessionTypes(strength.category)
+      })
+    }
+  }
+  
+  return selected.slice(0, 5)  // enforce max 5
+}
 
 function seedObjectives(inputs: SeedingInputs): ObjectiveSeed[] {
   const available_categories = inputs.execution_observations.length > 0
     ? ALL_CATEGORIES : TIER3_CATEGORIES
 
-  // 1. Identify gaps (address_risk or improve) from TwinState and ExecutionObservation analysis
-  const gaps = identifyGaps(inputs)  // Python analysis; not LLM
+  // Goal-type-aware seeding
+  if (inputs.training_goal.goal_type === 'race_event') {
+    return seedRaceEventObjectives(inputs)
+  } else if (inputs.training_goal.goal_type === 'target_performance') {
+    return seedTargetPerformanceObjectives(inputs)
+  } else if (inputs.training_goal.goal_type === 'fitness_improvement') {
+    return seedFitnessImprovementObjectives(inputs)
+  } else if (inputs.training_goal.goal_type === 'maintenance') {
+    return seedMaintenanceObjectives(inputs)
+  } else if (inputs.training_goal.goal_type === 'recovery') {
+    return seedRecoveryObjectives(inputs)
+  }
 
-  // 2. Identify strengths (maintain)
-  const strengths = identifyStrengths(inputs)  // Python analysis; not LLM
-
-  // 3. Select at most 5 total; always include at least 1 strength
+  // Default: standard seeding
+  const gaps = identifyGaps(inputs)
+  const strengths = identifyStrengths(inputs)
   const selected_gaps = gaps.slice(0, 4)
-  const selected_strength = strengths.slice(0, 1)  // at minimum 1
+  const selected_strength = strengths.slice(0, 1)
 
   return [...selected_gaps, ...selected_strength]
     .map(seed => ({
       category: seed.category,
       direction: seed.direction,
       session_types_relevant: deriveRelevantSessionTypes(seed.category),
-      // title and description: generated by LLM (< 50 tokens each)
     }))
 }
 ```
@@ -53,7 +160,8 @@ function seedObjectives(inputs: SeedingInputs): ObjectiveSeed[] {
 ```typescript
 function evaluateObjectivePostSession(
   objective: Objective,
-  execution_observation: ExecutionObservation
+  execution_observation: ExecutionObservation,
+  athlete_profile: AthleteProfile
 ): ObjectiveUpdate {
   // Python-computed; never LLM-derived
   // Reads coaching_observations to determine direction_of_change
@@ -62,19 +170,30 @@ function evaluateObjectivePostSession(
   let direction: ObjectiveDirectionOfChange = 'stable'
   let evidence = ''
 
+  // Confidence-weighted: low confidence observations produce direction: 'stable'
+  if (execution_observation.confidence_level === 'calibration') {
+    return {
+      direction_of_change: 'stable',
+      evidence: 'Observation confidence too low to drive objective change',
+      coach_note: null
+    }
+  }
+
   switch (objective.category) {
     case 'pacing_discipline':
       const final_rep_delta = signals.final_rep_delta_pct ?? 0
-      if (Math.abs(final_rep_delta) < 3) {
+      const pacing_threshold = athlete_profile.objective_thresholds?.pacing_discipline ?? 0.03
+      if (Math.abs(final_rep_delta) < pacing_threshold) {
         direction = 'improving'; evidence = `Final rep within ${Math.abs(final_rep_delta).toFixed(1)}% of target`
-      } else if (final_rep_delta > 8) {
+      } else if (final_rep_delta > pacing_threshold * 2.5) {
         direction = 'regressing'; evidence = `Final rep ${final_rep_delta.toFixed(1)}% slower than target`
       }
       break
 
-    case 'intent_compliance':
+    case 'intensity_compliance':
       const encroachments = signals.intent_encroachment_events ?? 0
-      direction = encroachments === 0 ? 'improving' : encroachments > 3 ? 'regressing' : 'stable'
+      const encroachment_threshold = athlete_profile.objective_thresholds?.encroachment_events ?? 3
+      direction = encroachments === 0 ? 'improving' : encroachments > encroachment_threshold ? 'regressing' : 'stable'
       evidence = `${encroachments} intent encroachment event(s) detected`
       break
 
@@ -88,6 +207,20 @@ function evaluateObjectivePostSession(
   }
 }
 ```
+
+> **Per-Athlete Evaluation Thresholds:**
+> 
+> Objective evaluation uses athlete-relative thresholds, not population defaults. Each threshold is stored in `AthleteProfile.objective_thresholds` (JSON, per-category) with population defaults as fallback.
+> 
+> ```typescript
+> type ObjectiveThresholds = {
+>   pacing_discipline?: number        // default: 0.03 (3% variance)
+>   encroachment_events?: number      // default: 3 events
+>   // ... other objective categories
+> }
+> ```
+> 
+> **Confidence-weighted evaluation:** Low confidence observations (`confidence_level: 'calibration'`) produce `direction: 'stable'` regardless of magnitude. This prevents noisy early data from driving objective changes.
 
 ## Update Cadence
 
@@ -107,6 +240,8 @@ function weeklyReview(athlete_id: string): ObjectiveUpdate[] {
   // Creates 'stable' updates for objectives with no session-level signal
 }
 ```
+
+**Note on achievement speed variance:** The "3 improving updates" criterion behaves differently by objective category. High-frequency objectives (e.g., `intensity_compliance` — updated every session) may achieve in 1–2 weeks. Low-frequency objectives (e.g., `threshold_quality` — updated only on threshold sessions) may take 6+ weeks. This is intentional: achievement reflects demonstrated consistency, not calendar time. The weekly review task creates 'stable' updates for objectives with no session-level signal, ensuring low-frequency objectives still progress (albeit slowly).
 
 ## Objective Achievement
 

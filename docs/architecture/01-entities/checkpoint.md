@@ -45,6 +45,10 @@ type Checkpoint = {
   confidence_changed: boolean | null  // did confidence level change?
   replan_triggered: boolean | null   // was replanning triggered?
   
+  // Trajectory validation (target_performance mode only)
+  trajectory_status?: 'ahead' | 'on_track' | 'behind' | 'at_risk'
+  proposal?: string  // Coach-driven proposal when trajectory changes
+  
   created_at: string                 // ISO 8601
   completed_at: string | null        // ISO 8601; set when status → completed
 }

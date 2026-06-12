@@ -54,6 +54,21 @@ Proactive messages (wellness_alert, phase_transition, etc.) are typically one pa
 | `confidence_upgrade` | Confidence level increased | One per transition | null |
 | `cycle_check_in` | ~21 days since last cycle log | Rate-limited (7 days) | null |
 
+---
+
+## ProactiveMessageService
+
+`ProactiveMessageService` is the routing layer that consumes events and delegates to the appropriate agent or generates messages directly:
+
+| Event Consumed | Action | Message Type |
+|---|---|---|
+| `twin_confidence_upgraded` | `check_confidence_upgrade()` | `confidence_upgrade` |
+| `checkpoint_completed` | `check_checkpoint_result()` | `post_workout` or `plan_regeneration` |
+| `physiology_updated` (confidence change) | Check if wellness pattern warrants alert | `wellness_alert` |
+| Phase transition detected | First day of new phase | `phase_transition` |
+
+The service enforces frequency guards (rate-limiting) for proactive message types. See `02-computations/session-lifecycle.md` for checkpoint processing flow.
+
 ## Invariants
 - `content` is never modified after creation. Messages are immutable.
 - `first_message` — only one per athlete per active goal. A second call to the generation endpoint returns 409.

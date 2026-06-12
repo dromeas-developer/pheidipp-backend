@@ -13,7 +13,7 @@
 ```typescript
 type LoadComputationInputs = {
   fit_data: FitData           // from FitParserService; raw records (not averages)
-  twin_state: TwinState       // for threshold references (used from Phase 2d onward)
+  twin_state: TwinState       // for threshold references
   data_tier: DataTier
   ingestion_pipeline_version: string
 }
@@ -29,7 +29,7 @@ type LoadScores = {
 
 Measures cardiovascular and metabolic stress from sustained aerobic effort.
 
-**Phase 2b (heuristic — no threshold reference):**
+**Heuristic (no threshold reference):**
 ```typescript
 // HR reserve integration: each second weighted by exponential function of HR reserve %
 function computeAerobicLoadHeuristic(
@@ -46,7 +46,7 @@ function computeAerobicLoadHeuristic(
 }
 ```
 
-**Phase 2d onward (threshold-referenced):** Same formula; uses real `lt1_estimate_bpm` and `lt2_estimate_bpm` from TwinState instead of population estimates. `ingestion_pipeline_version` incremented.
+**Threshold-referenced:** Same formula; uses real `lt1_estimate_bpm` and `lt2_estimate_bpm` from TwinState instead of population estimates.
 
 **Tier 1-2 (power available):** Power-based computation replaces HR-based:
 ```typescript
@@ -114,13 +114,18 @@ const SURFACE_MODIFIERS = {
 }
 
 const GRADIENT_COST_FACTOR = 0.18  // per 100m elevation gain per km
+const DENSITY_PENALTY_COEFFICIENT = 0.12
+const MAX_DENSITY_PENALTY = 15  // Cap to prevent runaway feedback loop
 
 function computeStructuralLoad(inputs: StructuralLoadInputs): number {
   const { distance_m, elevation_gain_m, surface_type, recent_structural_load_72h } = inputs
   const surface_modifier = SURFACE_MODIFIERS[surface_type]
   const base = (distance_m / 1000) * surface_modifier
   const gradient_cost = (elevation_gain_m / 100) * GRADIENT_COST_FACTOR * (distance_m / 1000)
-  const density_penalty = recent_structural_load_72h * 0.12  // accumulated fatigue amplifies stress
+  const density_penalty = Math.min(
+    recent_structural_load_72h * DENSITY_PENALTY_COEFFICIENT,
+    MAX_DENSITY_PENALTY
+  )
   return base + gradient_cost + density_penalty
 }
 ```
@@ -128,6 +133,27 @@ function computeStructuralLoad(inputs: StructuralLoadInputs): number {
 Requires GPS (distance + elevation). Available from Tier 3 onward. Tier 6: null.
 
 > **Crossover athlete profile:** The density penalty (`recent_structural_load_72h * 0.12`) is specifically designed to catch athletes transitioning from swimming or cycling who carry high aerobic load tolerance but low structural load tolerance. Without this, a cardiovascular-only model would miss structural stress accumulating at a rate cardiovascular fitness masks. This profile is identified at onboarding and structural capacity development is incorporated as an explicit objective. See `docs/vision/twin/load-fatigue.md#the-crossover-athlete-profile`.
+
+> **Crossover Athlete Structural Load Adjustment:**
+> 
+> The density penalty coefficient is conditioned on the crossover athlete profile:
+> 
+> ```typescript
+> const DENSITY_PENALTY_COEFFICIENT = athlete.structural_risk_flag ? 0.08 : 0.12
+> // Lower penalty for athletes with predicted structural resilience (non-running primary background)
+> ```
+> 
+> `AthleteProfile.structural_risk_flag` is set at onboarding from `AthletePreferences.sport_background`. Marathoners (high structural tolerance relative to aerobic) receive a lower density penalty. Swimmers/cyclists transitioning to running (low structural tolerance) receive the population default.
+> 
+> **Current boundary:** `sport_background` not `running_primary` activates the crossover athlete structural capacity *ramp in plan generation* (what sessions are prescribed). The `structural_risk_flag` additionally adjusts *how load is measured*. These are separate layers — both activated by the same onboarding signal.
+
+> **Feedback Loop Bound:**
+> 
+> The density penalty creates a positive feedback loop: structural load feeds into `recent_structural_load_72h` for future sessions, causing the penalty to compound over consecutive high-load days.
+> 
+> A 100km week at 1.0 base load/day produces a day 4 density penalty of ~0.36 (acceptable). Extreme cases (ultra blocks) could produce runaway without a bound.
+> 
+> `MAX_DENSITY_PENALTY = 15` caps the feedback loop, equivalent to ~125km of recent structural load. This preserves the physiological intent (accumulated structural fatigue amplifies stress) while preventing unbounded growth.
 
 ## Calibration Eligibility Gate
 
@@ -160,14 +186,14 @@ The three load scores feed the Banister impulse-response model. The full Baniste
 // fatigue_score(t) = fatigue_score(t-1) * exp(-1/τ_fatigue) + aerobic_load
 // See 02-computations/banister-update.md for full formula, time constants, and individual fitting.
 ```
-
 ## Version History
+
 | Version | Change |
 |---|---|
 | `v1-heuristic` | Population norm threshold references |
-| `v2-threshold-referenced` | Real lt1/lt2 from TwinState (Phase 2d) |
-| `v2-per-athlete-gap` | Per-athlete GAP curve in structural load (Phase 5d) |
-| `v3-personalised` | Generation 3 effort model (Phase 6e) |
+| `v2-threshold-referenced` | Real lt1/lt2 from TwinState |
+| `v2-per-athlete-gap` | Per-athlete GAP curve in structural load |
+| `v3-personalised` | Personalised effort model |
 
 ## Cross-References
 - Effort normalisation (GAP input to formulas): `02-computations/effort-normalisation.md`

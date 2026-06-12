@@ -19,7 +19,11 @@ type SessionPriority = 'primary' | 'secondary'
 type PlannedSession = {
   id: string                       // UUID, PK
   weekly_plan_id: string           // UUID, FK → WeeklyPlan (weekly synthesis creates these)
-  training_plan_id: string         // UUID, FK → TrainingPlan (denormalized for query performance; source of truth is WeeklyPlan.training_plan_id)
+  training_plan_id: string         // UUID, FK → TrainingPlan (denormalized for query performance)
+                                   // DENORMALIZED — source of truth is WeeklyPlan.training_plan_id
+                                   // STALENESS RISK: when a plan is superseded, existing PlannedSession records retain the old training_plan_id
+                                   // CORRECT QUERY PATTERN: join via WeeklyPlan → WeeklyPlan.training_plan_id (always current)
+                                   // The index (training_plan_id, target_date, session_slot) will hit superseded plans if used directly
   target_date: string              // YYYY-MM-DD
   week_number: number              // 1-indexed; derived from WeeklyPlan
   phase_label: PhaseLabel          // derived from WeeklyPlan.adjusted_intent
@@ -66,11 +70,23 @@ type PlannedSession = {
 
 ### Block Invariants
 
-- **Block members must be consecutive dates.** Sessions in the same block must occur on consecutive training days.
-- **Block members must all be quality sessions.** Rest, recovery_run, and easy sessions cannot be block members.
-- **Block cannot span more than 3 sessions.** Prevents abuse of the block concept.
-- **Block must include recovery after the last session.** The session following a block's final session must be rest or recovery_run.
-- **Block is optional.** Consecutive quality sessions without a block_id are forbidden by the existing structural rule.
+**Training Structure Rationale (Layer 2 — standalone):**
+
+- **Block members must be consecutive dates.** Consecutive quality sessions create compound training stimuli that require structured recovery.
+- **Block members must all be quality sessions.** Rest, recovery_run, and easy sessions do not contribute to compound stimulus.
+- **Block cannot span more than 3 sessions.** Limits compound stimulus duration to prevent excessive fatigue accumulation and maintain observation window clarity.
+- **Block must include recovery after the last session.** The recovery session is part of the block structure — it completes the stimulus-recovery cycle.
+- **Block is optional.** Not all quality sessions need to be grouped; isolated quality sessions with full recovery are valid training structures.
+
+**Block Size Enforcement:**
+
+The `identifyBlockCandidates()` function MUST enforce the 3-session cap. When `currentBlock.length` reaches 3, the function MUST push the block to `candidates` and reset `currentBlock`, even if the next session is also quality. Implementation: `03-agents/weekly-synthesis-agent.md` → Block Creation Logic.
+
+**Adaptation Observation Compatibility (Layer 4 — informational):**
+
+The `block_id` groups created by the above training-structure rules are *compatible with* observation by the adaptation signature layer (Layer 4). The adaptation layer observes recovery response to these compound stimuli as adaptation windows. See `01-entities/adaptation-observation.md`.
+
+**Key Principle:** Layer 2 block rules are derived from training physiology. Layer 4 observes what Layer 2 structures. If Layer 4's detection algorithm changes, Layer 2 rules do not change — Layer 4 adapts its observation window definition.
 
 ### Structural Session Distribution Rules
 
@@ -80,9 +96,9 @@ type PlannedSession = {
 - Threshold and vo2max sessions are sandwiched between easy or rest days
 - No two quality sessions (`threshold`, `vo2max`, `tempo`, `hill_repeats`, `fartlek`, `long_run`) on consecutive dates **unless they share a `block_id`**. Blocks must include recovery after the final session.
 
-These rules serve dual purposes: they protect training quality (adequate recovery between hard efforts) and they create clean observation windows for adaptation signature learning (uninterrupted recovery signals after compound stimuli).
+These rules protect training quality (adequate recovery between hard efforts). The block rules are derived from training physiology; they are not driven by the adaptation observation layer's requirements.
 
-The `block_id` groups created by these rules are what the adaptation signature layer observes as **adaptation windows** — the atomic unit for adaptation learning. The weekly synthesis agent creates `block_id` groups of 2-3 consecutive quality sessions; the adaptation signature layer then observes the recovery response to those groups. See `01-entities/adaptation-observation.md`.
+**The `block_id` groups created by these rules are observed by the adaptation signature layer as adaptation windows.** The weekly synthesis agent creates `block_id` groups of 2-3 consecutive quality sessions; the adaptation signature layer then observes the recovery response to those groups. See `01-entities/adaptation-observation.md`.
 
 ---
 
@@ -209,6 +225,7 @@ Auth: Bearer JWT, require_self
 
 Index: `(training_plan_id, target_date, session_slot)` for plan retrieval.
 Index: `(athlete_id via plan join, status, target_date)` for upcoming session queries.
+Index: `(weekly_plan_id)` for weekly plan session lookups.
 
 ---
 
@@ -278,7 +295,17 @@ Logs:
 ## Implementation Notes
 
 - The structural rules checked during redistribution are the same rules applied during plan generation. `SessionLifecycleService.find_redistribution_window()` runs the same validation.
-- The nightly `MissedSessionSweepTask` only transitions sessions with `status = 'generated'` (workout was shown to athlete) — never `pending` sessions that were not yet due.
+- The nightly `MissedSessionSweepTask` only transitions sessions with `status = 'generated'` (workout was shown to athlete) — never `pending` sessions that were not yet due. It does not touch `WeeklySession` records that were never promoted to `PlannedSession` — those remain in `scheduled` status on the `WeeklyPlan`.
 - When `accept-substitute` is called, a `GeneratedWorkout` is created from the library entry's embedded steps. The `PlannedSession` remains linked to the original planned session — no new PlannedSession is created for a substitution.
 - Block membership is set by the weekly synthesis agent during plan creation. The agent identifies consecutive quality sessions and groups them into blocks when appropriate for adaptation learning.
 - Same-day doubles are scheduled by the weekly synthesis agent based on athlete availability. The agent respects the preference for AM primary + PM secondary ordering.
+
+---
+
+## Timezone Interpretation
+
+**All `target_date` values are stored as athlete-local dates (YYYY-MM-DD).**
+- No timezone offset stored — the date is interpreted in the athlete's `AthleteProfile.timezone`
+- API consumers must resolve display using athlete's timezone
+- Scheduled tasks (MissedSessionSweepTask, WorkoutPrefetchTask) evaluate dates in athlete's timezone
+- `WeeklyPlan` and `WeeklySession` dates follow the same convention

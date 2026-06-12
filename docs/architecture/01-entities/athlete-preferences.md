@@ -32,6 +32,7 @@ type DaySchedule = {
   available: boolean
   max_hours: number        // ignored if available = false
   long_workout: boolean    // marks the day as eligible for long run placement
+  doubles_eligible: boolean  // marks the day as eligible for AM primary + PM secondary sessions
 }
 
 type WeeklySchedule = {
@@ -67,7 +68,7 @@ type AthletePreferences = {
 - `training_time_of_day` feeds the time-of-day modifier in `WellnessModifierService`. See `02-computations/wellness-modifier.md`.
 - `hr_source` is the primary input for data tier inference. See `00-foundations/data-tiers.md`.
 - Changes to `hr_source` or `power_source` affect the data tier of the next ingested Activity but do not retroactively alter historical Activities.
-- `weekly_schedule` is stored as structured JSONB. Each day's `available` and `max_hours` directly constrain `PlanGenerationService` session distribution.
+- `weekly_schedule` is stored as structured JSONB. Each day's `available` and `max_hours` directly constrain `PlanGenerationService` session distribution. `long_workout` marks the day for long run placement. `doubles_eligible` marks the day as eligible for AM primary + PM secondary sessions.
 
 ## Data Tier Inference
 

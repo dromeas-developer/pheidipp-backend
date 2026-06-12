@@ -5,6 +5,15 @@
 - The raw input for baseline computation and recovery modifier classification
 - Populated from wearable platforms; never from questionnaires
 
+**Design Note — Registration Flow:**
+
+Body composition metrics (including `weight_kg`) are NOT collected during athlete registration. Registration collects only stable demographic data (`date_of_birth`, `sex`, `height_cm`) via `AthleteProfile`.
+
+Body composition is ingested post-registration via:
+- Automatic sync from smart scales (Garmin, Withings)
+- Manual entry through wellness endpoints
+- First-sync onboarding prompt (future work)
+
 ## TypeScript Schema
 
 ```typescript

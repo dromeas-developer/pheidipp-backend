@@ -1,56 +1,4 @@
-# Wellness Modifier — Baseline, Trend Detection, and Recovery Classification
-
-## Purpose
-- Defines how raw AthleteWellness records become the GREEN/AMBER/RED recovery modifier
-- Includes the menstrual cycle composite adjustment and weather adjustment formulas
-- Output feeds GeneratedWorkout.adjusted_targets and TwinState wellness_update trigger
-
-## Stage 1 — Baseline Computation
-
-See `01-entities/athlete-wellness-baseline.md` for the storage contract.
-
-```typescript
-// Requires minimum 14 non-null values in the past 28 calendar days
-// Uses median (not mean) — resistant to outlier nights
-// Uses IQR (not std dev) — resistant to outlier nights
-
-function computeBaseline(values: number[]): { median: number; iqr: number } | null {
-  if (values.length < 14) return null  // insufficient data
-  const sorted = [...values].sort((a, b) => a - b)
-  const q1 = sorted[Math.floor(sorted.length * 0.25)]
-  const q3 = sorted[Math.floor(sorted.length * 0.75)]
-  return {
-    median: sorted[Math.floor(sorted.length * 0.5)],
-    iqr: q3 - q1
-  }
-}
-```
-
-Computed nightly by `BaselineComputationTask` for all athletes with new wellness data. Stored in `AthleteWellnessBaseline`.
-
-## Stage 2 — Deviation Scoring
-
-```typescript
-type RollingWindows = {
-  three_night: number[]
-  seven_night: number[]
-}
-
-function computeDeviationScore(
-  rolling_avg: number,
-  baseline: AthleteWellnessBaseline,
-  signal: WellnessSignal
-): number {
-  // Normalised deviation from baseline in units of IQR
-  const raw_deviation = (rolling_avg - baseline.baseline_value) / baseline.baseline_variability
-
-  // Sign convention: positive = WORSE than baseline for both HR and HRV signals
-  const HR_SIGNALS: WellnessSignal[] = ['avg_sleeping_hr_bpm', 'min_sleeping_hr_bpm']
-  return HR_SIGNALS.includes(signal) ? raw_deviation : -raw_deviation
-}
-```
-
-## Stage 3 — Composite Scoring
+### Stage 3 — Composite Scoring
 
 Signal weights (see `01-entities/athlete-wellness-baseline.md` for the authoritative table):
 
@@ -66,7 +14,7 @@ const SIGNAL_WEIGHTS: Record<WellnessSignal, number> = {
 
 function computeCompositeScore(
   three_night_deviations: Partial<Record<WellnessSignal, number>>,
-  cycle_phase_adjustment: number  // from CyclePhaseService; 0.0 if not applicable
+  cycle_phase_adjustment_iqr: number  // IQR-normalized units, NOT flat constants
 ): number {
   let weighted_sum = 0
   let weight_total = 0
@@ -78,11 +26,15 @@ function computeCompositeScore(
     }
   }
   const signal_composite = weight_total > 0 ? weighted_sum / weight_total : 0
-  return signal_composite + cycle_phase_adjustment
+  return signal_composite + cycle_phase_adjustment_iqr
 }
 ```
 
-## Stage 4 — GREEN/AMBER/RED Classification
+**Why additive, not multiplicative:** Cycle phase represents a prospective physiological state (hormonal, thermoregulatory) that affects recovery capacity independently of whether current wellness signals show deviation. An athlete at baseline wellness during late luteal is physiologically different from the same baseline during follicular. The additive adjustment captures this floor shift.
+
+**Double-counting mitigation:** The 3-night averaging window delays signal reflection. Cycle phase adjustment captures effects that haven't yet manifested in wellness measurements. Per-phase baselines (Phase 4f+) will reduce this adjustment as individual phase-correlated patterns are learned.
+
+### Stage 4 — GREEN/AMBER/RED Classification
 
 ```typescript
 // Primary classification from 3-night window
@@ -102,7 +54,7 @@ function classifyWithInsufficientData(): RecoveryModifierLevel {
 }
 ```
 
-## Target Adjustment by Level
+### Target Adjustment by Level
 
 ```typescript
 function applyRecoveryModifier(
@@ -143,33 +95,42 @@ function applyRecoveryModifier(
 }
 ```
 
-## Menstrual Cycle Composite Adjustments
+### Menstrual Cycle Composite Adjustments
 
-Applied to `cycle_phase_adjustment` input of `computeCompositeScore`.
+Applied to `cycle_phase_adjustment_iqr` input of `computeCompositeScore`. Values represent **typical deviation from baseline in IQR units** for each phase.
 
 **Population priors** (replaced by `AthleteProfile.cycle_personal_model.phase_sensitivity` when set):
 
 ```typescript
-function getCyclePhaseAdjustment(
+function getCyclePhaseAdjustmentIQR(
   phase: CyclePhase,
   cycle_day: number,
   personal_sensitivity?: Record<CyclePhase, number>
 ): number {
-  const DEFAULT_ADJUSTMENTS: Record<CyclePhase, number> = {
-    menstrual:  cycle_day <= 2 ? 0.40 : 0.20,
+  const DEFAULT_ADJUSTMENTS_IQR: Record<CyclePhase, number> = {
+    menstrual:  cycle_day <= 2 ? 0.30 : 0.15,
     follicular: -0.10,
     ovulatory:  0.00,
-    luteal:     cycle_day >= 24 ? 0.40 : 0.20,
+    luteal:     cycle_day >= 24 ? 0.30 : 0.15,
     unknown:    0.00
   }
 
+  let base = DEFAULT_ADJUSTMENTS_IQR[phase]
+  
   if (personal_sensitivity) {
-    // Replace population prior with individual sensitivity
-    return DEFAULT_ADJUSTMENTS[phase] * personal_sensitivity[phase]
+    const sens = Math.max(0.0, Math.min(2.0, personal_sensitivity[phase] ?? 1.0))
+    base = base * sens
   }
-  return DEFAULT_ADJUSTMENTS[phase]
+  
+  return base
 }
 ```
+
+**Rationale for values:**
+- Maximum adjustment capped at 0.30 IQR — prevents baseline GREEN→AMBER transition from cycle phase alone
+- Personal sensitivity clamped to [0.0, 2.0] — prevents unrealistic amplification from noisy personalization
+- `follicular: -0.10` provides slight recovery-favorable signal consistent with physiology
+- Values calibrated to match classification boundaries: `late luteal 0.30` + baseline `0.30` = `0.60` → AMBER only with additional wellness deviation
 
 **Luteal thermoregulatory modifier** (fed into weather adjustment, not composite score):
 ```typescript
@@ -177,7 +138,7 @@ const LUTEAL_TEMP_OFFSET_C = 0.35  // midpoint of 0.3–0.5°C range
 // Added to WeatherForecast.heat_index_c before weather adjustment computation
 ```
 
-## Weather Adjustment Formulas
+### Weather Adjustment Formulas
 
 ```typescript
 const NEUTRAL_HEAT_INDEX_C = 15.0
@@ -202,7 +163,7 @@ function computeWeatherPaceAdjustment(
 
 Note: The luteal thermoregulatory modifier stacks additively with weather because the mechanisms are physiologically distinct. The same formula applies with `luteal_temp_offset_c = 0.0` for non-luteal athletes.
 
-## REM Sleep — Coaching Semantics
+### REM Sleep — Coaching Semantics
 
 REM sleep captures cognitive and emotional recovery — distinct from deep sleep's physical/tissue repair role. The vision defines REM as "relevant for motivation, perceived effort, and decision-making capacity, particularly relevant for race situations."
 
@@ -218,19 +179,19 @@ REM sleep captures cognitive and emotional recovery — distinct from deep sleep
 | Sustained REM suppression (7+ nights) | 7-night rolling avg below baseline | Flag accumulated cognitive load; suggest mindfulness of effort pacing |
 | REM + deep sleep both suppressed | Both signals below baseline simultaneously | Compound recovery deficit; system managing more than it can absorb |
 
-**REM × cycle phase interaction:** Luteal phase degrades sleep quality, likely affecting REM disproportionately (REM is concentrated in latter half of sleep, which is more disrupted by elevated core temperature). The composite score already includes a luteal cycle phase adjustment (+0.2 to +0.4). Adding a REM-specific cycle modifier would double-count the same physiological effect. REM deviation captures the luteal sleep degradation indirectly through the signal itself.
+**REM × cycle phase interaction:** Luteal phase degrades sleep quality, likely affecting REM disproportionately (REM is concentrated in latter half of sleep, which is more disrupted by elevated core temperature). The composite score already includes a luteal cycle phase adjustment (+0.15 to +0.30). Adding a REM-specific cycle modifier would double-count the same physiological effect. REM deviation captures the luteal sleep degradation indirectly through the signal itself.
 
 **REM × race preparation:** During race-prep blocks (final 2–3 weeks before a goal race), sustained REM suppression can trigger a cognitive readiness flag in coaching messages — independent of the composite GREEN/AMBER/RED. This is a coaching-layer concern (agent reasoning), not a computation-layer concern. The `WellnessModifierService` computes the composite; the coaching agent receives full wellness context including REM trends and applies race-context interpretation.
 
-## TwinState wellness_update Trigger
+### TwinState wellness_update Trigger
 
 When `WellnessModifierService` produces an AMBER or RED classification that differs from the most recent `TwinState`'s implied modifier:
 - `TwinRecalibrationService` appends a new `TwinState` with `trigger = 'wellness_update'`
 - Fitness/fatigue scores are unchanged; the new record captures updated readiness context for agent consumption
 
-## Cross-References
+### Cross-References
 
-### Vision Signal Mapping
+#### Vision Signal Mapping
 
 The following maps vision signal descriptions (`docs/vision/twin/external-modifiers.md`) to architecture computation steps. This table is the authoritative cross-reference for verifying that the architecture faithfully implements the vision's interpretation philosophy.
 
@@ -251,7 +212,7 @@ The following maps vision signal descriptions (`docs/vision/twin/external-modifi
 - Vision: "single-night anomalies treated as noise" → Architecture: 3-night rolling window inherently filters single-night outliers
 - Vision: "patterns across 7+ nights may prompt plan restructuring" → Architecture: RED classification triggers target adjustment (-15%) and wellness_update TwinState
 
-### Entity References
+#### Entity References
 - AthleteWellness raw records: `01-entities/athlete-wellness.md`
 - AthleteWellnessBaseline storage: `01-entities/athlete-wellness-baseline.md`
 - CyclePhaseLog and phase computation: `01-entities/cycle-phase-log.md`

@@ -23,6 +23,8 @@ Idempotent: yes (deduplicated by `external_id`)
 Retry: up to 5 times with exponential backoff
 Timeout: 120s
 
+**Note on signal cleaning dependency:** `TwinRecalibrationTask` is enqueued BEFORE signal cleaning completes. `ThresholdDetectionService` within that task uses raw HR data for HR deflection algorithms (Tiers 2–4). For RR inflection detection (Tiers 1–3), the task waits for `RawSensorStream` to be available. If `RawSensorStream` is not yet stored, RR inflection is skipped for that session — the HR deflection result is still applied.
+
 **`IntervalsIcuSyncTask`**
 Trigger: scheduled (every 4h) + on-demand
 Steps: for each connected athlete → fetch new activities since cursor → enqueue FitIngestionTask per activity → update sync cursor
@@ -66,14 +68,14 @@ Timeout: 30s
 
 **`PostWorkoutTask`**
 Trigger: `session_completed` event
-Steps: wait for ExecutionAnalysisTask completion → run ObjectiveUpdateService → run ComparableSessionService → assemble context → call PostWorkoutAgent → write CoachingMessage
-Dependencies: ExecutionAnalysisTask must complete first (poll or event-based)
+Steps: wait for `execution_analysis_completed` event → run ObjectiveUpdateService → run ComparableSessionService → assemble context → call PostWorkoutAgent → write CoachingMessage
+Dependencies: ExecutionAnalysisTask must complete first. PostWorkoutTask waits for `execution_analysis_completed` event with a 2-minute timeout. If timeout expires, the task proceeds without ExecutionObservation (agent uses compliance-only context).
 Retry: up to 2 times (LLM calls are not idempotent; limited retries)
 Timeout: 60s
 
 **`WorkoutPrefetchTask`**
-Trigger: scheduled (18h before each athlete's training window)
-Steps: for each athlete with a pending session tomorrow → fetch weather → run WorkoutGenerationAgent → store GeneratedWorkout
+Trigger: scheduled (18h before each athlete's training window start in athlete local time)
+Steps: for each athlete with a pending session tomorrow (athlete local date) → fetch weather (for athlete local date) → run WorkoutGenerationAgent → store GeneratedWorkout
 Retry: up to 2 times
 Timeout: 30s per athlete
 
@@ -87,8 +89,12 @@ Retry: per-athlete; failed athletes skipped and retried next night
 
 **`MissedSessionSweepTask`**
 Trigger: scheduled (daily 06:00 UTC)
-Steps: transition `generated` sessions with `target_date < today` to `missed` → create wellness_alert CoachingMessage for affected athletes
-Timeout: 30s
+Steps:
+  - For each athlete with `generated` sessions:
+    - Compute athlete's current local date: `now().setZone(athlete.timezone).toISODate()`
+    - Transition sessions where `target_date < athlete_local_date` to `missed`
+  - Create wellness_alert CoachingMessage for affected athletes
+Timeout: 60s batch
 
 **`GapCurveFittingTask`**
 Trigger: after FitIngestionTask when athlete reaches 20+ outdoor sessions

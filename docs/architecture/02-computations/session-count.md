@@ -3,7 +3,7 @@
 ## Purpose
 
 - Deterministic Python function that computes the number of sessions for a given week
-- Inputs: `PhaseArcEntry.target_session_count` (coach's hint) + availability constraints
+- Inputs: `AdjustedWeeklyIntent.target_session_count` (coach's hint) + `target_distribution` (continuous) + availability constraints
 - Output: integer session count
 - This is pure Python — no LLM reasoning required
 - The coach decides the load; availability is a constraint
@@ -15,10 +15,11 @@
 ```python
 @dataclass
 class SessionCountInput:
-    target_session_count: int   # from PhaseArcEntry.target_session_count (coach's hint)
-    intensity_bias: str         # 'easy' | 'balanced' | 'moderate' | 'quality'
+    target_session_count: int   # from WeeklyDistribution or PhaseDescriptor (coach's hint)
+    target_distribution: dict   # from AdjustedWeeklyIntent.target_distribution (continuous)
     max_available: int          # derived from AthletePreferences.weekly_schedule at runtime
     max_sessions: int | None    # from AdjustedWeeklyIntent (pre-week review override)
+    is_recovery_week: bool      # from WeeklyDistribution.is_recovery_week
 ```
 
 ---
@@ -52,28 +53,31 @@ def compute_session_count(input: SessionCountInput) -> int:
     """Compute session count for a week.
 
     Resolution order:
-    1. Start with plan target (coach's hint from phase arc)
-    2. Adjust based on intensity bias (easy reduces, quality caps)
+    1. Start with plan target (coach's hint from weekly distribution)
+    2. Adjust based on intensity profile (high aerobic → more sessions, threshold → fewer)
     3. Cap at max available sessions (derived from weekly_schedule)
     4. Override with max_sessions if pre-week review set it
     """
     # Start with plan target
     base_count = input.target_session_count
 
-    # Adjust based on intensity bias
+    # Adjust based on target_distribution intensity profile
+    # High aerobic emphasis → maintain or increase session count
+    # High threshold/vo2max emphasis → cap to ensure recovery
     # Floor of 3 for easy weeks = coach's preferred minimum before availability capping.
     # Availability (max_available) may reduce further — that's the hard constraint.
-    match input.intensity_bias:
-        case "easy":
-            computed = max(3, base_count - 1)
-        case "balanced":
-            computed = base_count
-        case "moderate":
-            computed = base_count
-        case "quality":
-            computed = min(5, base_count)
-        case _:
-            computed = base_count
+    dist = input.target_distribution
+    intensity_load = dist.threshold + dist.vo2max + dist.neuromuscular
+    
+    if intensity_load > 0.3:
+        # High-intensity heavy week → cap to ensure recovery
+        computed = min(5, base_count)
+    elif dist.low_aerobic > 0.7:
+        # Easy/aerobic dominant week → can sustain higher volume
+        computed = max(3, base_count)
+    else:
+        # Balanced week → use plan target as-is
+        computed = base_count
 
     # Cap at max available sessions (derived from weekly_schedule)
     computed = min(computed, input.max_available)
@@ -103,7 +107,7 @@ The weekly synthesis agent receives `session_count` as a pre-computed input, not
 
 1. `PreWeekReviewService` (or `PlanGenerationService` for week 1) evaluates conditions
 2. `derive_max_available()` counts available days from `AthletePreferences.weekly_schedule`
-3. `compute_session_count()` runs with plan target, intensity bias, availability, and any override
+3. `compute_session_count()` runs with plan target, target distribution, availability, and any override
 4. `AdjustedWeeklyIntent` includes `session_count` as a field
 5. `WeeklySynthesisAgent` receives `AdjustedWeeklyIntent` and distributes sessions across available days
 

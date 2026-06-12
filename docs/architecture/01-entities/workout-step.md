@@ -33,6 +33,13 @@ type WorkoutStep = {
 
 type WorkoutTarget = {
   signal_type: 'power' | 'gap' | 'hr' | 'description'
+  // Modifier behaviour by signal_type:
+  //   'power'       — scaled by recovery modifier and weather adjustment
+  //   'gap'         — scaled by recovery modifier and weather adjustment (inversely: higher sec/km = slower)
+  //   'hr'          — UNCHANGED by all modifiers (HR is relative to current physiology, not to pace/power output)
+  //   'description' — UNCHANGED by all modifiers (plain language, not numeric)
+  // The two-column display (theoretical vs. adjusted) will show identical HR values when only
+  // HR targets are present — this is correct, not a bug. See wellness-modifier.md and weather-forecast.md.
   primary: {
     min: number | null
     max: number | null

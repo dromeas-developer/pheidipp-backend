@@ -6,10 +6,11 @@
 - Owns the form-to-descriptor mapping consumed by LLM agents
 
 ## Inputs
+
 ```typescript
 type BanisterUpdateInputs = {
   current: DimensionalScores        // current fitness, fatigue, form
-  load: number                      // aerobic_load from Activity (or per-dimension load in Phase 6c+)
+  load: number                      // per-dimension load (aerobic, neuromuscular, or structural)
   constants: BanisterTimeConstants  // fitness_tau_days, fatigue_tau_days, source
   days_since_last_update: number    // days since AthleteFitness.last_activity_id session
 }
@@ -37,7 +38,18 @@ function banisterUpdate(
 }
 ```
 
-This runs independently for each dimension once three-dimensional scoring is active (Phase 6c). Before that, `load` is the combined aerobic + neuromuscular load and only `aggregate` is updated.
+> **Three-Dimensional Update:**
+> 
+> The Banister update runs independently per dimension. Each dimension (`aerobic`, `neuromuscular`, `structural`) has its own fitness/fatigue scores fed by its respective load score from `Activity`.
+> 
+> ```typescript
+> // Per-dimension update:
+> aerobic_fitness(t) = aerobic_fitness(t-1) * exp(-1/τ_aerobic) + aerobic_load
+> neuromuscular_fitness(t) = neuromuscular_fitness(t-1) * exp(-1/τ_neuromuscular) + neuromuscular_load
+> structural_fitness(t) = structural_fitness(t-1) * exp(-1/τ_structural) + structural_load
+> ```
+> 
+> `aggregate` is a derived view of the three dimensions, maintained for backward compatibility and summary reporting.
 
 > **Recovery timing semantics:** The `days_since_last_update` parameter reflects primary session spacing. Recovery windows are measured from primary session to primary session. Secondary sessions (double-day PM sessions, suggested non-running workouts) do not reset the recovery clock. A morning easy run followed by an evening threshold session provides more recovery between primary efforts than two hard sessions on consecutive days. The weekly plan respects this when scheduling quality sessions. See `docs/vision/twin/load-fatigue.md#recovery-timing-and-session-priority`.
 
@@ -45,9 +57,9 @@ This runs independently for each dimension once three-dimensional scoring is act
 - `fitness_tau_days = 42` — aerobic fitness decays slowly over ~6 weeks
 - `fatigue_tau_days = 7` — fatigue clears over ~1 week
 
-These defaults apply until individual time constants are fitted (Phase 6d).
+Population defaults apply until individual time constants are fitted from the athlete's response history.
 
-## Individual Time Constants (Phase 6d+)
+## Individual Time Constants
 
 Population defaults are `fitness_tau = 42 days, fatigue_tau = 7 days`. Some athletes carry fatigue for 10+ days; others clear in 5. Individual constants are fitted from the athlete's response history by `TimeConstantFittingService` when ≥ 12 weeks of calibration-eligible data exist.
 
@@ -81,6 +93,6 @@ This descriptor (not the raw number) is what the LLM agent receives. Raw form sc
 ## Version History
 | Version | Change |
 |---|---|
-| `v1` | Population defaults only (Phase 1-6c) |
-| `v2-individual` | Individual time constant fitting (Phase 6d) |
-| `v3-dimensional` | Per-dimension update: aerobic, neuromuscular, structural (Phase 6c) |
+| `v1` | Population defaults only |
+| `v2-individual` | Individual time constant fitting |
+| `v3-dimensional` | Per-dimension update: aerobic, neuromuscular, structural |

@@ -4,6 +4,7 @@
 - Represents a named, trackable coaching goal for the current training goal
 - Bridges individual sessions to long-term physiological development
 - Updated after relevant sessions via ObjectiveUpdate records
+- Objectives are the organizing principle for ALL plan generation — race, fitness_improvement, maintenance, recovery, and target_performance modes all begin with objective seeding
 
 ## TypeScript Schema
 
@@ -16,7 +17,7 @@ type ObjectiveCategory =
   | 'structural_tolerance'
   | 'neuromuscular_sharpness'
   | 'durability'
-  | 'zone_compliance'
+  | 'intensity_compliance'
   | 'recovery_efficiency'
 
 type ObjectiveDirection = 'improve' | 'maintain' | 'address_risk'

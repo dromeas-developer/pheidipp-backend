@@ -68,8 +68,8 @@ stateDiagram-v2
     load_computed --> calibration_evaluated : CalibrationEligibilityService runs
     calibration_evaluated --> twin_updated : if calibration_eligible = true
     calibration_evaluated --> record_only : if calibration_eligible = false
-    load_computed --> cleaned : SignalCleaningService runs (Phase 5a)
-    cleaned --> segmented : SegmentationTask runs (Phase 5b)
+    load_computed --> cleaned : SignalCleaningService runs
+    cleaned --> segmented : SegmentationTask runs
 ```
 
 ## Events
@@ -161,7 +161,7 @@ Does Not Own:
 
 ## Failure Semantics
 - Object storage failure during FIT upload → task retries; no Activity record created; 202 Accepted returns a task_id; athlete can poll for status
-- `LoadComputationService` failure → Activity exists with null load scores; retry scheduled; `calibration_eligible` remains false until recomputed
+- `LoadComputationService` failure → Activity exists with null load scores; retry scheduled (up to 3×); `calibration_eligible = false` until recomputed; `activity.load_compute.failures` incremented; after max retries → `activity.load_compute.stuck.count` incremented + DLQ entry
 - FIT parsing failure (corrupt file) → Activity NOT created; 422 returned to caller with parse error detail
 
 ## Performance Constraints
@@ -173,13 +173,16 @@ Synchronous API latency:
 Asynchronous operations:
 - Full ingestion pipeline (parse + load + clean): p95 < 30s
 - Segmentation task: p95 < 60s (runs after cleaning)
-
 ## Observability
+
 Metrics:
 - `activity.ingested.total`: by source
 - `activity.calibration_eligible.rate`: percentage of ingested activities that are eligible
 - `activity.ingestion.latency_ms`: time from FIT upload to load scores written
 - `activity.fit_parse.failures`: count of corrupt/unreadable files
+- `activity.load_compute.failures`: count of LoadComputationService failures
+- `activity.load_compute.retry.count`: retry attempts per activity
+- `activity.load_compute.stuck.count`: activities exceeding max retries (DLQ candidates)
 Logs:
 - `activity.ingested`: activity_id, source, has_hr, has_rr, has_power, calibration_eligible
 - `activity.fit_parse.failed`: athlete_id, source, error_type

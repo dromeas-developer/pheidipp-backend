@@ -56,7 +56,7 @@ When `AthleteProfile.cycle_personal_model` is set (Phase 4f+), the phase boundar
 
 ### Cycle Length Learning
 
-The default 28-day assumption is a population prior. Individual athletes vary from ~21 to ~35 days. Using the wrong cycle length misclassifies phases — an athlete with a 32-day cycle classified under 28-day boundaries would be marked "luteal" 4 days too early, receiving a readiness penalty (+0.2 to +0.4) during what is actually still her follicular adaptation window (-0.1).
+The default 28-day assumption is a population prior. Individual athletes vary from ~21 to ~35 days. Using the wrong cycle length misclassifies phases — an athlete with a 32-day cycle classified under 28-day boundaries would be marked "luteal" 4 days too early, receiving a readiness penalty (+0.15 to +0.30) during what is actually still her follicular adaptation window (−0.10).
 
 **Learning mechanism:** `CyclePersonalisationTask` (triggered by `cycle_day_one_logged` event when ≥3 complete cycles exist) computes the athlete's actual cycle length from logged data:
 
@@ -104,15 +104,15 @@ The vision promises the model learns "how this specific athlete's execution data
 
 ## Recovery Modifier Composite Adjustments
 
-These adjustments are applied by `WellnessModifierService` to the composite score before GREEN/AMBER/RED classification. Population priors until `cycle_personal_model` is set.
+These adjustments are applied by `WellnessModifierService` to the composite score before GREEN/AMBER/RED classification. Population priors until `cycle_personal_model` is set. Values are in **IQR units** (see `02-computations/wellness-modifier.md` for derivation).
 
-| Phase | Composite adjustment | Physiological rationale |
+| Phase | Composite adjustment (IQR units) | Physiological rationale |
 |---|---|---|
-| `menstrual` | +0.2 to +0.4 (days 1-2 weighted higher) | Lowest oestrogen and progesterone; reduced readiness |
-| `follicular` | −0.1 | Peak adaptation window; slight positive modifier |
+| `menstrual` | +0.30 (day ≤2), +0.15 (day 3-5) | Lowest oestrogen and progesterone; reduced readiness |
+| `follicular` | −0.10 | Peak adaptation window; slight positive modifier |
 | `ovulatory` | 0.0 | Performance peak; no adjustment |
-| `luteal` early (days 17-23) | +0.2 | Progesterone rising; moderate readiness reduction |
-| `luteal` late (days 24+) | +0.4 | Late luteal sleep degradation; strongest modifier |
+| `luteal` early (days 17-23) | +0.15 | Progesterone rising; moderate readiness reduction |
+| `luteal` late (days 24+) | +0.30 | Late luteal sleep degradation; strongest modifier |
 | `unknown` | 0.0 | No adjustment when phase is unknown |
 
 ## Luteal Thermoregulatory Modifier
@@ -128,6 +128,14 @@ During the ovulatory phase, `Activity.quality_flags.elevated_laxity_risk = true`
 - No unique constraint on `(athlete_id, cycle_day_one_date)` — an athlete can correct a mis-entry by logging a new date. The most recent log is always the active one.
 - No DELETE. Logs accumulate as the training history of the coaching relationship.
 - Phase computation returns `unknown` (not an error) when no log exists or the most recent log is stale (> 45 days). This is a valid, graceful state.
+- **Mutability vs Immutability Tension:** `CyclePhaseLog` allows correction (new log with corrected `cycle_day_one_date` supersedes). `AdaptationObservation` is append-only and stores `cycle_phase` at observation time. If an athlete corrects their cycle day one date, all past `AdaptationObservation` records have incorrect `cycle_phase` values that **cannot be updated**.
+  
+  **Resolution:**
+  1. `AdaptationObservation.cycle_phase` is a **point-in-time classification** based on the log active at observation time. It is not retroactively corrected.
+  2. `CyclePersonalisationTask` (≥ 3 complete cycles) re-fits the personal model using **all historical logs**. The personal model absorbs corrections.
+  3. For analysis requiring accurate historical phases: re-compute phase from the corrected log history at query time (not from stored `cycle_phase`).
+  
+  **Audit trail:** `AdaptationObservation.cycle_phase_computation_basis` records whether phase was derived from default boundaries or personal model at observation time.
 
 ## Events
 
@@ -195,18 +203,18 @@ The following maps vision phase descriptions (`docs/vision/twin/womens-cycle.md`
 
 | Vision Phase | Architecture Phase | Day Boundaries (Default) | Composite Adjustment | Additional Effects |
 |---|---|---|---|---|
-| Menstrual (days 1-5, "approximately") | `menstrual` | ≤5 (hard cutoff) | +0.40 (day ≤2), +0.20 (day 3-5) | None |
+| Menstrual (days 1-5, "approximately") | `menstrual` | ≤5 (hard cutoff) | +0.30 (day ≤2), +0.15 (day 3-5) | None |
 | Follicular (days 6-13, "approximately") | `follicular` | 6-13 | −0.10 | None |
 | Ovulatory (days 12-16, "approximately") | `ovulatory` | 14-16 | 0.0 | `elevated_laxity_risk` flag |
-| Luteal (days 17-28, "approximately") | `luteal` | 17+ | +0.20 (early), +0.40 (late ≥24) | +0.35°C temp offset in weather adjustment |
+| Luteal (days 17-28, "approximately") | `luteal` | 17+ | +0.15 (early), +0.30 (late ≥24) | +0.35°C temp offset in weather adjustment |
 
 **Vision-to-architecture alignment notes:**
 - Vision: "approximately" day ranges → Architecture: hard cutoffs via `DEFAULT_BOUNDARIES`; personal model replaces with fitted boundaries
-- Vision: "first two days weighted highest" in menstrual → Architecture: day ≤2 → +0.40, day 3-5 → +0.20
+- Vision: "first two days weighted highest" in menstrual → Architecture: day ≤2 → +0.30, day 3-5 → +0.15
 - Vision: "lean into quality sessions" in follicular → Architecture: −0.10 composite adjustment (readiness boost)
 - Vision: "performance peak" in ovulatory → Architecture: 0.0 composite = no penalty (peak is implicit, not a positive adjustment); injury risk is explicit via flag
 - Vision: "core temp +0.3-0.5°C in luteal" → Architecture: `LUTEAL_TEMP_OFFSET_C = 0.35` (midpoint); feeds into weather adjustment, not composite
-- Vision: "sleep quality degrades toward end of luteal" → Architecture: late luteal (day ≥24) gets +0.40; compounding with sleep deviation is implicit in weighted sum
+- Vision: "sleep quality degrades toward end of luteal" → Architecture: late luteal (day ≥24) gets +0.30; compounding with sleep deviation is implicit in weighted sum
 - Vision: "model learns individual pattern" → Architecture: `cycle_personal_model` replaces boundaries and scales adjustments via `phase_sensitivity`
 - Vision: "3 cycles before calibration" → Architecture: `CyclePersonalisationTask` triggered by `cycle_day_one_logged` event when ≥3 complete cycles
 - Vision: "athlete logs day one only" → Architecture: `POST /cycle` accepts `cycle_day_one_date`; no ongoing daily input

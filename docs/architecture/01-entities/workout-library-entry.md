@@ -8,7 +8,7 @@
 ## TypeScript Schema
 
 ```typescript
-type LibraryEntrySource = 'seed' | 'generated'
+type LibraryEntrySource = 'generated'
 
 type WorkoutLibraryEntry = {
   id: string                            // UUID, PK
@@ -18,12 +18,17 @@ type WorkoutLibraryEntry = {
   phase_labels: PhaseLabel[]            // which plan phases this entry is appropriate for
   steps: EmbeddedStep[]                 // same structure as WorkoutStep; no FK
   intent_description: string
-  times_offered: number                 // incremented each time returned as substitute
-  times_accepted: number                // incremented when athlete selects
-  acceptance_rate: number               // computed: times_accepted / times_offered; 0 if never offered
+  plan_usages: number                   // incremented each time a plan generates this workout
+  substitute_offers: number             // incremented each time returned as substitute
+  substitute_accepts: number            // incremented when athlete selects
+  acceptance_rate: number               // computed: substitute_accepts / substitute_offers; 0 if never offered
+  canonical_key: string                 // deterministic hash of (session_type, step_structure, targets)
+  superseded_by_id: string | null       // if this entry was merged into another via deduplication
+  superseded_at: string | null          // datetime of merge
   created_at: string
-  created_by: LibraryEntrySource
+  created_by: LibraryEntrySource        // always 'generated' — system starts empty and builds up
 }
+```
 
 type EmbeddedStep = {
   step_order: number
@@ -38,6 +43,13 @@ type EmbeddedStep = {
 
 type WorkoutTarget = {
   signal_type: 'power' | 'gap' | 'hr' | 'description'
+  // Modifier behaviour by signal_type:
+  //   'power'       — scaled by recovery modifier and weather adjustment
+  //   'gap'         — scaled by recovery modifier and weather adjustment (inversely: higher sec/km = slower)
+  //   'hr'          — UNCHANGED by all modifiers (HR is relative to current physiology, not to pace/power output)
+  //   'description' — UNCHANGED by all modifiers (plain language, not numeric)
+  // The two-column display (theoretical vs. adjusted) will show identical HR values when only
+  // HR targets are present — this is correct, not a bug. See wellness-modifier.md and weather-forecast.md.
   primary: {
     min: number | null
     max: number | null
@@ -76,18 +88,28 @@ function findSubstitutes(
 
 ## Promotion from Generated to Library
 
-A `GeneratedWorkout` is promoted to `WorkoutLibraryEntry` (with `created_by = 'generated'`) when:
-- It has been offered as a substitute ≥ 3 times
-- Its `acceptance_rate ≥ 0.6`
+Every `GeneratedWorkout` is added to the `WorkoutLibraryEntry` table via `WorkoutLibraryService.findOrCreate()`. Deduplication is based on a `canonical_key` — a deterministic hash of `(session_type, step_structure, target_signal_types)` with normalized target values (±5% for power/GAP, ±3bpm for HR).
 
-This promotion runs as a nightly task — not immediately.
+When a generated workout matches an existing entry (same canonical key):
+- `plan_usages` is incremented on the existing entry
+- No new entry is created
+
+When no match exists:
+- A new `WorkoutLibraryEntry` is created with `plan_usages = 1`
+- `canonical_key` is computed and stored
+
+**Similarity rules for canonical key:**
+- Same `session_type`
+- Same number and order of steps
+- Same step types (warmup, work, recovery, cooldown)
+- Same target signal types
+- Targets within ±5% for power/GAP, ±3bpm for HR
 
 ## Invariants
 - `EmbeddedStep` uses the same field structure as `WorkoutStep` but is stored as JSONB within the entry, not as a FK-linked table. Library entries are templates, not parent-linked records.
 - `physiological_intent` on each `EmbeddedStep` is never null.
 - `target_gap_sec_per_km` is always GAP — never raw pace.
 - No athlete contributes to the library. `created_by = 'athlete'` does not exist.
-- Minimum 3 seed entries per `session_type` at initialisation.
 
 ## Storage Model
 | Data | Strategy | Consistency | Retention |
@@ -104,7 +126,7 @@ This promotion runs as a nightly task — not immediately.
 ## Observability
 Metrics:
 - `workout_library.acceptance_rate.distribution`: histogram by session_type
-- `workout_library.entries.by_source`: seed vs generated counts
+- `workout_library.entries.generated`: count of entries created from GeneratedWorkout
 
 ## Cross-References
 
@@ -122,5 +144,5 @@ Metrics:
 
 ### Promotion Source
 
-- Promotes from: `GeneratedWorkout` (nightly task, ≥3 offers, ≥0.6 acceptance rate)
-- Promotion logic: `02-computations/workout-promotion.md`
+- Promotes from: `GeneratedWorkout` (every generated workout is added to library)
+- Deduplication logic: `WorkoutLibraryService.findOrCreate()`

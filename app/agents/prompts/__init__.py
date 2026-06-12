@@ -1,1 +1,0 @@
-# Prompts module - frozen, versioned prompt modules

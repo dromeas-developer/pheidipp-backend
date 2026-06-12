@@ -110,11 +110,11 @@ function toPhysiologicalSegments(
 ```
 Per-athlete fine-tuned model (≥30 labelled segments)
   → Population model (default)
-    → Generation 1 heuristic (if population model not yet trained)
+    → Heuristic segmentation (if HMM model not yet trained)
 ```
-
 ## Cross-References
-- Generation 1 (superseded by this): `02-computations/segmentation-heuristic.md`
+
+- Heuristic segmentation (fallback when HMM unavailable): `02-computations/segmentation-heuristic.md`
 - Cleaned stream inputs: `02-computations/signal-cleaning.md`
 - PhysiologicalSegment schema (state_probabilities is non-null here): `01-entities/physiological-segment.md`
-- Versioning when Gen 1 records are superseded: `04-platform/versioning-and-reprocessing.md`
+- Versioning when heuristic records are superseded: `04-platform/versioning-and-reprocessing.md`

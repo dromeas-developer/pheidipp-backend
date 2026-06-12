@@ -56,7 +56,7 @@ Once sufficient `AdaptationObservation` records exist (≥ 3 complete adaptation
 
 - **Pre-week review service** (Python) uses `yield_by_intent_state` to decide if intensity allocation should be adjusted
 - **Weekly synthesis agent** uses `recovery_trajectory` to set appropriate recovery spacing
-- **Plan generation** uses aggregate patterns to inform the phase arc methodology
+- **Plan generation** uses aggregate patterns to inform the phase definitions methodology
 
 ```typescript
 function computePersonalisedPlanConstraints(

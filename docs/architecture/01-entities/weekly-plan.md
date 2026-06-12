@@ -21,8 +21,16 @@ type WeeklyPlan = {
   training_plan_id: string             // UUID, FK → TrainingPlan
   week_number: number                  // 1-indexed within the plan
   
-  // What this week is about
-  adjusted_intent: AdjustedWeeklyIntent  // from pre-week review
+  // What this week is about (after pre-week review)
+  // AdjustedWeeklyIntent carries:
+  //   - methodology: MethodologyTraitVector (from phase definition)
+  //   - target_distribution: { low_aerobic, high_aerobic, threshold, vo2max, neuromuscular } (continuous, replaces intensity_bias enum)
+  //   - target_specificity: number (from weekly distribution)
+  //   - objective: ObjectiveCategory[] (from phase definition)
+  //   - session_count: number (computed by PreWeekReviewService)
+  //   - adjustment_made: boolean
+  //   - distribution_adjusted: boolean (did pre-week review modify the distribution?)
+  adjusted_intent: AdjustedWeeklyIntent
   
   // The sessions
   sessions: WeeklySession[]
@@ -54,6 +62,15 @@ type WeeklySession = {
   checkpoint_metric?: string
   status: 'scheduled' | 'completed' | 'skipped' | 'missed'
   planned_session_id: string | null    // UUID, FK → PlannedSession (created when workout is generated)
+  // Null semantics: planned_session_id is null when the WeeklySession has not yet been promoted
+  // to a PlannedSession (workout not yet generated). This is expected for sessions in the current
+  // week whose workouts haven't been generated yet, or for Tier 6 athletes who train without
+  // generated workouts. API consumers must handle null here. See implementation notes.
+
+  // Block membership (set by weekly synthesis agent for adaptation window detection)
+  block_id: string | null              // null = standalone session; non-null = part of a hard adaptation block
+  block_position: 'first' | 'middle' | 'last' | null  // position within the block
+  block_session_count: number | null   // total sessions in this block (2-3 max)
 }
 ```
 
@@ -67,6 +84,7 @@ type WeeklySession = {
 - **Sessions array is immutable once active.** No mid-week session additions after status transitions to `active`.
 - **accumulated_fatigue_delta feeds forward.** It is the sum of all session fatigue contributions minus recovery. It feeds into the next pre-week review.
 - **One WeeklySession per PlannedSession.** When a workout is generated for a session, the `planned_session_id` FK is set on the WeeklySession. This link is established lazily at workout generation time, not at WeeklyPlan creation. The WeeklyPlan is created with sessions; PlannedSession records are created later when the workout generation agent runs.
+- **PlannedSession.training_plan_id is denormalized and can be stale.** When a plan is superseded, `PlannedSession` records retain the old `training_plan_id`. The authoritative plan reference is always `WeeklyPlan.training_plan_id`. Queries for "sessions in the current plan" MUST join through `WeeklyPlan`, not filter `PlannedSession.training_plan_id` directly. *See `planned-session.md` schema for denormalization rationale and correct query pattern.*
 
 ---
 
@@ -86,6 +104,14 @@ type WeeklySession = {
 | `pre_week_review_completed` | Weekly synthesis agent creates WeeklyPlan from AdjustedWeeklyIntent | v1 |
 | `session_completed` | Update WeeklySession status; check if week is complete | v1 |
 | `session_missed` | Update WeeklySession status; check if week is complete | v1 |
+
+**Edge case: ungenerated sessions.** If a `WeeklySession` has no corresponding `PlannedSession` (workout never generated), it cannot transition to `completed` or `missed`. The `MissedSessionSweepTask` only processes `PlannedSession` records — it does not touch `WeeklySession` records that were never promoted.
+
+**Resolution:** The weekly synthesis agent MUST generate workouts for all sessions in the current week before the week starts. If workout generation fails for any session, the system MUST either:
+1. Retry generation, OR
+2. Transition the `WeeklySession` to `missed` with `skip_reason = 'generation_failed'`
+
+The `week_completed` check MUST also count `WeeklySession` records with `planned_session_id = null` and `status != 'completed'` as `missed` after `week_ends_at` passes. This prevents the pipeline deadlock where ungenerated sessions block the next week's pre-review.
 
 Note: The `pre_week_review_completed` event payload contains `{training_plan_id, week_number, adjustment_made, adjustment_source}` — NOT `weekly_plan_id`, because the WeeklyPlan does not exist yet at the time of the review. The weekly synthesis agent uses `training_plan_id` + `week_number` to look up the phase arc entry and create the WeeklyPlan.
 
@@ -148,6 +174,31 @@ Does Not Own:
 - accumulated_fatigue_delta computation fails → defaults to 0; flagged for manual review
 
 ---
+
+### Lazy Link: Null `planned_session_id` Handling
+
+The `planned_session_id` FK on `WeeklySession` is nullable by design. It becomes non-null only when the workout generation agent creates a `PlannedSession` for that session.
+
+**Expected null states:**
+- Sessions in the current week whose workouts haven't been generated yet (normal for early-week sessions before generation runs)
+- Sessions in future synthesised weeks (plan exists but generation hasn't run yet)
+
+**Tier 6 edge case:** If a Tier 6 athlete manually logs an activity for a day that has a `WeeklySession` but no `PlannedSession`, the activity exists but is not linked to any session. The `WeeklySession` remains `status: 'scheduled'` with `planned_session_id: null`. The `MissedSessionSweepTask` only transitions sessions with `status: 'generated'` — it will not catch `WeeklySession` records that were never promoted to `PlannedSession`. These sessions could remain in `scheduled` status indefinitely.
+
+**API consumer guidance:** `GET /plan/sessions` returns `PlannedSessionResponse[]` — only sessions with a non-null `planned_session_id` appear in this query. Sessions that haven't been promoted to `PlannedSession` are not returned. Consumers needing the full weekly schedule should query `WeeklySession[]` directly from the `WeeklyPlan`.
+
+---
+
+### Storage Model
+
+| Data | Strategy | Consistency | Retention |
+|---|---|---|---|
+| `weekly_plans` table | append-only (status mutable) | strong | indefinite |
+| `weekly_sessions` table | append-only (status mutable) | strong | indefinite |
+
+Index: `(training_plan_id, week_number)` for plan week lookups.
+Index: `(weekly_plan_id)` for weekly plan session lookups.
+Index: `(planned_session_id)` for session-to-plan joins.
 
 ## Performance Constraints
 

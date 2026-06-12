@@ -21,7 +21,7 @@ Failures in analytical computation. Degrade gracefully; do not block the athlete
 
 | Failure | Response |
 |---|---|
-| `LoadComputationService` failure | Activity exists with null load scores. Retry scheduled. `calibration_eligible = false` until recomputed. |
+| `LoadComputationService` failure | Activity exists with null load scores. Retry scheduled (up to 3×). `calibration_eligible = false` until recomputed. `activity.load_compute.failures` incremented. After max retries → `activity.load_compute.stuck.count` incremented + DLQ entry. |
 | `ExecutionAnalysisService` failure | No `ExecutionObservation`. Post-workout message proceeds with compliance-only context. Retry up to 3×. |
 | `SegmentationTask` failure | No `PhysiologicalSegment` records. Execution analysis falls back to lap data. Retry. |
 | FIT file fetch failure during analysis | Retry up to 3×. If all fail → alert; manual investigation required. |

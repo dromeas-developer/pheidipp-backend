@@ -86,6 +86,19 @@ type WorkoutComplianceSummary = {
 
 ## Vision Cross-Reference
 
+> **Clarification — Coaching Observations ≠ Raw Data**
+> 
+> The vision constraint *"Every visualisation must pass: does this require the twin's context to produce?"* is satisfied because:
+> 
+> 1. `coaching_observations` are **pre-computed by `ExecutionAnalysisService`** (deterministic Python, not LLM)
+> 2. They require **twin context**: compliance assessment against `WorkoutStep` targets, session shape classification, comparable session identification (requires `TwinState` for fitness context)
+> 3. The LLM **receives** these observations as structured input and **narrates** from them — it does not compute them
+> 4. Raw pace/HR per lap is **never surfaced**; only the twin-processed findings (cross_rep_trend, final_rep_delta_pct, recovery_quality) are provided to the agent
+> 
+> `per_rep_analysis` is structured analytical output (rep-level compliance deltas), not raw sensor data. It is consumed by `ExecutionAnalysisService` to produce `coaching_observations` and is never surfaced directly to athletes or LLM agents.
+> 
+> **The athlete receives a coaching interpretation, not raw lap data.**
+
 ### Post-Workout Message Mapping
 
 Maps vision message elements from `vision/coach/post-workout.md` to architecture data fields and agent paragraph assignment. The vision defines **what the athlete reads**; the architecture stores **what the agent narrates from**.
@@ -164,22 +177,22 @@ Maps vision concepts from `vision/twin/execution-patterns.md` to `coaching_obser
 - One `ExecutionObservation` per `Activity`. One-to-one.
 - Only created for `calibration_eligible = true` activities with a linked `GeneratedWorkout` (the prescribed intent must be known for compliance assessment). Activities without `planned_session_id` or without `calibration_eligible = true` receive a simplified analysis with null `per_rep_analysis` and `effort_compliance`.
 - `coaching_observations` is computed by Python services — never by an LLM.
-- `per_rep_analysis` and `recovery_analysis` are null until Phase 5c. Pre-5c analysis works from lap data; post-5c it works from `PhysiologicalSegment` records.
+- `per_rep_analysis` and `recovery_analysis` are null when segment-based analysis is unavailable. Lap-based analysis works from FIT lap data; segment-based analysis works from `PhysiologicalSegment` records.
 - `analysis_version` must be updated when the analysis algorithm changes materially. Old records retain the old version string for auditability.
 
 ## Phase Evolution
 
-| Phase | `analysis_version` | Source data | `per_rep_analysis` |
+| Algorithm Version | `analysis_version` | Source data | `per_rep_analysis` |
 |---|---|---|---|
-| 4a | `lap-v1` | FIT lap messages + raw time-series | null |
-| 5c | `segment-v1` | `PhysiologicalSegment` records | populated |
+| Lap-based | `lap-v1` | FIT lap messages + raw time-series | null |
+| Segment-based | `segment-v1` | `PhysiologicalSegment` records | populated |
 
 ## Events
 
 ### Produced
 | Event | Trigger | Version | Payload |
 |---|---|---|---|
-| None | — | — | ExecutionObservation is consumed by agents directly |
+| `execution_analysis_completed` | ExecutionObservation successfully created | v1 | `{ activity_id: string, execution_observation_id: string }` |
 
 ### Consumed
 | Event | Action | Version |

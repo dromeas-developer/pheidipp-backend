@@ -8,7 +8,7 @@
 ## TypeScript Schema
 
 ```typescript
-type SegmentationType = 'heuristic-v1' | 'statistical-v1' | 'hmm-v1'
+type SegmentationType = 'heuristic-v1' | 'hmm-v1'
 
 // PlannedSegment — what was intended (derived from WorkoutStep)
 type PlannedSegment = {
@@ -39,7 +39,7 @@ type PhysiologicalSegment = {
   inferred_state: string  // segment-level intent; 'unknown' when confidence < 0.45
   confidence: number                   // 0.0–1.0; posterior probability of inferred_state
   state_probabilities: Record<string, number> | null
-  // null for heuristic-v1 and statistical-v1
+  // null for heuristic-v1
   // populated for hmm-v1 (full posterior distribution)
   observed_signals: {
     mean_hr_bpm: number | null
@@ -54,11 +54,11 @@ type PhysiologicalSegment = {
 ```
 
 ## Invariants
-- **Stable interface.** All three segmentation pipeline generations produce `PhysiologicalSegment` records with identical schema. Only `segmentation_version` changes between generations.
+- **Stable interface.** All segmentation pipeline variants (heuristic, HMM population, HMM per-athlete) produce `PhysiologicalSegment` records with identical schema. Only `segmentation_version` changes between variants.
 - **`inferred_state = 'unknown'`** when `confidence < 0.45`. This is the correct output for ambiguous transitions — not a fallback or error state.
 - **Unaligned segments** (no matching `PlannedSegment`) retain `planned_segment_id = null`. They are never discarded — they carry information about unplanned effort.
 - **Superseded records** receive `superseded_at` when a higher-quality version is produced for the same activity. Old records are never deleted. Both old and new records coexist; consumers should use the most recent non-superseded record.
-- **`state_probabilities`** is null for `heuristic-v1` and `statistical-v1`. Only `hmm-v1` produces full posterior distributions. Consumers must null-check.
+- **`state_probabilities`** is null for `heuristic-v1`. Only `hmm-v1` produces full posterior distributions. Consumers must null-check.
 - Segments with `confidence < 0.4` in `heuristic-v1` are not used in `per_rep_analysis` in `ExecutionObservation`. The coach makes no claims about unknown-state segments.
 
 ## Three-Way Comparison

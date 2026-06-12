@@ -65,6 +65,43 @@ type EventType =
   | 'cycle_phase_changed'
   // Checkpoint events
   | 'checkpoint_completed'
+  // Execution events
+  | 'execution_analysis_completed'
+  // Integration events
+  | 'integration_connected'
+  | 'integration_disconnected'
+```
+
+### Payload Schemas
+
+```typescript
+// integration_connected
+type IntegrationConnectedPayload = {
+  athlete_id: string
+  platform: 'intervals_icu' | 'garmin_connect'
+}
+
+// integration_disconnected
+type IntegrationDisconnectedPayload = {
+  athlete_id: string
+  platform: 'intervals_icu' | 'garmin_connect'
+}
+
+// training_goal_created
+type TrainingGoalCreatedPayload = {
+  training_goal_id: string
+  goal_type: GoalType
+  goal_event_type: GoalEventType | null
+  goal_event_date: string | null
+  fitness_level: number
+}
+
+// objective_updated
+type ObjectiveUpdatedPayload = {
+  objective_id: string
+  direction_of_change: ObjectiveDirectionOfChange
+  is_milestone: boolean
+}
 ```
 
 ## Event Schemas
@@ -105,7 +142,7 @@ type AthleteLoggedInPayload = {
   user_agent: string | null
 }
 ```
-**Producer:** `AuthService` (POST /auth/login or POST /auth/login/google)
+**Producer:** `AuthService` (POST /auth/login, POST /auth/login/google, or POST /auth/refresh)
 **Consumers:** Security monitoring, audit log
 
 ---
@@ -165,6 +202,111 @@ type ActivityCalibrationEligiblePayload = {
 ```
 **Producer:** `CalibrationEligibilityService`
 **Consumers:** `TwinRecalibrationTask`, `ThresholdDetectionService`
+
+---
+
+### `execution_analysis_completed`
+```typescript
+type ExecutionAnalysisCompletedPayload = {
+  activity_id: string
+  execution_observation_id: string | null  // null if analysis failed or degraded to lap-only
+  confidence_level: 'calibration' | 'analysis'
+  degradation_mode: boolean  // true if fell back to lap-based analysis (no physiological segments)
+  analysis_version: string
+}
+```
+**Producer:** `ExecutionAnalysisTask` (after creating `ExecutionObservation` or falling back)
+**Consumers:** `PostWorkoutTask` (waits for this event before proceeding)
+
+**Trigger Timing:** Fires immediately after `ExecutionObservation` is persisted (or after fallback logic completes).
+
+**Retry Semantics:** If `ExecutionAnalysisTask` fails, this event is **not** fired. `PostWorkoutTask` timeout logic handles the absence.
+
+---
+
+### `fitness_time_constants_fitted`
+```typescript
+type FitnessTimeConstantsFittedPayload = {
+  athlete_id: string
+  fitness_tau_days: number
+  fatigue_tau_days: number
+  fitting_r_squared: number
+  sample_count: number
+}
+```
+**Producer:** `GapCurveFittingTask` (after 20+ outdoor sessions)
+**Consumers:** `AthleteProfile` update service
+
+---
+
+### `training_goal_created`
+```typescript
+type TrainingGoalCreatedPayload = {
+  training_goal_id: string
+  goal_type: GoalType
+  goal_event_type: GoalEventType | null
+  goal_event_date: string | null
+  fitness_level: number
+}
+```
+**Producer:** `TrainingGoal` entity (POST /training-goals)
+**Consumers:** Audit log, analytics pipeline
+
+---
+
+### `planned_session_generated`
+```typescript
+type PlannedSessionGeneratedPayload = {
+  planned_session_id: string
+  weekly_plan_id: string
+  target_date: string
+  session_type: SessionType
+}
+```
+**Producer:** `WeeklySynthesisAgent` (for each session in WeeklyPlan)
+**Consumers:** `WorkoutPrefetchTask` (triggers day-of workout generation)
+
+---
+
+### `workout_generated`
+```typescript
+type WorkoutGeneratedPayload = {
+  generated_workout_id: string
+  planned_session_id: string
+  session_type: SessionType
+  step_count: number
+}
+```
+**Producer:** `WorkoutGenerationAgent`
+**Consumers:** API layer (home screen refresh), `WeatherForecastService` (prefetch cancellation)
+
+---
+
+### `post_workout_analysis_requested`
+```typescript
+type PostWorkoutAnalysisRequestedPayload = {
+  activity_id: string
+  planned_session_id: string | null
+  is_manual: boolean
+}
+```
+**Producer:** `SessionLifecycleService` (when session transitions to completed)
+**Consumers:** `PostWorkoutTask` (triggers context assembly)
+
+---
+
+### `cycle_phase_changed`
+```typescript
+type CyclePhaseChangedPayload = {
+  cycle_phase_log_id: string
+  athlete_id: string
+  phase: CyclePhase
+  cycle_day: number
+  computation_basis: 'default_boundaries' | 'personal_model'
+}
+```
+**Producer:** `CyclePhaseLog` entity (when new period start date logged)
+**Consumers:** `WellnessModifierService` (cycle composite adjustments), `WeatherForecastService` (luteal thermal offset)
 
 ---
 
@@ -507,12 +649,25 @@ type WellnessBaselineUpdatedPayload = {
 - `event_id` is a UUID, generated at the point of production
 - All events are append-only — events are never updated or deleted
 - Failed event processing is retried; events are not consumed destructively
-
 ## Storage Model
+
 | Data | Strategy | Consistency | Retention |
 |---|---|---|---|
 | System events | append-only event log | eventual | 90 days (operational window) |
+| Trigger events (TwinState causal) | append-only event log | eventual | 1 year |
 | Event dead-letter queue | append-only | strong | 30 days |
+
+> **Trigger Event Retention:**
+> 
+> System events that trigger `TwinState` creation are retained for 1 year (low-volume, high-audit-value):
+> - `activity_calibration_eligible`
+> - `physiology_updated`
+> - `fitness_updated`
+> - `race_prediction_updated`
+> 
+> Other system events are retained for 90 days.
+> 
+> **Audit Trail:** `TwinState.trigger` + inline snapshots provide the primary audit path. For full reconstruction, `PhysiologyMeasurement` (append-only) and `Activity` (load scores + FIT file) are retained indefinitely.
 
 ## Runtime Ownership
 Owns:

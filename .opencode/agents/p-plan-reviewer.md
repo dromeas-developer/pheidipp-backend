@@ -1,5 +1,5 @@
 ---
-model: litellm-proxy/mistral/mistral-medium-engineer
+model: litellm-proxy/mistral/mistral-medium
 permission:
   task:
     "*": "deny"
@@ -19,7 +19,6 @@ tools:
   "pheidipp-codebase-context_search_symbols":       true
   "pheidipp-codebase-context_get_architecture_context": false
   "pheidipp-codebase-context_reindex":              false
-  "pheidipp-codebase-context_write_report":         true
 ---
 
 # Pheidipp — Plan Reviewer

@@ -1,13 +1,18 @@
-# Training Goal
+# TrainingGoal
 
-- Holds the athlete's current training goal and self-reported fitness context
-- The temporal container for a TrainingPlan; one active goal per athlete at a time
-- Append-only: semantic fields are immutable after creation; only status transitions
-- `goal_type` drives coaching posture across all consumer agents. See Vision Alignment below and `docs/vision/product/goal-modes.md`.
+The root context container for an athlete's training intent. Defines the goal mode, target event (if applicable), and self-reported constraints. Acts as the anchor for `TrainingPlan` generation and `RegenerationTask` coordination.
+
+## Purpose
+
+-   **Context for Plan Generation:** Provides the `goal_type`, `goal_event_date`, and athlete constraints that drive `PlanGenerationService`.
+-   **Authority Boundary:** Enforces distinct pathways for date changes:
+    -   **Athlete-Initiated:** Logistic updates for `race_event` goals (e.g., race postponed).
+    -   **Coach-Driven:** Trajectory-based adjustments for `target_performance` goals (requires proposal and confirmation).
+-   **Secondary Event Management:** Tracks B-races and C-races that influence plan structure but do not drive the primary periodization.
 
 ## Vision Alignment
 
-The vision defines four goal modes, each with a distinct coaching posture, adaptive language, and transition rules. The `goal_type` enum is the architectural trigger for these behaviors.
+The vision defines five goal modes, each with a distinct coaching posture, adaptive language, and transition rules. The `goal_type` enum is the architectural trigger for these behaviors.
 
 | `goal_type` | Vision Mode | Coaching Posture | Language Cues | Transition Rules |
 |---|---|---|---|---|
@@ -15,6 +20,7 @@ The vision defines four goal modes, each with a distinct coaching posture, adapt
 | `fitness_improvement` | Fitness Improvement | Progressive overload, measurable gains, capacity building | "development," "capacity building," measurable gains | → Any mode based on readiness |
 | `maintenance` | Maintenance | Consistency-focused, habit preservation, fitness preservation | "consistency," "gradual progress," patience | → Fitness Improvement when ready |
 | `recovery` | Recovery | Healing-focused, conservative load, protective coaching | "healing," "protective," "gradual return" | → Fitness Improvement after healing markers |
+| `target_performance` | Target Performance | Gap-analysis driven, trajectory validation, systematic progression toward measurable target | "trajectory," "target pace," "gap closing," "benchmark" | → Recovery first, then chosen mode |
 
 **What never changes between modes:** Analysis quality, coach voice, and physiological modelling are identical in all modes. Non-race modes are not stripped-down experiences.
 
@@ -22,14 +28,15 @@ The vision defines four goal modes, each with a distinct coaching posture, adapt
 
 ---
 
-## TypeScript Schema
+## Schema
 
 ```typescript
 type GoalType =
-  | 'race_event'        // periodised toward specific goal; peaking, tapering, race-specific preparation
-  | 'fitness_improvement' // active development; progressive overload; measurable gains
-  | 'maintenance'       // consistency-focused; habit preservation; fitness preservation
-  | 'recovery'          // healing-focused; conservative load; protective coaching
+  | 'race_event'           // Periodized toward a specific date; peaking, tapering, race-specific prep
+  | 'fitness_improvement'  // Active development; progressive overload; measurable gains
+  | 'maintenance'          // Consistency-focused; habit preservation; fitness preservation
+  | 'recovery'             // Healing-focused; conservative load; protective coaching
+  | 'target_performance'   // Gap-analysis driven; athlete sets target time; system determines date
 
 type GoalEventType =
   | 'marathon' | 'half_marathon' | '10k' | '5k'
@@ -37,15 +44,12 @@ type GoalEventType =
 
 type TrainingGoalStatus = 'active' | 'completed' | 'abandoned'
 
-type SecondaryEventType =
-  | 'half_marathon' | '10k' | '5k' | 'trail_race'
-
 type SecondaryEventPriority = 'B' | 'C'
 
 type SecondaryEvent = {
   id: string                      // UUID, PK
-  training_goal_id: string       // UUID, FK → TrainingGoal
-  event_type: SecondaryEventType
+  training_goal_id: string        // UUID, FK → TrainingGoal
+  event_type: GoalEventType       // Reuse GoalEventType for simplicity
   event_date: string              // YYYY-MM-DD
   event_name: string | null
   priority: SecondaryEventPriority
@@ -55,55 +59,82 @@ type TrainingGoal = {
   id: string                         // UUID, PK
   athlete_id: string                 // UUID, FK → Athlete
 
-  // Goal definition — immutable after creation
+  // Goal Definition — Immutable after creation
   goal_type: GoalType
-  goal_event_type: GoalEventType | null   // null when goal_type ≠ 'race_event'
+  goal_event_type: GoalEventType | null   // Null unless goal_type = 'race_event'
   goal_event_name: string | null
-  goal_event_date: string | null     // YYYY-MM-DD; null for non-race_event goal types
-  custom_distance_km: number | null  // > 0; only when goal_event_type = 'custom'
-  goal_description: string | null    // free text; surfaced to first message agent
+  goal_event_date: string | null          // YYYY-MM-DD; Null for non-race_event types
+  custom_distance_km: number | null       // > 0; Only when goal_event_type = 'custom'
+  goal_description: string | null         // Free text; surfaced to first message agent
 
-  // Secondary events — mutable; max 3 per goal
-  secondary_events: SecondaryEvent[]
-
-  // Self-reported context at creation — immutable after creation
+  // Self-Reported Context — Immutable after creation
   weekly_volume_hours: number        // >= 0; CHECK constraint
   weekly_volume_km: number           // >= 0; CHECK constraint
   fitness_level: number              // 1–5; CHECK constraint; feeds Tier 3 bootstrap
-  recent_injury: string | null       // free text; surfaced to plan generation
+  recent_injury: string | null       // Free text; surfaced to plan generation
 
-  // Recovery context — required when goal_type = 'recovery'
-  injury_severity: InjurySeverity | null  // null for other goal types
+  // Recovery Context — Required when goal_type = 'recovery'
+  injury_severity: InjurySeverity | null  // Null for other goal types
 
-  // Intermediate goal — set when training length gate triggers
-  intermediate_goal: IntermediateGoal | null
+  // Target Performance Context — Required when goal_type = 'target_performance'
+  target_distance_km: number | null  // > 0; Only when goal_type = 'target_performance'
+  target_time_minutes: number | null // > 0; Only when goal_type = 'target_performance'
 
-  // Status — the only mutable fields
+  // Status — The only mutable fields via direct PATCH
   status: TrainingGoalStatus
   created_at: string                 // ISO 8601
-  closed_at: string | null           // set when status → completed or abandoned
-}
-
-type IntermediateGoal = {
-  description: string                         // plain English; e.g. "12-week aerobic base block"
-  physiological_objectives: string[]          // e.g. ["aerobic_fitness", "threshold_power", "structural_resilience"]
-  duration_weeks: number                      // 8–12 weeks
+  closed_at: string | null           // Set when status → completed or abandoned
 }
 ```
 
 ---
 
+## Design Rationale: Authority Boundaries for Date Changes
+
+The system enforces a strict boundary between **logistic updates** (athlete-controlled) and **strategic adjustments** (coach-driven).
+
+### 1. Athlete-Initiated Changes (`race_event` only)
+**Use Case:** A race is postponed, canceled, or rescheduled by the organizer.
+**Mechanism:** Direct `PATCH` to `goal_event_date`.
+**Rationale:** The athlete has sole authority over which race they are registered for. If the date changes, the plan must be regenerated to reflect the new timeline.
+**Constraint:** Allowed **only** when `goal_type = 'race_event'`.
+
+### 2. Coach-Driven Changes (`target_performance` and all modes)
+**Use Case:** The twin's trajectory analysis indicates the athlete is ahead of or behind schedule for a target performance.
+**Mechanism:** Two-step `RegenerationTask` flow (Propose → Confirm).
+**Rationale:**
+-   **Target Performance Mode:** The system determines the optimal date via gap analysis. Changing this date is a **strategic decision**, not a logistic one. It requires a coach's rationale and athlete confirmation.
+-   **All Modes:** Significant date changes (>7 days) alter the periodization structure. The coach must validate that the new timeline is physiologically sound.
+**Constraint:** Direct `PATCH` to `goal_event_date` is **blocked** for `target_performance` mode. Changes must flow through `RegenerationTask`.
+
+---
+
 ## Invariants
 
-- **One active goal per athlete.** Enforced by a partial unique index on `(athlete_id) WHERE status = 'active'`. Attempting to create a second active goal returns 409 Conflict. The caller must explicitly close the existing goal first.
-- **Semantic fields are immutable after creation.** `goal_type`, `goal_event_type`, `goal_event_date`, `custom_distance_km`, `weekly_volume_hours`, `weekly_volume_km`, `fitness_level`, `recent_injury`, `injury_severity` cannot be changed via PATCH. Secondary events are mutable and managed via dedicated endpoints.
-- **PATCH is restricted to** `status`, `goal_event_date`, and `goal_description` only. `goal_event_date` is an exception to the immutability rule because races get rescheduled; it triggers plan regeneration if the change is > 7 days.
-- **Secondary events are mutable.** `POST /athletes/{athlete_id}/goals/{goal_id}/secondary-events` creates secondary events. `PATCH` and `DELETE` on these endpoints update/remove them. Max 3 secondary events per goal.
-- **Secondary events cannot conflict with the primary goal event schedule.** Validation constraint prevents scheduling within taper phase or goal event week.
-- **Recovery mode requires injury_severity.** `injury_severity` is mandatory when `goal_type = 'recovery'`.
-- **Intermediate goal is set by training length gate.** `intermediate_goal` is populated when the training length gate determines the goal is >24 weeks away. The plan then covers only the intermediate duration.
-- No DELETE. Status transitions to `completed` or `abandoned` are the end state.
-- `fitness_level` (1–5) feeds the Tier 3 twin bootstrap in `TwinBootstrapService`. It is the athlete's self-assessment and is never updated automatically.
+### 1. One Active Goal Per Athlete
+Enforced by a partial unique index on `(athlete_id) WHERE status = 'active'`. Attempting to create a second active goal returns `409 Conflict`. The existing goal must be explicitly closed (`status → completed` or `abandoned`) before a new one is created.
+
+### 2. Immutability of Semantic Fields
+The following fields are **immutable** after creation to preserve the historical integrity of the goal context:
+-   `goal_type`, `goal_event_type`, `goal_event_name`
+-   `custom_distance_km`, `weekly_volume_hours`, `weekly_volume_km`
+-   `fitness_level`, `recent_injury`, `injury_severity`
+-   `target_distance_km`, `target_time_minutes` (for `target_performance`)
+
+**Rationale:** Changing these fields fundamentally alters the nature of the goal. If an athlete's intent changes (e.g., from "marathon" to "10k", or from "race_event" to "fitness_improvement"), they should close the current goal and create a new one. This preserves the audit trail of what the original plan was optimizing for.
+
+### 3. Mutable Fields
+Only the following fields can be updated via `PATCH /goals/{id}`:
+-   `status` (transition to `completed` or `abandoned`)
+-   `goal_event_date` (**Only** if `goal_type = 'race_event'`)
+-   `goal_description` (minor textual refinements)
+
+### 4. Secondary Event Limits
+-   **Maximum 3 secondary events** per active goal.
+-   **No conflicts:** Secondary events cannot fall within the taper phase or the week of the primary goal event. Validation returns `422 Unprocessable Entity` on violation.
+
+### 5. Target Performance Date Authority
+For `goal_type = 'target_performance'`, `goal_event_date` is **system-determined**. It cannot be modified via the standard `PATCH` endpoint. Changes require a `RegenerationTask` initiated by the coach (or athlete request via coach conversation) and confirmed by the athlete.
 
 ---
 
@@ -111,12 +142,18 @@ type IntermediateGoal = {
 
 ```mermaid
 stateDiagram-v2
-    [*] --> active : POST /athletes/{id}/onboarding\nor POST /athletes/{id}/goals
-    active --> completed : PATCH status=completed\n(athlete finished goal event)
-    active --> abandoned : PATCH status=abandoned\n(athlete changes direction)
+    [*] --> active : POST /goals
+    active --> active : PATCH status (no-op)
+    active --> active : PATCH goal_event_date (race_event only)
+    active --> pending_regeneration : POST /coach-propose-date-change
+    pending_regeneration --> active : RegenerationTask declined/expired
+    pending_regeneration --> completed : RegenerationTask confirmed + Plan regenerated
+    active --> completed : PATCH status=completed
+    active --> abandoned : PATCH status=abandoned
     completed --> [*]
     abandoned --> [*]
-    note right of active : Only one active goal allowed\nper athlete at any time
+    note right of active : One active goal per athlete\nPATCH restricted to status/date/description
+    note right of pending_regeneration : Coach-driven date change\nrequires athlete confirmation
 ```
 
 ---
@@ -127,9 +164,12 @@ stateDiagram-v2
 
 | Event | Trigger | Version | Payload |
 |---|---|---|---|
-| `training_goal_created` | Goal inserted with status=active | v1 | `{training_goal_id, goal_type, goal_event_type, goal_event_date, fitness_level}` |
-| `secondary_event_registered` | Secondary event added to goal | v1 | `{secondary_event_id, training_goal_id, event_type, event_date, priority}` |
-| `secondary_event_removed` | Secondary event removed from goal | v1 | `{secondary_event_id, training_goal_id, event_date}` |
+| `training_goal_created` | Goal inserted with `status=active` | v1 | `{training_goal_id, goal_type, goal_event_type, goal_event_date, fitness_level}` |
+| `training_goal_closed` | Status transitions to `completed` or `abandoned` | v1 | `{training_goal_id, status, closed_at, duration_days}` |
+| `secondary_event_registered` | Secondary event added | v1 | `{secondary_event_id, training_goal_id, event_type, event_date, priority}` |
+| `secondary_event_removed` | Secondary event removed | v1 | `{secondary_event_id, training_goal_id, event_date}` |
+| `regeneration_task_proposed` | Coach proposes date change | v1 | `{task_id, training_goal_id, proposed_date, rationale, trigger}` |
+| `regeneration_task_confirmed` | Athlete confirms date change | v1 | `{task_id, training_goal_id, new_goal_event_date}` |
 
 ### Consumed
 
@@ -137,11 +177,13 @@ stateDiagram-v2
 |---|---|---|
 | `onboarding_completed` | Goal already created; twin model build begins | v1 |
 
-Note: `onboarding_completed` does NOT directly trigger plan generation. Plan generation is triggered by `twin_model_ready` (produced by `twin-state.md` when the twin model is built with sufficient data). For Tier 1 athletes, this fires after historical data ingestion completes. For Tiers 2-3, this fires immediately after twin bootstrap.
+*Note: `onboarding_completed` does not trigger plan generation directly. Plan generation is triggered by `twin_model_ready`.*
 
 ---
 
 ## APIs
+
+### Standard Management
 
 ```yaml
 POST /athletes/{athlete_id}/goals
@@ -157,8 +199,23 @@ Request:
   weekly_volume_km: number, required
   fitness_level: number (1–5), required
   recent_injury?: string
-  injury_severity?: 'minor' | 'moderate' | 'major'  # required when goal_type = 'recovery'
+  injury_severity?: 'minor' | 'moderate' | 'major'  # Required if goal_type = 'recovery'
+  target_distance_km?: number  # Required if goal_type = 'target_performance'
+  target_time_minutes?: number  # Required if goal_type = 'target_performance'
 Response: 201
+  training_goal: TrainingGoalResponse
+Auth: Bearer JWT, require_self
+
+PATCH /athletes/{athlete_id}/goals/{goal_id}
+Description: Updates status, description, or race event date.
+Constraints:
+  - goal_event_date changes are ONLY allowed if goal_type = 'race_event'.
+  - target_performance goals MUST use the coach-driven regeneration endpoints.
+Request:
+  status?: 'completed' | 'abandoned'
+  goal_event_date?: string  # Triggers plan regen if delta > 7 days
+  goal_description?: string
+Response: 200 | 403 (if attempting to change target_performance date)
   training_goal: TrainingGoalResponse
 Auth: Bearer JWT, require_self
 
@@ -167,34 +224,29 @@ Response: 200 | 404
   training_goal: TrainingGoalResponse
 Auth: Bearer JWT, require_self
 
-PATCH /athletes/{athlete_id}/goals/{goal_id}
-Request:
-  status?: 'completed' | 'abandoned'
-  goal_event_date?: string  # triggers plan regen if delta > 7 days
-  goal_description?: string
-Response: 200
-  training_goal: TrainingGoalResponse
-Auth: Bearer JWT, require_self
-
 GET /athletes/{athlete_id}/goals
 Response: 200
-  goals: TrainingGoalResponse[]  # all goals, ordered by created_at desc
+  goals: TrainingGoalResponse[]  # All goals, ordered by created_at desc
 Auth: Bearer JWT, require_self
+```
 
+### Secondary Events
+
+```yaml
 POST /athletes/{athlete_id}/goals/{goal_id}/secondary-events
-Description: Registers a secondary event (B-event or C-event) on an active goal. Returns 422 if validation fails (max 3, conflict with A-race schedule).
+Description: Registers a B-event or C-event. Max 3 per goal.
 Request:
-  event_type: SecondaryEventType, required
+  event_type: GoalEventType, required
   event_date: string (YYYY-MM-DD), required
   event_name?: string
-  priority: SecondaryEventPriority, required  # 'B' or 'C'
-Response: 201
+  priority: 'B' | 'C', required
+Response: 201 | 422 (if validation fails)
   secondary_event: SecondaryEventResponse
 Auth: Bearer JWT, require_self
 
 PATCH /athletes/{athlete_id}/goals/{goal_id}/secondary-events/{event_id}
 Request:
-  event_date?: string  # triggers redistribution if needed
+  event_date?: string  # Triggers redistribution check
   event_name?: string
 Response: 200
   secondary_event: SecondaryEventResponse
@@ -206,77 +258,78 @@ Response: 200
 Auth: Bearer JWT, require_self
 ```
 
+### Coach-Driven Regeneration (Target Performance)
+
+```yaml
+POST /athletes/{athlete_id}/goals/{goal_id}/coach-propose-date-change
+Description: Proposes a date change based on trajectory analysis. Creates a pending RegenerationTask.
+Request:
+  proposed_date: string (YYYY-MM-DD), required
+  rationale: string, required  # Plain English; surfaced to athlete
+  trigger: 'trajectory_ahead' | 'trajectory_at_risk' | 'coach_conversation', required
+Response: 202 Accepted
+  regeneration_task: {
+    id: string
+    proposed_date: string
+    rationale: string
+    status: 'pending_confirmation'
+    expires_at: string  # 14 days from proposal
+  }
+Auth: Bearer JWT, require_coach_or_self  # Coach can propose; athlete can request via conversation
+
+POST /athletes/{athlete_id}/goals/{goal_id}/coach-confirm-date-change
+Description: Confirms or declines a proposed date change.
+Request:
+  regeneration_task_id: string, required
+  confirmed: boolean, required
+Response:
+  If confirmed: 200
+    new_training_plan: TrainingPlanResponse
+    superseded_plan_id: string
+  If declined: 200
+    regeneration_task: { status: 'declined' }
+Auth: Bearer JWT, require_self
+```
+
 ---
 
 ## Storage Model
 
 | Data | Strategy | Consistency | Retention |
 |---|---|---|---|
-| `training_goals` table | append-only (status mutable) | strong | indefinite |
+| `training_goals` table | Append-only (status mutable) | Strong | Indefinite |
+| `secondary_events` table | Mutable | Strong | Indefinite |
+| `regeneration_tasks` table | Append-only (status mutable) | Strong | Indefinite |
 
-Partial unique index: `CREATE UNIQUE INDEX ON training_goals (athlete_id) WHERE status = 'active'`
-
----
-
-## Mutation Rules
-
-| Layer | Read | Write | Delete |
-|---|---|---|---|
-| API | Yes | status, goal_event_date, goal_description only | No |
-| Service | Yes | All fields at creation; status/date/description after | No |
-| Repository | Yes | Yes | No |
-
----
-
-## Runtime Ownership
-
-Owns:
-- Goal context for plan generation and first message agent
-- Active goal enforcement (one per athlete)
-
-Does Not Own:
-- Plan generation logic → `02-computations/plan-generation.md` (hub), `02-computations/plan-generation-race.md` (race mode), `02-computations/plan-generation-fitness-improvement.md` (fitness improvement), `02-computations/plan-generation-maintenance.md` (maintenance), `02-computations/plan-generation-recovery.md` (recovery)
-- TwinState bootstrap values → `02-computations/load-computation.md`
-- TrainingPlan that belongs to this goal → `01-entities/training-plan.md`
-
----
-
-## Idempotency
-
-- Creating a goal when one is already active → 409 (no partial state created)
-- PATCH with the same `status` it already has → 200 (no-op)
-
----
-
-## Failure Semantics
-
-- `POST /goals` with conflicting active goal → 409 Conflict with message identifying the existing active goal
-- `PATCH` attempting to modify an immutable field → 422 Unprocessable Entity
-- `PATCH status=completed` on an already-completed goal → 422
-
----
-
-## Performance Constraints
-
-- `GET /goals/active`: p95 < 50ms (indexed on athlete_id WHERE status='active')
-- `POST /goals`: p95 < 200ms
+**Indexes:**
+-   `CREATE UNIQUE INDEX idx_training_goals_active ON training_goals (athlete_id) WHERE status = 'active';`
+-   `CREATE INDEX idx_regeneration_tasks_pending ON regeneration_tasks (training_goal_id, status) WHERE status = 'pending_confirmation';`
 
 ---
 
 ## Observability
 
-Metrics:
-- `training_goal.created.total`: by goal_type (race_event, fitness_improvement, maintenance, recovery)
-- `training_goal.completed.total`
-- `training_goal.abandoned.total`
-Logs:
-- `training_goal.created`: athlete_id, goal_type, goal_event_type, fitness_level
-- `training_goal.closed`: athlete_id, goal_id, status, duration_days
+**Metrics:**
+-   `training_goal.created.total`: By `goal_type`.
+-   `training_goal.closed.total`: By `status` (completed vs. abandoned).
+-   `regeneration_task.proposed.total`: By `trigger` (trajectory_ahead, at_risk, conversation).
+-   `regeneration_task.confirmed.rate`: Percentage of proposals accepted by athletes.
+
+**Logs:**
+-   `training_goal.created`: `athlete_id`, `goal_type`, `fitness_level`.
+-   `training_goal.closed`: `athlete_id`, `goal_id`, `status`, `duration_days`.
+-   `regeneration_task.proposed`: `athlete_id`, `goal_id`, `trigger`, `proposed_date`.
+-   `regeneration_task.confirmed`: `athlete_id`, `goal_id`, `task_id`.
+
+**Alerts:**
+-   **Stagnant Proposals:** Alert if `regeneration_task` remains `pending_confirmation` > 14 days (should auto-expire, but verify logic).
+-   **High Abandonment Rate:** Alert if `abandoned` rate > 20% for a specific `goal_type` cohort.
 
 ---
 
-## Implementation Notes
+## Cross-References
 
-- The partial unique index on `(athlete_id) WHERE status = 'active'` enforces the constraint at the database level without application-layer race conditions
-- `recent_injury` free text is passed verbatim to `PlanGenerationService` as a constraint — it is not parsed or classified
-- The `goal_event_date` exception to immutability is intentional: races get postponed or changed. The 7-day delta gate prevents constant noise plan regenerations from minor date adjustments.
+-   **Plan Generation:** `02-computations/plan-generation.md` (consumes `TrainingGoal` to build phase arc).
+-   **Regeneration Task Entity:** `01-entities/regeneration-task.md` (full schema and state machine).
+-   **Decision Authority:** `docs/vision/coach/decision-authority.md` ("Plan Modification Authority").
+-   **Goal Modes:** `docs/vision/product/goal-modes.md` (coaching posture per `goal_type`).

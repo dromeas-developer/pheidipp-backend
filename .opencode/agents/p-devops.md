@@ -20,7 +20,6 @@ tools:
   "pheidipp-codebase-context_search_symbols":           false
   "pheidipp-codebase-context_get_architecture_context": false
   "pheidipp-codebase-context_reindex":                  false
-  "pheidipp-codebase-context_write_report":             true
 ---
 
 # Pheidipp — DevOps & Build Validator

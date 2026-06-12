@@ -26,7 +26,7 @@ Runs weekly, before the weekly synthesis agent. Triggered by:
 ```typescript
 type PreWeekReviewInput = {
   // What the plan says for this week
-  phase_arc_entry: PhaseArcEntry      // from TrainingPlan.phase_arc
+  weekly_distribution: WeeklyDistribution      // from TrainingPlan.weekly_distributions
   
   // What actually happened
   prior_weeks_summary: PriorWeekSummary[]
@@ -59,7 +59,17 @@ type AdjustedWeeklyIntent = {
   phase_label: PhaseLabel
   methodology: MethodologyTraitVector
   physiological_emphasis: string      // "aerobic base consolidation"
-  intensity_bias: 'easy' | 'balanced' | 'moderate' | 'quality'
+  
+  // Continuous intensity distribution (replaces former intensity_bias enum)
+  target_distribution: {
+    low_aerobic: number
+    high_aerobic: number
+    threshold: number
+    vo2max: number
+    neuromuscular: number
+  }
+  target_specificity: number          // from weekly distribution
+  objective: ObjectiveCategory[]      // from phase definition
   
   // Session count for this week (computed by PreWeekReviewService)
   session_count: number               // from compute_session_count(); weekly planner reads this
@@ -68,6 +78,10 @@ type AdjustedWeeklyIntent = {
   adjustment_made: boolean
   adjustment_reason: string | null    // "athlete recovery below baseline, reducing intensity"
   adjustment_source: 'plan_unchanged' | 'fatigue_correction' | 'schedule_constraint' | 'adaptation_acceleration' | 'checkpoint_result'
+  
+  // Distribution adjustment tracking
+  distribution_adjusted: boolean      // did pre-week review modify the distribution?
+  distribution_adjustment_reason: string | null
   
   // Constraints for the weekly planner
   max_sessions: number | null         // audit: override value if one was applied (for observability; weekly planner reads only session_count)
@@ -89,66 +103,100 @@ type AdjustedWeeklyIntent = {
 The review is a pure Python function. All inputs are pre-computed; no LLM reasoning is required.
 
 ```python
+# TargetDistribution: see 00-foundations/terminology.md
+# {
+#   low_aerobic: number
+#   high_aerobic: number
+#   threshold: number
+#   vo2max: number
+#   neuromuscular: number
+# }
+
 def review_weekly_intent(input: PreWeekReviewInput) -> AdjustedWeeklyIntent:
-    base = input.phase_arc_entry
+    base = input.weekly_distribution
 
     # Derive max available sessions from weekly schedule
     max_available = derive_max_available(input.athlete_preferences.weekly_schedule)
 
+    # Helper: shift distribution toward easy
+    def shift_to_easy(dist: TargetDistribution) -> TargetDistribution:
+        return TargetDistribution(
+            low_aerobic=min(1.0, dist.low_aerobic + 0.3),
+            high_aerobic=dist.high_aerobic * 0.7,
+            threshold=dist.threshold * 0.5,
+            vo2max=dist.vo2max * 0.3,
+            neuromuscular=dist.neuromuscular * 0.3,
+        )
+
+    # Helper: shift distribution toward moderate
+    def shift_to_moderate(dist: TargetDistribution) -> TargetDistribution:
+        return TargetDistribution(
+            low_aerobic=max(0, dist.low_aerobic - 0.1),
+            high_aerobic=dist.high_aerobic + 0.05,
+            threshold=min(1.0, dist.threshold + 0.05),
+            vo2max=dist.vo2max,
+            neuromuscular=dist.neuromuscular,
+        )
+
     # 1. Check recovery state
     if input.current_wellness == "red":
+        adjusted_dist = shift_to_easy(base.target_distribution)
         session_count = compute_session_count(SessionCountInput(
             target_session_count=base.target_session_count,
-            intensity_bias="easy",
+            target_distribution=adjusted_dist,
             max_available=max_available,
             max_sessions=None,
         ))
         return AdjustedWeeklyIntent(
             **base,
+            target_distribution=adjusted_dist,
             session_count=session_count,
             adjustment_made=True,
             adjustment_reason="Wellness state RED — reducing intensity emphasis",
             adjustment_source="fatigue_correction",
-            intensity_bias="easy",
             avoid_session_types=["threshold", "vo2max"],
         )
 
     # 2. Check accumulated fatigue vs plan expectation
-    expected_fatigue = compute_expected_fatigue(input.phase_arc_entry)
-    actual_fatigue = (input.prior_weeks_summary[-1].accumulated_fatigue_delta if input.prior_weeks_summary else 0)
+    expected_fatigue = compute_expected_fatigue(base)
+    actual_fatigue = (input.prior_weeks_summary[-1].accumulated_fatigue_delta
+                      if input.prior_weeks_summary else 0)
     if actual_fatigue > expected_fatigue * 1.2:
+        adjusted_dist = shift_to_easy(base.target_distribution)
         session_count = compute_session_count(SessionCountInput(
             target_session_count=base.target_session_count,
-            intensity_bias="easy",
+            target_distribution=adjusted_dist,
             max_available=max_available,
             max_sessions=None,
         ))
         return AdjustedWeeklyIntent(
             **base,
+            target_distribution=adjusted_dist,
             session_count=session_count,
             adjustment_made=True,
             adjustment_reason="Accumulated fatigue exceeds plan expectation by >20%",
             adjustment_source="fatigue_correction",
-            intensity_bias="easy",
         )
 
     # 3. Check if adaptation signature suggests acceleration
     if input.adaptation_signature and len(input.adaptation_signature) >= 3:
-        yield_data = compute_yield_by_state(input.adaptation_signature)
-        if yield_data.threshold > POPULATION_MEDIAN * 1.2 and base.intensity_bias != "quality":
+        yield_by_state = compute_yield_by_state(input.adaptation_signature)
+        if (yield_by_state.threshold > POPULATION_MEDIAN * 1.2
+                and base.target_distribution.threshold < 0.2):
+            adjusted_dist = shift_to_moderate(base.target_distribution)
             session_count = compute_session_count(SessionCountInput(
                 target_session_count=base.target_session_count,
-                intensity_bias="moderate",
+                target_distribution=adjusted_dist,
                 max_available=max_available,
                 max_sessions=None,
             ))
             return AdjustedWeeklyIntent(
                 **base,
+                target_distribution=adjusted_dist,
                 session_count=session_count,
                 adjustment_made=True,
                 adjustment_reason="Threshold adaptation yield above median — can progress earlier",
                 adjustment_source="adaptation_acceleration",
-                intensity_bias="moderate",
             )
 
     # 4. Check checkpoint results
@@ -156,7 +204,7 @@ def review_weekly_intent(input: PreWeekReviewInput) -> AdjustedWeeklyIntent:
     if recent_checkpoint and recent_checkpoint.confidence_changed and recent_checkpoint.new_level == "high":
         session_count = compute_session_count(SessionCountInput(
             target_session_count=base.target_session_count,
-            intensity_bias=base.intensity_bias,
+            target_distribution=base.target_distribution,
             max_available=max_available,
             max_sessions=None,
         ))
@@ -170,12 +218,12 @@ def review_weekly_intent(input: PreWeekReviewInput) -> AdjustedWeeklyIntent:
 
     # 5. Check rolling disruption rate (coaching signal — no automatic adjustment)
     disruption_rate = compute_rolling_disruption_rate(input.prior_weeks_summary)
-    disruption_exceeded = disruption_rate > DISRUPTION_THRESHOLD  # 0.20
+    disruption_exceeded = disruption_rate > DISRUPTION_THRESHOLD
 
     # 6. No adjustment needed
     session_count = compute_session_count(SessionCountInput(
         target_session_count=base.target_session_count,
-        intensity_bias=base.intensity_bias,
+        target_distribution=base.target_distribution,
         max_available=max_available,
         max_sessions=None,
     ))
@@ -186,44 +234,13 @@ def review_weekly_intent(input: PreWeekReviewInput) -> AdjustedWeeklyIntent:
         adjustment_reason=None,
         adjustment_source="plan_unchanged",
         disruption_threshold_exceeded=disruption_exceeded,
-        disruption_window_weeks=DISRUPTION_WINDOW_WEEKS,  # 3
+        disruption_window_weeks=DISRUPTION_WINDOW_WEEKS,
         disruption_rate=disruption_rate,
         disruption_rationale=(
-            f"{disruption_rate:.0%} of sessions missed over {DISRUPTION_WINDOW_WEEKS} weeks"
+            f"{disruption_rate * 100:.0f}% of sessions missed over {DISRUPTION_WINDOW_WEEKS} weeks"
             if disruption_exceeded else None
         ),
     )
-```
-
-### Disruption Computation
-
-```python
-# Configurable parameters
-DISRUPTION_THRESHOLD = 0.20  # 20% of sessions missed
-DISRUPTION_WINDOW_WEEKS = 3  # rolling window
-
-def compute_rolling_disruption_rate(prior_weeks_summary: list[PriorWeekSummary]) -> float:
-    """Compute rolling disruption rate over the configured window.
-
-    Only considers weeks with data. If fewer than DISRUPTION_WINDOW_WEEKS
-    have data, uses whatever is available.
-
-    Returns: float between 0.0 and 1.0
-    """
-    if not prior_weeks_summary:
-        return 0.0
-
-    window = prior_weeks_summary[-DISRUPTION_WINDOW_WEEKS:]
-
-    total_missed = sum(w.sessions_missed for w in window)
-    total_completed = sum(w.sessions_completed for w in window)
-    total_skipped = sum(w.sessions_skipped for w in window)
-
-    denominator = total_completed + total_missed + total_skipped
-    if denominator == 0:
-        return 0.0
-
-    return total_missed / denominator
 ```
 
 ---
@@ -231,68 +248,95 @@ def compute_rolling_disruption_rate(prior_weeks_summary: list[PriorWeekSummary])
 ## Decision Logic
 
 ```typescript
+// TargetDistribution: see 00-foundations/terminology.md
+
 function reviewWeeklyIntent(input: PreWeekReviewInput): AdjustedWeeklyIntent {
-  const base = input.phase_arc_entry
+  const base = input.weekly_distribution
   
   // Derive max available sessions from weekly schedule
   const maxAvailable = deriveMaxAvailable(input.athlete_preferences.weekly_schedule)
   
+  // Helper: shift distribution toward easy
+  function shiftToEasy(dist: TargetDistribution): TargetDistribution {
+    return {
+      low_aerobic: Math.min(1.0, dist.low_aerobic + 0.3),
+      high_aerobic: dist.high_aerobic * 0.7,
+      threshold: dist.threshold * 0.5,
+      vo2max: dist.vo2max * 0.3,
+      neuromuscular: dist.neuromuscular * 0.3
+    }
+  }
+  
+  // Helper: shift distribution toward moderate
+  function shiftToModerate(dist: TargetDistribution): TargetDistribution {
+    return {
+      low_aerobic: Math.max(0, dist.low_aerobic - 0.1),
+      high_aerobic: dist.high_aerobic + 0.05,
+      threshold: Math.min(1.0, dist.threshold + 0.05),
+      vo2max: dist.vo2max,
+      neuromuscular: dist.neuromuscular
+    }
+  }
+  
   // 1. Check recovery state
   if (input.current_wellness === 'red') {
+    const adjusted_dist = shiftToEasy(base.target_distribution)
     const sessionCount = computeSessionCount({
       target_session_count: base.target_session_count,
-      intensity_bias: 'easy',
+      target_distribution: adjusted_dist,
       max_available: maxAvailable,
       max_sessions: null
     })
     return {
       ...base,
+      target_distribution: adjusted_dist,
       session_count: sessionCount,
       adjustment_made: true,
       adjustment_reason: 'Wellness state RED — reducing intensity emphasis',
       adjustment_source: 'fatigue_correction',
-      intensity_bias: 'easy',
       avoid_session_types: ['threshold', 'vo2max']
     }
   }
   
   // 2. Check accumulated fatigue vs plan expectation
-  const expected_fatigue = computeExpectedFatigue(input.phase_arc_entry)
+  const expected_fatigue = computeExpectedFatigue(base)
   const actual_fatigue = last(input.prior_weeks_summary)?.accumulated_fatigue_delta ?? 0
   if (actual_fatigue > expected_fatigue * 1.2) {
+    const adjusted_dist = shiftToEasy(base.target_distribution)
     const sessionCount = computeSessionCount({
       target_session_count: base.target_session_count,
-      intensity_bias: 'easy',
+      target_distribution: adjusted_dist,
       max_available: maxAvailable,
       max_sessions: null
     })
     return {
       ...base,
+      target_distribution: adjusted_dist,
       session_count: sessionCount,
       adjustment_made: true,
       adjustment_reason: 'Accumulated fatigue exceeds plan expectation by >20%',
-      adjustment_source: 'fatigue_correction',
-      intensity_bias: 'easy'
+      adjustment_source: 'fatigue_correction'
     }
   }
   
   // 3. Check if adaptation signature suggests acceleration
   if (input.adaptation_signature && input.adaptation_signature.length >= 3) {
     const yield = computeYieldByState(input.adaptation_signature)
-    if (yield.threshold > POPULATION_MEDIAN * 1.2 && base.intensity_bias !== 'quality') {
+    if (yield.threshold > POPULATION_MEDIAN * 1.2 && base.target_distribution.threshold < 0.2) {
+      const adjusted_dist = shiftToModerate(base.target_distribution)
       const sessionCount = computeSessionCount({
         target_session_count: base.target_session_count,
-        intensity_bias: 'moderate',
+        target_distribution: adjusted_dist,
         max_available: maxAvailable,
         max_sessions: null
       })
       return {
         ...base,
+        target_distribution: adjusted_dist,
         session_count: sessionCount,
         adjustment_made: true,
         adjustment_reason: 'Threshold adaptation yield above median — can progress earlier',
-        adjustment_source: 'adaptation_acceleration',
-        intensity_bias: 'moderate'
+        adjustment_source: 'adaptation_acceleration'
       }
     }
   }
@@ -302,7 +346,7 @@ function reviewWeeklyIntent(input: PreWeekReviewInput): AdjustedWeeklyIntent {
   if (recentCheckpoint?.confidence_changed && recentCheckpoint.new_level === 'high') {
     const sessionCount = computeSessionCount({
       target_session_count: base.target_session_count,
-      intensity_bias: base.intensity_bias,
+      target_distribution: base.target_distribution,
       max_available: maxAvailable,
       max_sessions: null
     })
@@ -322,7 +366,7 @@ function reviewWeeklyIntent(input: PreWeekReviewInput): AdjustedWeeklyIntent {
   // 6. No adjustment needed
   const sessionCount = computeSessionCount({
     target_session_count: base.target_session_count,
-    intensity_bias: base.intensity_bias,
+    target_distribution: base.target_distribution,
     max_available: maxAvailable,
     max_sessions: null
   })
@@ -348,11 +392,13 @@ function reviewWeeklyIntent(input: PreWeekReviewInput): AdjustedWeeklyIntent {
 
 | Source | Condition | Typical Adjustment |
 |---|---|---|
-| `plan_unchanged` | No deviation detected | Pass through plan intent |
-| `fatigue_correction` | Wellness RED or accumulated fatigue >20% above plan | Reduce intensity bias, avoid hard sessions |
+| `plan_unchanged` | No deviation detected | Pass through plan distribution and intent |
+| `fatigue_correction` | Wellness RED or accumulated fatigue >20% above plan | Shift distribution toward easy (increase low_aerobic proportion), reduce session count, avoid hard sessions |
 | `schedule_constraint` | Athlete availability reduced this week | Reduce max_sessions, prefer shorter sessions |
-| `adaptation_acceleration` | Adaptation yield above median, phase allows progression | Increase intensity bias, shift toward quality |
-| `checkpoint_result` | Confidence upgraded or metric updated | Enable more precise targets |
+| `adaptation_acceleration` | Adaptation yield above median, phase allows progression | Shift distribution toward quality (increase threshold/vo2max proportion), increase session count |
+| `checkpoint_result` | Confidence upgraded or metric updated | Enable more precise targets, adjust distribution if phase objectives are being met ahead of schedule |
+
+**Distribution adjustment mechanism:** The pre-week review reads the `WeeklyDistribution` for the upcoming week (derived from phase definitions by deterministic expansion). When adjustment is needed, it modifies the `target_distribution` values and sets `distribution_adjusted = true` with a reason. The weekly synthesis agent receives the adjusted distribution.
 
 **Note:** `disruption_threshold_exceeded` is a coaching signal, not an adjustment source. It does not change the plan's tactical direction. It surfaces in the output for the coach to act on — typically initiating a conversation about workload, motivation, or external factors. See `weekly-coaching-rhythm.md` for the behavioral contract.
 
@@ -393,7 +439,7 @@ function reviewWeeklyIntent(input: PreWeekReviewInput): AdjustedWeeklyIntent {
 |---|---|---|---|
 | `pre_week_review_completed` | Review finished | v1 | `{training_plan_id, week_number, adjustment_made, adjustment_source, disruption_threshold_exceeded}` |
 
-Note: The payload contains `training_plan_id` and `week_number`, not `weekly_plan_id`. The WeeklyPlan does not exist yet at the time of the review. The weekly synthesis agent uses these fields to look up the phase arc entry and create the WeeklyPlan. The `disruption_threshold_exceeded` field is a boolean coaching signal — it does not trigger automatic plan changes.
+Note: The payload contains `training_plan_id` and `week_number`, not `weekly_plan_id`. The WeeklyPlan does not exist yet at the time of the review. The weekly synthesis agent uses these fields to look up the weekly distribution and create the WeeklyPlan. The `disruption_threshold_exceeded` field is a boolean coaching signal — it does not trigger automatic plan changes.
 
 ### Consumed
 
@@ -415,7 +461,7 @@ Plan modifications are coach decisions, not athlete requests. The athlete sees t
 ## Cross-References
 
 - Decision authority: `docs/vision/coach/decision-authority.md` → "Plan Modification Authority"
-- Plan phase arc: `01-entities/training-plan.md` → `phase_arc`
+- Plan phase definitions: `01-entities/training-plan.md` → `phase_definitions`
 - Weekly synthesis: `03-agents/weekly-synthesis-agent.md`
 - Wellness state: `02-computations/wellness-modifier.md`
 - Adaptation signature: `01-entities/adaptation-signature.md`
@@ -425,6 +471,6 @@ Plan modifications are coach decisions, not athlete requests. The athlete sees t
 
 ## Design Notes
 
-- Week 1 has no prior execution data, so the pre-week review is unnecessary. PlanGenerationService creates the first WeeklyPlan atomically with the phase arc.
+- Week 1 has no prior execution data, so the pre-week review is unnecessary. PlanGenerationService creates the first WeeklyPlan atomically with the phase definitions.
 - The adjustment explanation surfaced to the athlete is generated via templates, not LLM narration.
 - The deterministic rule hierarchy (wellness → fatigue → adaptation → checkpoint) is a design decision. If the priority order needs adjustment, update the rules directly.

@@ -21,21 +21,51 @@ Triggered by `pre_week_review_completed` event. Runs once per week, before the w
 ## Context Type
 
 ```typescript
+type WeeklyFeasibilityMatrix = {
+  week_number: number
+  available_days: string[]  // ['2026-06-01', '2026-06-03', ...] from athlete preferences
+
+  // Hard constraints (LLM cannot violate)
+  blocked_days: {
+    date: string
+    reason: 'checkpoint' | 'secondary_event' | 'travel' | 'unavailable'
+  }[]
+
+  // Physiological constraints (48h rule)
+  quality_session_eligible_days: string[]  // Days where quality sessions are allowed
+  long_run_candidates: string[]  // Days suitable for long run (typically 1-2 options)
+
+  // Soft constraints (LLM should prefer)
+  preferred_quality_days: string[]  // e.g., weekends for athletes with weekday travel
+  preferred_recovery_days: string[]  // e.g., Mondays post-weekend long run
+
+  // Pre-computed anchors (non-negotiable)
+  long_run_day: string | null  // If athlete has explicit preference
+  checkpoint_sessions: {
+    date: string
+    type: CheckpointType
+    metric: string
+  }[]
+}
+
 type WeeklySynthesisInput = {
   // What this week is about (after pre-week review)
   adjusted_intent: AdjustedWeeklyIntent
-  
+
   // Current athlete state
   twin_state: TwinState
-  athlete_preferences: AthletePreferences  // available days, long_workout_day
-  
+  athlete_preferences: AthletePreferences
+
   // Prior context
-  prior_weeks_summary: PriorWeekSummary[]  // for continuity
-  training_plan: TrainingPlan              // for phase context and race schedule
-  
+  prior_weeks_summary: PriorWeekSummary[]
+  training_plan: TrainingPlan
+
+  // Feasibility Matrix (pre-computed constraints)
+  feasibility_matrix: WeeklyFeasibilityMatrix
+
   // Schedule constraints
-  secondary_events: SecondaryEvent[]       // any B/C races this week
-  checkpoint_schedule: CheckpointDescriptor[]  // checkpoints for THIS week (pre-filtered by caller)
+  secondary_events: SecondaryEvent[]
+  checkpoint_schedule: CheckpointDescriptor[]
 }
 ```
 
@@ -87,7 +117,7 @@ type WeeklySessionPlacement = {
 
 ### Context
 - AdjustedWeeklyIntent from pre-week review
-- Athlete preferences (available days, long_workout_day)
+- Athlete preferences (weekly_schedule for availability and long_workout)
 - Prior weeks summary (for continuity and fatigue context)
 - Training plan (phase context, race schedule, checkpoint schedule)
 - Secondary events this week
@@ -95,19 +125,43 @@ type WeeklySessionPlacement = {
 
 ### Instructions
 1. Read `session_count` from `AdjustedWeeklyIntent` (pre-computed by PreWeekReviewService)
-2. Identify which days are available (including doubles capacity)
-3. Place long run on long_workout_day (if available)
-4. Place checkpoints if scheduled this week (checkpoint_schedule is pre-filtered to this week by caller)
-5. Identify potential block candidates (2-3 consecutive quality sessions)
-6. If blocks are appropriate, assign block_id and block positions
-7. Distribute remaining sessions across available days
-8. Ensure no back-to-back quality sessions unless they share a block_id
-9. Ensure long run followed by rest or recovery
-10. Ensure minimum 48h between intense efforts (primary to primary)
-11. Apply intensity bias to session type distribution
-12. For doubles days: assign AM primary, PM secondary
-13. For non-running sessions: set is_suggested = true, session_priority = 'secondary'
-14. Return WeeklySessionPlacement[]
+2. Read `feasibility_matrix` to understand hard constraints:
+   - Do NOT place sessions on `blocked_days`
+   - Do NOT place quality sessions on days NOT in `quality_session_eligible_days`
+   - Place `checkpoint_sessions` on their specified dates
+3. Place long run:
+   - If `feasibility_matrix.long_run_day` is set → use it
+   - Else → select from `long_run_candidates` based on athlete preferences
+   - Ensure followed by rest/recovery day
+4. Identify block candidates:
+   - Only group consecutive quality sessions if:
+     - Athlete has high training load (from `twin_state`)
+     - Recovery capacity is adequate (from `adaptation_signature`)
+     - No `blocked_days` interrupt the block
+   - Max 3 sessions per block
+   - Assign `block_id` and positions (`first`, `middle`, `last`)
+5. Distribute remaining sessions:
+   - Prioritize `preferred_quality_days` for threshold/vo2max
+   - Ensure 48h between intense efforts (primary-to-primary)
+   - Use `quality_session_eligible_days` as the only valid locations
+6. Apply intensity bias:
+   - Map `target_distribution` to session types using `SESSION_INTENT_MAP`
+   - Adjust for `target_specificity` (race-specific variants if >0.7)
+7. Handle doubles:
+   - If `doubles_eligible` day and not long run → schedule AM primary + PM secondary
+   - Secondary sessions are non-running suggestions (strength, yoga)
+8. Write intent descriptions:
+   - Plain English, natural language
+   - Connect session to weekly objective (from `adjusted_intent.objective[]`)
+   - Example: "Threshold session — 4x10min at LT2. Focus on controlled pacing."
+9. Validate output BEFORE returning:
+   - No quality sessions on consecutive dates (unless same block_id)
+   - Long run followed by rest/recovery
+   - All sessions on `available_days`
+   - Session count matches `adjusted_intent.session_count`
+10. If validation fails:
+    - Retry ONCE with specific error feedback (e.g., "Quality sessions on Tue/Wed — separate them")
+    - If second attempt fails → trigger template fallback
 
 ---
 
@@ -128,16 +182,33 @@ Session count is computed deterministically by `PreWeekReviewService` (or `PlanG
 
 The weekly synthesis agent reads `session_count` from `AdjustedWeeklyIntent` and distributes sessions across available days.
 
-### Intensity Bias → Session Type Distribution
+### Target Distribution → Session Type Distribution
 
-| Intensity Bias | Easy Sessions | Quality Sessions | Notes |
-|---|---|---|---|
-| `easy` | 80–100% | 0–20% | Recovery or fatigue correction weeks |
-| `balanced` | 60–70% | 30–40% | Standard base building |
-| `moderate` | 50–60% | 40–50% | Build phase, threshold development |
-| `quality` | 40–50% | 50–60% | Race-specific, sharpening |
+The weekly synthesis agent reads `AdjustedWeeklyIntent.target_distribution` (continuous) instead of the former `intensity_bias` enum. The distribution directly drives session type counts.
 
-The weekly planner distributes session types to match the bias while respecting structural rules.
+**Distribution to session mapping:**
+
+```
+target_distribution = { low_aerobic: 0.55, high_aerobic: 0.15, threshold: 0.20, vo2max: 0.05, neuromuscular: 0.05 }
+session_count = 5
+
+→ Session types: 2-3 easy/low_aerobic, 1 high_aerobic (long run), 1 threshold, 0-1 vo2max/neuromuscular
+```
+
+**Specificity adjustment:** When `target_specificity` is high (>0.7), the agent selects race-specific variants of session types:
+- `threshold` → marathon-pace threshold (not generic LT2 intervals)
+- `high_aerobic` → marathon-pace long run (not easy long run)
+- `low_aerobic` → general aerobic (unchanged)
+
+**Objective guidance:** The `objective[]` array on `AdjustedWeeklyIntent` tells the agent WHY this week exists. The agent uses this to select specific workout types:
+- `objective: ['threshold_quality']` → threshold sessions use LT2 intervals
+- `objective: ['durability']` → long run includes sustained effort
+- `objective: ['pacing_discipline']` → race-pace work included
+
+**Recovery week adjustment:** When `is_recovery_week` is true (from weekly distribution), the agent:
+- Shifts distribution toward easy (increases low_aerobic proportion)
+- Reduces total session count by 1-2
+- Avoids quality sessions entirely
 
 ### Block Creation Logic
 
@@ -155,6 +226,12 @@ function identifyBlockCandidates(
   for (const session of sessions.sort((a, b) => a.target_date.localeCompare(b.target_date))) {
     if (quality_types.includes(session.session_type)) {
       currentBlock.push(session)
+      
+      // Enforce 3-session cap: push block when full, even if next session is quality
+      if (currentBlock.length === 3) {
+        candidates.push(currentBlock)
+        currentBlock = []
+      }
     } else {
       if (currentBlock.length >= 2) {
         candidates.push(currentBlock)
@@ -197,14 +274,17 @@ Note: When assigning `block_id` to consecutive quality sessions, the agent is cr
 
 ### Doubles Scheduling
 
-For athletes with doubles capacity:
+Doubles capacity is read from `AthletePreferences.weekly_schedule[day].doubles_eligible`. No inference needed — the flag is set explicitly during onboarding or preference updates.
 
 ```typescript
 function scheduleDoubles(
   sessions: WeeklySessionPlacement[],
   athlete_pref: AthletePreferences
 ): WeeklySessionPlacement[] {
-  const doubles_days = athlete_pref.doubles_days || [] // e.g. ['Tuesday', 'Thursday']
+  // Read doubles eligibility directly from schedule
+  const doubles_days = Object.entries(athlete_pref.weekly_schedule)
+    .filter(([_, schedule]) => schedule.available && schedule.doubles_eligible)
+    .map(([day, _]) => day)
   
   for (const session of sessions) {
     const day_of_week = getDayOfWeek(session.target_date)
@@ -259,10 +339,11 @@ If a checkpoint is scheduled this week:
 
 | Scenario | Behaviour |
 |---|---|
-| LLM failure | Fall back to template: distribute plan's default session types across available days |
-| Invalid output | Retry once with validation feedback; then template fallback |
-| Schedule constraints make synthesis impossible | Reduce session count until feasible; communicate to athlete |
-| No available days this week | Return empty sessions; flag as schedule conflict for athlete resolution |
+| LLM failure (timeout/API error) | Fall back to template (distribute session types across available days) |
+| Invalid output (fails validation) | Retry ONCE with specific constraint feedback; then template fallback |
+| Schedule constraints make synthesis impossible | Reduce session count until feasible; communicate to athlete via `adjustment_reason` |
+| No available days this week | Return empty sessions; flag as `schedule_conflict` for athlete resolution |
+| Feasibility matrix contradicts intent | Prioritize matrix (hard constraints); log warning for pre-week review audit |
 
 ---
 
@@ -277,26 +358,32 @@ def template_fallback(
 ) -> list[WeeklySessionPlacement]:
     sessions = []
     session_count = intent.session_count  # from AdjustedWeeklyIntent
-    available_days = athlete_pref.available_days
+
+    # Read availability from structured weekly_schedule
+    available_days = [day for day, schedule in athlete_pref.weekly_schedule.items() if schedule.available]
+    long_workout_day = next((day for day, schedule in athlete_pref.weekly_schedule.items() if schedule.long_workout), None)
 
     # Distribute: easy sessions first, then quality
     easy_count = math.ceil(session_count * 0.7)
     quality_count = session_count - easy_count
 
     # Place long run on long_workout_day
-    sessions.append(WeeklySessionPlacement(
-        target_date=next_date(athlete_pref.long_workout_day),
-        session_type="long_run",
-        intent_description=intent.physiological_emphasis,
-        approximate_duration_minutes=90,
-        is_checkpoint=False,
-    ))
+    if long_workout_day and long_workout_day in available_days:
+        sessions.append(WeeklySessionPlacement(
+            target_date=next_date(long_workout_day),
+            session_type="long_run",
+            intent_description=intent.physiological_emphasis,
+            approximate_duration_minutes=90,
+            is_checkpoint=False,
+        ))
 
     # Fill remaining sessions across available days
     # ... (simplified)
 
     return sessions
 ```
+
+**Note:** The template fallback now receives the `feasibility_matrix` and respects all hard constraints (blocked days, quality eligibility). It performs a simple round-robin distribution but never violates physiological rules.
 
 ---
 
@@ -346,7 +433,7 @@ The weekly rhythm is the coach's decision, not the athlete's. This agent produce
 - Weekly plan entity: `01-entities/weekly-plan.md`
 - Pre-week review: `03-agents/pre-week-review-agent.md` (Python service)
 - Session count computation: `02-computations/session-count.md`
-- Plan phase arc: `01-entities/training-plan.md` → `phase_arc`
+- Plan phase definitions: `01-entities/training-plan.md` → `phase_definitions`
 - Session placement rules: session placement rules section below
 - Workout generation: `03-agents/workout-generation-agent.md`
 - Checkpoint scheduling: `01-entities/checkpoint.md`

@@ -279,10 +279,26 @@ session_skipped / session_missed ──┐
                  training_plan_generated   (no action)
 ```
 
----
-
 ## Cross-References
 
 - All events and their schemas: `00-foundations/event-catalogue.md`
+- Event persistence (append-only log + transactional outbox): `04-platform/system-event.md`
 - Task definitions and retry policies: `04-platform/async-pipeline.md`
 - Failure handling per task type: `04-platform/failure-handling.md`
+
+---
+
+## Publication Mechanics
+
+Event emission follows the transactional outbox pattern to prevent phantom state:
+
+1. Domain service writes state change to database
+2. Same transaction writes `SystemEvent` row to `system_events` and `SystemEventOutbox` row with status = 'pending'
+3. Transaction commits atomically
+4. Publisher (post-commit) reads pending outbox entries and publishes to Redis/message bus
+5. On successful delivery, outbox row updated to status = 'published'
+
+This ensures:
+- Events are never lost due to process crash (persisted before publish)
+- Consumers never see state that wasn't committed (event linked to committed transaction)
+- Publication failures are retryable (outbox tracks attempts)

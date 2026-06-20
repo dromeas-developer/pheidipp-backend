@@ -89,3 +89,4 @@ A `CoachingMessage` without a corresponding `GenerationEvent` is a monitored ale
 - Async pipeline task definitions: `04-platform/async-pipeline.md`
 - GenerationEvent invariant: `01-entities/generation-event.md`
 - Activity fit_file_key invariant: `00-foundations/principles.md`
+- Event persistence and outbox failures: `04-platform/system-event.md`

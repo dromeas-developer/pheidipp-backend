@@ -24,6 +24,7 @@ All relational entity data. Strong consistency. Indefinite retention.
 - `physiological_segments` (+ `superseded_at`)
 - `race_predictions`, `adaptation_observations`
 - `checkpoints` (status + completion fields mutable)
+- `system_events` (+ `system_event_outbox` for publication status)
 
 *Mutable:*
 - `athletes`, `athlete_profiles`, `athlete_preferences`
@@ -148,3 +149,4 @@ WHERE training_plan_id = 'uuid-here';
 - Append-only invariant: `00-foundations/principles.md`
 - Versioning and supersession: `04-platform/versioning-and-reprocessing.md`
 - Async task queue: `04-platform/async-pipeline.md`
+- Event persistence: `04-platform/system-event.md`

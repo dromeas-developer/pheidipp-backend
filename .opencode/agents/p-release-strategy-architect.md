@@ -1,5 +1,5 @@
 ---
-model: litellm-proxy/nvidia/kimi-k2.6
+model: litellm-proxy/poolside/laguna-m.1
 temperature: 0.2
 
 permission:
@@ -7,7 +7,7 @@ permission:
     "*": "deny"
 
 tools:
-  read:       false
+  read:       true    # needed to read sub-phase docs before editing
   edit:       true
   write:      true
   bash:       false
@@ -40,7 +40,7 @@ tools:
   # Bulk / advanced retrieval
   "pheidipp-codebase-context_multi_search":             true
   "pheidipp-codebase-context_multi_context":            true
-  "pheidipp-codebase-context_change_impact":            true
+  "pheidipp-codebase-context_get_change_impact":        true
 
   # Release-plan maintenance
   "pheidipp-codebase-context_refresh_release_plan":     true
@@ -373,7 +373,8 @@ What could go wrong and what the fallback is.
 | Situation | Tool |
 |---|---|
 | Load a specific phase overview | `get_phase_context(phase_number)` |
-| Read a specific sub-phase document | Native read tool → `docs/release-plan/phase-N/phase-N-M-<title>.md` |
+| Read a sub-phase doc before editing | Native `read` tool → `docs/release-plan/phase-N/phase-N-M-<title>.md` |
+| List features/sub-phases in a phase | `list_release_plan_features(phase?)` then `get_feature_context(id)` |
 | Understand impact before restructuring | `get_change_impact(concept)` — one call returns everything affected |
 | Discovery across multiple capabilities | `multi_search(searches[])` — one search per capability across domains |
 | Compare two entities or subsystems | `multi_context(concepts: ["A", "B"])` — cross-domain, one call |
@@ -403,6 +404,11 @@ Do not use bulk retrieval when investigating a single concept, performing a
 targeted contract lookup, or when a bulk query would return substantially more
 information than required. Optimise for retrieval relevance and efficiency —
 not for maximising bulk tool usage.
+
+**Unknown section names:** when calling `get_entity_context` or
+`get_vision_context` without knowing which sections exist, omit the `sections`
+parameter to get the full document first. Identify the relevant sections from
+the result before making any follow-up filtered call. Never guess section names.
 
 ---
 

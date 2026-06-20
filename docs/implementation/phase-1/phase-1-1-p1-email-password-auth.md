@@ -6,196 +6,188 @@ Sub-Phase ID: Phase-1.1
 Sub-Phase Title: Phase 1 — Email/Password Authentication
 
 ## Objective
-Implement the foundational email/password authentication layer for Pheidipp so every later athlete-scoped endpoint can rely on a secure, token-based identity boundary. This plan creates the minimal identity/auth/profile storage, registration and login flows, JWT lifecycle, refresh-token rotation, and self-scope authorization dependency required by all downstream Phase 1 sub-phases.
+Implement the first authentication layer for Pheidipp by creating email/password registration, email/password login, JWT access-token issuance, 30-day refresh-token issuance, refresh-token rotation, and the `require_self` authorization dependency used by athlete-scoped routes. This plan establishes the secure identity foundation that later sub-phases depend on without implementing OAuth, email verification, password reset, rate limiting, onboarding, or full profile personalisation.
 
 ## Scope
-- Implement `POST /auth/register` for email/password registration.
-- Implement `POST /auth/login` for email/password login.
-- Implement `POST /auth/refresh` with 30-day refresh-token expiry and rotation on every use.
-- Issue access tokens with 15-minute expiry and refresh tokens with 30-day expiry.
-- Create minimal Phase 1.1 schema for `Athlete`, `AthleteAuth`, `AthleteProfile`, and `RefreshToken`.
-- Implement `require_self` route dependency for athlete-scoped endpoints.
-- Hash passwords with bcrypt and never store or return plaintext credentials.
-- Support multi-device sessions through a refresh-token table.
-- Produce auth events after successful registration and successful login/refresh token issuance.
-- Preserve `athlete.onboarding_complete = false` after registration; onboarding remains a later sub-phase.
+- `POST /auth/register` for email/password registration.
+- Atomic creation of `Athlete`, `AthleteAuth` with provider `email`, and minimal `AthleteProfile` with only registration demographics.
+- Secure bcrypt password hashing and password verification.
+- JWT access-token signing and verification with 15-minute expiry.
+- Refresh-token issuance with 30-day expiry and multi-device support through separate refresh-token records.
+- `POST /auth/refresh` refresh-token rotation: revoke the old token and insert a new token atomically.
+- `POST /auth/login` for email/password login and token-pair issuance.
+- `require_self` route dependency for athlete-scoped endpoints.
+- Safe API response serialization and logging that excludes secrets.
+- Production of authentication audit/security events defined by the architecture.
 
 ## Out Of Scope
-- OAuth providers (`google`, `strava`) and account linking.
+- OAuth providers Google and Strava.
+- Account linking, primary-method switching, auth-method removal, or password-change endpoints.
 - Email verification flow.
 - Password reset flow.
-- Rate limiting or brute-force hardening beyond bcrypt verification.
-- Full `AthleteProfile` schema beyond `date_of_birth`, `sex`, and `height_cm`.
-- `AthletePreferences`, `TrainingGoal`, onboarding, plan, coaching, workout, or activity endpoints.
-- OAuth provider token refresh or provider credential management.
+- Rate limiting or brute-force throttling.
+- Onboarding, training goals, twin bootstrap, or full `AthleteProfile` schema fields.
+- Athlete-scoped endpoint business logic beyond the shared `require_self` dependency.
 
 ## Architecture Contracts
-- `01-entities/athlete.md` — IMPLEMENTS `Athlete` creation and `AthleteResponse`; depends on `onboarding_complete = false` state after registration.
-- `01-entities/athlete-auth.md` — IMPLEMENTS email/password credential storage, token issuance, refresh-token rotation, and auth event production.
-- `01-entities/athlete-profile.md` — IMPLEMENTS minimal `AthleteProfile` creation at registration with only demographics fields needed for Phase 1.1.
-- `00-foundations/event-catalogue.md` → `athlete_registered` — PRODUCES after registration commits.
-- `00-foundations/event-catalogue.md` → `athlete_logged_in` — PRODUCES after login or refresh token issuance.
-- `docs/vision/product/brand-philosophy.md` — DEPENDS ON for plain, non-technical user-facing behavior and backend computation boundary.
-- `docs/vision/product/constraints.md` — DEPENDS ON for security and no-raw-data product constraints.
+- `01-entities/athlete.md` — IMPLEMENTS `Athlete` creation, `onboarding_complete = false` at registration, and `require_self` authorization semantics.
+- `01-entities/athlete-auth.md` — IMPLEMENTS email/password credential storage, login validation, refresh-token lifecycle, and auth event production.
+- `01-entities/athlete-profile.md` — IMPLEMENTS minimal registration profile with only `date_of_birth`, `sex`, and `height_cm` demographics.
+- `00-foundations/event-catalogue.md` → `athlete_registered` — PRODUCES after successful registration commit.
+- `00-foundations/event-catalogue.md` → `athlete_logged_in` — PRODUCES after successful login or refresh-token rotation.
+- `docs/vision/product/brand-philosophy.md` — DEPENDS ON plain, non-technical user-facing communication; auth errors must be clear without exposing internals.
+- `docs/vision/product/constraints.md` — DEPENDS ON security constraints and the principle that sensitive processing stays behind the API boundary.
 
 ## Invariants
 - `email` is unique across all athletes. Case-insensitive uniqueness enforced at DB level via unique index on `lower(email)`.
-- Authentication credentials are stored in `AthleteAuth`, not in `Athlete`. See `01-entities/athlete-auth.md`.
-- One `AthleteAuth` record per `(athlete_id, provider)`. An athlete cannot link the same provider twice.
 - `hashed_password` is never returned by any API endpoint or included in any log. Encrypted at rest.
-- `provider_tokens` is never returned by any API endpoint or included in any log. Encrypted at rest.
-- `provider_user_id` is never returned in API responses. Used for OAuth account matching only.
-- Exactly one `AthleteAuth` record per athlete must have `is_primary = true`. Primary cannot be removed without reassigning.
 - Refresh tokens are rotated on every use — old token is revoked atomically with new token creation.
 - `RefreshToken` records are append-only revocation records; rotation revokes the old token and inserts a new token record.
-- Email provider requires `hashed_password` (bcrypt). Google provider requires `provider_tokens`. Strava provider requires both `provider_tokens` and `provider_user_id`.
+- Refresh tokens expire 30 days after issuance (`expires_at = created_at + 30 days`). Expired tokens are rejected even if not revoked.
 - One `AthleteProfile` per `Athlete`. Created at registration. Enforced by unique constraint on `(athlete_id)`.
-- All events are scoped to a single `athlete_id`
-- `event_id` is a UUID, generated at the point of production
-- All events are append-only — events are never updated or deleted
-- Failed event processing is retried; events are not consumed destructively
-- `email` is unique across all athletes (case-insensitive)
-- `hashed_password` is never returned by any API endpoint or included in any log
-- Refresh tokens are rotated on every use — old token is revoked atomically with new token creation
-- Registration atomically creates `Athlete` and minimal `AthleteProfile`. If either fails, neither is committed.
+- Exactly one `AthleteAuth` record per athlete must have `is_primary = true`. Primary cannot be removed without reassigning.
+- `ip_address` in `RefreshToken` records is stored for audit only; if used for security analysis, it must be anonymized or hashed before logging.
+- Authentication credentials are stored in `AthleteAuth`, not in `Athlete`. See `01-entities/athlete-auth.md`.
+- The `require_self` FastAPI dependency validates that JWT `athlete_id` === path `athlete_id` and returns 403 on mismatch — never 404.
+- Registration atomically creates `Athlete` + `AthleteAuth` + `AthleteProfile` in a single database transaction. If any part fails, all roll back.
 
 ## Implementation Steps
-1. Create Phase 1.1 migrations for:
-   - `athletes` with `email` stored normalized to lowercase and `onboarding_complete = false`.
-   - `athlete_auths` with `provider = 'email'`, `hashed_password`, `is_primary = true`, and `last_login_at`.
-   - `athlete_profiles` with only `date_of_birth`, `sex`, and `height_cm` populated at registration.
-   - `athlete_refresh_tokens` as an append-only revocation ledger with hashed token lookup, expiry, revocation, and replacement fields.
-2. Add database constraints and indexes:
-   - Unique index on `lower(athletes.email)`.
-   - Unique constraint on `athlete_profiles.athlete_id`.
-   - Unique constraint on `(athlete_auths.athlete_id, athlete_auths.provider)`.
-   - Unique index on `athlete_refresh_tokens.token_hash`.
-   - Index on `(athlete_refresh_tokens.athlete_id, athlete_refresh_tokens.expires_at)`.
-3. Implement registration orchestration:
-   - Normalize and validate email.
-   - Validate password length and reject invalid requests before any write.
-   - Hash password with bcrypt cost factor 12 or higher.
-   - In one database transaction, insert `Athlete`, `AthleteAuth(provider='email')`, minimal `AthleteProfile`, and the first `RefreshToken`.
-   - Issue an access token and refresh token only after the transaction commits.
-   - Produce `athlete_registered` after commit.
-4. Implement login orchestration:
-   - Normalize email and locate the matching `AthleteAuth(provider='email')` through `Athlete`.
-   - Verify password with constant-time bcrypt comparison.
-   - On failure, return 401 without revealing whether email or password was wrong.
-   - On success, update `last_login_at`, issue a new token pair, insert a new `RefreshToken`, and produce `athlete_logged_in`.
-5. Implement refresh-token rotation:
-   - Hash the incoming refresh token and find an unexpired, unrevoked row.
-   - In one transaction, insert the replacement `RefreshToken`, set `revoked_at` and `replaced_by_refresh_token_id` on the old row, issue a new access token and refresh token, and produce `athlete_logged_in` with `token_type = 'refresh'`.
-   - If the old token is expired or revoked, return 401 and do not issue a replacement.
-6. Implement `require_self`:
-   - Decode and validate the access token.
-   - Return 401 for missing, malformed, expired, or unverifiable tokens.
-   - Return 403 when the JWT `athlete_id` does not match the path `athlete_id`.
-   - Never return 404 for authorization mismatches on athlete-scoped routes.
-7. Implement response and logging guards:
-   - Exclude `hashed_password`, `provider_tokens`, `provider_user_id`, raw refresh tokens, and token hashes from every API response.
-   - Log only non-sensitive identifiers such as `athlete_id`, provider, success/failure, and token type.
-   - Ensure duplicate registration cannot leave partial `Athlete`, `AthleteAuth`, `AthleteProfile`, or `RefreshToken` rows.
-8. Add auth observability:
-   - Count registrations, successful logins, failed logins, refresh successes, refresh failures, and expired-token attempts.
-   - Emit structured auth events without email, password, refresh token, or token hash values.
+1. Add or update persistence models for `Athlete`, `AthleteAuth`, minimal `AthleteProfile`, and `RefreshToken` so model registration and migrations reflect the Phase-1.1 contracts only.
+2. Enforce database uniqueness and lookup indexes for email normalization, `AthleteAuth`, and refresh-token lookup:
+   - `Athlete.email` unique via `lower(email)`.
+   - `AthleteAuth` unique per `(athlete_id, provider)`.
+   - `RefreshToken.token_hash` unique.
+   - `AthleteProfile.athlete_id` unique for the one-profile-per-athlete rule.
+3. Introduce a password-hashing component that hashes email-provider passwords with bcrypt cost factor 12 or higher and verifies passwords without returning or logging plaintext credentials.
+4. Introduce a token service that signs and verifies JWT access tokens with 15-minute expiry and creates opaque refresh tokens with 30-day expiry. JWT claims must include `athlete_id`; `auth_provider` may be included as informational only.
+5. Implement `POST /auth/register` in the auth service:
+   - Validate email format and password length.
+   - Normalize email to lowercase before persistence.
+   - Hash the password before persistence.
+   - Create `Athlete`, `AthleteAuth` with provider `email`, `is_primary = true`, and minimal `AthleteProfile` in one transaction.
+   - Create the first refresh-token audit record with a one-way token hash.
+   - Commit before producing `athlete_registered`.
+   - Return `AthleteResponse`, access token, and raw refresh token exactly once.
+   - Return 409 for duplicate email with no partial state.
+6. Implement `POST /auth/login` in the auth service:
+   - Look up the email-provider `AthleteAuth` record using normalized email.
+   - Verify the password with bcrypt and avoid credential/timing leakage.
+   - Update `last_login_at` only on successful validation.
+   - Issue a new access token and new refresh-token record.
+   - Produce `athlete_logged_in` after successful validation and token issuance.
+   - Return 401 for missing account, wrong password, or disabled credential without revealing which condition failed.
+7. Implement `POST /auth/refresh`:
+   - Hash the submitted refresh token and look up the matching `RefreshToken`.
+   - Reject missing, revoked, or expired tokens with 401.
+   - In one transaction, revoke the old token and insert a new token record with a new hash and new 30-day expiry.
+   - Populate the old token's replacement link atomically.
+   - Produce `athlete_logged_in` with `token_type = 'refresh'` after rotation succeeds.
+   - Return a new access token and new raw refresh token.
+8. Implement the `require_self` dependency used by athlete-scoped routes:
+   - Decode and verify the access-token signature and expiry.
+   - Return 401 for missing, malformed, or expired tokens.
+   - Return 403 when JWT `athlete_id` does not match the path `athlete_id`.
+   - Inject the authenticated `athlete_id` for downstream service calls.
+9. Add response serializers and logging safeguards so responses and logs never include `hashed_password`, `provider_tokens`, `provider_user_id`, plaintext passwords, raw refresh tokens, or stored token hashes.
+10. Register authentication metrics and safe audit logs for registration, login success/failure, refresh success/failure, and token rotation without logging credentials or email addresses.
 
 ## Event Contracts
 - `athlete_registered` — PRODUCES
-  - Required payload fields: `auth_provider: 'email'`, `has_password: true`, `profile_completed: boolean`.
-  - Envelope requirement: `athlete_id` must identify the newly registered athlete.
-  - Ordering assumption: Fires only after `Athlete`, `AthleteAuth`, minimal `AthleteProfile`, and initial `RefreshToken` have committed.
+  - Payload fields required by this plan: `auth_provider = 'email'`, `has_password = true`, `profile_completed = true` when the required registration profile fields are present.
+  - Ordering assumption: emitted only after the `Athlete`, `AthleteAuth`, minimal `AthleteProfile`, and first `RefreshToken` transaction commits.
 - `athlete_logged_in` — PRODUCES
-  - Required payload fields: `auth_provider: 'email'`, `token_type: 'access' | 'refresh'`, `ip_address: string | null`, `user_agent: string | null`.
-  - Envelope requirement: `athlete_id` must identify the authenticated athlete.
-  - Ordering assumption: Fires after password validation succeeds for login, or after a valid refresh token is rotated during refresh.
+  - Payload fields required by this plan: `auth_provider = 'email'`, `token_type = 'access'` for login, `token_type = 'refresh'` for refresh rotation, `ip_address`, `user_agent`.
+  - Ordering assumption: emitted only after password validation succeeds for login or after refresh-token rotation commits.
+- `refresh_token_rotated` — NOT PRODUCED
+  - Ordering assumption: token rotation is intentionally observable through the append-only `RefreshToken` ledger and metrics, not through a separate event.
 
 ## Pseudocode
 ```text
-register(email, password, profile):
-  normalize email
-  validate password
-  hash password with bcrypt
+POST /auth/register
+  validate email, password, required profile fields
+  normalized_email = lowercase(email)
+  password_hash = bcrypt_hash(password, cost >= 12)
 
-  transaction:
-    insert Athlete(email=lower(email), onboarding_complete=false)
-    insert AthleteAuth(athlete_id, provider='email', hashed_password, is_primary=true)
-    insert AthleteProfile(athlete_id, date_of_birth, sex, height_cm)
-    insert RefreshToken(athlete_id, token_hash, expires_at=now+30d)
+  begin transaction
+    create Athlete(email = normalized_email, onboarding_complete = false)
+    create AthleteAuth(
+      athlete_id,
+      provider = 'email',
+      hashed_password = password_hash,
+      is_primary = true
+    )
+    create AthleteProfile(athlete_id, date_of_birth, sex, height_cm)
+    create RefreshToken(
+      athlete_id,
+      token_hash = hash(raw_refresh_token),
+      expires_at = now + 30 days
+    )
+  commit transaction
 
-  issue access_token(expiry=15m, athlete_id, auth_provider='email')
-  issue refresh_token_secret
-  produce athlete_registered(auth_provider='email', has_password=true, profile_completed=profile_provided)
-  return athlete, access_token, refresh_token_secret
-```
+  emit athlete_registered(auth_provider='email', has_password=true, profile_completed=true)
+  return athlete, access_token(expires_in=15min), raw_refresh_token
 
-```text
-login(email, password):
-  normalize email
-  load AthleteAuth(provider='email') by normalized email
+POST /auth/login
+  normalized_email = lowercase(email)
+  auth_record = find AthleteAuth(provider='email', email normalized)
+  if auth_record missing or password verification fails:
+    return 401 without credential-specific details
 
-  if no record or bcrypt verification fails:
+  begin transaction
+    update auth_record.last_login_at
+    create RefreshToken(athlete_id, token_hash = hash(raw_refresh_token), expires_at = now + 30 days)
+  commit transaction
+
+  emit athlete_logged_in(auth_provider='email', token_type='access')
+  return athlete, access_token(expires_in=15min), raw_refresh_token
+
+POST /auth/refresh
+  submitted_hash = hash(raw_refresh_token)
+  token_record = find RefreshToken(token_hash = submitted_hash)
+  if token_record missing, revoked, or expired:
     return 401
 
-  transaction:
-    update AthleteAuth.last_login_at = now
-    insert RefreshToken(athlete_id, token_hash, expires_at=now+30d)
+  begin transaction
+    create new RefreshToken(
+      athlete_id = token_record.athlete_id,
+      token_hash = hash(new_raw_refresh_token),
+      expires_at = now + 30 days
+    )
+    set token_record.revoked_at = now
+    set token_record.replaced_by_refresh_token_id = new_token.id
+  commit transaction
 
-  issue access_token(expiry=15m, athlete_id, auth_provider='email')
-  issue refresh_token_secret
-  produce athlete_logged_in(auth_provider='email', token_type='access', ip_address, user_agent)
-  return athlete, access_token, refresh_token_secret
-```
+  emit athlete_logged_in(auth_provider='email', token_type='refresh')
+  return access_token(expires_in=15min), new_raw_refresh_token
 
-```text
-refresh(refresh_token_secret):
-  token_hash = hash(refresh_token_secret)
-  load RefreshToken by token_hash
-
-  if missing, expired, or revoked:
+require_self(path_athlete_id)
+  decode JWT
+  if token invalid or expired:
     return 401
-
-  transaction:
-    insert RefreshToken(athlete_id, token_hash=new_hash, expires_at=now+30d)
-    set old RefreshToken.revoked_at = now
-    set old RefreshToken.replaced_by_refresh_token_id = new.id
-
-  issue access_token(expiry=15m, athlete_id, auth_provider='email')
-  issue refresh_token_secret
-  produce athlete_logged_in(auth_provider='email', token_type='refresh', ip_address, user_agent)
-  return access_token, refresh_token_secret
-```
-
-```text
-require_self(jwt, path_athlete_id):
-  if jwt missing, malformed, expired, or unverifiable:
-    return 401
-
   if jwt.athlete_id != path_athlete_id:
     return 403
-
-  allow request
+  inject jwt.athlete_id
 ```
 
 ## Testing Requirements
-- `POST /auth/register` with a valid email/password creates exactly one `Athlete`, one `AthleteAuth(provider='email')`, one minimal `AthleteProfile`, and one `RefreshToken`; it returns a valid access token and refresh token.
-- `POST /auth/register` with an existing email using different casing returns 409 and leaves no partial `Athlete`, `AthleteAuth`, `AthleteProfile`, or `RefreshToken` rows.
-- `POST /auth/register` response contains no `hashed_password`, raw password, refresh token hash, or provider credential fields.
-- `POST /auth/login` with the wrong password returns 401 and does not issue tokens or create a new `RefreshToken`.
-- `POST /auth/login` with the correct password returns 200, updates `last_login_at`, creates a new `RefreshToken`, and produces `athlete_logged_in` with `token_type = 'access'`.
-- `POST /auth/refresh` with a valid refresh token returns a new token pair; the old refresh token returns 401 afterward; the new refresh token succeeds once.
-- Two independently issued refresh tokens for the same athlete can each be used until that specific token is rotated or expires.
-- An expired refresh token returns 401 and does not create a replacement token.
-- An expired access token on an athlete-scoped route returns 401.
-- An access token for athlete A used on `/athletes/{athlete_b_id}/...` returns 403, not 404.
-- Structured auth logs contain no email, password, refresh token, token hash, or credential value.
+- Registering with a valid email/password creates exactly one `Athlete`, one email-provider `AthleteAuth`, one minimal `AthleteProfile`, and one refresh-token record; response includes a decodable access token and raw refresh token.
+- Registering the same email with different casing returns 409 and leaves no partial `Athlete`, `AthleteAuth`, `AthleteProfile`, or `RefreshToken` records.
+- `POST /auth/login` with the wrong password returns 401; with the correct password returns a new token pair and updates `AthleteAuth.last_login_at`.
+- API responses and logs do not contain `hashed_password`, plaintext passwords, raw refresh tokens, stored refresh-token hashes, `provider_tokens`, or `provider_user_id`.
+- A request to an athlete-scoped route with an expired access token returns 401.
+- A request to an athlete-scoped route with a valid JWT for a different athlete returns 403, not 404.
+- `POST /auth/refresh` with a valid refresh token returns a new token pair; the old refresh token then returns 401, and the new refresh token can be used for another rotation.
+- Refresh-token rotation leaves the old `RefreshToken` revoked with a replacement link and inserts a new append-only `RefreshToken` record with a 30-day expiry.
+- Two independently issued refresh tokens for the same athlete can be rotated independently; rotating one does not revoke the other.
+- `athlete_registered` and `athlete_logged_in` events contain the required payload fields and are produced only after their respective success conditions.
 
 ## Coder Handoff Notes
-- No implementation ADR is required; the refresh-token table approach is already fixed by the sub-phase and has been added to `01-entities/athlete-auth.md`.
-- Do not implement OAuth even though `AuthProvider` includes `google` and `strava` for future schema compatibility.
-- Do not implement email verification, password reset, rate limiting, account linking, or password-change endpoints.
-- Keep `athlete.onboarding_complete = false` after registration. The onboarding sub-phase sets it to `true`.
-- The Phase 1.1 `athlete_profiles` table must remain minimal. Phase 1.2a extends it; do not add personalisation, location, timezone, training window, or structural-risk fields here.
-- Refresh-token rotation must be atomic: insert replacement, revoke old row, and issue the new token in the same transaction.
-- Never update or delete existing `RefreshToken` rows to rotate a token. Mark the old row revoked and insert the replacement.
-- Never put credentials in `Athlete`; credentials belong only in `AthleteAuth` and hashed refresh tokens belong only in `RefreshToken`.
+- No implementation ADR is required for this plan; the architecture already specifies the refresh-token rotation and append-only revocation-ledger behaviour.
+- This is Phase 1.1, so `AthleteProfile` must be minimal. Do not add personalisation models, location, timezone, training window, structural risk, or objective-threshold columns here; those belong to Phase 1.2a.
+- OAuth schema may exist in `AthleteAuth`, but Phase 1.1 implements only provider `email`. Do not implement Google, Strava, linking, unlinking, or primary-method switching.
+- `Athlete` owns identity and onboarding status only. Passwords and refresh-token audit state belong to `AthleteAuth`/auth service ownership.
+- Bcrypt cost must be 12 or higher. Never store or log plaintext passwords.
+- Refresh-token rotation is the highest-risk operation in this plan: revocation of the old token and insertion of the new token must be atomic.
+- `require_self` must distinguish invalid/expired tokens from cross-athlete authorization failures: 401 for token validity, 403 for athlete mismatch.
+- If an existing event/outbox mechanism exists in the codebase, use it for `athlete_registered` and `athlete_logged_in`; otherwise implement the minimum event persistence required by the architecture and keep event emission after commit.
+- Keep user-facing auth errors simple and non-technical, consistent with the brand philosophy of no AI-feel and no unnecessary jargon.

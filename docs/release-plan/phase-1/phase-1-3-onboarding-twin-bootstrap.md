@@ -18,6 +18,7 @@ The onboarding transaction is heavy — it creates `AthleteProfile`, `AthletePre
   5. `AthleteFitness` (zero fitness/fatigue, population time constants)
   6. `TwinState` (LOW confidence, `trigger = questionnaire`)
   7. Sets `athlete.onboarding_complete = true`
+  8. Inserts `onboarding_completed` event via transactional outbox (published after commit)
 - `GET /athletes/{id}/onboarding` — returns current onboarding status
 - `GET /athletes/{id}/twin` — returns latest `TwinState`
 - `GET /athletes/{id}/twin/history` — all snapshots
@@ -58,6 +59,7 @@ The onboarding transaction is heavy — it creates `AthleteProfile`, `AthletePre
 
 ## Invariants To Preserve
 - The entire onboarding sequence runs in one database transaction. If any step fails, all prior steps roll back. The athlete remains in `onboarding_complete = false` state.
+- Event publication uses transactional outbox: `onboarding_completed` event inserted in same transaction as domain state; published after commit via outbox mechanism. Prevents phantom state visibility.
 - `TwinBootstrapService` is pure Python. No LLM call, no external API call. Must complete within 200ms.
 - Re-onboarding is not supported. Calling `POST /athletes/{id}/onboarding` when `onboarding_complete = true` returns 409. Athletes update preferences via PATCH.
 - `TrainingGoal` enforces single active goal per athlete (409 on second creation).

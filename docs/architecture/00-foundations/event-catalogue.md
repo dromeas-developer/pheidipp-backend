@@ -651,11 +651,11 @@ type WellnessBaselineUpdatedPayload = {
 - Failed event processing is retried; events are not consumed destructively
 ## Storage Model
 
-| Data | Strategy | Consistency | Retention |
-|---|---|---|---|
-| System events | append-only event log | eventual | 90 days (operational window) |
-| Trigger events (TwinState causal) | append-only event log | eventual | 1 year |
-| Event dead-letter queue | append-only | strong | 30 days |
+Event persistence and transactional outbox semantics are owned by `04-platform/system-event.md`. This entity maintains:
+
+- Append-only event log (`system_events` table) with strong consistency within the producing transaction
+- Mutable outbox (`system_event_outbox` table) tracking publication status for at-least-once delivery
+- Retention: 90 days operational for most events, 1 year for trigger events (see `system-event.md` for details)
 
 > **Trigger Event Retention:**
 > 
@@ -666,8 +666,6 @@ type WellnessBaselineUpdatedPayload = {
 > - `race_prediction_updated`
 > 
 > Other system events are retained for 90 days.
-> 
-> **Audit Trail:** `TwinState.trigger` + inline snapshots provide the primary audit path. For full reconstruction, `PhysiologyMeasurement` (append-only) and `Activity` (load scores + FIT file) are retained indefinitely.
 
 ## Runtime Ownership
 Owns:

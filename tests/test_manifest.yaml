@@ -1,0 +1,555 @@
+version: "1.0"
+generated_at: "2026-06-17T00:00:00+00:00"
+last_reviewed_at: "2026-06-19T19:30:00+00:00"
+
+# ---------------------------------------------------------------------------
+# Phase-1.1 (P1, P2, P3) — Email/Password Authentication
+# Plan files:
+#   docs/implementation/phase-1/phase-1-1-p1-email-password-auth.md
+#   docs/implementation/phase-1/phase-1-1-p2-security-invariants-patch.md
+#   docs/implementation/phase-1/phase-1-1-p3-single-primary-auth-enforcement.md
+# Validation report:
+#   docs/implementation/phase-1/phase-1-1-p1-p2-p3-email-password-auth-validation.md
+# ---------------------------------------------------------------------------
+
+features:
+  phase-1-1-auth-register:
+    status: promoted
+    plan: "docs/implementation/phase-1/phase-1-1-p1-email-password-auth.md"
+    owned_by_plan:
+      - "phase-1-1-p1-email-password-auth"
+    description: "POST /auth/register — atomic Athlete + AthleteAuth + AthleteProfile + first RefreshToken + athlete_registered event."
+    protects:
+      - "Registration atomicity (no partial state on duplicate email)"
+      - "Email uniqueness, case-insensitive (ix_athletes_lower_email_unique)"
+      - "hashed_password never returned"
+      - "Profile fields DOB, sex, height_cm written at registration"
+      - "First RefreshToken record created with token_hash (never raw)"
+      - "athlete_registered event payload (auth_provider, has_password, profile_completed)"
+      - "Email normalised to lowercase before persistence"
+    impacts:
+      - "phase-1-1-auth-login"
+      - "phase-1-1-auth-refresh"
+      - "phase-1-1-security-invariants"
+    execution_prerequisites:
+      migrations: true
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit: []
+      integration:
+        - path: "tests/integration/test_auth_service.py"
+          owner: "phase-1-1-p1-email-password-auth"
+        - path: "tests/integration/test_athlete_repositories.py"
+          owner: "phase-1-1-p1-email-password-auth"
+      api:
+        - path: "tests/api/test_auth_endpoints.py"
+          owner: "phase-1-1-p1-email-password-auth"
+      behaviour:
+        - path: "tests/behaviour/test_auth_user_journey.py"
+          owner: "phase-1-1-p1-email-password-auth"
+      release: []
+
+  phase-1-1-auth-login:
+    status: promoted
+    plan: "docs/implementation/phase-1/phase-1-1-p1-email-password-auth.md"
+    owned_by_plan:
+      - "phase-1-1-p1-email-password-auth"
+    description: "POST /auth/login — credential validation, last_login_at touch, token issuance, athlete_logged_in event."
+    protects:
+      - "Constant-time credential path (missing account vs wrong password indistinguishable)"
+      - "last_login_at updated only on success"
+      - "athlete_logged_in event payload (auth_provider, token_type=access, ip_address truncated, user_agent)"
+      - "401 with identical detail for wrong password and unknown email"
+    impacts:
+      - "phase-1-1-auth-refresh"
+      - "phase-1-1-security-invariants"
+    execution_prerequisites:
+      migrations: true
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit: []
+      integration:
+        - path: "tests/integration/test_auth_service.py"
+          owner: "phase-1-1-p1-email-password-auth"
+      api:
+        - path: "tests/api/test_auth_endpoints.py"
+          owner: "phase-1-1-p1-email-password-auth"
+      behaviour:
+        - path: "tests/behaviour/test_auth_user_journey.py"
+          owner: "phase-1-1-p1-email-password-auth"
+      release: []
+
+  phase-1-1-auth-refresh:
+    status: promoted
+    plan: "docs/implementation/phase-1/phase-1-1-p1-email-password-auth.md"
+    owned_by_plan:
+      - "phase-1-1-p1-email-password-auth"
+    description: "POST /auth/refresh — atomic revoke + insert; SHA-256 hash lookup; 30-day expiry; append-only ledger."
+    protects:
+      - "Refresh tokens rotated on every use"
+      - "Old RefreshToken record kept (append-only revocation ledger)"
+      - "Replacement link (replaced_by_refresh_token_id) populated"
+      - "30-day expiry honoured (expires_at = now + 30 days)"
+      - "Multi-device refresh tokens coexist (rotating one does not revoke another)"
+      - "401 on missing/revoked/expired token"
+      - "athlete_logged_in event emitted with token_type=refresh"
+    impacts:
+      - "phase-1-1-security-invariants"
+    execution_prerequisites:
+      migrations: true
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit: []
+      integration:
+        - path: "tests/integration/test_auth_service.py"
+          owner: "phase-1-1-p1-email-password-auth"
+        - path: "tests/integration/test_refresh_token_repository.py"
+          owner: "phase-1-1-p1-email-password-auth"
+      api:
+        - path: "tests/api/test_auth_endpoints.py"
+          owner: "phase-1-1-p1-email-password-auth"
+      behaviour:
+        - path: "tests/behaviour/test_auth_user_journey.py"
+          owner: "phase-1-1-p1-email-password-auth"
+      release: []
+
+  phase-1-1-require-self:
+    status: promoted
+    plan: "docs/implementation/phase-1/phase-1-1-p1-email-password-auth.md"
+    owned_by_plan:
+      - "phase-1-1-p1-email-password-auth"
+    description: "FastAPI dependency for athlete-scoped routes — 401 vs 403 distinction, no 404 on mismatch."
+    protects:
+      - "401 on missing/malformed/expired token"
+      - "403 on path/jwt athlete_id mismatch (NEVER 404)"
+      - "JWT athlete_id claim drives downstream authorization"
+    impacts: []
+    execution_prerequisites:
+      migrations: true
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit: []
+      integration: []
+      api:
+        - path: "tests/api/test_auth_endpoints.py"
+          owner: "phase-1-1-p1-email-password-auth"
+      behaviour:
+        - path: "tests/behaviour/test_auth_user_journey.py"
+          owner: "phase-1-1-p1-email-password-auth"
+      release: []
+
+  phase-1-1-security-invariants:
+    status: promoted
+    plan: "docs/implementation/phase-1/phase-1-1-p2-security-invariants-patch.md"
+    owned_by_plan:
+      - "phase-1-1-p2-security-invariants-patch"
+    description: "ADR-005 P2 patch — token_hash non-disclosure, IP truncation (/24 IPv4, /64 IPv6), 7-day IP discard."
+    protects:
+      - "token_hash never returned by API or written to logs"
+      - "ip_address truncated to /24 (IPv4) or /64 (IPv6) before logging/event emission"
+      - "ip_address NULLed on RefreshToken rows older than 7 days"
+      - "discard_refresh_token_ips task is idempotent"
+      - "logging_utils ALLOWED_KEYS excludes hashed_password, token_hash, refresh_token, provider_tokens, provider_user_id, raw ip_address, email"
+      - "FORBIDDEN_KEYS denies every credential/secret/PII field as defence-in-depth"
+    impacts:
+      - "phase-1-1-auth-register"
+      - "phase-1-1-auth-login"
+      - "phase-1-1-auth-refresh"
+    execution_prerequisites:
+      migrations: true
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit:
+        - path: "tests/unit/test_ip_utils.py"
+          owner: "phase-1-1-p2-security-invariants-patch"
+        - path: "tests/unit/test_logging_utils.py"
+          owner: "phase-1-1-p2-security-invariants-patch"
+      integration:
+        - path: "tests/integration/test_refresh_token_repository.py"
+          owner: "phase-1-1-p2-security-invariants-patch"
+        - path: "tests/integration/test_discard_refresh_token_ips.py"
+          owner: "phase-1-1-p2-security-invariants-patch"
+        - path: "tests/integration/test_auth_service.py"
+          owner: "phase-1-1-p2-security-invariants-patch"
+      api:
+        - path: "tests/api/test_auth_endpoints.py"
+          owner: "phase-1-1-p2-security-invariants-patch"
+      behaviour:
+        - path: "tests/behaviour/test_auth_user_journey.py"
+          owner: "phase-1-1-p2-security-invariants-patch"
+      release: []
+
+  phase-1-1-single-primary-enforcement:
+    status: promoted
+    plan: "docs/implementation/phase-1/phase-1-1-p3-single-primary-auth-enforcement.md"
+    owned_by_plan:
+      - "phase-1-1-p3-single-primary-auth-enforcement"
+    description: "Partial unique index ix_athlete_auths_single_primary prevents multiple AthleteAuth rows with is_primary=true per athlete."
+    protects:
+      - "Two is_primary=true rows for the same athlete raise IntegrityError"
+      - "Multiple is_primary=false rows for the same athlete are permitted"
+      - "Exactly one primary enforced even after primary reassignment"
+    impacts:
+      - "phase-1-1-auth-register"
+      - "phase-1-1-auth-login"
+    execution_prerequisites:
+      migrations: true
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit: []
+      integration:
+        - path: "tests/integration/test_athlete_auth_primary_enforcement.py"
+          owner: "phase-1-1-p3-single-primary-auth-enforcement"
+      api: []
+      behaviour: []
+      release: []
+
+  phase-1-1-password-crypto:
+    status: promoted
+    plan: "docs/implementation/phase-1/phase-1-1-p1-email-password-auth.md"
+    owned_by_plan:
+      - "phase-1-1-p1-email-password-auth"
+    description: "PasswordHasher — bcrypt cost >= 12; constant-time verify; plain-text never leaves the module."
+    protects:
+      - "bcrypt cost factor >= 12"
+      - "72-byte truncation symmetry in hash and verify"
+      - "Malformed/non-string hash returns False (never raises)"
+      - "Invalid password input returns False for verify (never raises)"
+    impacts:
+      - "phase-1-1-auth-register"
+      - "phase-1-1-auth-login"
+    execution_prerequisites:
+      migrations: false
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit:
+        - path: "tests/unit/test_password_hasher.py"
+          owner: "phase-1-1-p1-email-password-auth"
+      integration: []
+      api: []
+      behaviour: []
+      release: []
+
+  phase-1-1-token-primitives:
+    status: promoted
+    plan: "docs/implementation/phase-1/phase-1-1-p1-email-password-auth.md"
+    owned_by_plan:
+      - "phase-1-1-p1-email-password-auth"
+    description: "TokenService — JWT access tokens (15 min) + opaque SHA-256-hashed refresh tokens (30 day)."
+    protects:
+      - "Access JWT carries athlete_id claim"
+      - "Access JWT default TTL is 15 minutes"
+      - "Refresh token defaults to 30-day expiry"
+      - "JWT verify rejects expired/wrong-secret/wrong-issuer/missing-claim tokens"
+      - "hash_refresh_token returns SHA-256 hex digest"
+      - "Refresh tokens are opaque (not parseable as JWT)"
+      - "Service refuses to construct without JWT_SECRET_KEY"
+    impacts:
+      - "phase-1-1-auth-register"
+      - "phase-1-1-auth-login"
+      - "phase-1-1-auth-refresh"
+      - "phase-1-1-require-self"
+    execution_prerequisites:
+      migrations: false
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit:
+        - path: "tests/unit/test_token_service.py"
+          owner: "phase-1-1-p1-email-password-auth"
+      integration: []
+      api: []
+      behaviour: []
+      release: []
+
+  phase-1-1-events:
+    status: promoted
+    plan: "docs/implementation/phase-1/phase-1-1-p1-email-password-auth.md"
+    owned_by_plan:
+      - "phase-1-1-p1-email-password-auth"
+    description: "athlete_registered and athlete_logged_in events persisted atomically with producing domain transaction."
+    protects:
+      - "SystemEvent row + SystemEventOutbox row land in same transaction (ADR-004)"
+      - "athlete_registered payload (auth_provider, has_password, profile_completed)"
+      - "athlete_logged_in payload (auth_provider, token_type, ip_address, user_agent)"
+      - "Events are emitted only after success — failed login/refresh do not emit"
+      - "ip_address in event payload is truncated per ADR-005"
+    impacts:
+      - "phase-1-1-auth-register"
+      - "phase-1-1-auth-login"
+      - "phase-1-1-auth-refresh"
+    execution_prerequisites:
+      migrations: true
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit: []
+      integration:
+        - path: "tests/integration/test_auth_service.py"
+          owner: "phase-1-1-p1-email-password-auth"
+      api:
+        - path: "tests/api/test_auth_endpoints.py"
+          owner: "phase-1-1-p1-email-password-auth"
+      behaviour:
+        - path: "tests/behaviour/test_auth_user_journey.py"
+          owner: "phase-1-1-p1-email-password-auth"
+      release: []
+
+# ---------------------------------------------------------------------------
+# Selection / execution-group membership.
+#
+# All Phase-1.1 features are status=promoted after the v3 clean pass
+# (154/154 green in 25s, reports/phase-1-1-p1-p2-p3-email-password-auth_devops.md
+# + reports/test_history/latest.md). Membership of each group was
+# decided by the Test Architect alongside p-test-architect protocol
+# Step 4 (selection groups):
+#
+# * smoke — pure-function unit tests only. No DB, no migrations, no
+#   containers. Sub-second each. These guard the most-leveraged
+#   primitives (bcrypt cost factor, JWT issue/verify hash & claim
+#   shape, opaque refresh-token hashing, IP truncation, audit-log
+#   allow/deny key contract). They are the cheapest tripwire for the
+#   catastrophic regression classes: auth broken, secrets leaked.
+# * feature — every Phase-1.1 test file (current feature scope).
+# * regression — every Phase-1.1 test file. Authentication is a
+#   non-optional security boundary; any Phase-1.1 test is a valid
+#   signal that a future change broke the auth foundation.
+# * release — same set as regression for this phase, since all
+#   Phase-1.1 features are promoted. DevOps will pick this up when
+#   running `execution_groups.release*`.
+# ---------------------------------------------------------------------------
+
+selection:
+  smoke:
+    - "tests/unit/test_password_hasher.py"
+    - "tests/unit/test_token_service.py"
+    - "tests/unit/test_ip_utils.py"
+    - "tests/unit/test_logging_utils.py"
+  feature:
+    - "tests/unit/test_password_hasher.py"
+    - "tests/unit/test_token_service.py"
+    - "tests/unit/test_ip_utils.py"
+    - "tests/unit/test_logging_utils.py"
+    - "tests/integration/test_auth_service.py"
+    - "tests/integration/test_athlete_repositories.py"
+    - "tests/integration/test_refresh_token_repository.py"
+    - "tests/integration/test_athlete_auth_primary_enforcement.py"
+    - "tests/integration/test_discard_refresh_token_ips.py"
+    - "tests/api/test_auth_endpoints.py"
+    - "tests/behaviour/test_auth_user_journey.py"
+  regression:
+    - "tests/unit/test_password_hasher.py"
+    - "tests/unit/test_token_service.py"
+    - "tests/unit/test_ip_utils.py"
+    - "tests/unit/test_logging_utils.py"
+    - "tests/integration/test_auth_service.py"
+    - "tests/integration/test_athlete_repositories.py"
+    - "tests/integration/test_refresh_token_repository.py"
+    - "tests/integration/test_athlete_auth_primary_enforcement.py"
+    - "tests/integration/test_discard_refresh_token_ips.py"
+    - "tests/api/test_auth_endpoints.py"
+    - "tests/behaviour/test_auth_user_journey.py"
+  release:
+    - "tests/unit/test_password_hasher.py"
+    - "tests/unit/test_token_service.py"
+    - "tests/unit/test_ip_utils.py"
+    - "tests/unit/test_logging_utils.py"
+    - "tests/integration/test_auth_service.py"
+    - "tests/integration/test_athlete_repositories.py"
+    - "tests/integration/test_refresh_token_repository.py"
+    - "tests/integration/test_athlete_auth_primary_enforcement.py"
+    - "tests/integration/test_discard_refresh_token_ips.py"
+    - "tests/api/test_auth_endpoints.py"
+    - "tests/behaviour/test_auth_user_journey.py"
+
+execution_groups:
+  p1-1-p1-unit:
+    scope: feature
+    tests:
+      - "tests/unit/test_password_hasher.py"
+      - "tests/unit/test_token_service.py"
+    phase: 1
+    depends_on: []
+  p1-1-p2-unit:
+    scope: feature
+    tests:
+      - "tests/unit/test_ip_utils.py"
+      - "tests/unit/test_logging_utils.py"
+    phase: 1
+    depends_on: []
+  p1-1-p1-integration:
+    scope: feature
+    tests:
+      - "tests/integration/test_auth_service.py"
+      - "tests/integration/test_athlete_repositories.py"
+      - "tests/integration/test_refresh_token_repository.py"
+    phase: 1
+    depends_on:
+      - "p1-1-p1-unit"
+  p1-1-p3-integration:
+    scope: feature
+    tests:
+      - "tests/integration/test_athlete_auth_primary_enforcement.py"
+    phase: 1
+    depends_on:
+      - "p1-1-p1-integration"
+  p1-1-p2-integration:
+    scope: feature
+    tests:
+      - "tests/integration/test_discard_refresh_token_ips.py"
+    phase: 1
+    depends_on:
+      - "p1-1-p1-integration"
+  p1-1-p1-api:
+    scope: feature
+    tests:
+      - "tests/api/test_auth_endpoints.py"
+    phase: 1
+    depends_on:
+      - "p1-1-p1-integration"
+      - "p1-1-p3-integration"
+      - "p1-1-p2-integration"
+  p1-1-p1-behaviour:
+    scope: feature
+    tests:
+      - "tests/behaviour/test_auth_user_journey.py"
+    phase: 1
+    depends_on:
+      - "p1-1-p1-api"
+  p1-1-smoke:
+    scope: smoke
+    tests:
+      - "tests/unit/test_password_hasher.py"
+      - "tests/unit/test_token_service.py"
+      - "tests/unit/test_ip_utils.py"
+      - "tests/unit/test_logging_utils.py"
+    phase: 1
+    depends_on: []
+
+# ---------------------------------------------------------------------------
+# Coverage snapshot at bootstrap. Each capability lists its current
+# classification. Empty lists mean we have no tests for that capability
+# yet; "covered"/"partial"/"missing" follow the protocol's definitions.
+# ---------------------------------------------------------------------------
+
+coverage:
+  routes:
+    covered:
+      - "POST /api/v1/auth/register"
+      - "POST /api/v1/auth/login"
+      - "POST /api/v1/auth/refresh"
+    partial:
+      - "GET /_protected/athletes/{athlete_id}/whoami (require_self — test-only route)"
+    missing: []
+  events:
+    covered:
+      - "athlete_registered"
+      - "athlete_logged_in (token_type=access)"
+      - "athlete_logged_in (token_type=refresh)"
+    partial: []
+    missing:
+      - "refresh_token_rotated (intentionally not emitted per ADR — N/A)"
+  invariants:
+    covered:
+      - "Email uniqueness (case-insensitive via functional index)"
+      - "hashed_password never returned in responses"
+      - "hashed_password never logged"
+      - "token_hash never returned in responses"
+      - "token_hash never logged"
+      - "provider_tokens not exposed"
+      - "provider_user_id not exposed"
+      - "Atomic registration (transaction rollback on duplicate)"
+      - "Append-only refresh-token ledger (rotation preserves old row)"
+      - "30-day refresh-token expiry"
+      - "AthleteProfile uniqueness per athlete"
+      - "One primary AthleteAuth per athlete (DB-enforced)"
+      - "require_self returns 403 on athlete mismatch"
+      - "require_self returns 401 on token problem"
+      - "Login does not leak missing-vs-wrong credential distinction"
+      - "ip_address truncated to /24 (IPv4) before logging/event emission"
+      - "ip_address truncated to /64 (IPv6) before logging/event emission"
+      - "ip_address discarded after 7 days"
+      - "discard_refresh_token_ips task idempotent"
+      - "athlete_registered payload shape"
+      - "athlete_logged_in payload shape (login + refresh)"
+      - "Multi-device refresh tokens coexist"
+      - "Replay of revoked refresh token returns 401"
+    partial:
+      - "Email PII suppression in audit logs (covered behaviourally via cap_auth_logs)"
+    missing:
+      - "Rate limiting / brute-force throttling (out of phase-1.1 scope)"
+
+history:
+  - date: "2026-06-17"
+    plan: "phase-1-1-p1-email-password-auth + p2-security-invariants-patch + p3-single-primary-auth-enforcement"
+    tests_added: 132
+    tests_modified: 0
+    tests_removed: 0
+    coverage_delta: "Bootstrap manifest for Phase-1.1. All required invariants, events, and routes are covered; execution groups wired."
+  - date: "2026-06-17"
+    plan: "phase-1-1-p1-email-password-auth + p2-security-invariants-patch + p3-single-primary-auth-enforcement"
+    tests_added: 0
+    tests_modified: 11
+    tests_removed: 0
+    coverage_delta: "Verified all 11 generated test files exist on disk; set validation.implemented=true for all Phase-1.1 features and populated selection.feature. validation.executable and validation.passed remain false pending DevOps execution."
+  - date: "2026-06-19"
+    plan: "phase-1-1-p1-p2-p3-email-password-auth-devops-v2-issue-3"
+    tests_added: 0
+    tests_modified: 2
+    tests_removed: 0
+    coverage_delta: "DevOps report v2 issue #3 (p-test-architect): relaxed access-token-uniqueness checks in tests/integration/test_auth_service.py::test_rotation_returns_new_token_pair and tests/api/test_auth_endpoints.py::test_refresh_returns_new_token_pair. Both tests now assert the actual security property of rotation — that the refresh token is replaced and the new access token still decodes to the same athlete_id — rather than relying on whole-token inequality. The removed raw-string inequality was incidentally passing thanks to the per-issuance ``jti`` UUID added in phase-1-1-p4, but it tested JWT-string uniqueness (an implementation detail of jti), not the security contract. Removed unused ``pyjwt`` / ``app.config.settings`` imports from tests/integration/test_auth_service.py (still used by tests/api/test_auth_endpoints.py::test_require_self_returns_401_for_expired_token). No coverage delta; the security property of refresh-token rotation is now asserted directly. validation.executable and validation.passed remain false pending DevOps execution."
+  - date: "2026-06-18"
+    plan: "phase-1-1-p1-email-password-auth + p2-security-invariants-patch + p3-single-primary-auth-enforcement"
+    tests_added: 0
+    tests_modified: 3
+    tests_removed: 0
+    coverage_delta: "DevOps rerun (reports/phase-1-1-p1-p2-p3-email-password-auth_devops_rerun.md) flagged test-side config drift. Three test files plus .env.test updated: tests/unit/test_token_service.py now decodes via a new _decode_test_jwt() helper that reads JWT_SECRET_KEY / JWT_ALGORITHM / JWT_ISSUER from app.config.settings, and crafts negative-case tokens with settings.* so signature/issuer no longer drift from .env.test overrides. tests/api/test_auth_endpoints.py and tests/behaviour/test_auth_user_journey.py apply the same settings.* substitution to the crafted-expired-token encode. .env.test JWT_SECRET_KEY extended from 30 to 43 bytes to silence the InsecureKeyLengthWarning. No coverage delta — the tests already asserted correct behaviour; the changes are environmental. Out-of-scope (Coder) items called out in docs/testing/phase-1-1-p1-p2-p3-email-password-auth_test_pack_rerun.md: app/utils/ip_utils.py IPv4 truncation TypeError at line 54, and the system_event_outbox ck_system_event_outbox_status_valid INSERT failure that all 19 auth_service + 13 api + 5 behaviour integration tests manifest as. validation.executable and validation.passed remain false pending a clean rerun after those Coder fixes."
+  - date: "2026-06-19"
+    plan: "phase-1-1-p1-p2-p3-email-password-auth"
+    tests_added: 0
+    tests_modified: 0
+    tests_removed: 0
+    coverage_delta: "Promotion (status generated|passing -> promoted) for all 9 Phase-1.1 features after the clean DevOps pass (154/154 in 25s, reports/phase-1-1-p1-p2-p3-email-password-auth_devops.md, reports/test_history/latest.md). Reconciled manifest drift: phase-1-1-events carried executable=false/passed=false even though every report and the test_history file prove its tests executed green in the same session - validation flipped to true alongside the promotion. Removed per-test validation blocks on phase-1-1-auth-register that had drifted to a stale passed=false on test_auth_endpoints.py opposite to the feature-level passed=true; the schema places validation on the feature entry only, and the audit log proves the deviation was a leftover from a previous session. selection.smoke now lists the 4 pure-function unit test files (test_password_hasher, test_token_service, test_ip_utils, test_logging_utils) - sub-second each, no DB/migrations/containers, and the cheapest tripwire for the catastrophic regression classes (auth broken, secrets leaked). selection.regression and selection.release now both hold the full Phase-1.1 set; authentication is a non-optional security boundary and every Phase-1.1 test is a valid signal that a later change touched the auth foundation. p1-1-smoke execution_group populated to match selection.smoke."

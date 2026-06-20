@@ -309,8 +309,12 @@ Full task inventory with triggers, steps, retry policies, and timeouts. Executio
 **Read for:** every task that exists; retry policies; what triggers each task; idempotency requirements.
 
 ### `04-platform/event-topology.md`
-End-to-end event flow diagram from athlete action to coach message. Scheduled task cron expressions. Consumer fanout for multi-consumer events. Ordering constraints between tasks.
-**Read for:** the full pipeline wiring; which events trigger which tasks; ordering guarantees.
+End-to-end event flow diagram from athlete action to coach message. Scheduled task cron expressions. Consumer fanout for multi-consumer events. Ordering constraints between tasks. Includes transactional outbox pattern for phantom-state prevention.
+**Read for:** the full pipeline wiring; which events trigger which tasks; ordering guarantees; publication mechanics.
+
+### `04-platform/system-event.md`
+Persistent event log and transactional outbox. Append-only `system_events` table with strong consistency. Mutable `system_event_outbox` tracks publication status. Retention policies for operational vs trigger events. Retry and DLQ integration.
+**Read for:** event storage schema; transactional outbox pattern; retention policies; publication state lifecycle.
 
 ### `04-platform/versioning-and-reprocessing.md`
 Version string format and registry. The reprocessing test. Supersession protocol (insert new, mark old `superseded_at`). Alternative pattern for Activity load scores (in-place update with version tracking). Offline reprocessing guarantees.

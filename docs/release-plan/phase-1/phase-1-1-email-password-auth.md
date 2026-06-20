@@ -16,11 +16,14 @@ Registration atomically creates `Athlete` + `AthleteAuth` + `AthleteProfile`. Th
 - `require_self` route dependency for athlete-scoped endpoints
 - Secure password hashing (bcrypt)
 - Multi-device session support (via refresh token table)
+- Event log schema (`system_events`, `system_event_outbox`) for transactional outbox pattern
+- Audit event publication (`athlete_registered`, `athlete_logged_in`) via outbox after successful transaction
 
 ## Architectural Contracts Required
 - `01-entities/athlete.md`
 - `01-entities/athlete-auth.md`
 - `01-entities/athlete-profile.md` (minimal schema — only demographics columns needed for registration; full schema completed in Phase-1.2a)
+- `04-platform/system-event.md` (event log schema and outbox mechanics)
 
 ## Vision References Required
 - `product/brand-philosophy.md` — "no AI-feel, no tech jargon"
@@ -31,12 +34,15 @@ None. This is the first sub-phase.
 
 ## Downstream Enablement
 - Phase-1.2a (Profile & Preferences) — registration creates the `Athlete` record
-- Phase-1.3 (Onboarding) — requires authenticated user to complete onboarding
+- Phase-1.3 (Onboarding) — `onboarding_completed` event published via transactional outbox; authenticated user required to complete onboarding
+- Phase-1.5a (First Coach Message) — `twin_model_ready` event consumed; outbox infrastructure required
 - All athlete-scoped endpoints require the auth layer
 
 ## Invariants To Preserve
 - `email` is unique across all athletes (case-insensitive)
 - `hashed_password` is never returned by any API endpoint or included in any log
+- `token_hash` is never returned by any API endpoint or included in any log
+- `ip_address` in `RefreshToken` records must be truncated before logging; extracted and discarded after 7 days
 - Refresh tokens are rotated on every use — old token is revoked atomically with new token creation
 - Registration atomically creates `Athlete` and minimal `AthleteProfile`. If either fails, neither is committed.
 

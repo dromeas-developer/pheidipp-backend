@@ -75,11 +75,12 @@ type AthleteAuthResponse = {
 ## Invariants
 
 - One `AthleteAuth` record per `(athlete_id, provider)`. An athlete cannot link the same provider twice.
+- `token_hash` is never returned by any API endpoint or included in any log. Stored hashed for lookup without plaintext exposure.
 - `hashed_password` is never returned by any API endpoint or included in any log. Encrypted at rest.
 - `provider_tokens` is never returned by any API endpoint or included in any log. Encrypted at rest.
 - `provider_user_id` is never returned in API responses. Used for OAuth account matching only.
-- `ip_address` in `RefreshToken` records is stored for audit only; if used for security analysis, it must be anonymized or hashed before logging.
-- Exactly one `AthleteAuth` record per athlete must have `is_primary = true`. Primary cannot be removed without reassigning.
+- `ip_address` in `RefreshToken` records must be truncated to /24 (IPv4) or /64 (IPv6) before any logging or security analysis. For long-term storage, `ip_address` is extracted and discarded after 7 days via automated cleanup while the token record itself remains until 30-day expiration.
+- Exactly one `AthleteAuth` record per athlete must have `is_primary = true`. Primary cannot be removed without reassigning. **DB enforcement:** partial unique index `ix_athlete_auths_single_primary` on `(athlete_id) WHERE is_primary = true` (Alembic index emitted from the ORM declaration on `AthleteAuth.__table_args__`). Inserting a second `is_primary = true` row for the same `athlete_id` raises `IntegrityError` at the storage layer; multiple non-primary rows (`is_primary = false`) coexist freely.
 - Refresh tokens are rotated on every use — old token is revoked atomically with new token creation.
 - `RefreshToken` records are append-only revocation records; rotation revokes the old token and inserts a new token record.
 - Refresh tokens expire 30 days after issuance (`expires_at = created_at + 30 days`). Expired tokens are rejected even if not revoked.
@@ -230,6 +231,7 @@ Note: Only for email provider. Returns 404 if no email provider linked.
 
 **Indexes:**
 - `UNIQUE (athlete_id, provider)` — one record per provider per athlete
+- `UNIQUE (athlete_id) WHERE is_primary = true` (partial) — enforces single primary auth method per athlete
 - `UNIQUE (token_hash)` — refresh token lookup without storing plaintext tokens
 - `INDEX (athlete_id, expires_at)` — session cleanup and audit
 - `INDEX (provider_user_id)` — OAuth account lookup (nullable; only set for OAuth providers)
@@ -284,8 +286,8 @@ Metrics:
 - `athlete.auth.oauth.refresh.failures.total`: count of OAuth token refresh failures
 
 Logs:
-- `athlete.registered`: athlete_id, auth_provider, has_password (never log email or credentials)
-- `athlete.logged_in`: athlete_id, auth_provider, success (never log credentials)
+- `athlete.registered`: athlete_id, auth_provider, has_password (never log email, credentials, or IP addresses)
+- `athlete.logged_in`: athlete_id, auth_provider, success, ip_address (ip_address truncated to /24 or /64 before logging; never log credentials)
 - `auth_method.linked`: athlete_id, provider
 - `auth_method.removed`: athlete_id, provider
 
@@ -294,6 +296,7 @@ Logs:
 - Registration atomically creates `Athlete` + `AthleteAuth` + `AthleteProfile` in a single database transaction. If any part fails, all roll back.
 - `hashed_password` uses bcrypt with cost factor ≥12. Never stored in plaintext.
 - `provider_tokens` are encrypted at rest using application-layer encryption (AES-256-GCM). The encryption key is not stored in the database.
+- `ip_address` in log events must be truncated to /24 (IPv4) or /64 (IPv6) before emission; raw addresses are extracted and discarded after 7 days via cleanup task.
 - OAuth token refresh is handled transparently by a background task. If refresh fails, the `AthleteAuth` record is not deleted — it is marked as requiring re-authentication.
 - The `require_self` FastAPI dependency validates `JWT.athlete_id === path.athlete_id`. It does not validate auth provider — all providers use the same authorization model.
-- JWT claims include `athlete_id` and optionally `auth_provider`. The `auth_provider` claim is informational and does not affect authorization logic.
+- JWT claims include `jti`, `iat`, `exp`, `iss`, `athlete_id`, and optionally `auth_provider`. The `jti` claim is a per-issuance UUID used to make each JWT value unique even when issued within the same second; it is not persisted or checked as a replay ledger. The `auth_provider` claim is informational and does not affect authorization logic.

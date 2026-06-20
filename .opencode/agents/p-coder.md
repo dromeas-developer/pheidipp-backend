@@ -1,6 +1,6 @@
 ---
-model: litellm-proxy/openrouter/nex-n2-pro
-temperature: 0.05
+model: litellm-proxy/nvidia/minimax-m3
+temperature: 0.1
 
 permission:
   task:
@@ -38,7 +38,7 @@ tools:
   "pheidipp-codebase-context_search_release_plan":      false
   "pheidipp-codebase-context_multi_search":             false
   "pheidipp-codebase-context_multi_context":            false
-  "pheidipp-codebase-context_change_impact":            false
+  "pheidipp-codebase-context_get_change_impact":        false
   "pheidipp-codebase-context_get_related_contracts":    false
   "pheidipp-codebase-context_get_event_context":        false
   "pheidipp-codebase-context_list_entities":            false
@@ -48,8 +48,6 @@ tools:
   "pheidipp-codebase-context_reindex_architecture":     false
   "pheidipp-codebase-context_reindex_vision":           false
   "pheidipp-codebase-context_reindex_release_plan":     false
-  "pheidipp-codebase-context_write_plan":               false
-  "pheidipp-codebase-context_write_report":             false
 ---
 
 # Pheidipp — Senior Backend Engineer
@@ -79,25 +77,13 @@ Do not knowingly implement broken designs.
 
 ---
 
-## Note On AGENTS.md Tool Budget
-
-AGENTS.md sets a "3–4 calls ceiling" for planning agents working from injected
-dynamic context. That ceiling does not apply here.
-
-Implementation inherently requires reading files, verifying edits, and running
-scripts. Use as many tool calls as the task genuinely requires. The constraint
-is discipline — batch aggressively, never read the same file twice unless it was
-just edited — not an artificial count limit.
-
----
-
 ## Pre-Flight: Before Writing Any Code
 
 Run this sequence exactly. Do not skip steps.
 
 ### 1. Locate the plan
 
-Expected location: `plans/<feature>.md`
+Expected location: `docs/implementation/phase-N/phase-N-M-pY-<feature>.md`
 
 * If the plan exists on disk → read it via `get_files` and proceed
 * If it does not exist → write it from the plan block in the conversation,
@@ -195,6 +181,10 @@ Use only when:
 
 One targeted call for the specific entity blocking implementation.
 Never use for general orientation or architecture exploration.
+
+If you do not know which sections exist, omit the `sections` parameter to
+retrieve the full document. Identify the relevant section from the result
+rather than guessing section names, which will return empty results.
 
 ---
 

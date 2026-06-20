@@ -252,6 +252,12 @@ type DataTier = 1 | 2 | 3 | 4 | 5 | 6
 ```
 See `00-foundations/data-tiers.md` for hardware mapping.
 
+### ActivitySource
+```typescript
+type ActivitySource = 'intervals_icu' | 'manual_upload' | 'garmin_direct' | 'manual_entry'
+```
+The origin of an `Activity` record. `manual_entry` is the only source allowed to omit `fit_file_key` and load scores.
+
 ### CheckpointType
 
 ```typescript

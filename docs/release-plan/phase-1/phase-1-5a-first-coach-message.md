@@ -35,6 +35,7 @@ The architect must be aware that `FirstMessageAgent` is an LLM agent, not a temp
 ## Upstream Dependencies
 - Phase-1.3 (Onboarding) — `AthleteProfile`, `AthletePreferences`, `TrainingGoal`, `TwinState` must exist.
 - Phase-1.2c (Twin & Fitness) — `CoachingMessage`, `GenerationEvent` schema must exist.
+- Phase-1.1 (Auth) — Transactional outbox (`04-platform/system-event.md`) must exist to receive and publish the `onboarding_completed` event that triggers this phase.
 
 ## Downstream Enablement
 - Phase-1.5b (Workout Generation) — shares `ContextBudgetService`, `PromptRegistry`, `TwinContextAssembler`

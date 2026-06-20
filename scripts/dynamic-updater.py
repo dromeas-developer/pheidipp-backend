@@ -479,11 +479,9 @@ def touched_areas(paths: set[str]) -> tuple[str, ...]:
 def change_set(root: Path, output: Path | None = None) -> ChangeSet:
     current_commit = run_command(["git", "rev-parse", "--short", "HEAD"], cwd=root) or "unknown"
     previous_commit = previous_output_commit(root, output)
-    base_commit = previous_commit or parent_commit(root, current_commit)
-
-    if previous_commit and previous_commit != current_commit:
+    if previous_commit is not None:
         base_commit = previous_commit
-    elif previous_commit == current_commit:
+    else:
         base_commit = parent_commit(root, current_commit)
 
     changes = committed_changes(root, base_commit, current_commit) + status_changes(root)
@@ -1643,6 +1641,9 @@ def generate(*, root: Path, output: Path | None = None, skip_db: bool = False, a
     pending_migrations = migration_pending(db_revision, migr)
 
     return f"""# implemented-state
+
+Commit:
+{change.current_commit}
 
 {format_change_set(change)}
 

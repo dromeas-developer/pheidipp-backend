@@ -550,17 +550,31 @@ Ordered list. Each step must be:
 - specific enough that the coder knows what to build
 - granular enough to be a single coherent unit of work
 - ordered so internal dependencies are clear
+- tagged with `[OWNER: <agent>]` to make execution responsibility explicit
+
+**Owner tags are mandatory.** Every step must carry exactly one:
+- `[OWNER: Coder]` — application code (models, services, repositories, routes)
+  AND Alembic revision generation (but not application)
+- `[OWNER: DevOps]` — Alembic revision review, augmentation, and application
+  to test and production databases
+- `[OWNER: Test Architect]` — test file generation and manifest updates
+
+The migration generation/application split is deliberate: the coder generates
+the revision file (it has full model context), DevOps reviews it, augments it
+for hypertable/extension requirements if needed, and applies it. The coder
+never calls `db-upgrade.sh` or `db-upgrade-test.sh`.
 
 Steps reference architecture contracts by name. They do NOT specify
 framework choices, library versions, or file structures.
 
 Good step:
-> 3. Implement `TwinRecalibrationService` to append a new `TwinState` record
->    on every `activity_calibration_eligible` event. Read load scores from
->    `Activity`, compute the Banister update per `02-computations/banister-update.md`,
->    and write the new `TwinState` with all inline snapshot fields populated.
+> 3. [OWNER: Coder] Implement `TwinRecalibrationService` to append a new
+>    `TwinState` record on every `activity_calibration_eligible` event. Read
+>    load scores from `Activity`, compute the Banister update per
+>    `02-computations/banister-update.md`, and write the new `TwinState` with
+>    all inline snapshot fields populated.
 
-Bad step:
+Bad step (no owner tag):
 > 3. Write the twin recalibration code.
 
 ## Event Contracts
@@ -598,6 +612,17 @@ Everything the coder needs that is not captured above:
 - suggested order within the steps if it matters beyond dependency
 - if an ADR was written: state its path and what constraint it imposes that
   the coder must not violate during implementation
+
+The following block is MANDATORY and must appear first in every
+Coder Handoff Notes section. List every step number and its owner.
+The coder executes only the steps listed under Execute and skips all others.
+
+```
+## Coder Scope
+Execute:  Steps N, N, N  [OWNER: Coder] — includes migration generation
+Skip:     Step N (DevOps — migration review and application),
+          Step N (Test Architect — tests)
+```
 ```
 
 ---

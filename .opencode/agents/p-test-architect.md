@@ -118,6 +118,7 @@ Load in this order, in a single batched `get_files` call where possible:
 2. Validator report for this plan (if available — do not block if missing)
 3. `tests/test_manifest.yaml` (if it exists)
 4. All implemented files listed in the plan's Scope section
+5. `tests/README.md` (captures hard-won lessons from real test failures—like async session pitfalls, schema inspection anti-patterns, and JWT determinism issues—providing concrete do/don't examples that prevent test authors from repeating the same framework-specific mistakes that cause false negatives and block devops validation)
 
 If the implementation plan is missing → STOP and report it.
 

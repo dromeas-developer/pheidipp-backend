@@ -66,6 +66,88 @@ refreshed = await repo.get_by_token_hash(token.token_hash)
 assert refreshed.ip_address is None
 ```
 
+---
+
+## Schema Inspection in Async Tests
+
+### ❌ Don't: Use `sync_session.connection()` for schema inspection
+
+```python
+# WRONG — raises MissingGreenlet error with asyncpg
+from sqlalchemy import inspect
+
+def _columns(db_session: AsyncSession, table: str) -> list[dict]:
+    conn = db_session.sync_session.connection()  # ❌ Requires greenlet context
+    inspector = inspect(conn)
+    return list(inspector.get_columns(table))
+```
+
+**Why it fails:** Tests run in asyncio event loops. `sync_session.connection()` tries to use asyncpg (async driver) from sync context, which requires a greenlet. Result: `MissingGreenlet` error.
+
+### ✅ Do: Use separate sync engine for schema inspection
+
+```python
+# CORRECT — create sync engine with psycopg2
+import os
+from sqlalchemy import create_engine, inspect
+
+def _columns(table: str) -> list[dict]:
+    database_url = os.environ.get("DATABASE_URL", "")
+    # Convert asyncpg → psycopg2
+    if database_url.startswith("postgresql+asyncpg://"):
+        database_url = database_url.replace(
+            "postgresql+asyncpg://", 
+            "postgresql+psycopg2://"
+        )
+    
+    engine = create_engine(database_url)
+    try:
+        with engine.connect() as conn:
+            inspector = inspect(conn)
+            # ✅ Fetch data INSIDE the with block
+            return list(inspector.get_columns(table))
+    finally:
+        engine.dispose()
+```
+
+**Key points:**
+- Don't pass `db_session` — use environment URL directly
+- Convert asyncpg URL to psycopg2
+- Fetch all data inside `with` block (don't return inspector objects)
+- Dispose engine to clean up connections
+
+### ❌ Don't: Use boolean checks on SQLAlchemy expressions
+
+```python
+# WRONG — TypeError on SQLAlchemy column expressions
+[idx for idx in Model.__table__.indexes 
+ if idx.dialect_options.get("postgresql", {}).get("where")]
+```
+
+**Error:** `TypeError: Boolean value of this clause is not defined`
+
+**Fix:** Explicitly check for `None`:
+```python
+[idx for idx in Model.__table__.indexes 
+ if idx.dialect_options.get("postgresql", {}).get("where") is not None]
+```
+
+### ❌ Don't: Query pg_catalog without schema filters
+
+When tests use isolated schemas, queries against `pg_constraint`, `pg_class`, etc. must filter by schema:
+
+```python
+# WRONG — regclass::text returns "schema.table", not just "table"
+WHERE conrelid::regclass::text IN ('activities')  # ❌ No match!
+
+# CORRECT — filter by schema and use relname
+JOIN pg_namespace ns ON ns.oid = table_class.relnamespace
+WHERE ns.nspname = :schema
+  AND table_class.relname IN ('activities', 'athlete_preferences')
+```
+
+---
+
 ## JWT Token Uniqueness in Tests
 
 ### The Issue

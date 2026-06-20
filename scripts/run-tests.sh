@@ -12,9 +12,14 @@ if [ -z "${TEST_DATABASE_URL:-}" ]; then
   exit 1
 fi
 
-TEST_PATH="${1:-tests/}"
+# Build test paths array - use all arguments or default to tests/
+if [ $# -gt 0 ]; then
+  TEST_PATHS="$*"
+else
+  TEST_PATHS="tests/"
+fi
 
 # Override DATABASE_URL for testing
 export DATABASE_URL="$TEST_DATABASE_URL"
 
-docker compose exec -e DATABASE_URL="$DATABASE_URL" api bash -c "pytest ${TEST_PATH} -v"
+docker compose exec -e DATABASE_URL="$DATABASE_URL" api bash -c "pytest ${TEST_PATHS} -v"

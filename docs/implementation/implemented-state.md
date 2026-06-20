@@ -1,99 +1,55 @@
 # implemented-state
 
+Commit:
+0e28ef9
+
 ## Change Set
 
 Base Commit:
-691a611
+0e28ef9
 
 Current Commit:
-77ee6c8
+0e28ef9
 
 Files Added:
-- alembic/versions/8265efd46112_phase_1_1_p3_single_primary_auth_.py
-- alembic/versions/fd373abd4b9e_phase_1_1_email_password_auth.py
-- app/api/deps.py
-- app/api/v1/__init__.py
-- app/api/v1/auth.py
-- app/core/logging_utils.py
-- app/core/security/__init__.py
-- app/core/security/password_hasher.py
-- app/core/security/token_service.py
-- app/models/athlete.py
-- app/models/athlete_auth.py
-- app/models/athlete_profile.py
-- app/models/enums.py
-- app/models/refresh_token.py
-- app/models/system_event.py
-- app/repositories/athlete_auth_repository.py
-- app/repositories/athlete_profile_repository.py
-- app/repositories/athlete_repository.py
-- app/repositories/refresh_token_repository.py
-- app/repositories/system_event_outbox_repository.py
-- app/repositories/system_event_repository.py
-- app/schemas/auth.py
-- app/services/auth_errors.py
-- app/services/auth_results.py
-- app/services/auth_service.py
-- app/services/event_publisher.py
-- app/tasks/discard_refresh_token_ips.py
-- app/tasks/discard_refresh_token_ips_cli.py
-- app/utils/__init__.py
-- app/utils/ip_utils.py
-- reports/phase-1-1-p1-p2-p3-email-password-auth_devops.md
-- reports/test_history/latest.md
-- tests/README.md
-- tests/__init__.py
-- tests/api/test_auth_endpoints.py
-- tests/behaviour/test_auth_user_journey.py
-- tests/integration/test_athlete_auth_primary_enforcement.py
-- tests/integration/test_athlete_repositories.py
-- tests/integration/test_auth_service.py
-- tests/integration/test_discard_refresh_token_ips.py
-- tests/integration/test_refresh_token_repository.py
-- tests/payloads.py
-- tests/test_manifest.yaml
-- tests/unit/test_ip_utils.py
-- tests/unit/test_logging_utils.py
-- tests/unit/test_password_hasher.py
-- tests/unit/test_token_service.py
+- alembic/versions/e7ffc8764335_phase_1_2a_profile_preferences_activity.py
+- app/models/activity.py
+- app/models/athlete_preferences.py
+- reports/phase-1-2a_devops.md
+- tests/integration/test_activity_schema.py
+- tests/integration/test_athlete_preferences_schema.py
+- tests/integration/test_athlete_profile_schema.py
+- tests/integration/test_migration_phase_1_2a.py
+- tests/integration/test_phase_1_1_registration_regression.py
+- tests/unit/test_activity_columns.py
+- tests/unit/test_athlete_profile_columns.py
+- tests/unit/test_enum_values.py
+- tests/unit/test_infer_data_tier.py
 
 Files Modified:
-- .env.test
-- app/api/__init__.py
-- app/api/v1/__init__.py
-- app/api/v1/health.py
-- app/core/__init__.py
-- app/main.py
 - app/models/__init__.py
-- app/repositories/__init__.py
-- app/schemas/__init__.py
-- app/services/__init__.py
-- pytest.ini
-- requirements.txt
-- tests/conftest.py
+- app/models/athlete_profile.py
+- app/models/enums.py
+- reports/test_history/latest.md
+- tests/README.md
+- tests/test_manifest.yaml
 
 Files Deleted:
 - none
 
 Touched Areas:
 - models
-- repositories
-- services
-- api
-- app
 - migrations
-- requirements
-- root
 - other
 
 Generated:
-2026-06-19T23:32:14.260446+00:00 UTC
+2026-06-20T18:53:54.773965+00:00 UTC
 
 Current DB Revision:
-8265efd46112 (head)
+e7ffc8764335 (head)
 
 Python Files Scanned:
-45
+47
 
 ---
 
@@ -102,17 +58,27 @@ Python Files Scanned:
 ### Domain Layer
 
 Entities:
+- Activity (activities) — app/models/activity.py
 - Athlete (athletes) — app/models/athlete.py
 - AthleteAuth (athlete_auths) — app/models/athlete_auth.py
+- AthletePreferences (athlete_preferences) — app/models/athlete_preferences.py
 - AthleteProfile (athlete_profiles) — app/models/athlete_profile.py
 - RefreshToken (athlete_refresh_tokens) — app/models/refresh_token.py
 - SystemEvent (system_events) — app/models/system_event.py
 - SystemEventOutbox (system_event_outbox) — app/models/system_event.py
 
 Enums:
+- ActivitySource — app/models/enums.py
 - AuthProvider — app/models/enums.py
+- DataTier — app/models/enums.py
 - EventPublicationStatus — app/models/system_event.py
+- GpsSource — app/models/enums.py
+- HrSource — app/models/enums.py
+- PowerSource — app/models/enums.py
+- PrimaryTrainingPlatform — app/models/enums.py
 - Sex — app/models/enums.py
+- SportBackground — app/models/enums.py
+- TrainingTimeOfDay — app/models/enums.py
 
 ### Persistence Layer
 
@@ -126,6 +92,7 @@ Repositories:
 
 Migrations:
 - 8265efd46112 (down: fd373abd4b9e) — alembic/versions/8265efd46112_phase_1_1_p3_single_primary_auth_.py
+- e7ffc8764335 (down: 8265efd46112) — alembic/versions/e7ffc8764335_phase_1_2a_profile_preferences_activity.py
 - fd373abd4b9e (down: none) — alembic/versions/fd373abd4b9e_phase_1_1_email_password_auth.py
 
 ### Service Layer
@@ -157,7 +124,7 @@ Public API:
 ### Registrations
 
 - app/models/__init__.py
-- Imports: Athlete, AthleteAuth, AthleteProfile, AuthProvider, EventPublicationStatus, RefreshToken, Sex, SystemEvent, SystemEventOutbox
+- Imports: Activity, ActivitySource, Athlete, AthleteAuth, AthletePreferences, AthleteProfile, AuthProvider, DataTier, EventPublicationStatus, GpsSource, HrSource, PowerSource, PrimaryTrainingPlatform, RefreshToken, Sex, SportBackground, SystemEvent, SystemEventOutbox, TrainingTimeOfDay, infer_data_tier
 
 - app/schemas/__init__.py
 - Imports: AthleteResponse, AuthResponse, LoginRequest, RefreshRequest, RefreshResponse, RegisterProfileIn, RegisterRequest, TokenPairResponse
@@ -182,15 +149,7 @@ Public API:
 ### Dependency Changes
 
 requirements.txt
-Added:
-- bcrypt>=4.0.0
-- pyjwt>=2.8.0
-
-Updated:
-- none
-
-Removed:
-- none
+No changes detected
 
 ### Service Wiring
 
@@ -268,7 +227,7 @@ Repository dependencies:
 ### Execution Readiness
 
 Current Revision:
-8265efd46112 (head)
+e7ffc8764335 (head)
 
 Migration Pending:
 yes

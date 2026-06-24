@@ -1,0 +1,412 @@
+version: "1.0"
+plan_id: "phase-1-2a-p1-profile-preferences-activity"
+generated_at: "2026-06-19T00:00:00+00:00"
+last_reviewed_at: "2026-06-21T13:00:00+00:00"
+
+# Plan covered by this sub-phase file:
+#   docs/implementation/phase-1/phase-1-2a-p1-profile-preferences-activity.md
+# Validation report:
+#   docs/implementation/phase-1/phase-1-2a-p1-profile-preferences-activity-validation.md
+# DevOps report: reports/phase-1-2a_devops.md
+# Result: PASS — 194/194 green
+
+features:
+  phase-1-2a-enums:
+    status: promoted
+    plan: "docs/implementation/phase-1/phase-1-2a-p1-profile-preferences-activity.md"
+    owned_by_plan:
+      - "phase-1-2a-p1-profile-preferences-activity"
+    description: "Closed ontology membership for Sex (Phase-1.1 invariant preserved), ActivitySource, DataTier, and preference enums; re-export from app.models."
+    protects:
+      - "ActivitySource values are exactly intervals_icu, manual_upload, garmin_direct, manual_entry"
+      - "DataTier values are exactly 1, 2, 3, 4, 5, 6"
+      - "Sex values are exactly male, female, not_specified (Phase-1.1 invariant preserved)"
+      - "SportBackground / TrainingTimeOfDay / GpsSource / HrSource / PowerSource / PrimaryTrainingPlatform have stable closed ontologies"
+      - "Every model enum is re-exported by app.models.__init__ so alembic autogen discovers them"
+    impacts:
+      - "phase-1-2a-athlete-profile-schema"
+      - "phase-1-2a-athlete-preferences-schema"
+      - "phase-1-2a-activity-schema"
+      - "phase-1-2a-data-tier-inference"
+      - "phase-1-2a-migration"
+    execution_prerequisites:
+      migrations: false
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit:
+        - path: "tests/unit/test_enum_values.py"
+          owner: "phase-1-2a-p1-profile-preferences-activity"
+      integration: []
+      api: []
+      behaviour: []
+      release: []
+
+  phase-1-2a-data-tier-inference:
+    status: promoted
+    plan: "docs/implementation/phase-1/phase-1-2a-p1-profile-preferences-activity.md"
+    owned_by_plan:
+      - "phase-1-2a-p1-profile-preferences-activity"
+    description: "Pure-function mapping (HrSource x PowerSource) -> DataTier per docs/architecture/00-foundations/data-tiers.md."
+    protects:
+      - "running_power_meter + chest_strap_rr -> Tier 1"
+      - "running_power_meter + non-RR HR -> Tier 2"
+      - "chest_strap_rr + no power -> Tier 3"
+      - "chest_strap_no_rr | wrist_optical + no power -> Tier 4"
+      - "HrSource.NONE + PowerSource.NONE -> Tier 5"
+      - "Cartesian product of all enum combinations returns a valid DataTier"
+    impacts:
+      - "phase-1-2a-enums"
+    execution_prerequisites:
+      migrations: false
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit:
+        - path: "tests/unit/test_infer_data_tier.py"
+          owner: "phase-1-2a-p1-profile-preferences-activity"
+      integration: []
+      api: []
+      behaviour: []
+      release: []
+
+  phase-1-2a-athlete-profile-schema:
+    status: promoted
+    plan: "docs/implementation/phase-1/phase-1-2a-p1-profile-preferences-activity.md"
+    owned_by_plan:
+      - "phase-1-2a-p1-profile-preferences-activity"
+    description: "AthleteProfile extended from Phase-1.1 minimal registration profile to the full schema (personalisation, location, scheduling, effort, risk, objective)."
+    protects:
+      - "athlete_profiles carries the full Phase-1.2a column set (4 personalisation JSONB, 2 location, timezone, training_window, current_effort_generation, structural_risk_flag, objective_thresholds)"
+      - "Phase-1.1 unique constraint on athlete_id preserved (DB-enforced)"
+      - "Phase-1.1 minimal profile still persistable (every new column nullable)"
+      - "date_of_birth and sex remain NOT NULL (registration contract)"
+      - "Extension is additive — never drop-and-recreate athlete_profiles"
+      - "Partial onboarding PATCH works: location-only, timezone-only, gap-only, etc."
+    impacts:
+      - "phase-1-2a-registration-regression"
+      - "phase-1-2a-migration"
+    execution_prerequisites:
+      migrations: true
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit:
+        - path: "tests/unit/test_athlete_profile_columns.py"
+          owner: "phase-1-2a-p1-profile-preferences-activity"
+      integration:
+        - path: "tests/integration/test_athlete_profile_schema.py"
+          owner: "phase-1-2a-p1-profile-preferences-activity"
+      api: []
+      behaviour: []
+      release: []
+
+  phase-1-2a-athlete-preferences-schema:
+    status: promoted
+    plan: "docs/implementation/phase-1/phase-1-2a-p1-profile-preferences-activity.md"
+    owned_by_plan:
+      - "phase-1-2a-p1-profile-preferences-activity"
+    description: "New AthletePreferences table — hardware, platform, schedule; one-per-athlete with DB-enforced uniqueness and CHECK years_structured_training >= 0."
+    protects:
+      - "athlete_preferences table created with full Phase-1.2a column set"
+      - "One AthletePreferences per Athlete (unique on athlete_id)"
+      - "DB CHECK constraint years_structured_training >= 0 enforced"
+      - "weekly_schedule JSONB round-trip preserves long_workout, doubles_eligible, available, max_hours"
+      - "Zero boundary accepted by the CHECK constraint"
+      - "Negative years_structured_training rejected at the DB layer"
+    impacts:
+      - "phase-1-2a-data-tier-inference"
+      - "phase-1-2a-migration"
+    execution_prerequisites:
+      migrations: true
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit: []
+      integration:
+        - path: "tests/integration/test_athlete_preferences_schema.py"
+          owner: "phase-1-2a-p1-profile-preferences-activity"
+      api: []
+      behaviour: []
+      release: []
+
+  phase-1-2a-activity-schema:
+    status: promoted
+    plan: "docs/implementation/phase-1/phase-1-2a-p1-profile-preferences-activity.md"
+    owned_by_plan:
+      - "phase-1-2a-p1-profile-preferences-activity"
+    description: "New Activity table — lean running observation index with partial unique dedup index and athlete/date indexes."
+    protects:
+      - "activities schema carries the documented lean field set"
+      - "No workout-summary columns (avg_hr/avg_pace/avg_power/avg_cadence/lap_data) ever — DB-level invariant"
+      - "Partial unique index on (athlete_id, external_id, source) WHERE external_id IS NOT NULL"
+      - "Duplicate (athlete_id, external_id, source) non-null external_id raises IntegrityError"
+      - "Same external_id different sources != duplicate (source participates in the key)"
+      - "manual_entry rows bypass dedup via NULL external_id (multiple manual entries coexist)"
+      - "Index on (athlete_id, activity_date) exists"
+      - "Index on (athlete_id, start_time) exists"
+      - "load_scores default to NULL (LoadComputationService populates them)"
+      - "FK to planned_sessions is NOT present (Phase-1.2b will add it)"
+      - "Activity-row cascade on athlete delete"
+    impacts:
+      - "phase-1-2a-migration"
+    execution_prerequisites:
+      migrations: true
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit:
+        - path: "tests/unit/test_activity_columns.py"
+          owner: "phase-1-2a-p1-profile-preferences-activity"
+      integration:
+        - path: "tests/integration/test_activity_schema.py"
+          owner: "phase-1-2a-p1-profile-preferences-activity"
+      api: []
+      behaviour: []
+      release: []
+
+  phase-1-2a-migration:
+    status: promoted
+    plan: "docs/implementation/phase-1/phase-1-2a-p1-profile-preferences-activity.md"
+    owned_by_plan:
+      - "phase-1-2a-p1-profile-preferences-activity"
+    description: "Alembic migration from Phase-1.1 P3 head (8265efd46112) to Phase-1.2a (e7ffc8764335) — extends athlete_profiles, creates athlete_preferences and activities; reversible via downgrade -1."
+    protects:
+      - "alembic upgrade head on a fresh database succeeds with no errors (rc=0)"
+      - "alembic downgrade -1 returns schema to Phase-1.1 P3 baseline"
+      - "down_revision chains from Phase-1.1 P3 head (8265efd46112)"
+      - "delivered revision equals e7ffc8764335"
+      - "Migration never drops Phase-1.1 tables (athletes, athlete_profiles, athlete_auths, athlete_refresh_tokens, system_events, system_event_outbox)"
+      - "Migration adds exactly the 11 documented Phase-1.2a columns to athlete_profiles in the documented order"
+      - "Migration adds the named CHECK constraint ck_athlete_preferences_years_structured_training_non_negative"
+      - "Migration creates partial unique uq_activities_athlete_external_source index with predicate external_id IS NOT NULL"
+      - "Migration declares athlete_id FKs with ondelete=CASCADE for both new tables (verified via pg_constraint.confdeltype)"
+      - "Phase-1.1 tables survive the migration (verified post-upgrade)"
+    impacts:
+      - "phase-1-2a-athlete-profile-schema"
+      - "phase-1-2a-athlete-preferences-schema"
+      - "phase-1-2a-activity-schema"
+      - "phase-1-2a-registration-regression"
+    execution_prerequisites:
+      migrations: true
+      seed_data: false
+      external_services: ["postgres"]
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit: []
+      integration:
+        - path: "tests/integration/test_migration_phase_1_2a.py"
+          owner: "phase-1-2a-p1-profile-preferences-activity"
+      api: []
+      behaviour: []
+      release: []
+
+  phase-1-2a-registration-regression:
+    status: promoted
+    plan: "docs/implementation/phase-1/phase-1-2a-p1-profile-preferences-activity.md"
+    owned_by_plan:
+      - "phase-1-2a-p1-profile-preferences-activity"
+    description: "Phase-1.1 registration journey (Athlete + AthleteAuth + minimal AthleteProfile + RefreshToken) still works against the Phase-1.2a-extended schema."
+    protects:
+      - "Registration produces exactly one Athlete"
+      - "Registration produces exactly one email AthleteAuth"
+      - "Registration produces exactly one minimal AthleteProfile (every Phase-1.2a column null)"
+      - "Registration produces exactly one RefreshToken"
+      - "Duplicate-email registration still raises DuplicateEmailError"
+      - "Round-trip read of the registered profile succeeds"
+    impacts:
+      - "phase-1-1-auth-register"
+      - "phase-1-2a-athlete-profile-schema"
+    execution_prerequisites:
+      migrations: true
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit: []
+      integration:
+        - path: "tests/integration/test_phase_1_1_registration_regression.py"
+          owner: "phase-1-2a-p1-profile-preferences-activity"
+      api: []
+      behaviour: []
+      release: []
+
+execution_groups:
+  p1-2a-p1-unit:
+    scope: feature
+    phase: 1
+    tests:
+      - "tests/unit/test_enum_values.py"
+      - "tests/unit/test_infer_data_tier.py"
+      - "tests/unit/test_athlete_profile_columns.py"
+      - "tests/unit/test_activity_columns.py"
+    depends_on: []
+  p1-2a-p1-integration:
+    scope: feature
+    phase: 1
+    tests:
+      - "tests/integration/test_athlete_profile_schema.py"
+      - "tests/integration/test_athlete_preferences_schema.py"
+      - "tests/integration/test_activity_schema.py"
+      - "tests/integration/test_phase_1_1_registration_regression.py"
+    depends_on:
+      - "p1-2a-p1-unit"
+  p1-2a-p1-migration:
+    scope: feature
+    phase: 1
+    tests:
+      - "tests/integration/test_migration_phase_1_2a.py"
+    depends_on:
+      - "p1-2a-p1-unit"
+      - "p1-2a-p1-integration"
+  p1-2a-smoke:
+    scope: smoke
+    phase: 1
+    tests:
+      - "tests/unit/test_enum_values.py"
+      - "tests/unit/test_infer_data_tier.py"
+      - "tests/unit/test_athlete_profile_columns.py"
+      - "tests/unit/test_activity_columns.py"
+    depends_on: []
+
+coverage:
+  routes:
+    covered: []
+    partial: []
+    missing:
+      - "Profile/preferences/activity API endpoints (not in Phase-1.2a scope)"
+  events:
+    covered: []
+    partial: []
+    missing:
+      - "activity_ingested (NOT PRODUCED in Phase-1.2a — out of scope until FIT/manual ingestion ships)"
+      - "activity_calibration_eligible (NOT PRODUCED in Phase-1.2a — out of scope until load computation ships)"
+      - "session_completed (NOT CONSUMED in Phase-1.2a — out of scope until session lifecycle ships)"
+      - "onboarding_completed (NOT CONSUMED in Phase-1.2a — out of scope)"
+  invariants:
+    covered:
+      - "ActivitySource values are exactly intervals_icu, manual_upload, garmin_direct, manual_entry"
+      - "DataTier values are exactly 1, 2, 3, 4, 5, 6"
+      - "Sex values preserved at male, female, not_specified (Phase-1.1 invariant preserved)"
+      - "infer_data_tier maps running_power_meter + chest_strap_rr -> Tier 1"
+      - "infer_data_tier maps running_power_meter + non-RR HR -> Tier 2"
+      - "infer_data_tier maps chest_strap_rr + no power -> Tier 3"
+      - "infer_data_tier maps chest_strap_no_rr | wrist_optical + no power -> Tier 4"
+      - "infer_data_tier maps HrSource.NONE + PowerSource.NONE -> Tier 5"
+      - "AthleteProfile.athlete_id remains uniquely constrained (Phase-1.1 invariant preserved)"
+      - "AthleteProfile carries the full Phase-1.2a column set"
+      - "AthleteProfile minimal registration row still persists with Phase-1.2a columns null"
+      - "AthletePreferences.athlete_id is uniquely constrained at the DB level"
+      - "AthletePreferences CHECK constraint years_structured_training >= 0 is enforced"
+      - "AthletePreferences weekly_schedule JSONB round-trip preserves all schedule keys"
+      - "Activity table has lean column set (no avg_hr/avg_pace/avg_power/avg_cadence/lap data)"
+      - "Activity dedup partial unique index on (athlete_id, external_id, source) WHERE external_id IS NOT NULL"
+      - "Duplicate (athlete_id, external_id, source) with non-null external_id raises IntegrityError"
+      - "Same external_id with different sources does NOT collide"
+      - "manual_entry rows bypass dedup via NULL external_id"
+      - "Activity indexes (athlete_id, activity_date) and (athlete_id, start_time) exist"
+      - "Activity planned_session_id is a free-standing nullable UUID (FK added by Phase-1.2b)"
+      - "Activity rows cascade-delete with their parent Athlete"
+      - "alembic upgrade head on a fresh database succeeds (rc=0)"
+      - "alembic downgrade -1 returns the schema to the Phase-1.1 P3 baseline"
+      - "Phase-1.2a migration revision equals e7ffc8764335"
+      - "Phase-1.2a migration down_revision chains from Phase-1.1 P3 head (8265efd46112)"
+      - "Migration never drops Phase-1.1 tables"
+      - "Phase-1.1 tables survive the migration"
+      - "Migration adds exactly the 11 documented columns to athlete_profiles"
+      - "Migration emits ck_athlete_preferences_years_structured_training_non_negative"
+      - "Migration emits partial unique uq_activities_athlete_external_source"
+      - "Migration declares ondelete=CASCADE FKs for activities and athlete_preferences"
+    partial: []
+    missing:
+      - "AthleteProfile onboarding-write services (not in Phase-1.2a scope)"
+      - "AthletePreferences onboarding-write services (not in Phase-1.2a scope)"
+      - "FIT upload / object storage ingestion (not in Phase-1.2a scope)"
+      - "Manual activity entry API / service (not in Phase-1.2a scope)"
+      - "LoadComputationService (not in Phase-1.2a scope)"
+      - "CalibrationEligibilityService (not in Phase-1.2a scope)"
+      - "Onboarding-completion flow (not in Phase-1.2a scope)"
+      - "Data tier inference at the activity boundary (not wired in Phase-1.2a)"
+
+history:
+  - date: "2026-06-20"
+    plan: "phase-1-2a-p1-profile-preferences-activity"
+    tests_added: 0
+    tests_modified: 0
+    tests_removed: 0
+    result: "PASS"
+    coverage_delta: >
+      Promotion (status generated|passing -> promoted) for all 7 Phase-1.2a features
+      after the clean DevOps pass. validation.executable and validation.passed
+      set to true for all features. selection.regression and selection.release
+      updated in index.yaml to include all Phase-1.2a test paths.
+      Schema-inspection tests (test_athlete_profile_schema, test_athlete_preferences_schema,
+      test_activity_schema) confirmed passing after DevOps infrastructure fix to
+      conftest.py (sync_session greenlet binding resolved).
+  - date: "2026-06-20"
+    plan: "phase-1-2a-devops-rerun-issue-1-2"
+    tests_added: 0
+    tests_modified: 2
+    tests_removed: 0
+    result: "PARTIAL"
+    coverage_delta: >
+      DevOps infrastructure remediation (issue #1 and #2): conftest.py updated to
+      fix AsyncSession.sync_session.connection() greenlet binding error affecting
+      schema-inspection tests. tests/integration/test_migration_phase_1_2a.py
+      updated to use correct connection pattern. 67 previously failing schema-
+      inspection tests now executable. validation.executable set to true for
+      phase-1-2a-athlete-profile-schema, phase-1-2a-athlete-preferences-schema,
+      and phase-1-2a-activity-schema after confirming tests run without framework
+      errors.
+  - date: "2026-06-19"
+    plan: "phase-1-2a-p1-profile-preferences-activity"
+    tests_added: 0
+    tests_modified: 1
+    tests_removed: 0
+    result: "PARTIAL"
+    coverage_delta: >
+      Verified all 9 generated test files exist on disk; set
+      validation.implemented=true for all Phase-1.2a features and populated
+      selection.feature. test_migration_phase_1_2a.py updated to fix
+      down_revision assertion (was asserting wrong Phase-1.1 head).
+      validation.executable and validation.passed remain false pending DevOps run.
+  - date: "2026-06-19"
+    plan: "phase-1-2a-p1-profile-preferences-activity"
+    tests_added: 9
+    tests_modified: 0
+    tests_removed: 0
+    result: "PARTIAL"
+    coverage_delta: >
+      Bootstrap manifest for Phase-1.2a. 9 test files generated across unit
+      (test_enum_values, test_infer_data_tier, test_athlete_profile_columns,
+      test_activity_columns) and integration (test_athlete_profile_schema,
+      test_athlete_preferences_schema, test_activity_schema,
+      test_migration_phase_1_2a, test_phase_1_1_registration_regression).
+      All 31 Phase-1.2a invariants mapped to at least one test assertion.
+      No routes or events in scope for this schema-only plan.

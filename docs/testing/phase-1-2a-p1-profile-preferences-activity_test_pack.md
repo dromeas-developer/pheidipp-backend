@@ -371,3 +371,114 @@ files will need updates — likely to switch the inspector target from
 to the project's sync engine, plus adding `models` to
 `app/main.py`'s import chain so `_prepare_database` discovers the
 Phase-1.2a tables.
+
+---
+
+## DevOps rerun (cross-phase) — Test-Architect fixes (2026-06-21)
+
+The DevOps retry report `reports/phase-1-2b_devops.md` (Phase-1.2b
+retry that re-ran the previously-failing four tests after round-1
+fixes) surfaced **two remaining Phase-1.2a test failures** plus
+**one Phase-1.2b collection error**. Although routed to p-coder by
+default, all three live in files Test Architect owns (the test
+surface); the DevOps report's "Route to p-coder" label is a
+fallback attribution, not an authoritative ownership claim. Both
+issues are documented here; the Phase-1.2b collection-error issue
+is documented under the Phase-1.2b test pack's Remediation Log
+(`docs/testing/phase-1-2b-p1-plan-sessions_test_pack.md`).
+
+Note on terminology: the original Phase-1.2a test-author for
+`test_activity_schema.py` is the Phase-1.2a plan; the file was
+later extended in Phase-1.2b to exercise the new `planned_session_id`
+FK linkage behaviour. The `SessionType.EASY` bad reference is on a
+code path the Phase-1.2b extension added, which is why this entry
+is recorded in this test pack — the file's Test Architect history
+covers both phase variants under
+`phase-1-2a-activity-schema` (Phase-1.2a origin) and
+`phase-1-2b-activity-schema-extension` (Phase-1.2b extension).
+
+### Issue 1 — `tests/integration/test_activity_schema.py::test_planned_session_id_is_nullable_uuid_with_or_without_fk`: `AttributeError: SessionType.EASY`
+
+**Root cause.** At ~L589, the new `PlannedSession` fixture constructed
+in Phase-1.2b passes `session_type=SessionType.EASY` where the
+canonical production enum (`app/models/enums.py::SessionType`) defines
+`EASY_RUN = "easy_run"` and has no `EASY` member. This yielded
+`AttributeError: type object 'SessionType' has no attribute 'EASY'`
+during collection/run.
+
+The actual DB string value the test cares about is `"easy_run"` (the
+enum `.value`); the test asserts FK linkage behaviour
+(`activity.planned_session_id == planned_id`, then `is None`), not
+the session_type value itself. Any legal `SessionType` member is
+semantically equivalent here — `EASY_RUN` matches the intent string
+`"Light aerobic opener"` and aligns with the canonical enum and
+every other reference in the codebase.
+
+Cross-codebase consistency check (grep across `tests/` and `app/`):
+
+* `SessionType.EASY_RUN` (canonical, production enum) — used in
+  `test_planned_session_schema.py:150`,
+  `test_weekly_plan_schema.py:196`, every `test_enum_values.py`
+  parametrize list, every `_norm`/`TODO` column assertion.
+* `"easy_run"` (string value) — listed in
+  `tests/unit/test_enum_values.py:511`,
+  `tests/unit/test_planned_session_columns.py:129`,
+  `tests/unit/test_weekly_plan_columns.py:282`.
+* `SessionType.EASY` — **only** at the failing L589 site. Single,
+  isolated outlier. Confirms the production enum is the source of
+  truth and the test had the wrong member.
+
+**Fix.** Single-character change: `SessionType.EASY` →
+`SessionType.EASY_RUN` at L589. Enum-string value `"easy_run"`
+agrees with the production enum and every consumer. No production
+enum change — that would invert the bug and break every other test
+caller. No test scope change — the test still asserts the FK-linkage
+invariant it was written for.
+
+### Issue 2 — `tests/integration/test_migration_phase_1_2a.py::test_downgrade_returns_schema_to_phase_1_1_baseline`: alembic parent-revision syntax unsupported
+
+**Root cause.** The Phase-1.2b chain extension forced a rewrite of
+the downgrade target: `downgrade -1` now reverts only Phase-1.2b
+and leaves Phase-1.2a intact, so the test instead targets the
+revision preceding `e7ffc8764335` to reach the Phase-1.1 P3
+baseline. The original code chose `f"{e7ffc8764335}^"` — Alembic's
+**caret parent-of-revision operator**.
+
+Alembic 1.13.1 (the version pinned by this project — also visible
+in the DevOps observation) does **not** parse `^` as a parent
+operator on the `downgrade` sub-command. `^` only became a
+canonical revision-target operator in Alembic 1.14+. Result: a
+parser-level error rather than the intended downgrade semantics.
+
+**Fix.** Use the existing `PHASE_1_1_P3_REVISION = "8265efd46112"`
+constant (already declared at L42 of the same file) directly as
+the downgrade target. This is:
+
+* **Equivalence-preserving.** `8265efd46112` is exactly the parent
+  revision of `e7ffc8764335` (the `down_revision` declared on the
+  Phase-1.2a migration file), so the `<rev>^` semantics are
+  preserved despite the syntax change.
+* **Self-documenting.** The constant name (`PHASE_1_1_P3_REVISION`)
+  + the inline comment (`parent of {PHASE_1_2A_REVISION}`) carry the
+  intent forward without relying on operator knowledge.
+* **Alembic-portable.** Bare revision IDs are valid in every
+  Alembic version since 0.9; the `^` operator remains useful in
+  1.14+ but isn't required for this test.
+
+The error message and the `assert rc_dn == 0` failure path now
+reference `PHASE_1_1_P3_REVISION` (with the parent relationship
+explained in the f-string), so a future CI regression names the
+correct downgrade target instead of an obscure `^` expression.
+
+**Cross-cutting risk: none.** Localised to one downgrade call site.
+`_run_alembic_subprocess`, the schema-isolation helper, and the
+post-downgrade `inspector.has_table("activities")` /
+`inspector.has_table("athlete_preferences")` assertions are all
+untouched.
+
+### Test-Architect-level fix in Phase-1.2b (cross-reference)
+
+Issue 3 in the same retry report is the `import pytest` collection
+error in `tests/unit/test_training_goal_columns.py`. Handled under
+the Phase-1.2b test pack Remediation Log (this file is a Phase-1.2a
+document and does not own the Phase-1.2b unit suite).

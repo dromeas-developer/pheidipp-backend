@@ -38,6 +38,26 @@ from app.models.enums import ActivitySource
 TABLE = "activities"
 
 
+def _sync_url() -> str:
+    """Convert asyncpg ``DATABASE_URL`` into a sync psycopg2 URL.
+
+    Required by direct-connection introspection helpers that use the
+    sync ``sqlalchemy.inspect`` path. The same helper exists in
+    ``test_training_plan_schema.py`` and ``test_checkpoint_schema.py``
+    — adding it here keeps ``test_planned_session_id_is_nullable_uuid_with_or_without_fk``
+    self-contained without coupling these test files by import.
+    """
+    database_url = os.environ.get("DATABASE_URL", "")
+    if not database_url:
+        raise RuntimeError("DATABASE_URL environment variable not set")
+    if database_url.startswith("postgresql+asyncpg://"):
+        database_url = database_url.replace(
+            "postgresql+asyncpg://",
+            "postgresql+psycopg2://",
+        )
+    return database_url
+
+
 def _columns(table: str) -> list[dict]:
     """Get column info for a table using sync engine."""
     database_url = os.environ.get("DATABASE_URL", "")
@@ -449,29 +469,145 @@ class TestActivityPersistence:
         assert activity.quality_flags["hr_dropout_pct"] == 14.5
         assert activity.quality_flags["gps_loss"] is True
 
-    async def test_planned_session_id_is_nullable_uuid_no_fk(
+    async def test_planned_session_id_is_nullable_uuid_with_or_without_fk(
         self, db_session: AsyncSession
     ) -> None:
-        """The FK to ``planned_sessions`` is added by Phase-1.2b's
-        migration (after that table exists). For Phase-1.2a the column
-        is a free-standing nullable UUID.
+        """``activities.planned_session_id`` is a free-standing nullable
+        UUID for Phase-1.2a and gains a FK to ``planned_sessions.id``
+        in Phase-1.2b.
 
-        We assert by trying to persist an Activity row with a
-        random UUID for ``planned_session_id`` — if the FK existed it
-        would raise an IntegrityError on the ``planned_sessions``
-        table; with no FK the row persists cleanly.
+        The shared ``_prepare_database`` fixture builds the full
+        ``Base.metadata`` schema, so this test must be **phase-aware**
+        rather than universal: it inspects the live schema and asserts
+        whichever contract is currently in force.
+
+        * If ``planned_sessions`` table is absent (Phase-1.2a baseline)
+          — persist a row with a random ``planned_session_id`` UUID
+          and assert it round-trips. A free-standing nullable UUID
+          accepts any value.
+        * If ``planned_sessions`` table is present (Phase-1.2b) — first
+          create a real ``PlannedSession`` row so the FK is satisfied,
+          then assert the persisted ``Activity`` carries the correct
+          reference. This proves the FK is wired to ``planned_sessions.id``
+          rather than silently verified.
+
+        In both phases the column is **nullable** — the schema
+        contract ``activities.planned_session_id IS NULL`` is the
+        common assertion at the end.
         """
-        import uuid
+        import uuid as _uuid
+
+        engine = create_engine(_sync_url())
+        try:
+            with engine.connect() as conn:
+                has_planned_sessions = conn.execute(
+                    text(
+                        "SELECT EXISTS ("
+                        "  SELECT 1 FROM information_schema.tables "
+                        "  WHERE table_schema = current_schema() "
+                        "    AND table_name = 'planned_sessions' "
+                        ")"
+                    )
+                ).scalar_one()
+        finally:
+            engine.dispose()
 
         athlete = await _new_athlete(db_session, "plan-sess@example.com")
         activity = _activity_factory(athlete_id=athlete.id)
-        # Random UUID — there is no planned_sessions row for it; we
-        # expect persistence to succeed (no FK to violate).
-        activity.planned_session_id = uuid.uuid4()
+
+        if not has_planned_sessions:
+            # Phase-1.2a: free-standing nullable UUID. Persist any
+            # random UUID — with no FK to violate, the row commits.
+            activity.planned_session_id = _uuid.uuid4()
+            db_session.add(activity)
+            await db_session.flush()
+            await db_session.refresh(activity)
+            assert activity.planned_session_id is not None
+            return
+
+        # Phase-1.2b: FK to planned_sessions.id is enforced. We must
+        # create a real PlannedSession row to satisfy the FK before
+        # asserting the link holds.
+        from datetime import date as _date
+        from app.models.training_goal import TrainingGoal
+        from app.models.training_plan import TrainingPlan
+        from app.models.weekly_plan import WeeklyPlan
+        from app.models.planned_session import PlannedSession
+        from app.models.enums import (
+            GoalType,
+            PhaseLabel,
+            PlannedSessionStatus,
+            SessionPriority,
+            SessionSlot,
+            SessionType,
+            TrainingGoalStatus,
+            TrainingPlanStatus,
+            WeeklyPlanStatus,
+        )
+
+        goal = TrainingGoal(
+            athlete_id=athlete.id,
+            goal_type=GoalType.MAINTENANCE,
+            weekly_volume_hours=4.0,
+            weekly_volume_km=25.0,
+            fitness_level=3,
+            status=TrainingGoalStatus.ACTIVE,
+        )
+        db_session.add(goal)
+        await db_session.flush()
+
+        plan = TrainingPlan(
+            training_goal_id=goal.id,
+            status=TrainingPlanStatus.ACTIVE,
+        )
+        db_session.add(plan)
+        await db_session.flush()
+
+        weekly = WeeklyPlan(
+            training_plan_id=plan.id,
+            week_number=1,
+            week_starts_at=_date(2026, 6, 22),
+            week_ends_at=_date(2026, 6, 28),
+            adjusted_intent={
+                "methodology": "pheidipp-default",
+                "target_distribution": {},
+                "objectives": [],
+                "session_count": 1,
+                "adjustment_flags": {},
+            },
+            status=WeeklyPlanStatus.ACTIVE,
+        )
+        db_session.add(weekly)
+        await db_session.flush()
+
+        planned = PlannedSession(
+            weekly_plan_id=weekly.id,
+            training_plan_id=plan.id,
+            week_number=1,
+            target_date=_date(2026, 6, 22),
+            phase_label=PhaseLabel.AEROBIC_BASE,
+            session_slot=SessionSlot.AM,
+            session_type=SessionType.EASY_RUN,
+            intent_description="Light aerobic opener",
+            approximate_duration_minutes=45,
+            status=PlannedSessionStatus.PENDING,
+            session_priority=SessionPriority.PRIMARY,
+        )
+        db_session.add(planned)
+        await db_session.flush()
+        planned_id = planned.id
+
+        activity.planned_session_id = planned_id
         db_session.add(activity)
         await db_session.flush()
         await db_session.refresh(activity)
-        assert activity.planned_session_id is not None
+        assert activity.planned_session_id == planned_id
+
+        # And the nullable invariant holds when we leave it NULL.
+        activity.planned_session_id = None
+        await db_session.flush()
+        await db_session.refresh(activity)
+        assert activity.planned_session_id is None
 
 
 class TestActivityForeignKeyCascade:

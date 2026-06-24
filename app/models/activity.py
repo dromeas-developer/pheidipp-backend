@@ -1,6 +1,6 @@
 """Activity — lean physiological observation index.
 
-Implements the Phase-1.2a contract from
+Implements the Phase-1.2a + Phase-1.2b contract from
 docs/architecture/01-entities/activity.md.
 
 The table is a lean index: identity, source, timing, signal-availability
@@ -9,11 +9,14 @@ dashboard fields (no ``avg_hr``, no ``avg_pace``, no ``avg_power``, no
 ``avg_cadence``, no lap data) ever appear here — those belong in the
 FIT file or in execution-analysis records.
 
-``planned_session_id`` is a nullable UUID without a foreign key. The
-``planned_sessions`` table is created in Phase-1.2b; the FK is added by
-that plan's migration. Referencing it here would couple this plan to
-the next sub-phase and risk a forward-only migration path that can
-break the head.
+``planned_session_id`` is a nullable UUID with a foreign key to
+``planned_sessions.id``. Phase-1.2a initially created the column WITHOUT
+the FK (so a fresh-DB migration could stand alone on the head it
+inherited); Phase-1.2b emits an explicit
+``op.create_foreign_key('fk_activities_planned_session',
+'activities', 'planned_sessions', ['planned_session_id'], ['id'])``
+operation that wires the FK while preserving the column's nullable
+semantics and zero-downtime additive intent.
 """
 
 from __future__ import annotations
@@ -68,11 +71,14 @@ class Activity(Base):
         ForeignKey("athletes.id", ondelete="CASCADE"),
         nullable=False,
     )
-    # Nullable UUID only — the FK to ``planned_sessions`` is added by
-    # Phase-1.2b's migration when that table exists. Do NOT add the FK
-    # here or this plan's migration will fail on a fresh database.
+    # Nullable UUID referencing ``planned_sessions.id``. Phase-1.2a
+    # created the column without the FK; Phase-1.2b's migration wires
+    # the FK via ``op.create_foreign_key`` rather than re-creating the
+    # column. Keeping ``nullable=True`` is essential — unplanned
+    # activities (Tier 6 manual entries) must persist without a session.
     planned_session_id: Mapped[uuid.UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),
+        ForeignKey("planned_sessions.id", ondelete="SET NULL"),
         nullable=True,
     )
 
@@ -169,4 +175,9 @@ class Activity(Base):
         ),
         Index("ix_activities_athlete_date", "athlete_id", "activity_date"),
         Index("ix_activities_athlete_start_time", "athlete_id", "start_time"),
+        # FK index — supports reverse lookup from planned_session_id
+        # (e.g. ``session_completed`` consumer resolving the planned
+        # session) and follows the "always index FK columns"
+        # convention.
+        Index("ix_activities_planned_session", "planned_session_id"),
     )

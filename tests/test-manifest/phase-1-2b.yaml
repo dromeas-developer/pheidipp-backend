@@ -1,0 +1,587 @@
+version: "1.0"
+plan_id: "phase-1-2b-p1-plan-sessions"
+generated_at: "2026-06-20T00:00:00+00:00"
+last_reviewed_at: "2026-06-23T04:00:00+00:00"
+
+# Plan covered by this sub-phase file:
+#   docs/implementation/phase-1/phase-1-2b-p1-plan-sessions.md
+# Delivered migration:
+#   alembic/versions/1b9e9026db1e_phase_1_2b_plans_sessions_checkpoints.py
+#   (down_revision=e7ffc8764335)
+# DevOps report: pending first run
+
+features:
+  phase-1-2b-enums:
+    status: promoted
+    plan: "docs/implementation/phase-1/phase-1-2b-p1-plan-sessions.md"
+    owned_by_plan:
+      - "phase-1-2b-p1-plan-sessions"
+    description: "Plan / session / checkpoint enum contracts — GoalType, GoalEventType, TrainingGoalStatus, InjurySeverity, SecondaryEventPriority, TrainingPlanStatus, PhaseLabel, SessionType, SessionSlot, SessionPriority, PlannedSessionStatus, WeeklyPlanStatus, CheckpointType, CheckpointStatus, ObjectiveCategory."
+    protects:
+      - "GoalType values are exactly race_event, target_performance, fitness_improvement, maintenance, recovery"
+      - "GoalEventType values are exactly marathon, half_marathon, 10k, 5k, ultra, trail_race, custom"
+      - "TrainingGoalStatus values are exactly active, completed, abandoned"
+      - "InjurySeverity values are exactly minor, moderate, major"
+      - "SecondaryEventPriority values are exactly B, C"
+      - "TrainingPlanStatus values are exactly active, superseded, completed"
+      - "PhaseLabel carries 20 canonical labels plus 3 legacy aliases (base_building, threshold_development, race_specific)"
+      - "SessionType has exactly 16 values; race_specific is NOT a SessionType"
+      - "SessionSlot values are exactly am, pm"
+      - "SessionPriority values are exactly primary, secondary"
+      - "PlannedSessionStatus values are exactly pending, generated, completed, skipped, missed, redistributed"
+      - "WeeklyPlanStatus values are exactly synthesised, active, completed"
+      - "CheckpointType values are exactly calibration, benchmark, race_simulation, secondary_race, progress_review"
+      - "CheckpointStatus values are exactly scheduled, completed, skipped"
+      - "ObjectiveCategory values are exactly the 9 closed ontology members"
+      - "All Phase-1.2b enums are re-exported from app.models.__init__ for Alembic autogen"
+    impacts:
+      - "phase-1-2b-training-goal-schema"
+      - "phase-1-2b-training-plan-schema"
+      - "phase-1-2b-weekly-plan-schema"
+      - "phase-1-2b-planned-session-schema"
+      - "phase-1-2b-checkpoint-schema"
+    execution_prerequisites:
+      migrations: false
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit:
+        - path: "tests/unit/test_enum_values.py"
+          owner: "phase-1-2b-p1-plan-sessions"
+      integration: []
+      api: []
+      behaviour: []
+      release: []
+
+  phase-1-2b-training-goal-schema:
+    status: promoted
+    plan: "docs/implementation/phase-1/phase-1-2b-p1-plan-sessions.md"
+    owned_by_plan:
+      - "phase-1-2b-p1-plan-sessions"
+    description: "New TrainingGoal table — one active per athlete, immutable semantic fields, mutable status/closure fields, supporting CHECKs (volume non-negative, fitness level 1..5, positive target/custom distance/time)."
+    protects:
+      - "training_goals carries the documented column set"
+      - "Partial unique index ix_training_goals_athlete_active present with WHERE status = 'active'"
+      - "Two ACTIVE goals for the same athlete raise IntegrityError"
+      - "ACTIVE + COMPLETED coexist"
+      - "ACTIVE + ABANDONED coexist"
+      - "CHECK constraint weekly_volume_hours >= 0 enforced"
+      - "CHECK constraint weekly_volume_km >= 0 enforced"
+      - "CHECK constraint fitness_level between 1 and 5 enforced"
+      - "CHECK constraint custom_distance_km IS NULL OR > 0 enforced"
+      - "CHECK constraints target_distance_km and target_time_minutes IS NULL OR > 0 enforced"
+      - "athlete_id FK CASCADES on athlete deletion"
+      - "Goal rows cascade-delete with parent Athlete"
+      - "Recovery goal with InjurySeverity MODERATE round-trips"
+      - "Minimal fitness_improvement goal persists with all goal_event_* and injury fields null"
+    impacts:
+      - "phase-1-2b-secondary-event-schema"
+      - "phase-1-2b-regeneration-task-schema"
+      - "phase-1-2b-training-plan-schema"
+      - "phase-1-2b-migration"
+    execution_prerequisites:
+      migrations: true
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit:
+        - path: "tests/unit/test_training_goal_columns.py"
+          owner: "phase-1-2b-p1-plan-sessions"
+      integration:
+        - path: "tests/integration/test_training_goal_schema.py"
+          owner: "phase-1-2b-p1-plan-sessions"
+      api: []
+      behaviour: []
+      release: []
+
+  phase-1-2b-secondary-event-schema:
+    status: promoted
+    plan: "docs/implementation/phase-1/phase-1-2b-p1-plan-sessions.md"
+    owned_by_plan:
+      - "phase-1-2b-p1-plan-sessions"
+    description: "SecondaryEvent supporting storage — B/C-races against a TrainingGoal."
+    protects:
+      - "secondary_events carries the documented column set"
+      - "training_goal_id FK CASCADES on goal deletion"
+      - "event_type is GoalEventType (shared enum)"
+      - "priority is SecondaryEventPriority (B or C)"
+      - "event_date is required"
+      - "event_name is nullable"
+      - "Indexes on (training_goal_id) and (training_goal_id, event_date) exist"
+      - "Minimal {type, date, priority} row persists without event_name"
+    impacts:
+      - "phase-1-2b-training-goal-schema"
+      - "phase-1-2b-migration"
+    execution_prerequisites:
+      migrations: true
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit:
+        - path: "tests/unit/test_secondary_event_columns.py"
+          owner: "phase-1-2b-p1-plan-sessions"
+      integration:
+        - path: "tests/integration/test_secondary_event_schema.py"
+          owner: "phase-1-2b-p1-plan-sessions"
+      api: []
+      behaviour: []
+      release: []
+
+  phase-1-2b-regeneration-task-schema:
+    status: promoted
+    plan: "docs/implementation/phase-1/phase-1-2b-p1-plan-sessions.md"
+    owned_by_plan:
+      - "phase-1-2b-p1-plan-sessions"
+    description: "RegenerationTask supporting storage — coach-proposed date change against a TrainingGoal. training_plan_id FK SET NULL on plan deletion; partial pending-proposal index."
+    protects:
+      - "regeneration_tasks carries the documented column set"
+      - "training_goal_id FK CASCADES on goal deletion"
+      - "training_plan_id FK SET NULLs on plan deletion (task itself survives)"
+      - "Inline-union CHECK status IN ('pending_confirmation','confirmed','declined','expired') enforced"
+      - "Invalid status values raise IntegrityError"
+      - "Partial index ix_regeneration_tasks_pending present with WHERE status = 'pending_confirmation'"
+      - "Pending row carries NULL training_plan_id; confirmed row links to its new plan"
+      - "decided_at nullable; set on confirmation"
+    impacts:
+      - "phase-1-2b-training-goal-schema"
+      - "phase-1-2b-training-plan-schema"
+      - "phase-1-2b-migration"
+    execution_prerequisites:
+      migrations: true
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit:
+        - path: "tests/unit/test_regeneration_task_columns.py"
+          owner: "phase-1-2b-p1-plan-sessions"
+      integration:
+        - path: "tests/integration/test_regeneration_task_schema.py"
+          owner: "phase-1-2b-p1-plan-sessions"
+      api: []
+      behaviour: []
+      release: []
+
+  phase-1-2b-training-plan-schema:
+    status: promoted
+    plan: "docs/implementation/phase-1/phase-1-2b-p1-plan-sessions.md"
+    owned_by_plan:
+      - "phase-1-2b-p1-plan-sessions"
+    description: "TrainingPlan table — goal linkage, twin_state placeholder, non-destructive supersession, nullable training_goal_id."
+    protects:
+      - "training_plans carries the documented column set"
+      - "training_goal_id FK CASCADES on goal deletion"
+      - "twin_state_id is nullable UUID WITHOUT FK (delayed to Phase-1.2c)"
+      - "JSONB columns default to empty arrays"
+      - "Superseded row survives (no deleted_at column)"
+      - "Minimal plan persists with NULL twin_state_id"
+    impacts:
+      - "phase-1-2b-migration"
+      - "phase-1-2b-weekly-plan-schema"
+    execution_prerequisites:
+      migrations: true
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit:
+        - path: "tests/unit/test_training_plan_columns.py"
+          owner: "phase-1-2b-p1-plan-sessions"
+      integration:
+        - path: "tests/integration/test_training_plan_schema.py"
+          owner: "phase-1-2b-p1-plan-sessions"
+      api: []
+      behaviour: []
+      release: []
+
+  phase-1-2b-weekly-plan-schema:
+    status: promoted
+    plan: "docs/implementation/phase-1/phase-1-2b-p1-plan-sessions.md"
+    owned_by_plan:
+      - "phase-1-2b-p1-plan-sessions"
+    description: "WeeklyPlan table — plan linkage, week_number uniqueness, FK cascade, week_number >= 1."
+    protects:
+      - "weekly_plans carries the documented column set"
+      - "UNIQUE (training_plan_id, week_number) enforced"
+      - "FK to training_plans CASCADES on plan deletion"
+      - "week_number >= 1 enforced at DB layer"
+      - "Minimal plan persists with week_number=1"
+    impacts:
+      - "phase-1-2b-training-plan-schema"
+      - "phase-1-2b-planned-session-schema"
+      - "phase-1-2b-migration"
+    execution_prerequisites:
+      migrations: true
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit:
+        - path: "tests/unit/test_weekly_plan_columns.py"
+          owner: "phase-1-2b-p1-plan-sessions"
+      integration:
+        - path: "tests/integration/test_weekly_plan_schema.py"
+          owner: "phase-1-2b-p1-plan-sessions"
+      api: []
+      behaviour: []
+      release: []
+
+  phase-1-2b-planned-session-schema:
+    status: promoted
+    plan: "docs/implementation/phase-1/phase-1-2b-p1-plan-sessions.md"
+    owned_by_plan:
+      - "phase-1-2b-p1-plan-sessions"
+    description: "PlannedSession table — weekly_plan linkage, date/slot uniqueness, CASCADE FKs, OPTIONAL planned_session_id."
+    protects:
+      - "planned_sessions carries the documented column set"
+      - "UNIQUE (weekly_plan_id, target_date, session_slot) enforced"
+      - "FK to weekly_plans CASCADES on parent deletion"
+      - "FK to training_plans CASCADES on parent deletion"
+      - "approximate_duration_minutes > 0 enforced"
+      - "week_number >= 1 enforced"
+      - "block_position bounded to {first, middle, last}"
+    impacts:
+      - "phase-1-2b-weekly-plan-schema"
+      - "phase-1-2b-migration"
+    execution_prerequisites:
+      migrations: true
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit:
+        - path: "tests/unit/test_planned_session_columns.py"
+          owner: "phase-1-2b-p1-plan-sessions"
+      integration:
+        - path: "tests/integration/test_planned_session_schema.py"
+          owner: "phase-1-2b-p1-plan-sessions"
+      api: []
+      behaviour: []
+      release: []
+
+  phase-1-2b-checkpoint-schema:
+    status: promoted
+    plan: "docs/implementation/phase-1/phase-1-2b-p1-plan-sessions.md"
+    owned_by_plan:
+      - "phase-1-2b-p1-plan-sessions"
+    description: "Checkpoint table — strict 1:1 PlannedSession linkage, inline-union CHECKs, ARRAY secondary_metrics."
+    protects:
+      - "checkpoints carries the documented column set"
+      - "UNIQUE NOT NULL planned_session_id enforced (strict 1:1)"
+      - "NO training_plan_id column — derived via PlannedSession"
+      - "FK to planned_sessions CASCADES on parent deletion"
+      - "status bounded to {scheduled, completed, skipped}"
+      - "trajectory_status bounded to {ahead, on_track, behind, at_risk}"
+      - "secondary_metrics ARRAY(String) round-trips"
+    impacts:
+      - "phase-1-2b-planned-session-schema"
+      - "phase-1-2b-migration"
+    execution_prerequisites:
+      migrations: true
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit:
+        - path: "tests/unit/test_checkpoint_columns.py"
+          owner: "phase-1-2b-p1-plan-sessions"
+      integration:
+        - path: "tests/integration/test_checkpoint_schema.py"
+          owner: "phase-1-2b-p1-plan-sessions"
+      api: []
+      behaviour: []
+      release: []
+
+  phase-1-2b-activity-schema-extension:
+    status: promoted
+    plan: "docs/implementation/phase-1/phase-1-2b-p1-plan-sessions.md"
+    owned_by_plan:
+      - "phase-1-2b-p1-plan-sessions"
+    description: "Activity.planned_session_id column now references planned_sessions.id with ondelete=SET NULL (Phase-1.2b wires the FK)."
+    protects:
+      - "activities.planned_session_id FK to planned_sessions with ondelete=SET NULL"
+      - "FK constraint appears in pg_constraint"
+      - "FK uses confdeltype='n' (SET NULL)"
+      - "FK trigger fires on planned_session deletion"
+      - "Activity row survives planned_session deletion"
+    impacts:
+      - "phase-1-2a-migration"
+      - "phase-1-2b-migration"
+    execution_prerequisites:
+      migrations: true
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit: []
+      integration:
+        - path: "tests/integration/test_activity_schema.py"
+          owner: "phase-1-2b-p1-plan-sessions"
+      api: []
+      behaviour: []
+      release: []
+
+  phase-1-2b-migration:
+    status: promoted
+    plan: "docs/implementation/phase-1/phase-1-2b-p1-plan-sessions.md"
+    owned_by_plan:
+      - "phase-1-2b-p1-plan-sessions"
+    description: "Alembic migration 1b9e9026db1e from Phase-1.2a head (e7ffc8764335) — creates 8 tables, wires FK, partial indexes."
+    protects:
+      - "alembic upgrade head on a fresh database succeeds (rc=0)"
+      - "alembic downgrade -1 returns schema to Phase-1.2a baseline"
+      - "Delivered revision equals 1b9e9026db1e"
+      - "Migration down_revision chains from Phase-1.2a head"
+      - "Migration never drops Phase-1.1 / Phase-1.2a tables"
+      - "All 8 Phase-1.2b tables created"
+      - "ix_training_goals_athlete_active emitted with predicate"
+      - "ix_regeneration_tasks_pending emitted with predicate"
+      - "uq_weekly_plans_plan_week UNIQUE emitted"
+      - "uq_planned_sessions_plan_date_slot UNIQUE emitted"
+      - "checkpoints UNIQUE on planned_session_id emitted"
+      - "fk_activities_planned_session FK with ondelete=SET NULL"
+      - "training_plans.twin_state_id WITHOUT FK (delayed to Phase-1.2c)"
+    impacts:
+      - "phase-1-2b-training-goal-schema"
+      - "phase-1-2b-secondary-event-schema"
+      - "phase-1-2b-training-plan-schema"
+      - "phase-1-2b-regeneration-task-schema"
+      - "phase-1-2b-weekly-plan-schema"
+      - "phase-1-2b-planned-session-schema"
+      - "phase-1-2b-checkpoint-schema"
+      - "phase-1-2b-activity-schema-extension"
+      - "phase-1-2a-migration"
+    execution_prerequisites:
+      migrations: true
+      seed_data: false
+      external_services: ["postgres"]
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit: []
+      integration:
+        - path: "tests/integration/test_migration_phase_1_2b.py"
+          owner: "phase-1-2b-p1-plan-sessions"
+      api: []
+      behaviour: []
+      release: []
+
+execution_groups:
+  p1-2b-p1-unit:
+    scope: smoke
+    phase: 1
+    tests:
+      - "tests/unit/test_enum_values.py"
+      - "tests/unit/test_training_goal_columns.py"
+      - "tests/unit/test_secondary_event_columns.py"
+      - "tests/unit/test_regeneration_task_columns.py"
+      - "tests/unit/test_training_plan_columns.py"
+      - "tests/unit/test_weekly_plan_columns.py"
+      - "tests/unit/test_planned_session_columns.py"
+      - "tests/unit/test_checkpoint_columns.py"
+    depends_on: []
+  p1-2b-p1-integration:
+    scope: feature
+    phase: 1
+    tests:
+      - "tests/integration/test_training_goal_schema.py"
+      - "tests/integration/test_secondary_event_schema.py"
+      - "tests/integration/test_regeneration_task_schema.py"
+      - "tests/integration/test_training_plan_schema.py"
+      - "tests/integration/test_weekly_plan_schema.py"
+      - "tests/integration/test_planned_session_schema.py"
+      - "tests/integration/test_checkpoint_schema.py"
+      - "tests/integration/test_activity_schema.py"
+    depends_on:
+      - "p1-2b-p1-unit"
+  p1-2b-p1-migration:
+    scope: feature
+    phase: 1
+    tests:
+      - "tests/integration/test_migration_phase_1_2b.py"
+    depends_on:
+      - "p1-2b-p1-unit"
+      - "p1-2b-p1-integration"
+      - "p1-2a-p1-migration"
+
+coverage:
+  routes:
+    covered: []
+    partial: []
+    missing:
+      - "Training goal / plan / session API endpoints (not in Phase-1.2b scope)"
+  events:
+    covered: []
+    partial: []
+    missing:
+      - "training_plan_generated (not in Phase-1.2b scope)"
+      - "planned_session_generated (not in Phase-1.2b scope)"
+      - "session_completed (not in Phase-1.2b scope)"
+      - "session_skipped (not in Phase-1.2b scope)"
+      - "session_missed (not in Phase-1.2b scope)"
+      - "weekly_plan_created (not in Phase-1.2b scope)"
+      - "week_completed (not in Phase-1.2b scope)"
+      - "checkpoint_completed (not in Phase-1.2b scope)"
+  invariants:
+    covered:
+      - "GoalType values are exactly race_event, target_performance, fitness_improvement, maintenance, recovery"
+      - "GoalEventType values are exactly marathon, half_marathon, 10k, 5k, ultra, trail_race, custom"
+      - "TrainingGoalStatus values are exactly active, completed, abandoned"
+      - "InjurySeverity values are exactly minor, moderate, major"
+      - "SecondaryEventPriority is bounded to {B, C}"
+      - "TrainingPlanStatus is bounded to {active, superseded, completed}"
+      - "PhaseLabel carries 20 canonical labels plus 3 legacy aliases"
+      - "SessionType has exactly 16 values; race_specific is NOT a SessionType"
+      - "SessionSlot is bounded to {am, pm}"
+      - "SessionPriority is bounded to {primary, secondary}"
+      - "PlannedSessionStatus is bounded to {pending, generated, completed, skipped, missed, redistributed}"
+      - "WeeklyPlanStatus is bounded to {synthesised, active, completed}"
+      - "CheckpointType is bounded to {calibration, benchmark, race_simulation, secondary_race, progress_review}"
+      - "CheckpointStatus is bounded to {scheduled, completed, skipped}"
+      - "ObjectiveCategory is bounded to the 9 closed ontology members"
+      - "training_goals carries the full Phase-1.2b column set (goal definition + self-reported context + recovery context + target performance + status)"
+      - "training_goals has the active-goal partial unique index WHERE status='active' (one active goal per athlete)"
+      - "Two ACTIVE goals for the same athlete are rejected at the DB layer; ACTIVE+COMPLETED coexist via partial predicate"
+      - "training_goals volume fields (weekly_volume_hours, weekly_volume_km) are non-negative at the DB layer"
+      - "training_goals.fitness_level is bounded 1..5 at the DB layer"
+      - "training_goals.custom_distance_km is NULL OR positive when set"
+      - "training_goals.target_distance_km and target_time_minutes are NULL OR positive when set"
+      - "training_goals has athlete_id FK CASCADE on athlete deletion"
+      - "training_plans.training_goal_id FK CASCADES on goal deletion"
+      - "training_plans.twin_state_id is a nullable UUID column WITHOUT a FK (deliberate — twin_states does not exist yet; Phase-1.2c adds the FK)"
+      - "training_plans JSONB structural columns default to empty arrays / null"
+      - "training_plans supersession is non-destructive (superseded_at + status='superseded' keeps the row; no deleted_at column)"
+      - "secondary_events FK to training_goals CASCADES on goal deletion"
+      - "regeneration_tasks FK to training_goals CASCADES on goal deletion"
+      - "regeneration_tasks FK to training_plans SET-NULLs on plan deletion (task itself survives)"
+      - "regeneration_tasks status is bounded to pending_confirmation|confirmed|declined|expired"
+      - "regeneration_tasks has partial index ix_regeneration_tasks_pending WHERE status='pending_confirmation'"
+      - "weekly_plans has UNIQUE (training_plan_id, week_number); duplicates rejected"
+      - "weekly_plans FK to training_plans CASCADES on plan deletion"
+      - "weekly_plans week_number >= 1 (zero and negative rejected); counters non-negative"
+      - "weekly_sessions.planned_session_id is unique when non-null and null otherwise (no orphans)"
+      - "weekly_sessions status inline-union bounded to {scheduled, completed, skipped, missed}; rejects other values"
+      - "weekly_sessions block_position inline-union bounded to {first, middle, last}"
+      - "weekly_sessions approximate_duration_minutes > 0 (zero and negative rejected)"
+      - "planned_sessions has UNIQUE (weekly_plan_id, target_date, session_slot) — AM/PM disambiguation contract"
+      - "planned_sessions.training_plan_id is the denormalised FK (staleness documented; queries join through WeeklyPlan)"
+      - "planned_sessions.activity_id is a free-standing nullable UUID — NO FK to activities (deferred to a future migration)"
+      - "planned_sessions FKs to weekly_plans and training_plans CASCADE on parent deletion"
+      - "planned_sessions approximate_duration_minutes > 0; week_number >= 1"
+      - "planned_sessions block_position bounded to {first, middle, last}"
+      - "checkpoints has UNIQUE+NOT NULL planned_session_id (strict 1:1 with PlannedSession)"
+      - "checkpoints has NO training_plan_id column — derivation via PlannedSession→WeeklyPlan→TrainingPlan"
+      - "checkpoints FK to planned_sessions CASCADES on planned_session deletion"
+      - "checkpoints status bounded to {scheduled, completed, skipped}; trajectory_status bounded to {ahead, on_track, behind, at_risk}"
+      - "checkpoints.secondary_metrics is ARRAY(String); round-trip preserves multiple values"
+      - "activities.planned_session_id remains a nullable UUID column"
+      - "activities.planned_session_id now references planned_sessions.id with ondelete=SET NULL (Phase-1.2b wires the FK)"
+      - "alembic upgrade head on a fresh database succeeds (rc=0)"
+      - "alembic downgrade -1 returns schema to Phase-1.2a baseline (8 new tables gone; activities.planned_session_id FK removed)"
+      - "Delivered Phase-1.2b migration revision equals 1b9e9026db1e (auditable via test_migration_file_present)"
+      - "Migration down_revision chains from Phase-1.2a head (e7ffc8764335)"
+      - "Upgrade and downgrade never drop Phase-1.1 / Phase-1.2a tables"
+      - "All 8 Phase-1.2b tables created (training_goals, secondary_events, training_plans, regeneration_tasks, weekly_plans, weekly_sessions, planned_sessions, checkpoints)"
+      - "ix_training_goals_athlete_active partial unique index emitted with predicate status='active'"
+      - "ix_regeneration_tasks_pending partial index emitted with predicate status='pending_confirmation'"
+      - "uq_weekly_plans_plan_week UNIQUE constraint emitted"
+      - "uq_planned_sessions_plan_date_slot UNIQUE constraint emitted"
+      - "checkpoints UNIQUE constraint on planned_session_id emitted (strict 1:1 invariant)"
+      - "fk_activities_planned_session FK emitted with ondelete=SET NULL"
+      - "training_plans.twin_state_id column emitted WITHOUT a FK (deliberate — deferred to Phase-1.2c)"
+    partial: []
+    missing:
+      - "Goal status immutability of semantic fields (deferred to service layer)"
+      - "Recovery mode <-> injury_severity IS NOT NULL pairing (deferred to service layer)"
+      - "SecondaryEvent maximum-3-per-goal (application-layer invariant)"
+      - "SecondaryEvent conflict-with-taper (application-layer invariant)"
+      - "TrainingPlan supersession replaces (no double-active invariants enforced at DB layer)"
+      - "TrainingGoal closure writes closed_at atomically (service layer)"
+      - "RegenerationTask 14-day TTL enforcement (service layer)"
+      - "RegenerationTask approval/decline flow (service layer — Phase-1.4)"
+      - "WeeklyPlan session immutability once status=active (service layer)"
+      - "WeeklySession→PlannedSession transition (workout generation — Phase-1.5b)"
+      - "PlannedSession completion linkage (activity_id FK added in later sub-phase; service layer owns that invariant for now)"
+      - "PlannedSession redistribution cascade logic (service layer)"
+      - "PlannedSession skip / miss sweep (service layer — Phase 4)"
+      - "Checkpoint atomic completion (metric_updated, confidence_changed, replan_triggered, completed_at set together — service layer)"
+      - "Checkpoint trajectory_validation proposals (service layer — later phase)"
+      - "Plan visibility / privacy contracts for the coach layer (vision)"
+
+history:
+  - date: "2026-06-23"
+    plan: "phase-1-2b-p1-plan-sessions"
+    tests_added: 0
+    tests_modified: 2
+    tests_removed: 0
+    result: "PASS"
+    coverage_delta: >
+      Promotion (status generated -> promoted) for all 10 Phase-1.2b features
+      after the clean DevOps pass (880/880 in 127s,
+      reports/phase-1-2b_devops.md). Fixed two PlannedSession enum issues:
+      SCHEDULED -> PENDING and added required session_priority=SessionPriority.PRIMARY.
+      selection.regression and selection.release now include all 45 tests from
+      Phase-1.1, Phase-1.2a, and Phase-1.2b. The platform now has complete
+      schema coverage for auth, athlete profile/preferences, activity tracking,
+      and training plan infrastructure (goals, plans, weekly plans, sessions,
+      checkpoints). 
+  - date: "2026-06-21"
+    plan: "phase-1-2b-test-bug-fixes-round-3"
+    tests_added: 0
+    tests_modified: 3
+    tests_removed: 0
+    result: "PARTIAL"
+    coverage_delta: "DevOps retry report flagged 3 test-file bugs (EASY_RUN enum, Alembic caret syntax, missing pytest import). All fixes localised to test files; validation fields remain owned by DevOps."
+  - date: "2026-06-21"
+    plan: "phase-1-2b-test-bug-fixes-round-2"
+    tests_added: 0
+    tests_modified: 1
+    tests_removed: 0
+    result: "PARTIAL"
+    coverage_delta: "Fixed SET NULL identity-map issue in test_regeneration_task_schema.py by adding refresh() call. Decision documented: fix test not conftest."
+  - date: "2026-06-21"
+    plan: "phase-1-2b-test-bug-fixes-round-1"
+    tests_added: 0
+    tests_modified: 4
+    tests_removed: 0
+    result: "PARTIAL"
+    coverage_delta: "Fixed 4 test bugs: confdeltype assertion, status validation string length, factory signature, unique goal constraint workaround. No production changes."
+  - date: "2026-06-20"
+    plan: "phase-1-2b-p1-plan-sessions"
+    tests_added: 16
+    tests_modified: 1
+    tests_removed: 0
+    result: "PARTIAL"
+    coverage_delta: "Phase-1.2b test pack delivered with 15 new test files. Manifest wired with 9 features. Migration 1b9e9026db1e validated structurally + functionally."

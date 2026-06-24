@@ -754,13 +754,37 @@ class TestPhase12aMigrationDowngrade:
                 f"STDOUT:\n{out_up}\nSTDERR:\n{err_up}"
             )
 
-            # 2) Downgrade one revision.
+            # 2) Downgrade two revisions: revert Phase-1.2b AND
+            #    Phase-1.2a so the schema returns to the Phase-1.1
+            #    P3 baseline.
+            #
+            #    When this test was first written, the migration
+            #    chain ended at Phase-1.2a (so ``downgrade -1`` was
+            #    sufficient). Phase-1.2b extended the chain with an
+            #    additional revision on top of ``e7ffc8764335``, so
+            #    ``downgrade -1`` now reverts only the Phase-1.2b
+            #    layer and leaves Phase-1.2a tables and columns
+            #    intact. Targeting the **explicit** prior-phase head
+            #    (``PHASE_1_1_P3_REVISION`` = Phase-1.1 P3 head,
+            #    ``8265efd46112``) deterministically rolls back both
+            #    layers regardless of any further revisions added
+            #    later in the chain.
+            #
+            #    Note: Alembic 1.13.1 (the version pinned for this
+            #    project) does **not** understand the ``<rev>^``
+            #    parent-of-revision caret syntax — that operator was
+            #    introduced in Alembic 1.14+ and yields a confusing
+            #    parser error on sub-command ``downgrade``. We
+            #    therefore pass the bare revision id rather than
+            #    computing the parent dynamically.
             rc_dn, out_dn, err_dn = _run_alembic_subprocess(
-                schema_url, ("downgrade", "-1"),
+                schema_url,
+                ("downgrade", PHASE_1_1_P3_REVISION),
             )
             assert rc_dn == 0, (
-                f"alembic downgrade -1 failed (rc={rc_dn}). "
-                f"STDOUT:\n{out_dn}\nSTDERR:\n{err_dn}"
+                f"alembic downgrade to {PHASE_1_1_P3_REVISION} ("
+                f"Phase-1.1 P3 head, parent of {PHASE_1_2A_REVISION}) "
+                f"failed (rc={rc_dn}). STDOUT:\n{out_dn}\nSTDERR:\n{err_dn}"
             )
 
             # 3) The Phase-1.2a tables and columns are gone.

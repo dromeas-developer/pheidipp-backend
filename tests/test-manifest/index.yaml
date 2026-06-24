@@ -1,0 +1,409 @@
+version: "1.0"
+last_reviewed_at: "2026-06-23T04:00:00+00:00"
+
+# ---------------------------------------------------------------------------
+# INDEX — lightweight cross-phase registry.
+# Per-sub-phase details (features, protects, coverage, history) live in
+# the individual phase files: phase-1-1.yaml, phase-1-2a.yaml, etc.
+#
+# SELECTION GROUP SEMANTICS:
+#   smoke      — all promoted pure-function unit tests; no DB/containers;
+#                cheapest tripwire for catastrophic regressions.
+#                Rebuild when any sub-phase promotes new unit tests.
+#   feature    — CURRENT active sub-phase tests only (not all promoted).
+#                DevOps reads this for the default run scope.
+#   regression — all promoted tests across ALL sub-phases (status=promoted,
+#                validation.passed=true). Only Test Architect adds entries here
+#                after reviewing a passing DevOps run.
+#   release    — same as regression until a separate release gate is defined.
+#
+# PROMOTION FLOW:
+#   1. DevOps sets validation.executable + validation.passed in sub-phase file
+#   2. Test Architect reviews DevOps report
+#   3. Test Architect advances status: passing -> promoted in sub-phase file
+#   4. Test Architect rebuilds regression + release groups in this file
+#   5. Test Architect appends one-line entry to history in this file
+# ---------------------------------------------------------------------------
+
+selection:
+  smoke:
+    - "tests/unit/test_password_hasher.py"
+    - "tests/unit/test_token_service.py"
+    - "tests/unit/test_ip_utils.py"
+    - "tests/unit/test_logging_utils.py"
+    - "tests/unit/test_enum_values.py"
+    - "tests/unit/test_infer_data_tier.py"
+    - "tests/unit/test_athlete_profile_columns.py"
+    - "tests/unit/test_activity_columns.py"
+    - "tests/unit/test_training_goal_columns.py"
+    - "tests/unit/test_secondary_event_columns.py"
+    - "tests/unit/test_regeneration_task_columns.py"
+    - "tests/unit/test_training_plan_columns.py"
+    - "tests/unit/test_weekly_plan_columns.py"
+    - "tests/unit/test_planned_session_columns.py"
+    - "tests/unit/test_checkpoint_columns.py"
+  feature:
+    - "tests/unit/test_enum_values.py"
+    - "tests/unit/test_training_goal_columns.py"
+    - "tests/unit/test_secondary_event_columns.py"
+    - "tests/unit/test_regeneration_task_columns.py"
+    - "tests/unit/test_training_plan_columns.py"
+    - "tests/unit/test_weekly_plan_columns.py"
+    - "tests/unit/test_planned_session_columns.py"
+    - "tests/unit/test_checkpoint_columns.py"
+    - "tests/integration/test_training_goal_schema.py"
+    - "tests/integration/test_secondary_event_schema.py"
+    - "tests/integration/test_regeneration_task_schema.py"
+    - "tests/integration/test_training_plan_schema.py"
+    - "tests/integration/test_weekly_plan_schema.py"
+    - "tests/integration/test_planned_session_schema.py"
+    - "tests/integration/test_checkpoint_schema.py"
+    - "tests/integration/test_activity_schema.py"
+    - "tests/integration/test_migration_phase_1_2b.py"
+  regression:
+    - "tests/unit/test_password_hasher.py"
+    - "tests/unit/test_token_service.py"
+    - "tests/unit/test_ip_utils.py"
+    - "tests/unit/test_logging_utils.py"
+    - "tests/unit/test_enum_values.py"
+    - "tests/unit/test_infer_data_tier.py"
+    - "tests/unit/test_athlete_profile_columns.py"
+    - "tests/unit/test_activity_columns.py"
+    - "tests/unit/test_training_goal_columns.py"
+    - "tests/unit/test_secondary_event_columns.py"
+    - "tests/unit/test_regeneration_task_columns.py"
+    - "tests/unit/test_training_plan_columns.py"
+    - "tests/unit/test_weekly_plan_columns.py"
+    - "tests/unit/test_planned_session_columns.py"
+    - "tests/unit/test_checkpoint_columns.py"
+    - "tests/integration/test_auth_service.py"
+    - "tests/integration/test_athlete_repositories.py"
+    - "tests/integration/test_refresh_token_repository.py"
+    - "tests/integration/test_athlete_auth_primary_enforcement.py"
+    - "tests/integration/test_discard_refresh_token_ips.py"
+    - "tests/integration/test_athlete_profile_schema.py"
+    - "tests/integration/test_athlete_preferences_schema.py"
+    - "tests/integration/test_activity_schema.py"
+    - "tests/integration/test_phase_1_1_registration_regression.py"
+    - "tests/integration/test_migration_phase_1_2a.py"
+    - "tests/integration/test_training_goal_schema.py"
+    - "tests/integration/test_secondary_event_schema.py"
+    - "tests/integration/test_regeneration_task_schema.py"
+    - "tests/integration/test_training_plan_schema.py"
+    - "tests/integration/test_weekly_plan_schema.py"
+    - "tests/integration/test_planned_session_schema.py"
+    - "tests/integration/test_checkpoint_schema.py"
+    - "tests/integration/test_migration_phase_1_2b.py"
+    - "tests/api/test_auth_endpoints.py"
+    - "tests/behaviour/test_auth_user_journey.py"
+  release:
+    - "tests/unit/test_password_hasher.py"
+    - "tests/unit/test_token_service.py"
+    - "tests/unit/test_ip_utils.py"
+    - "tests/unit/test_logging_utils.py"
+    - "tests/unit/test_enum_values.py"
+    - "tests/unit/test_infer_data_tier.py"
+    - "tests/unit/test_athlete_profile_columns.py"
+    - "tests/unit/test_activity_columns.py"
+    - "tests/unit/test_training_goal_columns.py"
+    - "tests/unit/test_secondary_event_columns.py"
+    - "tests/unit/test_regeneration_task_columns.py"
+    - "tests/unit/test_training_plan_columns.py"
+    - "tests/unit/test_weekly_plan_columns.py"
+    - "tests/unit/test_planned_session_columns.py"
+    - "tests/unit/test_checkpoint_columns.py"
+    - "tests/integration/test_auth_service.py"
+    - "tests/integration/test_athlete_repositories.py"
+    - "tests/integration/test_refresh_token_repository.py"
+    - "tests/integration/test_athlete_auth_primary_enforcement.py"
+    - "tests/integration/test_discard_refresh_token_ips.py"
+    - "tests/integration/test_athlete_profile_schema.py"
+    - "tests/integration/test_athlete_preferences_schema.py"
+    - "tests/integration/test_activity_schema.py"
+    - "tests/integration/test_phase_1_1_registration_regression.py"
+    - "tests/integration/test_migration_phase_1_2a.py"
+    - "tests/integration/test_training_goal_schema.py"
+    - "tests/integration/test_secondary_event_schema.py"
+    - "tests/integration/test_regeneration_task_schema.py"
+    - "tests/integration/test_training_plan_schema.py"
+    - "tests/integration/test_weekly_plan_schema.py"
+    - "tests/integration/test_planned_session_schema.py"
+    - "tests/integration/test_checkpoint_schema.py"
+    - "tests/integration/test_migration_phase_1_2b.py"
+    - "tests/api/test_auth_endpoints.py"
+    - "tests/behaviour/test_auth_user_journey.py"
+
+# ---------------------------------------------------------------------------
+# Cross-phase execution dependencies
+# ---------------------------------------------------------------------------
+
+cross_phase_dependencies:
+  - from: "p1-2a-p1-integration"
+    to: "p1-2b-p1-integration"
+    type: runs_before
+  - from: "p1-2a-p1-migration"
+    to: "p1-2b-p1-migration"
+    type: runs_before
+
+# ---------------------------------------------------------------------------
+# This is the aggregate view across all promoted sub-phases.
+# ---------------------------------------------------------------------------
+
+coverage:
+  routes:
+    covered:
+      - "POST /api/v1/auth/register"
+      - "POST /api/v1/auth/login"
+      - "POST /api/v1/auth/refresh"
+    partial:
+      - "GET /_protected/athletes/{athlete_id}/whoami (require_self — test-only route)"
+    missing: []
+
+  events:
+    covered:
+      - "athlete_registered"
+      - "athlete_logged_in (token_type=access)"
+      - "athlete_logged_in (token_type=refresh)"
+    partial: []
+    missing:
+      - "refresh_token_rotated (intentionally NOT EMITTED per ADR-005 — N/A)"
+      - "activity_ingested (NOT PRODUCED in Phase-1.2a — out of scope until FIT/manual ingestion ships)"
+      - "activity_calibration_eligible (NOT PRODUCED in Phase-1.2a — out of scope until load computation + calibration services ship)"
+      - "session_completed (NOT CONSUMED in Phase-1.2a — out of scope until planned_sessions + session lifecycle ship)"
+      - "onboarding_completed (NOT CONSUMED in Phase-1.2a — out of scope until onboarding orchestration ships)"
+
+  invariants:
+    covered:
+      # Phase-1.1
+      - "Email uniqueness (case-insensitive via functional index)"
+      - "hashed_password never returned in responses"
+      - "hashed_password never logged"
+      - "token_hash never returned in responses"
+      - "token_hash never logged"
+      - "provider_tokens not exposed"
+      - "provider_user_id not exposed"
+      - "Atomic registration (transaction rollback on duplicate)"
+      - "Append-only refresh-token ledger (rotation preserves old row)"
+      - "30-day refresh-token expiry"
+      - "AthleteProfile uniqueness per athlete"
+      - "One primary AthleteAuth per athlete (DB-enforced)"
+      - "require_self returns 403 on athlete mismatch"
+      - "require_self returns 401 on token problem"
+      - "Login does not leak missing-vs-wrong credential distinction"
+      - "ip_address truncated to /24 (IPv4) before logging/event emission"
+      - "ip_address truncated to /64 (IPv6) before logging/event emission"
+      - "ip_address discarded after 7 days"
+      - "discard_refresh_token_ips task idempotent"
+      - "athlete_registered payload shape"
+      - "athlete_logged_in payload shape (login + refresh)"
+      - "Multi-device refresh tokens coexist"
+      - "Replay of revoked refresh token returns 401"
+      # Phase-1.2a
+      - "ActivitySource values are exactly intervals_icu, manual_upload, garmin_direct, manual_entry"
+      - "DataTier values are exactly 1, 2, 3, 4, 5, 6"
+      - "Sex values preserved at male, female, not_specified"
+      - "infer_data_tier maps running_power_meter + chest_strap_rr -> Tier 1"
+      - "infer_data_tier maps running_power_meter + non-RR HR -> Tier 2"
+      - "infer_data_tier maps chest_strap_rr + no power -> Tier 3"
+      - "infer_data_tier maps chest_strap_no_rr | wrist_optical + no power -> Tier 4"
+      - "infer_data_tier maps HrSource.NONE + PowerSource.NONE -> Tier 5"
+      - "AthleteProfile.athlete_id remains uniquely constrained"
+      - "AthleteProfile carries the full Phase-1.2a column set"
+      - "AthleteProfile minimal registration row still persists with Phase-1.2a columns null"
+      - "AthletePreferences.athlete_id is uniquely constrained at the DB level"
+      - "AthletePreferences CHECK constraint years_structured_training >= 0 is enforced"
+      - "AthletePreferences weekly_schedule JSONB round-trip preserves all schedule keys"
+      - "Activity table has lean column set (no avg_hr/avg_pace/avg_power/avg_cadence/lap data)"
+      - "Activity dedup partial unique index on (athlete_id, external_id, source) WHERE external_id IS NOT NULL"
+      - "Duplicate (athlete_id, external_id, source) with non-null external_id raises IntegrityError"
+      - "Same external_id with different sources does NOT collide"
+      - "manual_entry rows bypass dedup via NULL external_id"
+      - "Activity indexes (athlete_id, activity_date) and (athlete_id, start_time) exist"
+      - "Activity planned_session_id is a free-standing nullable UUID (FK added by Phase-1.2b)"
+      - "Activity rows cascade-delete with their parent Athlete"
+      - "alembic upgrade head on a fresh database succeeds (rc=0)"
+      - "alembic downgrade -1 returns the schema to the Phase-1.1 P3 baseline"
+      - "Phase-1.2a migration down_revision chains from Phase-1.1 P3 head (8265efd46112)"
+      - "Phase-1.2a migration revision equals e7ffc8764335"
+      - "Migration never drops Phase-1.1 tables"
+      - "Phase-1.1 tables survive the migration"
+      - "Migration adds exactly the 11 documented columns to athlete_profiles"
+      - "Migration emits ck_athlete_preferences_years_structured_training_non_negative"
+      - "Migration emits partial unique uq_activities_athlete_external_source"
+      - "Migration declares ondelete=CASCADE FKs for activities and athlete_preferences"
+      # Phase-1.2b
+      - "GoalType values are exactly race_event, target_performance, fitness_improvement, maintenance, recovery"
+      - "GoalEventType values are exactly marathon, half_marathon, 10k, 5k, ultra, trail_race, custom"
+      - "TrainingGoalStatus values are exactly active, completed, abandoned"
+      - "InjurySeverity values are exactly minor, moderate, major"
+      - "SecondaryEventPriority is bounded to {B, C}"
+      - "TrainingPlanStatus is bounded to {active, superseded, completed}"
+      - "PhaseLabel carries 20 canonical labels plus 3 legacy aliases"
+      - "SessionType has exactly 16 values; race_specific is NOT a SessionType"
+      - "SessionSlot is bounded to {am, pm}"
+      - "SessionPriority is bounded to {primary, secondary}"
+      - "PlannedSessionStatus is bounded to {pending, generated, completed, skipped, missed, redistributed}"
+      - "WeeklyPlanStatus is bounded to {synthesised, active, completed}"
+      - "CheckpointType is bounded to {calibration, benchmark, race_simulation, secondary_race, progress_review}"
+      - "CheckpointStatus is bounded to {scheduled, completed, skipped}"
+      - "ObjectiveCategory is bounded to the 9 closed ontology members"
+      - "training_goals carries the full Phase-1.2b column set"
+      - "training_goals has the active-goal partial unique index WHERE status='active'"
+      - "Two ACTIVE goals for the same athlete are rejected at the DB layer; ACTIVE+COMPLETED coexist via partial predicate"
+      - "training_goals volume fields (weekly_volume_hours, weekly_volume_km) are non-negative at the DB layer"
+      - "training_goals.fitness_level is bounded 1..5 at the DB layer"
+      - "training_goals.custom_distance_km is NULL OR positive when set"
+      - "training_goals.target_distance_km and target_time_minutes are NULL OR positive when set"
+      - "training_goals has athlete_id FK CASCADE on athlete deletion"
+      - "training_plans.training_goal_id FK CASCADES on goal deletion"
+      - "training_plans.twin_state_id is a nullable UUID column WITHOUT a FK (delayed to Phase-1.2c)"
+      - "training_plans JSONB structural columns default to empty arrays / null"
+      - "training_plans supersession is non-destructive"
+      - "secondary_events FK to training_goals CASCADES on goal deletion"
+      - "regeneration_tasks FK to training_goals CASCADES on goal deletion"
+      - "regeneration_tasks FK to training_plans SET-NULLs on plan deletion (task survives)"
+      - "regeneration_tasks status is bounded to pending_confirmation|confirmed|declined|expired"
+      - "regeneration_tasks has partial index ix_regeneration_tasks_pending WHERE status='pending_confirmation'"
+      - "weekly_plans has UNIQUE (training_plan_id, week_number); duplicates rejected"
+      - "weekly_plans FK to training_plans CASCADES on plan deletion"
+      - "weekly_plans week_number >= 1 enforced"
+      - "weekly_sessions.planned_session_id is unique when non-null and null otherwise"
+      - "weekly_sessions status inline-union bounded to {scheduled, completed, skipped, missed}"
+      - "weekly_sessions block_position inline-union bounded to {first, middle, last}"
+      - "weekly_sessions approximate_duration_minutes > 0 enforced"
+      - "planned_sessions has UNIQUE (weekly_plan_id, target_date, session_slot)"
+      - "planned_sessions.training_plan_id is the denormalised FK"
+      - "planned_sessions.activity_id is a free-standing nullable UUID"
+      - "planned_sessions FKs CASCADE on parent deletion"
+      - "checkpoints has UNIQUE+NOT NULL planned_session_id (strict 1:1)"
+      - "checkpoints has NO training_plan_id column"
+      - "checkpoints FK to planned_sessions CASCADES on deletion"
+      - "checkpoints status bounded to {scheduled, completed, skipped}"
+      - "checkpoints.secondary_metrics is ARRAY(String); round-trip preserves multiple values"
+      - "activities.planned_session_id FK to planned_sessions with ondelete=SET NULL"
+      - "Phase-1.2b migration upgrade/downgrade succeeds and is reversible"
+      - "All 8 Phase-1.2b tables created correctly"
+      - "Partial unique index ix_training_goals_athlete_active emitted"
+      - "Partial index ix_regeneration_tasks_pending emitted"
+      - "UNIQUE constraints uq_weekly_plans_plan_week and uq_planned_sessions_plan_date_slot emitted"
+      - "checkpoints UNIQUE constraint on planned_session_id emitted"
+      - "fk_activities_planned_session FK emitted with ondelete=SET NULL"
+    partial:
+      - "Email PII suppression in audit logs (covered behaviourally via cap_auth_logs)"
+    missing:
+      - "Rate limiting / brute-force throttling (out of phase-1.1 scope)"
+      - "Profile/preferences/activity API endpoints (not in Phase-1.2a scope)"
+      - "AthleteProfile onboarding-write services (not in Phase-1.2a scope)"
+      - "FIT upload / object storage ingestion (not in Phase-1.2a scope)"
+      - "Manual activity entry API / service (not in Phase-1.2a scope)"
+      - "LoadComputationService (not in Phase-1.2a scope)"
+      - "CalibrationEligibilityService (not in Phase-1.2a scope)"
+      - "Onboarding-completion flow (not in Phase-1.2a scope)"
+      - "Training goal / plan / session API endpoints (not in Phase-1.2b scope)"
+      - "Goal status immutability (deferred to service layer)"
+      - "Recovery mode pairing (deferred to service layer)"
+      - "SecondaryEvent maximum-3-per-goal (application-layer invariant)"
+      - "SecondaryEvent conflict-with-taper (application-layer invariant)"
+      - "TrainingPlan supersession replaces (no double-active invariants)"
+      - "TrainingGoal closure writes closed_at (service layer)"
+
+# ---------------------------------------------------------------------------
+# History — one entry per sub-phase run.
+# Full prose lives in docs/testing/ test pack documents.
+# ---------------------------------------------------------------------------
+
+history:
+  - date: "2026-06-17"
+    plan: "phase-1-1-p1-email-password-auth + p2-security-invariants-patch + p3-single-primary-auth-enforcement"
+    tests_added: 132
+    tests_modified: 0
+    tests_removed: 0
+    result: "PASS"
+  - date: "2026-06-17"
+    plan: "phase-1-1-p1-email-password-auth + p2-security-invariants-patch + p3-single-primary-auth-enforcement"
+    tests_added: 0
+    tests_modified: 11
+    tests_removed: 0
+    result: "PARTIAL"
+  - date: "2026-06-18"
+    plan: "phase-1-1-p1-email-password-auth + p2-security-invariants-patch + p3-single-primary-auth-enforcement"
+    tests_added: 0
+    tests_modified: 3
+    tests_removed: 0
+    result: "PARTIAL"
+  - date: "2026-06-19"
+    plan: "phase-1-1-p1-p2-p3-email-password-auth-devops-v2-issue-3"
+    tests_added: 0
+    tests_modified: 2
+    tests_removed: 0
+    result: "PARTIAL"
+  - date: "2026-06-19"
+    plan: "phase-1-1-p1-p2-p3-email-password-auth"
+    tests_added: 0
+    tests_modified: 0
+    tests_removed: 0
+    result: "PASS"
+  - date: "2026-06-19"
+    plan: "phase-1-2a-p1-profile-preferences-activity"
+    tests_added: 9
+    tests_modified: 0
+    tests_removed: 0
+    result: "PARTIAL"
+  - date: "2026-06-19"
+    plan: "phase-1-2a-p1-profile-preferences-activity"
+    tests_added: 0
+    tests_modified: 1
+    tests_removed: 0
+    result: "PARTIAL"
+  - date: "2026-06-20"
+    plan: "phase-1-2a-devops-rerun-issue-1-and-2"
+    tests_added: 0
+    tests_modified: 2
+    tests_removed: 0
+    result: "PARTIAL"
+  - date: "2026-06-20"
+    plan: "phase-1-2a-p1-profile-preferences-activity"
+    tests_added: 0
+    tests_modified: 0
+    tests_removed: 0
+    result: "PASS"
+  - date: "2026-06-20"
+    plan: "phase-1-2b-p1-plan-sessions"
+    tests_added: 16
+    tests_modified: 1
+    tests_removed: 0
+    result: "PARTIAL"
+  - date: "2026-06-21"
+    plan: "phase-1-2b-test-bug-fixes-round-1"
+    tests_added: 0
+    tests_modified: 4
+    tests_removed: 0
+    result: "PARTIAL"
+  - date: "2026-06-21"
+    plan: "phase-1-2b-test-bug-fixes-round-2"
+    tests_added: 0
+    tests_modified: 1
+    tests_removed: 0
+    result: "PARTIAL"
+  - date: "2026-06-21"
+    plan: "phase-1-2b-test-bug-fixes-round-3"
+    tests_added: 0
+    tests_modified: 3
+    tests_removed: 0
+    result: "PARTIAL"
+  - date: "2026-06-23"
+    plan: "phase-1-2b-p1-plan-sessions"
+    tests_added: 0
+    tests_modified: 2
+    tests_removed: 0
+    result: "PASS"
+    coverage_delta: >
+      Promotion (status generated -> promoted) for all 10 Phase-1.2b features
+      after the clean DevOps pass (880/880 in 127s,
+      reports/phase-1-2b_devops.md). Fixed two PlannedSession enum issues:
+      SCHEDULED -> PENDING and added required session_priority=SessionPriority.PRIMARY.
+      selection.regression and selection.release now include all 45 tests from
+      Phase-1.1, Phase-1.2a, and Phase-1.2b. The platform now has complete
+      schema coverage for auth, athlete profile/preferences, activity tracking,
+      and training plan infrastructure (goals, plans, weekly plans, sessions,
+      checkpoints). 

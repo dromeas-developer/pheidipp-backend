@@ -122,3 +122,249 @@ class PrimaryTrainingPlatform(str, Enum):
     INTERVALS_ICU = "intervals_icu"
     GARMIN_CONNECT = "garmin_connect"
     MANUAL = "manual"
+
+
+# ---------------------------------------------------------------------------
+# Phase-1.2b — Plan / Session / Checkpoint enums.
+#
+# These closed ontologies implement the contracts declared in
+# docs/architecture/01-entities/training-goal.md, training-plan.md,
+# weekly-plan.md, planned-session.md, checkpoint.md, and
+# 00-foundations/terminology.md. Values are part of the public
+# architecture contract: changing them is a breaking change for
+# downstream services. Legacy aliases on ``PhaseLabel`` are mapped
+# to canonical labels by the deterministic expansion layer.
+# ---------------------------------------------------------------------------
+
+
+class GoalType(str, Enum):
+    """Training-objective mode. Drives coaching posture and language.
+
+    See docs/architecture/01-entities/training-goal.md and
+    docs/vision/product/goal-modes.md.
+    """
+
+    RACE_EVENT = "race_event"
+    TARGET_PERFORMANCE = "target_performance"
+    FITNESS_IMPROVEMENT = "fitness_improvement"
+    MAINTENANCE = "maintenance"
+    RECOVERY = "recovery"
+
+
+class GoalEventType(str, Enum):
+    """Race / performance event type that any training goal may target.
+
+    Used on ``TrainingGoal`` and also reused on ``SecondaryEvent``.
+    """
+
+    MARATHON = "marathon"
+    HALF_MARATHON = "half_marathon"
+    TEN_K = "10k"
+    FIVE_K = "5k"
+    ULTRA = "ultra"
+    TRAIL_RACE = "trail_race"
+    CUSTOM = "custom"
+
+
+class TrainingGoalStatus(str, Enum):
+    """Lifecycle status of a ``TrainingGoal``.
+
+    Enforces ``one active per athlete`` via a partial unique index on
+    ``(athlete_id) WHERE status = 'active'``.
+    """
+
+    ACTIVE = "active"
+    COMPLETED = "completed"
+    ABANDONED = "abandoned"
+
+
+class InjurySeverity(str, Enum):
+    """How severe the athlete-reported injury is.
+
+    Required when ``TrainingGoal.goal_type = 'recovery'``; null for all
+    other goal types. Drives the recovery-mode phase duration and
+    load progression rules in plan generation.
+
+    See docs/architecture/00-foundations/terminology.md → Shared Enums.
+    """
+
+    MINOR = "minor"
+    MODERATE = "moderate"
+    MAJOR = "major"
+
+
+class SecondaryEventPriority(str, Enum):
+    """B-races and C-races tracked as secondary events (B-races are
+    higher priority than C-races).
+    """
+
+    B = "B"
+    C = "C"
+
+
+class TrainingPlanStatus(str, Enum):
+    """Lifecycle status of a ``TrainingPlan``.
+
+    Old plans transition to ``superseded`` rather than being deleted;
+    ``completed`` is reserved for plans that ran their full duration
+    without being replaced.
+    """
+
+    ACTIVE = "active"
+    SUPERSEDED = "superseded"
+    COMPLETED = "completed"
+
+
+class PhaseLabel(str, Enum):
+    """Closed ontology of methodology-specific phase labels.
+
+    Canonical labels are the primary values; legacy aliases
+    (``base_building``, ``threshold_development``, ``race_specific``)
+    are mapped to canonical labels by the deterministic expansion
+    layer per docs/architecture/00-foundations/terminology.md.
+    New plans should use canonical labels directly.
+    """
+
+    # Aerobic development — canonical.
+    AEROBIC_BASE = "aerobic_base"
+    AEROBIC_FOUNDATION = "aerobic_foundation"
+    AEROBIC_ACCUMULATION = "aerobic_accumulation"
+    AEROBIC_BUILD = "aerobic_build"
+
+    # Structural — canonical.
+    HILL_PHASE = "hill_phase"
+    STRUCTURAL_TOLERANCE = "structural_tolerance"
+
+    # Threshold — canonical.
+    THRESHOLD_BUILD = "threshold_build"
+    THRESHOLD_PEAK = "threshold_peak"
+    THRESHOLD_CONSOLIDATION = "threshold_consolidation"
+
+    # VO2max — canonical.
+    VO2MAX_DEVELOPMENT = "vo2max_development"
+    VO2MAX_SHARPENING = "vo2max_sharpening"
+
+    # Race-specific — canonical.
+    SPECIAL_ENDURANCE = "special_endurance"
+    SPECIFIC_ENDURANCE = "specific_endurance"
+    RACE_REHEARSAL = "race_rehearsal"
+
+    # Integration — canonical.
+    SHARPENING = "sharpening"
+    TAPER = "taper"
+    RACE_WEEK = "race_week"
+
+    # Recovery / maintenance — canonical.
+    RECOVERY = "recovery"
+    TRANSITION = "transition"
+    ROLLING_BLOCK = "rolling_block"
+
+    # Legacy aliases — mapped by deterministic expansion layer.
+    BASE_BUILDING = "base_building"                # → 'aerobic_base'
+    THRESHOLD_DEVELOPMENT = "threshold_development"  # → 'threshold_build'
+    RACE_SPECIFIC = "race_specific"                # → 'specific_endurance'
+
+
+class SessionType(str, Enum):
+    """The concrete workout prescription shown on the calendar.
+
+    16 session types → 6 physiological intents via
+    ``SESSION_INTENT_MAP`` in docs/architecture/00-foundations/terminology.md.
+    Note: ``race_specific`` is a ``SessionPurpose``, not a ``SessionType``.
+    """
+
+    REST = "rest"
+    RECOVERY_RUN = "recovery_run"
+    EASY_RUN = "easy_run"
+    LONG_RUN = "long_run"
+    MEDIUM_LONG_RUN = "medium_long_run"
+    STEADY_STATE = "steady_state"
+    TEMPO = "tempo"
+    THRESHOLD = "threshold"
+    VO2MAX = "vo2max"
+    HILL_REPEATS = "hill_repeats"
+    FARTLEK = "fartlek"
+    STRIDES = "strides"
+    DRILLS_MOBILITY = "drills_mobility"
+    CROSS_TRAINING = "cross_training"
+    TEST_SESSION = "test_session"
+    OPTIONAL_RUN = "optional_run"
+
+
+class SessionSlot(str, Enum):
+    """AM/PM session designation on double-day schedules.
+
+    ``None`` for single-session days.
+    """
+
+    AM = "am"
+    PM = "pm"
+
+
+class SessionPriority(str, Enum):
+    """Workout generation priority.
+
+    Primary sessions receive full workout generation. Secondary
+    sessions may be suggested without detailed targets.
+    """
+
+    PRIMARY = "primary"
+    SECONDARY = "secondary"
+
+
+class PlannedSessionStatus(str, Enum):
+    """Lifecycle status of a ``PlannedSession`` once the workout
+    generation pipeline has run.
+    """
+
+    PENDING = "pending"
+    GENERATED = "generated"
+    COMPLETED = "completed"
+    SKIPPED = "skipped"
+    MISSED = "missed"
+    REDISTRIBUTED = "redistributed"
+
+
+class WeeklyPlanStatus(str, Enum):
+    """Lifecycle status of a ``WeeklyPlan``."""
+
+    SYNTHESISED = "synthesised"
+    ACTIVE = "active"
+    COMPLETED = "completed"
+
+
+class CheckpointType(str, Enum):
+    """Closed ontology of checkpoint categories.
+
+    See docs/architecture/01-entities/checkpoint.md.
+    """
+
+    CALIBRATION = "calibration"
+    BENCHMARK = "benchmark"
+    RACE_SIMULATION = "race_simulation"
+    SECONDARY_RACE = "secondary_race"
+    PROGRESS_REVIEW = "progress_review"
+
+
+class CheckpointStatus(str, Enum):
+    """Lifecycle status of a ``Checkpoint``."""
+
+    SCHEDULED = "scheduled"
+    COMPLETED = "completed"
+    SKIPPED = "skipped"
+
+
+class ObjectiveCategory(str, Enum):
+    """Shared objective taxonomy between phase definitions and
+    athlete-facing coaching objectives.
+    """
+
+    AEROBIC_BASE = "aerobic_base"
+    THRESHOLD_QUALITY = "threshold_quality"
+    PACING_DISCIPLINE = "pacing_discipline"
+    INTENSITY_DISTRIBUTION = "intensity_distribution"
+    STRUCTURAL_TOLERANCE = "structural_tolerance"
+    NEUROMUSCULAR_SHARPNESS = "neuromuscular_sharpness"
+    DURABILITY = "durability"
+    INTENSITY_COMPLIANCE = "intensity_compliance"
+    RECOVERY_EFFICIENCY = "recovery_efficiency"

@@ -228,68 +228,51 @@ Then confirm the manifest was saved and STOP.
 
 ---
 
-## Manifest Schema
+## Manifest Structure
+
+The manifest is split across multiple files under `tests/test-manifest/`:
+
+```
+tests/test-manifest/
+  index.yaml          # selection groups, cross-phase coverage, history summary
+  phase-1-1.yaml      # all features and tests for Phase 1.1
+  phase-1-2a.yaml     # all features and tests for Phase 1.2a
+  phase-1-2b.yaml     # etc — one file per sub-phase
+```
+
+**Agents load only what they need:**
+- DevOps: reads `index.yaml` (for selection scope) + the current sub-phase file
+- Test Architect: reads `index.yaml` + the current sub-phase file; reads other
+  sub-phase files only when cross-phase impact analysis requires it
+- Implementation Architect: reads `index.yaml` only (for coverage gaps)
+
+**One file per sub-phase.** When a new sub-phase begins, the Test Architect
+creates a new `phase-N-Mx.yaml` file. It never modifies a prior sub-phase
+file except to update `validation` fields when DevOps reports results for
+previously deferred tests.
+
+---
+
+## Index Schema
 
 ```yaml
+# tests/test-manifest/index.yaml
 version: "1.0"
-generated_at: "<ISO 8601 timestamp>"
-last_reviewed_at: "<ISO 8601 timestamp>"
+last_reviewed_at: "<ISO 8601>"
 
-features:
-  <feature-id>:                    # e.g. "phase-1-1-auth"
-    status: generated              # generated | executable | passing | promoted | deprecated
-    plan: "<plan file path>"
-    owned_by_plan:                 # which plans introduced tests for this feature
-      - "<plan-id>"
-    description: "<one line>"
-    protects:                      # invariants these tests protect
-      - "<invariant description>"
-    impacts:                       # other features whose tests are affected
-      - "<feature-id>"
-    execution_prerequisites:
-      migrations: true             # test DB must be migrated before running
-      seed_data: false             # whether seed data is required
-      external_services: []        # list of required services e.g. ["redis", "minio"]
-    validation:
-      implemented: false           # test file exists on disk
-      executable: false            # test runs without import/setup errors
-      passed: false                # test has passed at least once in CI
-    tests:
-      unit:
-        - path: "tests/unit/test_auth.py"
-          owner: "<plan-id>"
-      integration:
-        - path: "tests/integration/test_auth_service.py"
-          owner: "<plan-id>"
-      api:
-        - path: "tests/api/test_auth_routes.py"
-          owner: "<plan-id>"
-      behaviour:
-        - path: "tests/behaviour/test_register_flow.py"
-          owner: "<plan-id>"
-      release:
-        - path: "tests/release/test_auth_regression.py"
-          owner: "<plan-id>"
-
+# Resolved selection groups — paths only, no feature metadata
+# Rebuilt by Test Architect when any sub-phase file changes promotion state
 selection:
-  smoke:                           # critical path only — fastest execution
+  smoke:
     - "<test file path>"
-  feature:                         # current feature + direct impacts
-    - "<test file path>"
-  regression:                      # all promoted tests + current feature
-    - "<test file path>"           # only include tests where validation.passed = true
-  release:                         # full suite — all promoted release tests
-    - "<test file path>"           # only include tests where status = promoted
+  feature:
+    - "<test file path>"     # current sub-phase only
+  regression:
+    - "<test file path>"     # all promoted tests across all sub-phases
+  release:
+    - "<test file path>"     # all status=promoted tests
 
-execution_groups:
-  <group-name>:
-    scope: smoke | feature | regression | release
-    tests:
-      - "<test file path>"
-    phase: "<phase number>"
-    depends_on:
-      - "<group-name>"
-
+# Cross-phase coverage summary — updated when features are promoted
 coverage:
   routes:
     covered: ["<route>"]
@@ -304,48 +287,135 @@ coverage:
     partial: ["<invariant>"]
     missing: ["<invariant>"]
 
+# One line per sub-phase — prose belongs in the test pack document not here
 history:
-  - date: "<ISO 8601>"
+  - date: "<YYYY-MM-DD>"
     plan: "<plan-id>"
-    tests_added: <count>
-    tests_modified: <count>
-    tests_removed: <count>
-    coverage_delta: "<brief description>"
+    tests_added: <n>
+    tests_modified: <n>
+    tests_removed: <n>
+    result: "PASS | FAIL | PARTIAL"
+```
+
+---
+
+## Sub-Phase File Schema
+
+```yaml
+# tests/test-manifest/phase-N-Mx.yaml
+version: "1.0"
+plan_id: "<plan-id>"
+generated_at: "<ISO 8601>"
+last_reviewed_at: "<ISO 8601>"
+
+features:
+  <feature-id>:
+    status: generated        # generated | executable | passing | promoted | deprecated
+    plan: "<plan file path>"
+    owned_by_plan:
+      - "<plan-id>"
+    description: "<one line>"
+    protects:
+      - "<invariant description>"
+    impacts:
+      - "<feature-id>"       # may reference features in other sub-phase files
+    execution_prerequisites:
+      migrations: true
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: false     # set by Test Architect at generation time
+      executable: false      # set by DevOps after execution
+      passed: false          # set by DevOps after execution
+    tests:
+      unit:
+        - path: "tests/unit/test_x.py"
+          owner: "<plan-id>"
+      integration:
+        - path: "tests/integration/test_x.py"
+          owner: "<plan-id>"
+      api:
+        - path: "tests/api/test_x.py"
+          owner: "<plan-id>"
+      behaviour:
+        - path: "tests/behaviour/test_x.py"
+          owner: "<plan-id>"
+      release:
+        - path: "tests/release/test_x.py"
+          owner: "<plan-id>"
+
+# Execution groups for this sub-phase only
+execution_groups:
+  <group-name>:
+    scope: smoke | feature | regression | release
+    phase: "<phase-N>"
+    tests:
+      - "<test file path>"
+    depends_on:
+      - "<group-name>"
+
+# Coverage for this sub-phase only — index.yaml holds the cross-phase view
+coverage:
+  routes:
+    covered: ["<route>"]
+    partial: ["<route>"]
+    missing: ["<route>"]
+  events:
+    covered: ["<event>"]
+    partial: ["<event>"]
+    missing: ["<event>"]
+  invariants:
+    covered: ["<invariant>"]
+    partial: ["<invariant>"]
+    missing: ["<invariant>"]
 ```
 
 ---
 
 ## Manifest Ownership Rules
 
-`tests/test_manifest.yaml` has split ownership between the Test Architect
-and DevOps. The division follows who has direct evidence for each field.
+The manifest is split-owned between the Test Architect and DevOps.
+The division follows who has direct evidence for each field.
 
-| Field | Owner | Rationale |
-|---|---|---|
-| `validation.implemented` | Test Architect | Only the Test Architect knows whether a test file was generated and exists on disk |
-| `validation.executable` | DevOps | Only DevOps has run the suite and knows whether tests ran without import/setup errors |
-| `validation.passed` | DevOps | Only DevOps has the actual pass/fail result |
-| `status` progression | Test Architect | Promotion decisions (`passing → promoted`) are judgment calls, not transcription |
-| `selection` groups | Test Architect | Which tests belong in smoke/regression/release is a design decision |
-| All other fields | Test Architect | Schema, features, coverage, history, `owned_by_plan`, `execution_prerequisites` |
+| Field | File | Owner | Rationale |
+|---|---|---|---|
+| `validation.implemented` | sub-phase | Test Architect | Only the Test Architect knows whether a test file was generated and exists on disk |
+| `validation.executable` | sub-phase | DevOps | Only DevOps has run the suite and knows whether tests ran without errors |
+| `validation.passed` | sub-phase | DevOps | Only DevOps has the actual pass/fail result |
+| `status` progression | sub-phase | Test Architect | Promotion decisions are judgment calls, not transcription |
+| `selection` groups | index | Test Architect | Which tests belong in smoke/regression/release is a design decision |
+| `coverage` (cross-phase) | index | Test Architect | Updated when features are promoted |
+| `history` | index | Test Architect | One-line summary per sub-phase, appended after promotion |
+| All other sub-phase fields | sub-phase | Test Architect | Features, protects, impacts, prerequisites |
 
 **What this means in practice:**
 
-When the Test Architect generates tests, it sets `validation.implemented = true`
-and leaves `validation.executable` and `validation.passed` as `false` — it has
-no execution evidence yet.
+When the Test Architect generates tests, it creates the sub-phase file, sets
+`validation.implemented = true`, leaves `validation.executable` and
+`validation.passed` as `false`, and updates `index.yaml`'s `selection.feature`
+with the new test paths.
 
-When DevOps runs the suite, it updates `validation.executable` and
-`validation.passed` directly in the manifest within the same session — it does
-not wait for the Test Architect to transcribe results it does not have.
+When DevOps runs the suite, it reads `index.yaml` for scope, reads the
+current sub-phase file for prerequisites and feature list, then updates
+`validation.executable` and `validation.passed` directly in the sub-phase
+file within the same session.
 
-When DevOps reports a full PASS, the Test Architect reads that report and
-decides whether to advance `status` from `passing` to `promoted` and whether
-to move tests into `selection.regression` or `selection.release`. That is a
-deliberate judgment call that belongs to the Test Architect, not an automatic
-consequence of passing.
+When DevOps encounters infrastructure failures (import errors, greenlet
+errors, fixture errors, connection errors), it may fix `tests/conftest.py`,
+`pytest.ini`, `tests/payloads.py`, and `tests/*/__init__.py` directly. It
+records every change in its report under `## Infrastructure Fixes`. The Test
+Architect must review these in its next cycle and incorporate them into the
+canonical test pack.
 
-No other agent modifies the manifest for any reason.
+DevOps never modifies `test_*.py` assertion files. If a test fails with an
+assertion error after infrastructure is fixed, hand back to the Test Architect.
+
+When DevOps reports a full PASS, the Test Architect advances `status` to
+`promoted` in the sub-phase file, rebuilds `index.yaml`'s `selection.regression`
+and `selection.release` to include newly promoted tests, updates `index.yaml`'s
+`coverage`, and appends a one-line entry to `index.yaml`'s `history`.
+
+No other agent modifies any manifest file for any reason.
 
 ---
 
@@ -361,4 +431,3 @@ These apply to all generated tests regardless of type.
 * Fixtures handle setup and teardown — tests do not call `setUp`/`tearDown`
 * Mock external dependencies (email, payment, third-party APIs) at the
   service boundary — do not mock internal services
-  

@@ -1,58 +1,63 @@
 # implemented-state
 
 Commit:
-5967870
+7d11c76
 
 ## Change Set
 
 Base Commit:
-5967870
+7d11c76
 
 Current Commit:
-5967870
+7d11c76
 
 Files Added:
-- alembic/versions/1b9e9026db1e_phase_1_2b_plans_sessions_checkpoints.py
-- app/models/checkpoint.py
-- app/models/planned_session.py
-- app/models/regeneration_task.py
-- app/models/secondary_event.py
-- app/models/training_goal.py
-- app/models/training_plan.py
-- app/models/weekly_plan.py
-- reports/phase-1-2b_devops.md
-- reports/phase-1-2b_validation.md
-- tests/integration/test_checkpoint_schema.py
-- tests/integration/test_migration_phase_1_2b.py
-- tests/integration/test_planned_session_schema.py
-- tests/integration/test_regeneration_task_schema.py
-- tests/integration/test_secondary_event_schema.py
-- tests/integration/test_training_goal_schema.py
-- tests/integration/test_training_plan_schema.py
-- tests/integration/test_weekly_plan_schema.py
-- tests/test-manifest/index.yaml
-- tests/test-manifest/phase-1-1.yaml
-- tests/test-manifest/phase-1-2a.yaml
-- tests/test-manifest/phase-1-2b.yaml
-- tests/unit/test_checkpoint_columns.py
-- tests/unit/test_planned_session_columns.py
-- tests/unit/test_regeneration_task_columns.py
-- tests/unit/test_secondary_event_columns.py
-- tests/unit/test_training_goal_columns.py
-- tests/unit/test_training_plan_columns.py
-- tests/unit/test_weekly_plan_columns.py
+- alembic/versions/79dc97d4e433_phase_1_2c_twin_fitness_coaching_.py
+- alembic/versions/d1579f4430e7_add_training_plans_twin_state_fk.py
+- app/models/athlete_fitness.py
+- app/models/athlete_physiology.py
+- app/models/coaching_message.py
+- app/models/generated_workout.py
+- app/models/generation_event.py
+- app/models/twin_state.py
+- app/models/workout_step.py
+- reports/Phase-1.2c-P1_validation.md
+- reports/phase-1-2b-p1-plan-sessions_validation.md
+- reports/phase-1-2b-p2-test-contract-alignment_validation.md
+- reports/phase-1-2c-P1_devops.md
+- tests/integration/test_athlete_fitness_schema.py
+- tests/integration/test_athlete_physiology_schema.py
+- tests/integration/test_coaching_message_schema.py
+- tests/integration/test_generated_workout_schema.py
+- tests/integration/test_generation_event_schema.py
+- tests/integration/test_migration_phase_1_2c.py
+- tests/integration/test_twin_state_schema.py
+- tests/integration/test_workout_step_schema.py
+- tests/test-manifest/phase-1-2c.yaml
+- tests/unit/test_athlete_fitness_columns.py
+- tests/unit/test_athlete_physiology_columns.py
+- tests/unit/test_coaching_message_columns.py
+- tests/unit/test_generated_workout_columns.py
+- tests/unit/test_generation_event_columns.py
+- tests/unit/test_twin_state_columns.py
+- tests/unit/test_workout_step_columns.py
 
 Files Modified:
 - app/models/__init__.py
-- app/models/activity.py
 - app/models/enums.py
+- app/models/training_plan.py
 - reports/test_history/latest.md
-- tests/integration/test_activity_schema.py
-- tests/integration/test_migration_phase_1_2a.py
+- tests/README.md
+- tests/conftest.py
+- tests/integration/test_migration_phase_1_2b.py
+- tests/integration/test_training_plan_schema.py
+- tests/test-manifest/index.yaml
+- tests/test-manifest/phase-1-2b.yaml
 - tests/unit/test_enum_values.py
+- tests/unit/test_training_plan_columns.py
 
 Files Deleted:
-- tests/test_manifest.yaml
+- none
 
 Touched Areas:
 - models
@@ -60,13 +65,13 @@ Touched Areas:
 - other
 
 Generated:
-2026-06-24T03:54:24.698402+00:00 UTC
+2026-06-25T02:43:19.116945+00:00 UTC
 
 Current DB Revision:
-1b9e9026db1e (head)
+d1579f4430e7 (head)
 
 Python Files Scanned:
-54
+61
 
 ---
 
@@ -78,9 +83,14 @@ Entities:
 - Activity (activities) — app/models/activity.py
 - Athlete (athletes) — app/models/athlete.py
 - AthleteAuth (athlete_auths) — app/models/athlete_auth.py
+- AthleteFitness (athlete_fitness) — app/models/athlete_fitness.py
+- AthletePhysiology (athlete_physiology) — app/models/athlete_physiology.py
 - AthletePreferences (athlete_preferences) — app/models/athlete_preferences.py
 - AthleteProfile (athlete_profiles) — app/models/athlete_profile.py
 - Checkpoint (checkpoints) — app/models/checkpoint.py
+- CoachingMessage (coaching_messages) — app/models/coaching_message.py
+- GeneratedWorkout (generated_workouts) — app/models/generated_workout.py
+- GenerationEvent (generation_events) — app/models/generation_event.py
 - PlannedSession (planned_sessions) — app/models/planned_session.py
 - RefreshToken (athlete_refresh_tokens) — app/models/refresh_token.py
 - RegenerationTask (regeneration_tasks) — app/models/regeneration_task.py
@@ -89,8 +99,10 @@ Entities:
 - SystemEventOutbox (system_event_outbox) — app/models/system_event.py
 - TrainingGoal (training_goals) — app/models/training_goal.py
 - TrainingPlan (training_plans) — app/models/training_plan.py
+- TwinState (twin_states) — app/models/twin_state.py
 - WeeklyPlan (weekly_plans) — app/models/weekly_plan.py
 - WeeklySession (weekly_sessions) — app/models/weekly_plan.py
+- WorkoutStep (workout_steps) — app/models/workout_step.py
 
 Enums:
 - ActivitySource — app/models/enums.py
@@ -104,21 +116,31 @@ Enums:
 - GpsSource — app/models/enums.py
 - HrSource — app/models/enums.py
 - InjurySeverity — app/models/enums.py
+- MeasurementSource — app/models/enums.py
+- MessageType — app/models/enums.py
 - ObjectiveCategory — app/models/enums.py
 - PhaseLabel — app/models/enums.py
+- PhysiologicalIntent — app/models/enums.py
 - PlannedSessionStatus — app/models/enums.py
 - PowerSource — app/models/enums.py
 - PrimaryTrainingPlatform — app/models/enums.py
+- RecoveryModifierLevel — app/models/enums.py
 - SecondaryEventPriority — app/models/enums.py
 - SessionPriority — app/models/enums.py
+- SessionPurpose — app/models/enums.py
 - SessionSlot — app/models/enums.py
 - SessionType — app/models/enums.py
 - Sex — app/models/enums.py
+- SignalType — app/models/enums.py
 - SportBackground — app/models/enums.py
+- StepType — app/models/enums.py
 - TrainingGoalStatus — app/models/enums.py
 - TrainingPlanStatus — app/models/enums.py
 - TrainingTimeOfDay — app/models/enums.py
+- TwinConfidenceLevel — app/models/enums.py
+- TwinTrigger — app/models/enums.py
 - WeeklyPlanStatus — app/models/enums.py
+- WellnessTrend — app/models/enums.py
 
 ### Persistence Layer
 
@@ -132,7 +154,9 @@ Repositories:
 
 Migrations:
 - 1b9e9026db1e (down: e7ffc8764335) — alembic/versions/1b9e9026db1e_phase_1_2b_plans_sessions_checkpoints.py
+- 79dc97d4e433 (down: 1b9e9026db1e) — alembic/versions/79dc97d4e433_phase_1_2c_twin_fitness_coaching_.py
 - 8265efd46112 (down: fd373abd4b9e) — alembic/versions/8265efd46112_phase_1_1_p3_single_primary_auth_.py
+- d1579f4430e7 (down: 79dc97d4e433) — alembic/versions/d1579f4430e7_add_training_plans_twin_state_fk.py
 - e7ffc8764335 (down: 8265efd46112) — alembic/versions/e7ffc8764335_phase_1_2a_profile_preferences_activity.py
 - fd373abd4b9e (down: none) — alembic/versions/fd373abd4b9e_phase_1_1_email_password_auth.py
 
@@ -165,7 +189,7 @@ Public API:
 ### Registrations
 
 - app/models/__init__.py
-- Imports: Activity, ActivitySource, Athlete, AthleteAuth, AthletePreferences, AthleteProfile, AuthProvider, Checkpoint, CheckpointStatus, CheckpointType, DataTier, EventPublicationStatus, GoalEventType, GoalType, GpsSource, HrSource, InjurySeverity, ObjectiveCategory, PhaseLabel, PlannedSession, PlannedSessionStatus, PowerSource, PrimaryTrainingPlatform, RefreshToken, RegenerationTask, SecondaryEvent, SecondaryEventPriority, SessionPriority, SessionSlot, SessionType, Sex, SportBackground, SystemEvent, SystemEventOutbox, TrainingGoal, TrainingGoalStatus, TrainingPlan, TrainingPlanStatus, TrainingTimeOfDay, WeeklyPlan, WeeklyPlanStatus, WeeklySession, infer_data_tier
+- Imports: Activity, ActivitySource, Athlete, AthleteAuth, AthleteFitness, AthletePhysiology, AthletePreferences, AthleteProfile, AuthProvider, Checkpoint, CheckpointStatus, CheckpointType, CoachingMessage, DataTier, EventPublicationStatus, GeneratedWorkout, GenerationEvent, GoalEventType, GoalType, GpsSource, HrSource, InjurySeverity, MeasurementSource, MessageType, ObjectiveCategory, PhaseLabel, PhysiologicalIntent, PlannedSession, PlannedSessionStatus, PowerSource, PrimaryTrainingPlatform, RecoveryModifierLevel, RefreshToken, RegenerationTask, SecondaryEvent, SecondaryEventPriority, SessionPriority, SessionPurpose, SessionSlot, SessionType, Sex, SignalType, SportBackground, StepType, SystemEvent, SystemEventOutbox, TrainingGoal, TrainingGoalStatus, TrainingPlan, TrainingPlanStatus, TrainingTimeOfDay, TwinConfidenceLevel, TwinState, TwinTrigger, WeeklyPlan, WeeklyPlanStatus, WeeklySession, WellnessTrend, WorkoutStep, infer_data_tier
 
 - app/schemas/__init__.py
 - Imports: AthleteResponse, AuthResponse, LoginRequest, RefreshRequest, RefreshResponse, RegisterProfileIn, RegisterRequest, TokenPairResponse
@@ -268,7 +292,7 @@ Repository dependencies:
 ### Execution Readiness
 
 Current Revision:
-1b9e9026db1e (head)
+d1579f4430e7 (head)
 
 Migration Pending:
 yes

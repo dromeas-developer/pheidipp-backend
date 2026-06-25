@@ -286,15 +286,6 @@ coverage:
     covered: ["<invariant>"]
     partial: ["<invariant>"]
     missing: ["<invariant>"]
-
-# One line per sub-phase — prose belongs in the test pack document not here
-history:
-  - date: "<YYYY-MM-DD>"
-    plan: "<plan-id>"
-    tests_added: <n>
-    tests_modified: <n>
-    tests_removed: <n>
-    result: "PASS | FAIL | PARTIAL"
 ```
 
 ---
@@ -368,6 +359,16 @@ coverage:
     covered: ["<invariant>"]
     partial: ["<invariant>"]
     missing: ["<invariant>"]
+
+# One line per sub-phase — prose belongs in the test pack document not here
+history:
+  - date: "<YYYY-MM-DD>"
+    plan: "<plan-id>"
+    tests_added: <n>
+    tests_modified: <n>
+    tests_removed: <n>
+    result: "PASS | FAIL | PARTIAL"
+    
 ```
 
 ---

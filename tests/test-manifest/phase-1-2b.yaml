@@ -1,7 +1,7 @@
 version: "1.0"
 plan_id: "phase-1-2b-p1-plan-sessions"
 generated_at: "2026-06-20T00:00:00+00:00"
-last_reviewed_at: "2026-06-23T04:00:00+00:00"
+last_reviewed_at: "2026-06-24T23:55:00+00:00"
 
 # Plan covered by this sub-phase file:
 #   docs/implementation/phase-1/phase-1-2b-p1-plan-sessions.md
@@ -541,6 +541,62 @@ coverage:
       - "Plan visibility / privacy contracts for the coach layer (vision)"
 
 history:
+  - date: "2026-06-24"
+    plan: "phase-1-2b-p1-plan-sessions"
+    tests_added: 0
+    tests_modified: 1
+    tests_removed: 0
+    result: "PARTIAL"
+    coverage_delta: >
+      Phase-1.2c DevOps round-4 report flagged 1 remaining failure in
+      Phase-1.2b test file (cross-schema pg_constraint leak). Fix:
+      tests/integration/test_migration_phase_1_2b.py::test_training_plans_twin_state_id_column_exists_no_fk
+      — added pg_namespace JOIN + :schema parameter to both the column
+      query and the FK count query, so both inspect only the isolated
+      Phase-1.2b test schema (phase_1_2b_test_<uuid>) and never pick up
+      the fk_training_plans_twin_state constraint that Phase-1.2c
+      correctly applied in the public schema. The fixture already
+      pinned `alembic upgrade PHASE_1_2B_REVISION` so the FK is not
+      created inside the isolated schema; the schema scoping on the
+      query is a belt-and-suspenders safeguard against the same
+      failure mode re-occurring if any future sub-phase adds an
+      identically-named FK. Production code unchanged.
+  - date: "2026-06-24"
+    plan: "phase-1-2b-p1-plan-sessions"
+    tests_added: 0
+    tests_modified: 2
+    tests_removed: 0
+    result: "PARTIAL"
+    coverage_delta: >
+      Phase-1.2c DevOps round-3 report flagged 2 prior-phase failures in
+      Phase-1.2b test files (reports/phase-1-2c-P1_devops.md). Fixes:
+      (1) tests/unit/test_training_plan_columns.py::test_twin_state_id_nullable_uuid_no_fk
+      -> test_twin_state_id_nullable_uuid_with_set_null_fk — Phase-1.2c now
+      wires the FK with ON DELETE SET NULL, so the test asserts the FK is
+      present and declared SET NULL rather than asserting its absence. The
+      column-side invariants (nullable UUID) remain unchanged.
+      (2) tests/integration/test_migration_phase_1_2b.py::phase_1_2b_schema
+      fixture upgraded from `alembic upgrade head` to `alembic upgrade
+      PHASE_1_2B_REVISION` (1b9e9026db1e) — pins Phase-1.2b assertions
+      to that revision so the Phase-1.2c FK follow-up does not bleed in.
+      Added PHASE_1_2B_REVISION alias at module bottom to fix the
+      NameError previously flagged in test_downgrade_returns_schema_to_phase_1_2a_baseline.
+      Production code unchanged.
+  - date: "2026-06-24"
+    plan: "phase-1-2b-p1-plan-sessions"
+    tests_added: 0
+    tests_modified: 1
+    tests_removed: 0
+    result: "PARTIAL"
+    coverage_delta: >
+      Phase-1.2c DevOps run flagged 1 prior-phase failure in
+      test_migration_phase_1_2b.py::test_downgrade_returns_schema_to_phase_1_2a_baseline
+      (downgrade -1 from Phase-1.2c head lands on Phase-1.2b, not Phase-1.2a).
+      Fixed by upgrading to PHASE_1_2B_REVISION explicitly instead of head so
+      the Phase-1.2b -> Phase-1.2a downgrade contract is tested in isolation.
+      The 3 test_training_plan_schema.py failures (FK wiring) remain pending
+      the Coder/Architect amendment of migration 79dc97d4e433 — Test
+      Architect does not modify production migration files.
   - date: "2026-06-23"
     plan: "phase-1-2b-p1-plan-sessions"
     tests_added: 0

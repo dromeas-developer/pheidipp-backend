@@ -1,5 +1,5 @@
 version: "1.0"
-last_reviewed_at: "2026-06-23T04:00:00+00:00"
+last_reviewed_at: "2026-06-25T00:30:00+00:00"
 
 # ---------------------------------------------------------------------------
 # INDEX — lightweight cross-phase registry.
@@ -42,6 +42,14 @@ selection:
     - "tests/unit/test_weekly_plan_columns.py"
     - "tests/unit/test_planned_session_columns.py"
     - "tests/unit/test_checkpoint_columns.py"
+    # Phase-1.2c unit tests (promoted 2026-06-25)
+    - "tests/unit/test_twin_state_columns.py"
+    - "tests/unit/test_athlete_physiology_columns.py"
+    - "tests/unit/test_athlete_fitness_columns.py"
+    - "tests/unit/test_coaching_message_columns.py"
+    - "tests/unit/test_generation_event_columns.py"
+    - "tests/unit/test_generated_workout_columns.py"
+    - "tests/unit/test_workout_step_columns.py"
   feature:
     - "tests/unit/test_enum_values.py"
     - "tests/unit/test_training_goal_columns.py"
@@ -60,6 +68,22 @@ selection:
     - "tests/integration/test_checkpoint_schema.py"
     - "tests/integration/test_activity_schema.py"
     - "tests/integration/test_migration_phase_1_2b.py"
+    # Phase-1.2c — current active sub-phase
+    - "tests/unit/test_twin_state_columns.py"
+    - "tests/unit/test_athlete_physiology_columns.py"
+    - "tests/unit/test_athlete_fitness_columns.py"
+    - "tests/unit/test_coaching_message_columns.py"
+    - "tests/unit/test_generation_event_columns.py"
+    - "tests/unit/test_generated_workout_columns.py"
+    - "tests/unit/test_workout_step_columns.py"
+    - "tests/integration/test_twin_state_schema.py"
+    - "tests/integration/test_athlete_physiology_schema.py"
+    - "tests/integration/test_athlete_fitness_schema.py"
+    - "tests/integration/test_coaching_message_schema.py"
+    - "tests/integration/test_generation_event_schema.py"
+    - "tests/integration/test_generated_workout_schema.py"
+    - "tests/integration/test_workout_step_schema.py"
+    - "tests/integration/test_migration_phase_1_2c.py"
   regression:
     - "tests/unit/test_password_hasher.py"
     - "tests/unit/test_token_service.py"
@@ -94,6 +118,22 @@ selection:
     - "tests/integration/test_planned_session_schema.py"
     - "tests/integration/test_checkpoint_schema.py"
     - "tests/integration/test_migration_phase_1_2b.py"
+    # Phase-1.2c (promoted 2026-06-25 — see cross_phase_history)
+    - "tests/unit/test_twin_state_columns.py"
+    - "tests/unit/test_athlete_physiology_columns.py"
+    - "tests/unit/test_athlete_fitness_columns.py"
+    - "tests/unit/test_coaching_message_columns.py"
+    - "tests/unit/test_generation_event_columns.py"
+    - "tests/unit/test_generated_workout_columns.py"
+    - "tests/unit/test_workout_step_columns.py"
+    - "tests/integration/test_twin_state_schema.py"
+    - "tests/integration/test_athlete_physiology_schema.py"
+    - "tests/integration/test_athlete_fitness_schema.py"
+    - "tests/integration/test_coaching_message_schema.py"
+    - "tests/integration/test_generation_event_schema.py"
+    - "tests/integration/test_generated_workout_schema.py"
+    - "tests/integration/test_workout_step_schema.py"
+    - "tests/integration/test_migration_phase_1_2c.py"
     - "tests/api/test_auth_endpoints.py"
     - "tests/behaviour/test_auth_user_journey.py"
   release:
@@ -130,6 +170,22 @@ selection:
     - "tests/integration/test_planned_session_schema.py"
     - "tests/integration/test_checkpoint_schema.py"
     - "tests/integration/test_migration_phase_1_2b.py"
+    # Phase-1.2c (promoted 2026-06-25 — see cross_phase_history)
+    - "tests/unit/test_twin_state_columns.py"
+    - "tests/unit/test_athlete_physiology_columns.py"
+    - "tests/unit/test_athlete_fitness_columns.py"
+    - "tests/unit/test_coaching_message_columns.py"
+    - "tests/unit/test_generation_event_columns.py"
+    - "tests/unit/test_generated_workout_columns.py"
+    - "tests/unit/test_workout_step_columns.py"
+    - "tests/integration/test_twin_state_schema.py"
+    - "tests/integration/test_athlete_physiology_schema.py"
+    - "tests/integration/test_athlete_fitness_schema.py"
+    - "tests/integration/test_coaching_message_schema.py"
+    - "tests/integration/test_generation_event_schema.py"
+    - "tests/integration/test_generated_workout_schema.py"
+    - "tests/integration/test_workout_step_schema.py"
+    - "tests/integration/test_migration_phase_1_2c.py"
     - "tests/api/test_auth_endpoints.py"
     - "tests/behaviour/test_auth_user_journey.py"
 
@@ -143,6 +199,12 @@ cross_phase_dependencies:
     type: runs_before
   - from: "p1-2a-p1-migration"
     to: "p1-2b-p1-migration"
+    type: runs_before
+  - from: "p1-2b-p1-integration"
+    to: "p1-2c-p1-integration"
+    type: runs_before
+  - from: "p1-2b-p1-migration"
+    to: "p1-2c-p1-migration"
     type: runs_before
 
 # ---------------------------------------------------------------------------
@@ -256,7 +318,7 @@ coverage:
       - "training_goals.target_distance_km and target_time_minutes are NULL OR positive when set"
       - "training_goals has athlete_id FK CASCADE on athlete deletion"
       - "training_plans.training_goal_id FK CASCADES on goal deletion"
-      - "training_plans.twin_state_id is a nullable UUID column WITHOUT a FK (delayed to Phase-1.2c)"
+      - "training_plans.twin_state_id is a nullable UUID column WITHOUT a FK (delayed to Phase-1.2c — migration amendment pending Coder/Architect action)"
       - "training_plans JSONB structural columns default to empty arrays / null"
       - "training_plans supersession is non-destructive"
       - "secondary_events FK to training_goals CASCADES on goal deletion"
@@ -308,102 +370,57 @@ coverage:
       - "TrainingGoal closure writes closed_at (service layer)"
 
 # ---------------------------------------------------------------------------
-# History — one entry per sub-phase run.
-# Full prose lives in docs/testing/ test pack documents.
+# Cross-phase promotion history — one line per sub-phase promotion.
+# ---------------------------------------------------------------------------
+# Append a single-line entry when a sub-phase is promoted (status
+# advanced from generated|passing -> promoted). This gives platform
+# reviewers and the DevOps pipeline a chronological view of when each
+# sub-phase graduated from "currently under test" to "permanent
+# regression coverage".
 # ---------------------------------------------------------------------------
 
-history:
-  - date: "2026-06-17"
-    plan: "phase-1-1-p1-email-password-auth + p2-security-invariants-patch + p3-single-primary-auth-enforcement"
-    tests_added: 132
-    tests_modified: 0
-    tests_removed: 0
+cross_phase_history:
+  - date: "2026-06-25"
+    plan: "phase-1-2c-p1-twin-fitness-coaching-workouts"
+    tests_promoted: 15
     result: "PASS"
-  - date: "2026-06-17"
-    plan: "phase-1-1-p1-email-password-auth + p2-security-invariants-patch + p3-single-primary-auth-enforcement"
-    tests_added: 0
-    tests_modified: 11
-    tests_removed: 0
-    result: "PARTIAL"
-  - date: "2026-06-18"
-    plan: "phase-1-1-p1-email-password-auth + p2-security-invariants-patch + p3-single-primary-auth-enforcement"
-    tests_added: 0
-    tests_modified: 3
-    tests_removed: 0
-    result: "PARTIAL"
-  - date: "2026-06-19"
-    plan: "phase-1-1-p1-p2-p3-email-password-auth-devops-v2-issue-3"
-    tests_added: 0
-    tests_modified: 2
-    tests_removed: 0
-    result: "PARTIAL"
-  - date: "2026-06-19"
-    plan: "phase-1-1-p1-p2-p3-email-password-auth"
-    tests_added: 0
-    tests_modified: 0
-    tests_removed: 0
-    result: "PASS"
-  - date: "2026-06-19"
-    plan: "phase-1-2a-p1-profile-preferences-activity"
-    tests_added: 9
-    tests_modified: 0
-    tests_removed: 0
-    result: "PARTIAL"
-  - date: "2026-06-19"
-    plan: "phase-1-2a-p1-profile-preferences-activity"
-    tests_added: 0
-    tests_modified: 1
-    tests_removed: 0
-    result: "PARTIAL"
-  - date: "2026-06-20"
-    plan: "phase-1-2a-devops-rerun-issue-1-and-2"
-    tests_added: 0
-    tests_modified: 2
-    tests_removed: 0
-    result: "PARTIAL"
-  - date: "2026-06-20"
-    plan: "phase-1-2a-p1-profile-preferences-activity"
-    tests_added: 0
-    tests_modified: 0
-    tests_removed: 0
-    result: "PASS"
-  - date: "2026-06-20"
-    plan: "phase-1-2b-p1-plan-sessions"
-    tests_added: 16
-    tests_modified: 1
-    tests_removed: 0
-    result: "PARTIAL"
-  - date: "2026-06-21"
-    plan: "phase-1-2b-test-bug-fixes-round-1"
-    tests_added: 0
-    tests_modified: 4
-    tests_removed: 0
-    result: "PARTIAL"
-  - date: "2026-06-21"
-    plan: "phase-1-2b-test-bug-fixes-round-2"
-    tests_added: 0
-    tests_modified: 1
-    tests_removed: 0
-    result: "PARTIAL"
-  - date: "2026-06-21"
-    plan: "phase-1-2b-test-bug-fixes-round-3"
-    tests_added: 0
-    tests_modified: 3
-    tests_removed: 0
-    result: "PARTIAL"
+    details: >
+      1127/1127 tests pass (157.10s). All 9 Phase-1.2c features promoted:
+      enums + 7 schema entities + migration. Adds twin_states,
+      athlete_physiology, athlete_fitness, coaching_messages,
+      generation_events, generated_workouts, workout_steps tables and
+      wires training_plans.twin_state_id FK (Phase-1.2c deferred FK).
+      Round-4 cross-schema pg_constraint leak fix unblocked the
+      Phase-1.2b regression run. selection.regression and
+      selection.release now include all Phase-1.2c tests;
+      this sub-phase adds 15 test files (7 unit + 8 integration);
+      cumulative regression envelope is 60 promoted test files
+      across Phase-1.1, 1.2a, 1.2b, 1.2c.
   - date: "2026-06-23"
     plan: "phase-1-2b-p1-plan-sessions"
-    tests_added: 0
-    tests_modified: 2
-    tests_removed: 0
+    tests_promoted: 10
     result: "PASS"
-    coverage_delta: >
-      Promotion (status generated -> promoted) for all 10 Phase-1.2b features
-      after the clean DevOps pass (880/880 in 127s,
-      reports/phase-1-2b_devops.md). Fixed two PlannedSession enum issues:
-      SCHEDULED -> PENDING and added required session_priority=SessionPriority.PRIMARY.
-      selection.regression and selection.release now include all 45 tests from
-      Phase-1.1, Phase-1.2a, and Phase-1.2b. The platform now has complete
-      schema coverage for auth, athlete profile/preferences, activity tracking,
-      and training plan infrastructure (goals, plans, weekly plans, sessions,
-      checkpoints). 
+    details: >
+      880/880 tests pass (127s). All 10 Phase-1.2b features promoted:
+      enums + 7 schema entities + migration. Adds training_goals,
+      secondary_events, regeneration_tasks, training_plans,
+      weekly_plans, planned_sessions, weekly_sessions, checkpoints
+      tables. selection.regression now spans Phase-1.1 + 1.2a + 1.2b.
+  - date: "2026-06-22"
+    plan: "phase-1-2a-p1-profile-preferences-activity"
+    tests_promoted: 4
+    result: "PASS"
+    details: >
+      All 4 Phase-1.2a features promoted: athlete_profile extension,
+      athlete_preferences table, activity table + dedup partial index,
+      registration regression. Activity.fit_file_key and tier
+      inference remain service-layer concerns.
+  - date: "2026-06-20"
+    plan: "phase-1-1-p1-email-password-auth"
+    tests_promoted: 6
+    result: "PASS"
+    details: >
+      Initial promotion — auth foundation: registration, login,
+      refresh-token rotation, atomic duplicate-email rejection,
+      require_self dependency, IP truncation/discard. 16 unit tests
+      + 7 integration tests + 1 behaviour test + 1 API test promoted.

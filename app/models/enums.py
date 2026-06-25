@@ -368,3 +368,163 @@ class ObjectiveCategory(str, Enum):
     DURABILITY = "durability"
     INTENSITY_COMPLIANCE = "intensity_compliance"
     RECOVERY_EFFICIENCY = "recovery_efficiency"
+
+
+# ---------------------------------------------------------------------------
+# Phase-1.2c — Twin / Fitness / Coaching / Workout enums.
+#
+# These closed ontologies implement the contracts declared in
+# docs/architecture/01-entities/twin-state.md, athlete-physiology.md,
+# athlete-fitness.md, coaching-message.md, generation-event.md,
+# generated-workout.md, workout-step.md and
+# 00-foundations/terminology.md → Shared Enums.
+# Values are part of the public architecture contract: changing them is a
+# breaking change for downstream services, prompt payloads, and persisted
+# JSONB schemas.
+# ---------------------------------------------------------------------------
+
+
+class TwinTrigger(str, Enum):
+    """What caused a ``TwinState`` snapshot to be appended.
+
+    See docs/architecture/01-entities/twin-state.md → Schema.
+    """
+
+    QUESTIONNAIRE = "questionnaire"
+    ACTIVITY_SYNC = "activity_sync"
+    CALIBRATION = "calibration"
+    PHYSIOLOGY_INPUT = "physiology_input"
+    WELLNESS_UPDATE = "wellness_update"
+
+
+class TwinConfidenceLevel(str, Enum):
+    """Coarse confidence for the twin as a whole.
+
+    See docs/architecture/00-foundations/confidence-model.md and
+    01-entities/twin-state.md. Per-metric confidence lives on
+    ``TwinState.metric_confidence``.
+    """
+
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+class MessageType(str, Enum):
+    """Closed ontology of coach-to-athlete message categories.
+
+    See docs/architecture/01-entities/coaching-message.md → MessageType.
+    """
+
+    FIRST_MESSAGE = "first_message"
+    POST_WORKOUT = "post_workout"
+    WELLNESS_ALERT = "wellness_alert"
+    PHASE_TRANSITION = "phase_transition"
+    PLAN_REGENERATION = "plan_regeneration"
+    CONFIDENCE_UPGRADE = "confidence_upgrade"
+    CYCLE_CHECK_IN = "cycle_check_in"
+    WEEKLY_SUMMARY = "weekly_summary"
+
+
+class StepType(str, Enum):
+    """Closed ontology of segment categories inside a workout.
+
+    See docs/architecture/01-entities/workout-step.md → StepType.
+    """
+
+    WARMUP = "warmup"
+    WORK = "work"
+    RECOVERY = "recovery"
+    COOLDOWN = "cooldown"
+
+
+class RecoveryModifierLevel(str, Enum):
+    """GREEN / AMBER / RED readiness signal produced by WellnessModifierService.
+
+    See docs/architecture/00-foundations/terminology.md → Shared Enums.
+    """
+
+    GREEN = "green"
+    AMBER = "amber"
+    RED = "red"
+
+
+class WellnessTrend(str, Enum):
+    """7-day composite wellness trend direction at snapshot time.
+
+    ``WellnessTrend`` is not explicitly defined in the architecture but
+    is referenced by ``TwinState.wellness_trend`` and by the
+    ``form_trend`` field on the ``AthleteFitnessResponse`` derivation
+    inline union ``'improving' | 'stable' | 'declining'``. Values are
+    aligned per the plan's Coder Handoff Notes.
+    """
+
+    IMPROVING = "improving"
+    STABLE = "stable"
+    DECLINING = "declining"
+
+
+class PhysiologicalIntent(str, Enum):
+    """Physiological adaptation a session or step targets — the primary
+    coaching abstraction. Six values; many:1 mapping from SessionType.
+
+    See docs/architecture/00-foundations/terminology.md → Shared Enums /
+    PhysiologicalIntent.
+    """
+
+    LOW_AEROBIC = "low_aerobic"
+    HIGH_AEROBIC = "high_aerobic"
+    THRESHOLD = "threshold"
+    VO2MAX = "vo2max"
+    NEUROMUSCULAR = "neuromuscular"
+    RECOVERY = "recovery"
+
+
+class MeasurementSource(str, Enum):
+    """Provenance of a physiological observation / measurement.
+
+    See docs/architecture/01-entities/athlete-physiology.md →
+    MeasurementSource.
+    """
+
+    QUESTIONNAIRE_ESTIMATE = "questionnaire_estimate"
+    TRAINING_HR_DEFLECTION = "training_hr_deflection"
+    TRAINING_RR_INFLECTION = "training_rr_inflection"
+    TRAINING_POWER_HR_RATIO = "training_power_hr_ratio"
+    FIELD_TEST = "field_test"
+    LAB_TEST = "lab_test"
+
+
+class SignalType(str, Enum):
+    """Signal channel that a ``WorkoutTarget`` carries targets in.
+
+    ``description`` is a non-numeric plain-language target variant used
+    when no numeric signal is appropriate (Tier 6 / no-signal sessions).
+    See docs/architecture/01-entities/generated-workout.md →
+    ``WorkoutTarget`` and 00-foundations/terminology.md.
+    """
+
+    POWER = "power"
+    GAP = "gap"
+    HR = "hr"
+    DESCRIPTION = "description"
+
+
+class SessionPurpose(str, Enum):
+    """Why the session is being run — distinct from ``PhysiologicalIntent`` /
+    ``SessionType``. ``race_specific`` is NOT a ``SessionType`` and
+    ``calibration`` annotates test sessions so the compliance family uses
+    the data-quality assessment instead of the standard compliance
+    assessment.
+
+    See docs/architecture/00-foundations/terminology.md → SessionPurpose.
+    Required by Phase-1.2c's WorkoutStep contract (architecture
+    01-entities/workout-step.md). Plan step 1 does not list this enum
+    explicitly but ``WorkoutStep.session_purpose`` references it; the
+    enum is added here to keep step 8's "all fields from architecture
+    contract" implementation faithful.
+    """
+
+    GENERAL = "general"
+    RACE_SPECIFIC = "race_specific"
+    CALIBRATION = "calibration"

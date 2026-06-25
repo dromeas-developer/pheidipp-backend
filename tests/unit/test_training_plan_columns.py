@@ -7,8 +7,10 @@ service can land later without DB migration churn.
 
 Invariants pinned here:
 
-* ``twin_state_id`` is present and nullable; the FK is deferred to
-  Phase-1.2c when ``twin_states`` exists.
+* ``twin_state_id`` is present, nullable UUID, and the FK to
+  ``twin_states.id`` is declared ``ON DELETE SET NULL``. The column
+  was added in Phase-1.2b without a constraint; the FK was wired in
+  Phase-1.2c once ``twin_states`` existed.
 * JSONB structural columns are non-nullable with a sensible default
   (empty list / null dict) so plan-synthesis can ``jsonb_set`` over
   them without an INSERT-side coalesce.
@@ -50,23 +52,35 @@ class TestTrainingPlanRequiredColumns:
         assert col.nullable is False
         assert isinstance(col.type, PG_UUID)
 
-    def test_twin_state_id_nullable_uuid_no_fk(self) -> None:
-        """``twin_state_id`` is a free-standing nullable UUID in
-        Phase-1.2b — no FK declared on the mapper because the
-        target table ``twin_states`` does not exist yet. The FK is
-        added by Phase-1.2c."""
+    def test_twin_state_id_nullable_uuid_with_set_null_fk(self) -> None:
+        """``twin_state_id`` is a nullable UUID column with an FK to
+        ``twin_states.id`` declared ``ON DELETE SET NULL``.
+
+        Phase-1.2b added the column without an FK; Phase-1.2c wired
+        the FK once ``twin_states`` existed. Orphaning a twin state
+        must not cascade-delete the plan — the SET NULL semantics
+        match the column's nullability and the architecture contract.
+        """
         col = _columns()["twin_state_id"]
         assert col.nullable is True
         assert isinstance(col.type, PG_UUID)
-        # The column is NOT a foreign key — checking via the absence
-        # of a ForeignKey-side-column relationship on this mapper.
-        for fk in TrainingPlan.__table__.foreign_keys:
-            if fk.column.table.name == "twin_states":
-                pytest.fail(
-                    "training_plans.twin_state_id must NOT carry an "
-                    "FK to twin_states in Phase-1.2b — the target "
-                    "table does not exist yet. Phase-1.2c will add it."
-                )
+        # Exactly one FK points at ``twin_states.id`` and it must be
+        # declared SET NULL — the cascade-delete invariant is
+        # explicitly NOT allowed on this FK.
+        twin_fks = [
+            fk
+            for fk in TrainingPlan.__table__.foreign_keys
+            if fk.column.table.name == "twin_states"
+        ]
+        assert len(twin_fks) == 1, (
+            "training_plans.twin_state_id must carry exactly one FK "
+            "to twin_states (wired in Phase-1.2c). "
+            f"Got {len(twin_fks)}."
+        )
+        assert twin_fks[0].ondelete == "SET NULL", (
+            "training_plans.twin_state_id FK must ON DELETE SET NULL "
+            "— orphaning a twin state must NOT cascade-delete the plan."
+        )
 
     def test_phases_summary_required_jsonb_with_default(self) -> None:
         col = _columns()["phases_summary"]
@@ -132,8 +146,8 @@ class TestTrainingPlanIndexes:
         )
 
     def test_twin_state_index_present(self) -> None:
-        """Reverse-lookup TwinState → plans uses the (deferred) FK
-        target. Indexed even though the FK is added in Phase-1.2c."""
+        """Reverse-lookup TwinState → plans uses the FK target.
+        Indexed for the production query path."""
         matched = [
             idx
             for idx in _indexes().values()
@@ -141,7 +155,7 @@ class TestTrainingPlanIndexes:
         ]
         assert matched, (
             "Expected an index on (twin_state_id) for "
-            "reverse-lookup even though the FK is added in Phase-1.2c."
+            "reverse-lookup TwinState → plans."
         )
 
 

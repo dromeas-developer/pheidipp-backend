@@ -165,37 +165,115 @@ class TestTrainingPlanDBSchemaColumns:
 # ---------------------------------------------------------------------------
 
 
-class TestTrainingPlanTwinStateFKDeferred:
-    """``training_plans.twin_state_id`` exists as a nullable column
-    only — the FK is deliberately deferred to Phase-1.2c."""
+class TestTrainingPlanTwinStateFKWired:
+    """Phase-1.2c wires the ``training_plans.twin_state_id -> twin_states.id``
+    FK that was deferred in Phase-1.2b. Once ``twin_states`` exists, the FK
+    is enforced at the DB layer.
 
-    def test_no_fk_to_twin_states(self) -> None:
+    Reference: docs/implementation/phase-1/
+    phase-1-2c-p1-twin-fitness-coaching-workouts.md
+    """
+
+    def test_fk_to_twin_states_present(self) -> None:
+        """Phase-1.2c must declare an FK from training_plans.twin_state_id
+        to twin_states.id."""
         fks = _foreign_keys(TABLE)
         matches = [
-            fk for fk in fks
+            fk
+            for fk in fks
             if fk.get("referred_table") == "twin_states"
+            and tuple(fk.get("constrained_columns") or ())
+            == ("twin_state_id",)
         ]
-        assert not matches, (
-            "training_plans must NOT have a FK to twin_states in "
-            "Phase-1.2b (the target table does not exist yet). "
-            f"Got: {matches}"
+        assert matches, (
+            "Phase-1.2c must wire training_plans.twin_state_id -> "
+            "twin_states.id as a foreign key. "
+            f"Got: {[fk.get('referred_table') for fk in fks]}"
         )
 
-    async def test_random_uuid_in_twin_state_id_persists_no_fk_violation(
+    def test_twin_state_fk_ondelete_in_pg_catalog(self) -> None:
+        """The FK ON DELETE behaviour is encoded as
+        ``pg_constraint.confdeltype``. Pin the value so a Phase-1.2c
+        migration that wires the FK with an unexpected cascade
+        mode (e.g. RESTRICT) fails this tripwire."""
+        from sqlalchemy import text
+
+        engine = create_engine(_sync_url())
+        try:
+            with engine.connect() as conn:
+                row = conn.execute(
+                    text(
+                        """
+                        SELECT c.confdeltype,
+                               pg_get_constraintdef(c.oid) AS constraint_def
+                        FROM pg_constraint c
+                        JOIN pg_class conrelid_table
+                          ON conrelid_table.oid = c.conrelid
+                        JOIN pg_class confrelid_table
+                          ON confrelid_table.oid = c.confrelid
+                        WHERE c.contype = 'f'
+                          AND confrelid_table.relname = 'twin_states'
+                          AND conrelid_table.relname = :table_name
+                        """
+                    ),
+                    {"table_name": TABLE},
+                ).fetchone()
+        finally:
+            engine.dispose()
+        assert row is not None, (
+            "training_plans.twin_state_id -> twin_states.id FK must "
+            "exist on the migrated schema."
+        )
+        # PostgreSQL pg_constraint.confdeltype codes:
+        # 'a' = NO ACTION (default).
+        # 'r' = RESTRICT.
+        # 'c' = CASCADE.
+        # 'n' = SET NULL.
+        # 'd' = SET DEFAULT.
+        # The architecture pins SET NULL so deleting a TwinState
+        # preserves the TrainingPlan row with twin_state_id NULL.
+        assert row[0] == "n", (
+            f"training_plans.twin_state_id FK ON DELETE must be SET "
+            f"NULL so deleting a TwinState preserves the TrainingPlan "
+            f"row. Got confdeltype={row[0]!r}, "
+            f"constraint_def={row[1]!r}"
+        )
+
+    async def test_null_twin_state_id_persists(
         self, db_session: AsyncSession
     ) -> None:
-        """A random UUID for ``twin_state_id`` must persist cleanly —
-        any FK to a non-existent table would raise IntegrityError."""
-        athlete = await _new_athlete(db_session, "twin-state-deferred@example.com")
+        """NULL twin_state_id is permitted (twin_states may not yet
+        exist for the goal)."""
+        athlete = await _new_athlete(
+            db_session, "twin-state-nullable@example.com"
+        )
         goal = await _new_goal(db_session, athlete.id)
         plan = _plan_factory(
             training_goal_id=goal.id,
-            twin_state_id=uuid.uuid4(),  # random — no twin_states row
+            twin_state_id=None,
         )
         db_session.add(plan)
         await db_session.flush()
         await db_session.refresh(plan)
-        assert plan.twin_state_id is not None
+        assert plan.twin_state_id is None
+
+    async def test_random_uuid_in_twin_state_id_rejected(
+        self, db_session: AsyncSession
+    ) -> None:
+        """Phase-1.2c wires the FK — a random UUID with no
+        twin_states row must raise IntegrityError."""
+        athlete = await _new_athlete(
+            db_session, "twin-state-deferred@example.com"
+        )
+        goal = await _new_goal(db_session, athlete.id)
+        plan = _plan_factory(
+            training_goal_id=goal.id,
+            twin_state_id=uuid.uuid4(),  # no twin_states row exists
+        )
+        db_session.add(plan)
+        with pytest.raises(IntegrityError):
+            await db_session.flush()
+        await db_session.rollback()
 
 
 # ---------------------------------------------------------------------------

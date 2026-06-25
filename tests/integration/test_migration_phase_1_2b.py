@@ -2,7 +2,10 @@
 
 The Phase-1.2b plan requires:
 
-* ``alembic upgrade head`` succeeds on a fresh database with no errors.
+* ``alembic upgrade`` to the Phase-1.2b revision succeeds on a
+  fresh database with no errors (pinned to the Phase-1.2b
+  revision — NOT the current repo head — so later sub-phases
+  cannot bleed into these assertions).
 * The schema carries every Phase-1.2b table (``training_goals``,
   ``secondary_events``, ``training_plans``, ``regeneration_tasks``,
   ``weekly_plans``, ``planned_sessions``, ``weekly_sessions``,
@@ -404,13 +407,24 @@ def _test_async_dsn() -> Optional[str]:
 
 @pytest.fixture
 def phase_1_2b_schema():
-    """Set up an isolated Postgres schema, ``alembic upgrade head``
-    to Phase-1.2b, then yield a dict with the schema name and a
-    sync URL pointed at the schema. Tears the schema down on exit."""
+    """Set up an isolated Postgres schema, ``alembic upgrade`` to the
+    Phase-1.2b head (pinned — NOT the current repo head), then yield
+    a dict with the schema name and a sync URL pointed at the schema.
+    Tears the schema down on exit.
+
+    Pinning to the Phase-1.2b revision is required for test isolation:
+    later sub-phases (Phase-1.2c adds ``twin_states`` and wires the
+    ``training_plans.twin_state_id`` FK; future sub-phases may add
+    more) must NOT bleed into Phase-1.2b assertions. The downgrade
+    test pins to the same revision before running ``downgrade -1``
+    so the round-trip lands on the Phase-1.2a baseline.
+    """
     async_dsn = _test_async_dsn()
     if not async_dsn:
         pytest.skip("DATABASE_URL not configured in test env.")
     if PHASE_1_2B_MIGRATION is None:
+        pytest.skip(PHASE_1_2B_MIGRATION_REQUIRED)
+    if PHASE_1_2B_REVISION is None:
         pytest.skip(PHASE_1_2B_MIGRATION_REQUIRED)
     base = _psql_dsn(async_dsn)
     schema = f"phase_1_2b_test_{uuid.uuid4().hex[:8]}"
@@ -418,11 +432,12 @@ def phase_1_2b_schema():
     schema_url = f"{base}?options=-c%20search_path%3D{schema}"
     try:
         rc, stdout, stderr = _run_alembic_subprocess(
-            schema_url, ("upgrade", "head"),
+            schema_url, ("upgrade", PHASE_1_2B_REVISION),
         )
         if rc != 0:
             raise RuntimeError(
-                f"alembic upgrade head failed (rc={rc}).\n"
+                f"alembic upgrade {PHASE_1_2B_REVISION} failed "
+                f"(rc={rc}).\n"
                 f"STDOUT:\n{stdout}\nSTDERR:\n{stderr}"
             )
         yield {
@@ -436,14 +451,16 @@ def phase_1_2b_schema():
 
 class TestPhase12bMigrationUpgrades:
     """End-to-end migration tests. Each builds an isolated schema,
-    runs ``alembic upgrade head`` to Phase-1.2b, then asserts the
-    resulting tables, columns, and invariants."""
+    runs ``alembic upgrade`` pinned to the Phase-1.2b revision
+    (NOT the current repo head — isolation requirement), then
+    asserts the resulting tables, columns, and invariants."""
 
-    def test_alembic_upgrade_head_succeeds_on_fresh_schema(
+    def test_alembic_upgrade_to_phase_1_2b_revision_succeeds_on_fresh_schema(
         self, phase_1_2b_schema
     ) -> None:
-        """Reaches this point only if alembic upgrade returned
-        without exception — the fixture raises otherwise."""
+        """Reaches this point only if ``alembic upgrade
+        PHASE_1_2B_REVISION`` returned without exception — the
+        fixture raises otherwise."""
 
     @pytest.mark.parametrize(
         "preserved_table",
@@ -664,7 +681,14 @@ class TestPhase12bMigrationUpgrades:
         self, phase_1_2b_schema
     ) -> None:
         """``training_plans.twin_state_id`` is a nullable UUID column
-        with NO FK (awaiting Phase-1.2c)."""
+        with NO FK (awaiting Phase-1.2c).
+
+        The FK count query is scoped to ``phase_1_2b_schema['schema']``
+        via a ``pg_namespace`` join — without that filter the query
+        would pick up the Phase-1.2c FK ``fk_training_plans_twin_state``
+        from the ``public`` schema (where Phase-1.2c correctly
+        applied it) and report a phantom 1 FK inside the isolated
+        Phase-1.2b schema."""
         engine = create_engine(phase_1_2b_schema["sync_url"])
         try:
             with engine.connect() as conn:
@@ -676,13 +700,16 @@ class TestPhase12bMigrationUpgrades:
                             FROM pg_attribute a
                             JOIN pg_class c ON c.oid = a.attrelid
                             JOIN pg_type t ON t.oid = a.atttypid
-                            WHERE c.relname = 'training_plans'
+                            JOIN pg_namespace n ON n.oid = c.relnamespace
+                            WHERE n.nspname = :schema
+                              AND c.relname = 'training_plans'
                               AND a.attname = 'twin_state_id'
                               AND a.attnum > 0
                               AND NOT a.attisdropped
                             """
                         ).strip()
-                    )
+                    ),
+                    {"schema": phase_1_2b_schema["schema"]},
                 ).fetchone()
         finally:
             engine.dispose()
@@ -705,7 +732,9 @@ class TestPhase12bMigrationUpgrades:
                             SELECT COUNT(*)
                             FROM pg_constraint c
                             JOIN pg_class conrelid_table ON conrelid_table.oid = c.conrelid
+                            JOIN pg_namespace n ON n.oid = conrelid_table.relnamespace
                             WHERE c.contype = 'f'
+                              AND n.nspname = :schema
                               AND conrelid_table.relname = 'training_plans'
                               AND EXISTS (
                                   SELECT 1 FROM unnest(c.conkey) AS k
@@ -715,14 +744,16 @@ class TestPhase12bMigrationUpgrades:
                               )
                             """
                         ).strip()
-                    )
+                    ),
+                    {"schema": phase_1_2b_schema["schema"]},
                 ).scalar_one()
         finally:
             engine.dispose()
         assert fk_count == 0, (
             "training_plans.twin_state_id must NOT carry a FK yet — "
             "twin_states does not exist in Phase-1.2b. "
-            f"Got {fk_count} FK rows."
+            f"Got {fk_count} FK rows in schema "
+            f"`{phase_1_2b_schema['schema']}`."
         )
 
     def test_phase_1_2b_tables_have_cascade_fks(
@@ -801,11 +832,17 @@ class TestPhase12bMigrationDowngrade:
         schema_url = f"{base}?options=-c%20search_path%3D{schema}"
         _create_isolated_schema(base, schema)
         try:
+            # Upgrade only to the Phase-1.2b revision (not head) so
+            # the test pins the Phase-1.2b → Phase-1.2a downgrade
+            # contract without depending on later sub-phases
+            # (Phase-1.2c adds 7 more tables that, with head, would
+            # require multiple downgrade steps to reach Phase-1.2a).
             rc_up, out_up, err_up = _run_alembic_subprocess(
-                schema_url, ("upgrade", "head"),
+                schema_url, ("upgrade", PHASE_1_2B_REVISION),
             )
             assert rc_up == 0, (
-                f"alembic upgrade head failed (rc={rc_up}). "
+                f"alembic upgrade {PHASE_1_2B_REVISION} failed "
+                f"(rc={rc_up}). "
                 f"STDOUT:\n{out_up}\nSTDERR:\n{err_up}"
             )
 
@@ -1126,3 +1163,7 @@ PHASE_1_2B_DELIVERED_REVISION = (
     if PHASE_1_2B_MIGRATION is not None
     else None
 )
+# Canonical name used by fixtures and the downgrade test to pin
+# ``alembic upgrade`` to the Phase-1.2b head (not the current repo
+# head — Phase-1.2b tests must not depend on later sub-phases).
+PHASE_1_2B_REVISION = PHASE_1_2B_DELIVERED_REVISION

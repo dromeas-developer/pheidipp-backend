@@ -1,9 +1,9 @@
-date: 2026-06-23T04:00:00+00:00
-plan: phase-1-2b
+date: 2026-06-24T23:45:00+00:00
+plan: phase-1-2c-p1-twin-fitness-coaching-workouts
 execution_group: feature
-total: 880
-passed: 880
+total: 1127
+passed: 1127
 failed: 0
 skipped: 0
-duration_seconds: 127
+duration_seconds: 157.10
 failures: []

@@ -29,6 +29,7 @@ from __future__ import annotations
 import logging
 import os
 import uuid
+import warnings
 from contextlib import asynccontextmanager, contextmanager
 from datetime import datetime
 from typing import AsyncIterator, Iterator, Optional, Sequence
@@ -37,6 +38,7 @@ from unittest.mock import patch
 import pytest
 from fastapi import Depends, FastAPI
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy.exc import SAWarning
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -48,6 +50,27 @@ os.environ.setdefault("JWT_SECRET_KEY", "test-secret-do-not-use-in-prod")
 os.environ.setdefault(
     "DATABASE_URL",
     "postgresql+asyncpg://postgres:postgres@db:5432/test_pheidipp",
+)
+
+
+# ---------------------------------------------------------------------------
+# Suppress benign SQLAlchemy cycle warning.
+# ---------------------------------------------------------------------------
+# The Phase-1.2c schema introduces a deliberate FK cycle between
+# twin_states → activities → planned_sessions → weekly_plans →
+# training_plans → twin_states. SQLAlchemy's ``metadata.sorted_tables``
+# emits ``SAWarning: Cannot correctly sort tables; there are
+# unresolvable cycles between tables`` whenever the conftest
+# teardown enumerates tables for ``TRUNCATE ... CASCADE``. PostgreSQL's
+# ``CASCADE`` handles the cycle natively (one statement truncates the
+# whole SCC), so the warning is informational only. Suppressing it
+# keeps the test output signal-to-noise high without papering over any
+# real schema problem — a different SAWarning surfacing from the same
+# code path would still be visible.
+warnings.filterwarnings(
+    "ignore",
+    message=r"Cannot correctly sort tables.*",
+    category=SAWarning,
 )
 
 from app.api.deps import require_self  # noqa: E402

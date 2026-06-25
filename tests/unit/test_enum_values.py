@@ -1,10 +1,11 @@
-"""Unit tests for the Phase-1.1, Phase-1.2a, and Phase-1.2b enum contracts.
+"""Unit tests for the Phase-1.1, Phase-1.2a, Phase-1.2b, and
+Phase-1.2c enum contracts.
 
 These are pure-Python tests that lock down the closed ontologies used
 across the schema. The values are public contract: changing them is a
 breaking change for downstream services (data-tier inference, plan
 generation, weekly synthesis, workout generation, deduplication,
-INGEST pipelines).
+INGEST pipelines, twin recalibration, coaching output, audit log).
 
 Anything outside these tests asserting "the values are what we typed"
 duplicates this contract; this module is the single source of truth
@@ -15,6 +16,7 @@ Plan reference:
 * Phase-1.1: docs/implementation/phase-1/phase-1-1-p1-email-password-auth.md
 * Phase-1.2a: docs/implementation/phase-1/phase-1-2a-p1-profile-preferences-activity.md
 * Phase-1.2b: docs/implementation/phase-1/phase-1-2b-p1-plan-sessions.md
+* Phase-1.2c: docs/implementation/phase-1/phase-1-2c-p1-twin-fitness-coaching-workouts.md
 
 Architecture:
 
@@ -29,6 +31,13 @@ Architecture:
 * docs/architecture/01-entities/planned-session.md (SessionSlot, SessionPriority, PlannedSessionStatus)
 * docs/architecture/01-entities/checkpoint.md (CheckpointType, CheckpointStatus, PhaseLabel)
 * docs/architecture/00-foundations/objectives.md (ObjectiveCategory)
+* docs/architecture/01-entities/twin-state.md (TwinTrigger, TwinConfidenceLevel)
+* docs/architecture/00-foundations/confidence-model.md (TwinConfidenceLevel)
+* docs/architecture/01-entities/coaching-message.md (MessageType)
+* docs/architecture/01-entities/workout-step.md (StepType)
+* docs/architecture/01-entities/athlete-fitness.md (RecoveryModifierLevel, WellnessTrend)
+* docs/architecture/01-entities/athlete-physiology.md (MeasurementSource)
+* docs/architecture/01-entities/generated-workout.md (SignalType)
 """
 
 from __future__ import annotations
@@ -45,21 +54,31 @@ from app.models.enums import (
     GpsSource,
     HrSource,
     InjurySeverity,
+    MeasurementSource,
+    MessageType,
     ObjectiveCategory,
     PhaseLabel,
+    PhysiologicalIntent,
     PlannedSessionStatus,
     PowerSource,
     PrimaryTrainingPlatform,
+    RecoveryModifierLevel,
     SecondaryEventPriority,
     SessionPriority,
+    SessionPurpose,
     SessionSlot,
     SessionType,
     Sex,
+    SignalType,
     SportBackground,
+    StepType,
     TrainingGoalStatus,
     TrainingPlanStatus,
     TrainingTimeOfDay,
+    TwinConfidenceLevel,
+    TwinTrigger,
     WeeklyPlanStatus,
+    WellnessTrend,
 )
 
 
@@ -260,6 +279,17 @@ class TestEnumReExports:
             "CheckpointType",
             "CheckpointStatus",
             "ObjectiveCategory",
+            # Phase-1.2c enums — twin / fitness / coaching / workouts.
+            "TwinTrigger",
+            "TwinConfidenceLevel",
+            "MessageType",
+            "StepType",
+            "RecoveryModifierLevel",
+            "WellnessTrend",
+            "PhysiologicalIntent",
+            "MeasurementSource",
+            "SignalType",
+            "SessionPurpose",
         ],
     )
     def test_enum_is_exported_from_models_package(
@@ -284,16 +314,26 @@ class TestEnumReExports:
             GoalEventType,
             GoalType,
             InjurySeverity,
+            MeasurementSource,
+            MessageType,
             ObjectiveCategory,
             PhaseLabel,
+            PhysiologicalIntent,
             PlannedSessionStatus,
+            RecoveryModifierLevel,
             SecondaryEventPriority,
             SessionPriority,
+            SessionPurpose,
             SessionSlot,
             SessionType,
+            SignalType,
+            StepType,
             TrainingGoalStatus,
             TrainingPlanStatus,
+            TwinConfidenceLevel,
+            TwinTrigger,
             WeeklyPlanStatus,
+            WellnessTrend,
         )
 
         enum_map = {
@@ -302,16 +342,26 @@ class TestEnumReExports:
             "GoalEventType": GoalEventType,
             "GoalType": GoalType,
             "InjurySeverity": InjurySeverity,
+            "MeasurementSource": MeasurementSource,
+            "MessageType": MessageType,
             "ObjectiveCategory": ObjectiveCategory,
             "PhaseLabel": PhaseLabel,
+            "PhysiologicalIntent": PhysiologicalIntent,
             "PlannedSessionStatus": PlannedSessionStatus,
+            "RecoveryModifierLevel": RecoveryModifierLevel,
             "SecondaryEventPriority": SecondaryEventPriority,
             "SessionPriority": SessionPriority,
+            "SessionPurpose": SessionPurpose,
             "SessionSlot": SessionSlot,
             "SessionType": SessionType,
+            "SignalType": SignalType,
+            "StepType": StepType,
             "TrainingGoalStatus": TrainingGoalStatus,
             "TrainingPlanStatus": TrainingPlanStatus,
+            "TwinConfidenceLevel": TwinConfidenceLevel,
+            "TwinTrigger": TwinTrigger,
             "WeeklyPlanStatus": WeeklyPlanStatus,
+            "WellnessTrend": WellnessTrend,
             "ActivitySource": ActivitySource,
             "DataTier": DataTier,
             "GpsSource": GpsSource,
@@ -626,3 +676,297 @@ class TestObjectiveCategoryContract:
             "intensity_compliance",
             "recovery_efficiency",
         }
+
+
+# ---------------------------------------------------------------------------
+# Phase-1.2c — Twin / Fitness / Coaching / Workout enum contracts.
+#
+# These values are part of the public architecture. Changing them is a
+# breaking change for twin recalibration, confidence upgrades,
+# coaching message routing, workout generation, wellness modifier
+# decisions, and the LLM audit log (Phase 1.3, 1.5, 1.5b, 1.6).
+#
+# The tests below pin the exact closed ontology declared in
+# docs/architecture/01-entities/{twin-state, athlete-physiology,
+# athlete-fitness, coaching-message, generation-event,
+# generated-workout, workout-step}.md and
+# docs/architecture/00-foundations/{terminology, confidence-model}.md.
+# ---------------------------------------------------------------------------
+
+
+class TestTwinTriggerContract:
+    """``TwinTrigger`` captures what caused a TwinState snapshot to be
+    appended. Closed ontology: 5 values, no aliases."""
+
+    def test_twin_trigger_has_exactly_five_values(self) -> None:
+        assert {member.value for member in TwinTrigger} == {
+            "questionnaire",
+            "activity_sync",
+            "calibration",
+            "physiology_input",
+            "wellness_update",
+        }
+
+    def test_twin_trigger_values_are_lowercase_strings(self) -> None:
+        for member in TwinTrigger:
+            assert isinstance(member.value, str)
+            assert member.value == member.value.lower(), (
+                f"TwinTrigger.{member.name} value {member.value!r} "
+                "must be lowercase."
+            )
+
+    def test_twin_trigger_includes_activity_sync(self) -> None:
+        """``activity_sync`` is the most frequent trigger — appended
+        after every Activity ingestion."""
+        assert TwinTrigger.ACTIVITY_SYNC.value == "activity_sync"
+
+
+class TestTwinConfidenceLevelContract:
+    """``TwinConfidenceLevel`` is a coarse three-level confidence
+    marker for the twin as a whole. The per-metric breakdown lives
+    on ``TwinState.metric_confidence`` JSONB."""
+
+    def test_twin_confidence_level_has_exactly_three_values(self) -> None:
+        assert {member.value for member in TwinConfidenceLevel} == {
+            "low",
+            "medium",
+            "high",
+        }
+
+    def test_twin_confidence_level_values_are_lowercase(self) -> None:
+        for member in TwinConfidenceLevel:
+            assert isinstance(member.value, str)
+            assert member.value == member.value.lower()
+
+    def test_twin_confidence_level_count(self) -> None:
+        """Anti-goal: no 'very_high' or 'experimental' level sneaks in."""
+        assert len(list(TwinConfidenceLevel)) == 3
+
+
+class TestMessageTypeContract:
+    """``MessageType`` is the closed ontology of coach-to-athlete
+    message categories — 8 values covering first_message,
+    post_workout, wellness_alert, phase_transition,
+    plan_regeneration, confidence_upgrade, cycle_check_in,
+    weekly_summary."""
+
+    def test_message_type_has_exactly_eight_values(self) -> None:
+        assert {member.value for member in MessageType} == {
+            "first_message",
+            "post_workout",
+            "wellness_alert",
+            "phase_transition",
+            "plan_regeneration",
+            "confidence_upgrade",
+            "cycle_check_in",
+            "weekly_summary",
+        }
+
+    def test_message_type_values_are_lowercase_strings(self) -> None:
+        for member in MessageType:
+            assert isinstance(member.value, str)
+            assert member.value == member.value.lower(), (
+                f"MessageType.{member.name} value {member.value!r} "
+                "must be lowercase."
+            )
+
+    def test_message_type_first_message_value(self) -> None:
+        """``first_message`` triggers the partial unique index
+        ``uq_coaching_messages_athlete_first_message`` — only one
+        first_message per athlete."""
+        assert MessageType.FIRST_MESSAGE.value == "first_message"
+
+    def test_message_type_post_workout_value(self) -> None:
+        """``post_workout`` triggers the partial unique index
+        ``uq_coaching_messages_activity_post_workout`` — only one
+        post_workout per activity."""
+        assert MessageType.POST_WORKOUT.value == "post_workout"
+
+    def test_message_type_count(self) -> None:
+        """Anti-goal: 8 values exactly, no aliases like 'intro' or
+        'welcome' sneak in for first_message."""
+        assert len(list(MessageType)) == 8
+
+
+class TestStepTypeContract:
+    """``StepType`` is the segment category inside a workout — 4
+    values: warmup, work, recovery, cooldown."""
+
+    def test_step_type_has_exactly_four_values(self) -> None:
+        assert {member.value for member in StepType} == {
+            "warmup",
+            "work",
+            "recovery",
+            "cooldown",
+        }
+
+    def test_step_type_values_are_lowercase_strings(self) -> None:
+        for member in StepType:
+            assert isinstance(member.value, str)
+            assert member.value == member.value.lower()
+
+    def test_step_type_count(self) -> None:
+        """Anti-goal: no 'rest' or 'interval' StepType — rest belongs
+        as a SessionType on PlannedSession, not a step within a
+        workout."""
+        assert len(list(StepType)) == 4
+
+
+class TestRecoveryModifierLevelContract:
+    """``RecoveryModifierLevel`` is the GREEN / AMBER / RED readiness
+    signal produced by WellnessModifierService. Drives the
+    at-a-glance modifier chip in the daily view."""
+
+    def test_recovery_modifier_level_has_exactly_three_values(self) -> None:
+        assert {member.value for member in RecoveryModifierLevel} == {
+            "green",
+            "amber",
+            "red",
+        }
+
+    def test_recovery_modifier_level_values_are_lowercase(self) -> None:
+        for member in RecoveryModifierLevel:
+            assert isinstance(member.value, str)
+            assert member.value == member.value.lower()
+
+    def test_recovery_modifier_level_count(self) -> None:
+        """Anti-goal: no 'yellow' or 'orange' aliases sneak in —
+        the vision doc mandates GREEN / AMBER / RED verbatim."""
+        assert len(list(RecoveryModifierLevel)) == 3
+
+
+class TestWellnessTrendContract:
+    """``WellnessTrend`` is the 7-day composite wellness trend
+    direction at snapshot time. Three values: improving, stable,
+    declining."""
+
+    def test_wellness_trend_has_exactly_three_values(self) -> None:
+        assert {member.value for member in WellnessTrend} == {
+            "improving",
+            "stable",
+            "declining",
+        }
+
+    def test_wellness_trend_values_are_lowercase(self) -> None:
+        for member in WellnessTrend:
+            assert isinstance(member.value, str)
+            assert member.value == member.value.lower()
+
+    def test_wellness_trend_count(self) -> None:
+        """Anti-goal: no 'flat' or 'volatile' aliases sneak in."""
+        assert len(list(WellnessTrend)) == 3
+
+
+class TestPhysiologicalIntentContract:
+    """``PhysiologicalIntent`` is the primary coaching abstraction —
+    6 values: low_aerobic, high_aerobic, threshold, vo2max,
+    neuromuscular, recovery. Many:1 mapping from SessionType."""
+
+    def test_physiological_intent_has_exactly_six_values(self) -> None:
+        assert {member.value for member in PhysiologicalIntent} == {
+            "low_aerobic",
+            "high_aerobic",
+            "threshold",
+            "vo2max",
+            "neuromuscular",
+            "recovery",
+        }
+
+    def test_physiological_intent_values_are_lowercase(self) -> None:
+        for member in PhysiologicalIntent:
+            assert isinstance(member.value, str)
+            assert member.value == member.value.lower()
+
+    def test_physiological_intent_count(self) -> None:
+        """Anti-goal: no 'race_pace' or 'speed' intent — the closed
+        ontology is six values exactly."""
+        assert len(list(PhysiologicalIntent)) == 6
+
+
+class TestMeasurementSourceContract:
+    """``MeasurementSource`` captures provenance of a physiological
+    observation / measurement. Six values covering questionnaire
+    estimates, training-time HR/RR/power-hr signals, field tests,
+    and lab tests."""
+
+    def test_measurement_source_has_exactly_six_values(self) -> None:
+        assert {member.value for member in MeasurementSource} == {
+            "questionnaire_estimate",
+            "training_hr_deflection",
+            "training_rr_inflection",
+            "training_power_hr_ratio",
+            "field_test",
+            "lab_test",
+        }
+
+    def test_measurement_source_values_are_lowercase(self) -> None:
+        for member in MeasurementSource:
+            assert isinstance(member.value, str)
+            assert member.value == member.value.lower()
+
+    def test_measurement_source_count(self) -> None:
+        assert len(list(MeasurementSource)) == 6
+
+
+class TestSignalTypeContract:
+    """``SignalType`` is the signal channel a ``WorkoutTarget`` can
+    carry targets in. Four values: power, gap, hr, description.
+    ``description`` is the non-numeric plain-language target variant
+    for Tier 6 / no-signal sessions."""
+
+    def test_signal_type_has_exactly_four_values(self) -> None:
+        assert {member.value for member in SignalType} == {
+            "power",
+            "gap",
+            "hr",
+            "description",
+        }
+
+    def test_signal_type_values_are_lowercase(self) -> None:
+        for member in SignalType:
+            assert isinstance(member.value, str)
+            assert member.value == member.value.lower()
+
+    def test_signal_type_count(self) -> None:
+        """Anti-goal: no 'cadence' or 'elevation' as a SignalType —
+        those are not target-bearing channels."""
+        assert len(list(SignalType)) == 4
+
+
+class TestSessionPurposeContract:
+    """``SessionPurpose`` annotates WHY a session is being run —
+    distinct from ``PhysiologicalIntent`` / ``SessionType``.
+    Three values: general, race_specific, calibration.
+
+    Note: ``race_specific`` is a SessionPurpose, NOT a SessionType.
+    """
+
+    def test_session_purpose_has_exactly_three_values(self) -> None:
+        assert {member.value for member in SessionPurpose} == {
+            "general",
+            "race_specific",
+            "calibration",
+        }
+
+    def test_session_purpose_values_are_lowercase(self) -> None:
+        for member in SessionPurpose:
+            assert isinstance(member.value, str)
+            assert member.value == member.value.lower()
+
+    def test_session_purpose_general_default_value(self) -> None:
+        """``general`` is the server_default on
+        WorkoutStep.session_purpose."""
+        assert SessionPurpose.GENERAL.value == "general"
+
+    def test_race_specific_is_session_purpose_not_session_type(self) -> None:
+        """Architecture invariant: ``race_specific`` lives on
+        SessionPurpose, not SessionType. Pin both enums here so the
+        separation is enforced."""
+        assert SessionPurpose.RACE_SPECIFIC.value == "race_specific"
+        # ``race_specific`` must NOT appear on SessionType — it lives
+        # only on SessionPurpose. Anti-goal tripwire.
+        session_type_values = {m.value for m in SessionType}
+        assert "race_specific" not in session_type_values, (
+            "Architecture invariant broken: SessionType must NOT "
+            "carry 'race_specific' — it lives on SessionPurpose only."
+        )

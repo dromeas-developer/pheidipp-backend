@@ -1,18 +1,9 @@
 """TrainingPlan — generated periodised training structure for a goal.
 
-Implements the Phase-1.2b schema contract from
-docs/architecture/01-entities/training-plan.md.
-
-Schema-only foundation: there is no plan generation, supersession, or
-service-layer schedule logic in this plan. The model persists the
-adapter-strategy structure (``phase_definitions``, ``weekly_distributions``,
-``checkpoint_schedule``) so Phase-1.2b's migration can land the
-shape without coupling to the generation pipeline.
-
-Phase-1.2b deliverable deliberately defers the ``twin_state_id`` FK
-to Phase-1.2c (when ``TwinState`` exists). The column is present in
-this model — it is a nullable ``UUID`` — and the migration creates
-the column without a foreign key. Phase-1.2c wires the FK.
+Implements the Phase-1.2b/1.2c schema contract from
+docs/architecture/01-entities/training-plan.md and wires the
+deferred ``twin_state_id`` foreign key now that ``twin_states``
+exists.
 """
 
 from __future__ import annotations
@@ -52,9 +43,7 @@ class TrainingPlan(Base):
       ``fitness_improvement`` / ``maintenance`` / ``recovery`` modes.
       Stored as JSONB.
 
-    ``twin_state_id`` is present now (so the schema records which
-    twin version generated the plan) but its FK is DELAYED to
-    Phase-1.2c when ``twin_states`` exists.
+    ``twin_state_id`` records which twin version produced this plan.
     """
 
     __tablename__ = "training_plans"
@@ -69,11 +58,15 @@ class TrainingPlan(Base):
         ForeignKey("training_goals.id", ondelete="CASCADE"),
         nullable=False,
     )
-    # Nullable UUID column only. The FK to ``twin_states`` is added by
-    # Phase-1.2c when that table exists. Adding it here would couple
-    # this plan to a future sub-phase and break the head.
+    # Nullable UUID column pointing at the twin version that produced
+    # this plan. ``ondelete=SET NULL`` matches the column's nullability
+    # — orphaning a twin state must not cascade-delete the plan. The
+    # explicit name matches the contract asserted by the Phase-1.2c
+    # test pack (``fk_training_plans_twin_state``).
     twin_state_id: Mapped[uuid.UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True), nullable=True
+        PG_UUID(as_uuid=True),
+        ForeignKey("twin_states.id", ondelete="SET NULL", name="fk_training_plans_twin_state"),
+        nullable=True,
     )
 
     # ------------------------------------------------------------------
@@ -135,7 +128,6 @@ class TrainingPlan(Base):
             "training_goal_id",
             "status",
         ),
-        # Reverse-lookup TwinState → plans using the (deferred) FK
-        # target. Indexed even though the FK is added in Phase-1.2c.
+        # Reverse-lookup TwinState → plans via the FK target.
         Index("ix_training_plans_twin_state", "twin_state_id"),
     )

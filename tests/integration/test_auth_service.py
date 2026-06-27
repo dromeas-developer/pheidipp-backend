@@ -123,6 +123,7 @@ class TestRegisterCreatesAllArtifacts:
         assert len(profiles) == 1
         profile = profiles[0]
         assert profile.sex == Sex.NOT_SPECIFIED
+        assert profile.height_cm is not None
         assert float(profile.height_cm) == 180.0
 
     async def test_register_creates_first_refresh_token(

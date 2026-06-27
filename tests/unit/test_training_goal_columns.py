@@ -14,11 +14,9 @@ from __future__ import annotations
 
 import pytest
 from sqlalchemy import (
-    CheckConstraint,
     Date,
     DateTime,
     Float,
-    Index,
     Integer,
     String,
     Text,
@@ -33,18 +31,13 @@ from app.models.enums import (
     TrainingGoalStatus,
 )
 from app.models.training_goal import TrainingGoal
-
-
-def _columns() -> dict[str, object]:
-    return {column.key: column for column in TrainingGoal.__table__.columns}
-
-
-def _indexes() -> dict[str, Index]:
-    return {idx.name: idx for idx in TrainingGoal.__table__.indexes}
-
-
-def _check_constraints() -> list[CheckConstraint]:
-    return [c for c in TrainingGoal.__table__.constraints if isinstance(c, CheckConstraint)]
+from tests.utils.model_helpers import (
+    get_columns,
+    get_indexes,
+    get_check_constraints,
+    get_check_text,
+    get_enum_values,
+)
 
 
 class TestTrainingGoalRequiredColumns:
@@ -52,23 +45,21 @@ class TestTrainingGoalRequiredColumns:
     on the declarative mapper."""
 
     def test_id_column_uuid_primary_key(self) -> None:
-        cols = _columns()
+        cols = get_columns(TrainingGoal)
         assert "id" in cols
         assert cols["id"].primary_key is True
         assert isinstance(cols["id"].type, PG_UUID)
 
     def test_athlete_id_is_required_uuid(self) -> None:
-        col = _columns()["athlete_id"]
+        col = get_columns(TrainingGoal)["athlete_id"]
         assert col.nullable is False
         assert isinstance(col.type, PG_UUID)
 
     def test_goal_type_is_enum_backed_required(self) -> None:
-        col = _columns()["goal_type"]
+        col = get_columns(TrainingGoal)["goal_type"]
         assert col.nullable is False
         assert isinstance(col.type, SAEnum)
-        values_callable = col.type.values_callable
-        assert values_callable is not None
-        actual = sorted(values_callable(GoalType))
+        actual = sorted(get_enum_values(col, GoalType))
         expected = sorted(
             [
                 "race_event",
@@ -81,12 +72,10 @@ class TestTrainingGoalRequiredColumns:
         assert actual == expected
 
     def test_goal_event_type_nullable_enum(self) -> None:
-        col = _columns()["goal_event_type"]
+        col = get_columns(TrainingGoal)["goal_event_type"]
         assert col.nullable is True
         assert isinstance(col.type, SAEnum)
-        values_callable = col.type.values_callable
-        assert values_callable is not None
-        actual = sorted(values_callable(GoalEventType))
+        actual = sorted(get_enum_values(col, GoalEventType))
         expected = sorted(
             [
                 "marathon",
@@ -101,81 +90,77 @@ class TestTrainingGoalRequiredColumns:
         assert actual == expected
 
     def test_goal_event_name_nullable_string(self) -> None:
-        col = _columns()["goal_event_name"]
+        col = get_columns(TrainingGoal)["goal_event_name"]
         assert col.nullable is True
         assert isinstance(col.type, String)
         assert col.type.length == 255
 
     def test_goal_event_date_nullable_date(self) -> None:
-        col = _columns()["goal_event_date"]
+        col = get_columns(TrainingGoal)["goal_event_date"]
         assert col.nullable is True
         assert isinstance(col.type, Date)
 
     def test_custom_distance_km_nullable_float(self) -> None:
-        col = _columns()["custom_distance_km"]
+        col = get_columns(TrainingGoal)["custom_distance_km"]
         assert col.nullable is True
         assert isinstance(col.type, Float)
 
     def test_goal_description_nullable_text(self) -> None:
-        col = _columns()["goal_description"]
+        col = get_columns(TrainingGoal)["goal_description"]
         assert col.nullable is True
         assert isinstance(col.type, Text)
 
     def test_weekly_volume_hours_required_float(self) -> None:
-        col = _columns()["weekly_volume_hours"]
+        col = get_columns(TrainingGoal)["weekly_volume_hours"]
         assert col.nullable is False
         assert isinstance(col.type, Float)
 
     def test_weekly_volume_km_required_float(self) -> None:
-        col = _columns()["weekly_volume_km"]
+        col = get_columns(TrainingGoal)["weekly_volume_km"]
         assert col.nullable is False
         assert isinstance(col.type, Float)
 
     def test_fitness_level_required_integer(self) -> None:
-        col = _columns()["fitness_level"]
+        col = get_columns(TrainingGoal)["fitness_level"]
         assert col.nullable is False
         assert isinstance(col.type, Integer)
 
     def test_recent_injury_nullable_text(self) -> None:
-        col = _columns()["recent_injury"]
+        col = get_columns(TrainingGoal)["recent_injury"]
         assert col.nullable is True
         assert isinstance(col.type, Text)
 
     def test_injury_severity_nullable_enum(self) -> None:
-        col = _columns()["injury_severity"]
+        col = get_columns(TrainingGoal)["injury_severity"]
         assert col.nullable is True
         assert isinstance(col.type, SAEnum)
-        values_callable = col.type.values_callable
-        assert values_callable is not None
-        actual = sorted(values_callable(InjurySeverity))
+        actual = sorted(get_enum_values(col, InjurySeverity))
         assert actual == ["major", "minor", "moderate"]
 
     def test_target_distance_km_nullable_float(self) -> None:
-        col = _columns()["target_distance_km"]
+        col = get_columns(TrainingGoal)["target_distance_km"]
         assert col.nullable is True
         assert isinstance(col.type, Float)
 
     def test_target_time_minutes_nullable_integer(self) -> None:
-        col = _columns()["target_time_minutes"]
+        col = get_columns(TrainingGoal)["target_time_minutes"]
         assert col.nullable is True
         assert isinstance(col.type, Integer)
 
     def test_status_required_enum(self) -> None:
-        col = _columns()["status"]
+        col = get_columns(TrainingGoal)["status"]
         assert col.nullable is False
         assert isinstance(col.type, SAEnum)
-        values_callable = col.type.values_callable
-        assert values_callable is not None
-        actual = sorted(values_callable(TrainingGoalStatus))
+        actual = sorted(get_enum_values(col, TrainingGoalStatus))
         assert actual == ["abandoned", "active", "completed"]
 
     def test_created_at_required_datetime(self) -> None:
-        col = _columns()["created_at"]
+        col = get_columns(TrainingGoal)["created_at"]
         assert col.nullable is False
         assert isinstance(col.type, DateTime)
 
     def test_closed_at_nullable_datetime(self) -> None:
-        col = _columns()["closed_at"]
+        col = get_columns(TrainingGoal)["closed_at"]
         assert col.nullable is True
         assert isinstance(col.type, DateTime)
 
@@ -185,7 +170,7 @@ class TestTrainingGoalActivePartialUniqueIndex:
     ``status = 'active'`` — one active goal per athlete."""
 
     def test_active_goal_partial_unique_index_present(self) -> None:
-        indexes = _indexes()
+        indexes = get_indexes(TrainingGoal)
         assert "ix_training_goals_athlete_active" in indexes, (
             "TrainingGoal must declare `ix_training_goals_athlete_active` "
             "to enforce one active goal per athlete."
@@ -195,13 +180,13 @@ class TestTrainingGoalActivePartialUniqueIndex:
         assert columns == {"athlete_id"}
 
     def test_active_goal_index_is_unique(self) -> None:
-        idx = _indexes()["ix_training_goals_athlete_active"]
+        idx = get_indexes(TrainingGoal)["ix_training_goals_athlete_active"]
         assert idx.unique is True
 
     def test_active_goal_partial_predicate_is_status_active(self) -> None:
         """The partial predicate must constrain ``status = 'active'`` —
         other statuses don't participate in the unique constraint."""
-        idx = _indexes()["ix_training_goals_athlete_active"]
+        idx = get_indexes(TrainingGoal)["ix_training_goals_athlete_active"]
         predicate = idx.dialect_options.get("postgresql", {}).get("where")
         assert predicate is not None, (
             "ix_training_goals_athlete_active must declare a "
@@ -220,7 +205,7 @@ class TestTrainingGoalSecondaryIndexes:
     """Athlete/created_at lookup supports recent-goal pagination."""
 
     def test_athlete_created_at_index_present(self) -> None:
-        indexes = _indexes()
+        indexes = get_indexes(TrainingGoal)
         matched = [
             idx
             for idx in indexes.values()
@@ -236,17 +221,11 @@ class TestTrainingGoalCheckConstraints:
     """DB-level CHECK constraints codify immutable-semantic-field
     invariants at the schema layer."""
 
-    def _check_text(self, check: CheckConstraint) -> str:
-        """``CheckConstraint`` exposes ``expression`` (newer SA) or
-        ``sqltext`` (older SA). Normalise to a string for assertions."""
-        expr = getattr(check, "expression", None) or getattr(check, "sqltext", None)
-        return (str(expr) if expr is not None else "")
-
     def test_weekly_volume_hours_non_negative_check(self) -> None:
-        checks = _check_constraints()
+        checks = get_check_constraints(TrainingGoal)
         found = any(
-            "weekly_volume_hours" in self._check_text(c)
-            and ">=" in self._check_text(c)
+            "weekly_volume_hours" in get_check_text(c)
+            and ">=" in get_check_text(c)
             for c in checks
         )
         assert found, (
@@ -255,10 +234,10 @@ class TestTrainingGoalCheckConstraints:
         )
 
     def test_weekly_volume_km_non_negative_check(self) -> None:
-        checks = _check_constraints()
+        checks = get_check_constraints(TrainingGoal)
         found = any(
-            "weekly_volume_km" in self._check_text(c)
-            and ">=" in self._check_text(c)
+            "weekly_volume_km" in get_check_text(c)
+            and ">=" in get_check_text(c)
             for c in checks
         )
         assert found, (
@@ -267,11 +246,11 @@ class TestTrainingGoalCheckConstraints:
         )
 
     def test_fitness_level_range_check(self) -> None:
-        checks = _check_constraints()
+        checks = get_check_constraints(TrainingGoal)
         found = any(
-            "fitness_level" in self._check_text(c)
-            and ">=" in self._check_text(c)
-            and "<=" in self._check_text(c)
+            "fitness_level" in get_check_text(c)
+            and ">=" in get_check_text(c)
+            and "<=" in get_check_text(c)
             for c in checks
         )
         assert found, (
@@ -280,11 +259,11 @@ class TestTrainingGoalCheckConstraints:
         )
 
     def test_custom_distance_positive_check(self) -> None:
-        checks = _check_constraints()
+        checks = get_check_constraints(TrainingGoal)
         found = any(
-            "custom_distance_km" in self._check_text(c).lower()
-            and "is null" in self._check_text(c).lower()
-            and ">" in self._check_text(c)
+            "custom_distance_km" in get_check_text(c).lower()
+            and "is null" in get_check_text(c).lower()
+            and ">" in get_check_text(c)
             for c in checks
         )
         assert found, (
@@ -293,11 +272,11 @@ class TestTrainingGoalCheckConstraints:
         )
 
     def test_target_distance_positive_check(self) -> None:
-        checks = _check_constraints()
+        checks = get_check_constraints(TrainingGoal)
         found = any(
-            "target_distance_km" in self._check_text(c).lower()
-            and "is null" in self._check_text(c).lower()
-            and ">" in self._check_text(c)
+            "target_distance_km" in get_check_text(c).lower()
+            and "is null" in get_check_text(c).lower()
+            and ">" in get_check_text(c)
             for c in checks
         )
         assert found, (
@@ -306,11 +285,11 @@ class TestTrainingGoalCheckConstraints:
         )
 
     def test_target_time_positive_check(self) -> None:
-        checks = _check_constraints()
+        checks = get_check_constraints(TrainingGoal)
         found = any(
-            "target_time_minutes" in self._check_text(c).lower()
-            and "is null" in self._check_text(c).lower()
-            and ">" in self._check_text(c)
+            "target_time_minutes" in get_check_text(c).lower()
+            and "is null" in get_check_text(c).lower()
+            and ">" in get_check_text(c)
             for c in checks
         )
         assert found, (
@@ -340,7 +319,7 @@ class TestTrainingGoalSchemaAntiGoals:
     def test_forbidden_columns_are_absent(self, forbidden_field: str) -> None:
         """Schema-only plan — only the storage shape belongs on this
         table. Plan generation fields land on ``training_plans``."""
-        assert forbidden_field not in _columns(), (
+        assert forbidden_field not in get_columns(TrainingGoal), (
             f"TrainingGoal must not carry `{forbidden_field}`. The "
             "schema-only contract puts plan generation fields on "
             "`training_plans`, not the goal."

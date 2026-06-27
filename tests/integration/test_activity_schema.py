@@ -24,76 +24,19 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 
-import os
 import pytest
-from sqlalchemy import create_engine, inspect, select, text
+from sqlalchemy import create_engine, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.activity import Activity
 from app.models.athlete import Athlete
 from app.models.enums import ActivitySource
+from tests.utils.factories import make_athlete
+from tests.utils.schema_helpers import db_columns, db_indexes, get_sync_database_url
 
 
 TABLE = "activities"
-
-
-def _sync_url() -> str:
-    """Convert asyncpg ``DATABASE_URL`` into a sync psycopg2 URL.
-
-    Required by direct-connection introspection helpers that use the
-    sync ``sqlalchemy.inspect`` path. The same helper exists in
-    ``test_training_plan_schema.py`` and ``test_checkpoint_schema.py``
-    — adding it here keeps ``test_planned_session_id_is_nullable_uuid_with_or_without_fk``
-    self-contained without coupling these test files by import.
-    """
-    database_url = os.environ.get("DATABASE_URL", "")
-    if not database_url:
-        raise RuntimeError("DATABASE_URL environment variable not set")
-    if database_url.startswith("postgresql+asyncpg://"):
-        database_url = database_url.replace(
-            "postgresql+asyncpg://",
-            "postgresql+psycopg2://",
-        )
-    return database_url
-
-
-def _columns(table: str) -> list[dict]:
-    """Get column info for a table using sync engine."""
-    database_url = os.environ.get("DATABASE_URL", "")
-    if not database_url:
-        raise RuntimeError("DATABASE_URL environment variable not set")
-    
-    # Convert asyncpg URL to psycopg2
-    if database_url.startswith("postgresql+asyncpg://"):
-        database_url = database_url.replace("postgresql+asyncpg://", "postgresql+psycopg2://")
-    
-    engine = create_engine(database_url)
-    try:
-        with engine.connect() as conn:
-            inspector = inspect(conn)
-            return list(inspector.get_columns(table))
-    finally:
-        engine.dispose()
-
-
-def _indexes(table: str) -> list[dict]:
-    """Get index info for a table using sync engine."""
-    database_url = os.environ.get("DATABASE_URL", "")
-    if not database_url:
-        raise RuntimeError("DATABASE_URL environment variable not set")
-    
-    # Convert asyncpg URL to psycopg2
-    if database_url.startswith("postgresql+asyncpg://"):
-        database_url = database_url.replace("postgresql+asyncpg://", "postgresql+psycopg2://")
-    
-    engine = create_engine(database_url)
-    try:
-        with engine.connect() as conn:
-            inspector = inspect(conn)
-            return [dict(idx) for idx in inspector.get_indexes(table)]
-    finally:
-        engine.dispose()
 
 
 def _activity_factory(
@@ -127,11 +70,6 @@ def _activity_factory(
     )
 
 
-async def _new_athlete(db_session: AsyncSession, email: str) -> Athlete:
-    a = Athlete(email=email)
-    db_session.add(a)
-    await db_session.flush()
-    return a
 
 
 class TestActivityDBSchemaColumns:
@@ -166,7 +104,7 @@ class TestActivityDBSchemaColumns:
     async def test_required_column_present(
         self, db_session: AsyncSession, expected_column: str
     ) -> None:
-        cols = {col["name"] for col in _columns(TABLE)}
+        cols = {col["name"] for col in db_columns(TABLE)}
         assert expected_column in cols, (
             f"activities.{expected_column} missing from DB schema."
         )
@@ -194,7 +132,7 @@ class TestActivityDBSchemaColumns:
     ) -> None:
         """Lean-schema invariant at the DB layer. ``lean running
         observation index'' — no summary fields ever."""
-        cols = {col["name"] for col in _columns(TABLE)}
+        cols = {col["name"] for col in db_columns(TABLE)}
         assert forbidden_field not in cols, (
             f"activities.{forbidden_field} physically exists in the DB. "
             f"The Lean-schema invariant forbids it; remove the column."
@@ -207,7 +145,7 @@ class TestActivityDedupPartialUniqueIndex:
     have ``external_id IS NULL`` and must NOT collide."""
 
     def _dedup_index(self, db_session) -> dict | None:
-        for idx in _indexes(TABLE):
+        for idx in db_indexes(TABLE):
             cols = idx.get("column_names") or []
             if set(cols) >= {"athlete_id", "external_id", "source"} and idx.get(
                 "unique"
@@ -258,7 +196,7 @@ class TestActivityDedupPartialUniqueIndex:
         """Two activities with the same (athlete_id, external_id, source)
         and a non-null external_id must violate the partial unique
         index."""
-        athlete = await _new_athlete(db_session, "dup-ext@example.com")
+        athlete = await make_athlete(db_session, "dup-ext@example.com")
         a1 = _activity_factory(
             athlete_id=athlete.id,
             source=ActivitySource.INTERVALS_ICU,
@@ -283,7 +221,7 @@ class TestActivityDedupPartialUniqueIndex:
         external_id)`` that ignores source. Two activities for the
         same athlete/external_id but different sources are different
         records."""
-        athlete = await _new_athlete(db_session, "diff-src@example.com")
+        athlete = await make_athlete(db_session, "diff-src@example.com")
         a1 = _activity_factory(
             athlete_id=athlete.id,
             source=ActivitySource.INTERVALS_ICU,
@@ -308,7 +246,7 @@ class TestActivityDedupPartialUniqueIndex:
     ) -> None:
         """``manual_entry`` rows have ``external_id IS NULL`` and the
         partial predicate must let multiple manual entries coexist."""
-        athlete = await _new_athlete(db_session, "manual-many@example.com")
+        athlete = await make_athlete(db_session, "manual-many@example.com")
         m1 = _activity_factory(
             athlete_id=athlete.id,
             source=ActivitySource.MANUAL_ENTRY,
@@ -341,7 +279,7 @@ class TestActivityIndexesPresent:
     async def test_athlete_date_index_present(
         self, db_session: AsyncSession
     ) -> None:
-        idx_list = _indexes(TABLE)
+        idx_list = db_indexes(TABLE)
         matched = [
             idx
             for idx in idx_list
@@ -355,7 +293,7 @@ class TestActivityIndexesPresent:
     async def test_athlete_start_time_index_present(
         self, db_session: AsyncSession
     ) -> None:
-        idx_list = _indexes(TABLE)
+        idx_list = db_indexes(TABLE)
         matched = [
             idx
             for idx in idx_list
@@ -376,7 +314,7 @@ class TestManualEntryInvariants:
     async def test_manual_entry_persists_with_null_fit_file_key(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(db_session, "manual-fitnull@example.com")
+        athlete = await make_athlete(db_session, "manual-fitnull@example.com")
         activity = _activity_factory(
             athlete_id=athlete.id,
             source=ActivitySource.MANUAL_ENTRY,
@@ -396,7 +334,7 @@ class TestManualEntryInvariants:
         boundary (not the DB) because the file is uploaded before the
         row is created. We persist a ``manual_upload`` row with
         ``fit_file_key=None`` and assert the DB accepts it."""
-        athlete = await _new_athlete(db_session, "up-no-key@example.com")
+        athlete = await make_athlete(db_session, "up-no-key@example.com")
         activity = _activity_factory(
             athlete_id=athlete.id,
             source=ActivitySource.MANUAL_UPLOAD,
@@ -418,7 +356,7 @@ class TestActivityPersistence:
         """Activity insertion of a row with no load scores is valid —
         ``LoadComputationService`` populates them asynchronously. A row
         inserted with explicit nulls must round-trip nulls."""
-        athlete = await _new_athlete(db_session, "load-null@example.com")
+        athlete = await make_athlete(db_session, "load-null@example.com")
         activity = _activity_factory(
             athlete_id=athlete.id,
             source=ActivitySource.MANUAL_ENTRY,
@@ -434,7 +372,7 @@ class TestActivityPersistence:
         self, db_session: AsyncSession
     ) -> None:
         """All three signal flags can be independently set."""
-        athlete = await _new_athlete(db_session, "signals-rt@example.com")
+        athlete = await make_athlete(db_session, "signals-rt@example.com")
         activity = _activity_factory(
             athlete_id=athlete.id,
             source=ActivitySource.INTERVALS_ICU,
@@ -457,7 +395,7 @@ class TestActivityPersistence:
         """``quality_flags`` is structured JSONB. Custom keys present
         per architecture: ``hr_dropout_pct``, ``gps_loss``,
         ``sensor_malfunction``, ``elevated_laxity_risk``."""
-        athlete = await _new_athlete(db_session, "qf@example.com")
+        athlete = await make_athlete(db_session, "qf@example.com")
         activity = _activity_factory(athlete_id=athlete.id)
         activity.quality_flags = {
             "hr_dropout_pct": 14.5,
@@ -497,7 +435,7 @@ class TestActivityPersistence:
         """
         import uuid as _uuid
 
-        engine = create_engine(_sync_url())
+        engine = create_engine(get_sync_database_url())
         try:
             with engine.connect() as conn:
                 has_planned_sessions = conn.execute(
@@ -512,7 +450,7 @@ class TestActivityPersistence:
         finally:
             engine.dispose()
 
-        athlete = await _new_athlete(db_session, "plan-sess@example.com")
+        athlete = await make_athlete(db_session, "plan-sess@example.com")
         activity = _activity_factory(athlete_id=athlete.id)
 
         if not has_planned_sessions:
@@ -619,7 +557,7 @@ class TestActivityForeignKeyCascade:
     ) -> None:
         from sqlalchemy import delete as sa_delete
 
-        athlete = await _new_athlete(db_session, "cascade@example.com")
+        athlete = await make_athlete(db_session, "cascade@example.com")
         activity = _activity_factory(
             athlete_id=athlete.id,
             source=ActivitySource.MANUAL_ENTRY,

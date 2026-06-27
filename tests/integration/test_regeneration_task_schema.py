@@ -18,10 +18,8 @@ Reference plan: docs/implementation/phase-1/phase-1-2b-p1-plan-sessions.md
 
 from __future__ import annotations
 
-import os
-
 import pytest
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -30,64 +28,17 @@ from app.models.enums import GoalType, TrainingGoalStatus, TrainingPlanStatus
 from app.models.regeneration_task import RegenerationTask
 from app.models.training_goal import TrainingGoal
 from app.models.training_plan import TrainingPlan
+from tests.utils.factories import make_athlete
+from tests.utils.schema_helpers import (
+    db_check_constraints,
+    db_columns,
+    db_foreign_keys,
+    db_indexes,
+    get_sync_database_url,
+)
 
 
 TABLE = "regeneration_tasks"
-
-
-def _sync_url() -> str:
-    database_url = os.environ.get("DATABASE_URL", "")
-    if not database_url:
-        raise RuntimeError("DATABASE_URL environment variable not set")
-    if database_url.startswith("postgresql+asyncpg://"):
-        database_url = database_url.replace(
-            "postgresql+asyncpg://",
-            "postgresql+psycopg2://",
-        )
-    return database_url
-
-
-def _columns(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_columns(table))
-    finally:
-        engine.dispose()
-
-
-def _check_constraints(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_check_constraints(table))
-    finally:
-        engine.dispose()
-
-
-def _indexes(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_indexes(table))
-    finally:
-        engine.dispose()
-
-
-def _foreign_keys(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_foreign_keys(table))
-    finally:
-        engine.dispose()
-
-
-async def _new_athlete(db_session: AsyncSession, email: str) -> Athlete:
-    a = Athlete(email=email)
-    db_session.add(a)
-    await db_session.flush()
-    return a
 
 
 async def _new_goal_and_plan(
@@ -158,7 +109,7 @@ class TestRegenerationTaskDBSchemaColumns:
     async def test_required_column_present(
         self, db_session: AsyncSession, expected_column: str
     ) -> None:
-        cols = {col["name"] for col in _columns(TABLE)}
+        cols = {col["name"] for col in db_columns(TABLE)}
         assert expected_column in cols, (
             f"regeneration_tasks.{expected_column} missing from DB schema."
         )
@@ -171,7 +122,7 @@ class TestRegenerationTaskDBSchemaColumns:
 
 class TestRegenerationTaskForeignKeys:
     def test_training_goal_id_fk_to_training_goals(self) -> None:
-        fks = _foreign_keys(TABLE)
+        fks = db_foreign_keys(TABLE)
         matches = [
             fk for fk in fks
             if fk.get("referred_table") == "training_goals"
@@ -184,7 +135,7 @@ class TestRegenerationTaskForeignKeys:
         )
 
     def test_training_plan_id_fk_to_training_plans_nullable(self) -> None:
-        fks = _foreign_keys(TABLE)
+        fks = db_foreign_keys(TABLE)
         matches = [
             fk for fk in fks
             if fk.get("referred_table") == "training_plans"
@@ -201,7 +152,7 @@ class TestRegenerationTaskForeignKeys:
     ) -> None:
         from datetime import date as _date
 
-        athlete = await _new_athlete(db_session, "rt-cascade@example.com")
+        athlete = await make_athlete(db_session, "rt-cascade@example.com")
         goal, _ = await _new_goal_and_plan(db_session, athlete)
         task = _task_factory(
             training_goal_id=goal.id, proposed_date=_date(2026, 9, 1)
@@ -257,7 +208,7 @@ class TestRegenerationTaskForeignKeys:
         """
         from datetime import date as _date
 
-        athlete = await _new_athlete(db_session, "rt-set-null@example.com")
+        athlete = await make_athlete(db_session, "rt-set-null@example.com")
         goal, plan = await _new_goal_and_plan(db_session, athlete)
         task = _task_factory(
             training_goal_id=goal.id,
@@ -304,53 +255,26 @@ class TestRegenerationTaskForeignKeys:
         The pg-catalog check pins the schema contract so a future
         regression surfaces immediately.
         """
-        engine = create_engine(_sync_url())
-        try:
-            with engine.connect() as conn:
-                row = conn.execute(
-                    text(
-                        """
-                        SELECT c.confdeltype,
-                               pg_get_constraintdef(c.oid) AS constraint_def
-                        FROM pg_constraint c
-                        JOIN pg_namespace n
-                          ON n.oid = c.connamespace
-                        JOIN pg_class tbl
-                          ON tbl.oid = c.conrelid
-                        JOIN pg_class ref
-                          ON ref.oid = c.confrelid
-                        WHERE n.nspname = current_schema()
-                          AND tbl.relname = 'regeneration_tasks'
-                          AND ref.relname = 'training_plans'
-                          AND c.contype = 'f'
-                          AND EXISTS (
-                              SELECT 1
-                              FROM pg_attribute a
-                              WHERE a.attrelid = tbl.oid
-                                AND a.attnum = c.conkey[1]
-                                AND a.attname = 'training_plan_id'
-                          )
-                        """
-                    )
-                ).fetchone()
-        finally:
-            engine.dispose()
-        assert row is not None, (
-            "regeneration_tasks.training_plan_id FK to training_plans.id "
-            "not found in the test schema. The Phase-1.2a baseline does "
-            "not include it; check that the migration has applied."
+        fks = db_foreign_keys(TABLE)
+        plan_fks = [
+            fk for fk in fks
+            if fk.get("referred_table") == "training_plans"
+            and tuple(fk.get("constrained_columns") or ())
+            == ("training_plan_id",)
+        ]
+        assert plan_fks, (
+            "regeneration_tasks.training_plan_id FK must reference "
+            "training_plans(id)."
         )
-        confdeltype, constraint_def = row
-        assert confdeltype == "n", (
-            "regeneration_tasks.training_plan_id must be declared with "
-            "ON DELETE SET NULL (confdeltype='n'). Got: "
-            f"confdeltype={confdeltype!r}, def={constraint_def}"
+        assert plan_fks[0].get("options", {}).get("ondelete") == "SET NULL", (
+            "regeneration_tasks.training_plan_id FK ON DELETE must be "
+            "SET NULL."
         )
 
     def test_status_inline_union_check(self) -> None:
         text = " | ".join(
             (c.get("sqltext") or "")
-            for c in _check_constraints(TABLE)
+            for c in db_check_constraints(TABLE)
         ).lower()
         for status_value in (
             "pending_confirmation",
@@ -368,7 +292,7 @@ class TestRegenerationTaskForeignKeys:
     ) -> None:
         from datetime import date as _date
 
-        athlete = await _new_athlete(db_session, "rt-status-bad@example.com")
+        athlete = await make_athlete(db_session, "rt-status-bad@example.com")
         goal, _ = await _new_goal_and_plan(db_session, athlete)
         task = _task_factory(
             training_goal_id=goal.id,
@@ -392,7 +316,7 @@ class TestRegenerationTaskPersistence:
     ) -> None:
         from datetime import date as _date
 
-        athlete = await _new_athlete(db_session, "rt-pending@example.com")
+        athlete = await make_athlete(db_session, "rt-pending@example.com")
         goal, _ = await _new_goal_and_plan(db_session, athlete)
         task = _task_factory(
             training_goal_id=goal.id,
@@ -410,7 +334,7 @@ class TestRegenerationTaskPersistence:
     ) -> None:
         from datetime import date as _date, datetime, timezone
 
-        athlete = await _new_athlete(db_session, "rt-confirmed@example.com")
+        athlete = await make_athlete(db_session, "rt-confirmed@example.com")
         goal, plan = await _new_goal_and_plan(db_session, athlete)
         task = _task_factory(
             training_goal_id=goal.id,
@@ -437,7 +361,7 @@ class TestRegenerationTaskPendingIndex:
         """The partial index ``ix_regeneration_tasks_pending`` must
         appear in ``pg_indexes`` for the test schema with predicate
         ``status = 'pending_confirmation'``."""
-        engine = create_engine(_sync_url())
+        engine = create_engine(get_sync_database_url())
         try:
             with engine.connect() as conn:
                 row = conn.execute(
@@ -473,7 +397,7 @@ class TestRegenerationTaskPendingIndex:
     def test_pending_index_column_set(self) -> None:
         matched = [
             idx
-            for idx in _indexes(TABLE)
+            for idx in db_indexes(TABLE)
             if idx.get("name") == "ix_regeneration_tasks_pending"
             and set(idx.get("column_names") or ())
             == {"training_goal_id", "status"}

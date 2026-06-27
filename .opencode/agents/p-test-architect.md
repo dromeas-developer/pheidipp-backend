@@ -257,11 +257,17 @@ previously deferred tests.
 
 ```yaml
 # tests/test-manifest/index.yaml
+# Lean cross-phase registry. Only two things live here:
+#   1. Resolved selection groups (paths only)
+#   2. Cross-phase coverage summary
+#   3. Cross-phase execution group dependencies
+# History, features, execution groups, and per-sub-phase coverage
+# live in the individual sub-phase files.
 version: "1.0"
 last_reviewed_at: "<ISO 8601>"
 
-# Resolved selection groups — paths only, no feature metadata
-# Rebuilt by Test Architect when any sub-phase file changes promotion state
+# Resolved selection groups — paths only, no feature metadata.
+# Rebuilt by Test Architect when any sub-phase file changes promotion state.
 selection:
   smoke:
     - "<test file path>"
@@ -272,7 +278,7 @@ selection:
   release:
     - "<test file path>"     # all status=promoted tests
 
-# Cross-phase coverage summary — updated when features are promoted
+# Cross-phase coverage summary — updated when features are promoted.
 coverage:
   routes:
     covered: ["<route>"]
@@ -286,6 +292,13 @@ coverage:
     covered: ["<invariant>"]
     partial: ["<invariant>"]
     missing: ["<invariant>"]
+
+# Cross-phase execution group dependencies.
+# Intra-phase ordering lives in the sub-phase files.
+cross_phase_dependencies:
+  <group-id>:
+    depends_on_cross_phase:
+      - "<group-id>"
 ```
 
 ---
@@ -335,17 +348,18 @@ features:
         - path: "tests/release/test_x.py"
           owner: "<plan-id>"
 
-# Execution groups for this sub-phase only
+# Execution groups for this sub-phase only.
+# Cross-phase depends_on edges live in index.yaml cross_phase_dependencies.
 execution_groups:
   <group-name>:
     scope: smoke | feature | regression | release
-    phase: "<phase-N>"
+    phase: <n>
     tests:
       - "<test file path>"
     depends_on:
-      - "<group-name>"
+      - "<group-name>"       # intra-phase only
 
-# Coverage for this sub-phase only — index.yaml holds the cross-phase view
+# Coverage for this sub-phase only — index.yaml holds the cross-phase view.
 coverage:
   routes:
     covered: ["<route>"]
@@ -360,7 +374,9 @@ coverage:
     partial: ["<invariant>"]
     missing: ["<invariant>"]
 
-# One line per sub-phase — prose belongs in the test pack document not here
+# Full audit history for this sub-phase.
+# Every Test Architect or DevOps change gets an entry here.
+# The index.yaml has no history block — this is the only history record.
 history:
   - date: "<YYYY-MM-DD>"
     plan: "<plan-id>"
@@ -368,7 +384,8 @@ history:
     tests_modified: <n>
     tests_removed: <n>
     result: "PASS | FAIL | PARTIAL"
-    
+    coverage_delta: >
+      <prose description of what changed and why>
 ```
 
 ---
@@ -384,9 +401,10 @@ The division follows who has direct evidence for each field.
 | `validation.executable` | sub-phase | DevOps | Only DevOps has run the suite and knows whether tests ran without errors |
 | `validation.passed` | sub-phase | DevOps | Only DevOps has the actual pass/fail result |
 | `status` progression | sub-phase | Test Architect | Promotion decisions are judgment calls, not transcription |
+| `history` | sub-phase | Test Architect | Full audit trail for this sub-phase — lives where the detail lives |
 | `selection` groups | index | Test Architect | Which tests belong in smoke/regression/release is a design decision |
 | `coverage` (cross-phase) | index | Test Architect | Updated when features are promoted |
-| `history` | index | Test Architect | One-line summary per sub-phase, appended after promotion |
+| `cross_phase_dependencies` | index | Test Architect | Cross-phase execution group ordering |
 | All other sub-phase fields | sub-phase | Test Architect | Features, protects, impacts, prerequisites |
 
 **What this means in practice:**
@@ -414,7 +432,8 @@ assertion error after infrastructure is fixed, hand back to the Test Architect.
 When DevOps reports a full PASS, the Test Architect advances `status` to
 `promoted` in the sub-phase file, rebuilds `index.yaml`'s `selection.regression`
 and `selection.release` to include newly promoted tests, updates `index.yaml`'s
-`coverage`, and appends a one-line entry to `index.yaml`'s `history`.
+`coverage`, and appends a `history` entry to the sub-phase file describing
+what changed and why.
 
 No other agent modifies any manifest file for any reason.
 

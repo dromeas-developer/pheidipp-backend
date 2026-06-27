@@ -21,70 +21,20 @@ Reference plan: docs/implementation/phase-1/phase-1-2c-p1-twin-fitness-coaching-
 from __future__ import annotations
 
 import json
-import os
 import uuid
 
 import pytest
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.athlete import Athlete
 from app.models.athlete_physiology import AthletePhysiology
+from tests.utils.factories import make_athlete
+from tests.utils.schema_helpers import db_columns, db_foreign_keys, db_indexes
 
 
 TABLE = "athlete_physiology"
-
-
-def _sync_url() -> str:
-    database_url = os.environ.get("DATABASE_URL", "")
-    if not database_url:
-        raise RuntimeError("DATABASE_URL environment variable not set")
-    if database_url.startswith("postgresql+asyncpg://"):
-        database_url = database_url.replace(
-            "postgresql+asyncpg://",
-            "postgresql+psycopg2://",
-        )
-    return database_url
-
-
-def _columns(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_columns(table))
-    finally:
-        engine.dispose()
-
-
-def _indexes(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_indexes(table))
-    finally:
-        engine.dispose()
-
-
-def _foreign_keys(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_foreign_keys(table))
-    finally:
-        engine.dispose()
-
-
-# ---------------------------------------------------------------------------
-# Helpers.
-# ---------------------------------------------------------------------------
-
-
-async def _new_athlete(db_session: AsyncSession, email: str) -> Athlete:
-    a = Athlete(email=email)
-    db_session.add(a)
-    await db_session.flush()
-    return a
 
 
 def _physiology_factory(
@@ -150,7 +100,7 @@ class TestAthletePhysiologyDBSchemaColumns:
     async def test_required_column_present(
         self, db_session: AsyncSession, expected_column: str
     ) -> None:
-        cols = {col["name"] for col in _columns(TABLE)}
+        cols = {col["name"] for col in db_columns(TABLE)}
         assert expected_column in cols, (
             f"athlete_physiology.{expected_column} missing from DB schema."
         )
@@ -165,20 +115,20 @@ class TestAthletePhysiologyUniqueIndexDB:
     def test_unique_index_present(self) -> None:
         matched = [
             idx
-            for idx in _indexes(TABLE)
+            for idx in db_indexes(TABLE)
             if set(idx.get("column_names") or ()) == {"athlete_id"}
             and idx.get("unique")
         ]
         assert matched, (
             "athlete_physiology must declare UNIQUE (athlete_id) — "
             "one row per athlete. "
-            f"Got: {[idx.get('column_names') for idx in _indexes(TABLE)]}"
+            f"Got: {[idx.get('column_names') for idx in db_indexes(TABLE)]}"
         )
 
     async def test_two_physiology_rows_same_athlete_rejected(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "phys-dup@example.com"
         )
         p1 = _physiology_factory(athlete_id=athlete.id)
@@ -208,7 +158,7 @@ class TestAthletePhysiologyNotNullConstraintsDB:
     async def test_missing_lt1_rejected(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "phys-no-lt1@example.com"
         )
         # Raw INSERT with literal SQL NULL for ``lt1`` — bypasses
@@ -238,7 +188,7 @@ class TestAthletePhysiologyNotNullConstraintsDB:
     async def test_missing_lt2_rejected(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "phys-no-lt2@example.com"
         )
         with pytest.raises(IntegrityError):
@@ -273,7 +223,7 @@ class TestAthletePhysiologyNullableOptionalColumnsDB:
     async def test_minimal_row_with_only_lt1_lt2_persists(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "phys-minimal@example.com"
         )
         row = AthletePhysiology(
@@ -297,7 +247,7 @@ class TestAthletePhysiologyNullableOptionalColumnsDB:
     ) -> None:
         """The bootstrapped 220-age path: only ``max_hr`` populated,
         cp / vo2max still null."""
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "phys-max-hr-only@example.com"
         )
         row = _physiology_factory(
@@ -324,7 +274,7 @@ class TestAthletePhysiologyNullableOptionalColumnsDB:
 
 class TestAthletePhysiologyForeignKeyCascadeDB:
     def test_athlete_id_fk_to_athletes(self) -> None:
-        fks = _foreign_keys(TABLE)
+        fks = db_foreign_keys(TABLE)
         athlete_fks = [
             fk
             for fk in fks
@@ -337,30 +287,18 @@ class TestAthletePhysiologyForeignKeyCascadeDB:
         )
 
     def test_ondelete_is_cascade_in_pg_catalog(self) -> None:
-        engine = create_engine(_sync_url())
-        try:
-            with engine.connect() as conn:
-                row = conn.execute(
-                    text(
-                        """
-                        SELECT c.confdeltype
-                        FROM pg_constraint c
-                        JOIN pg_class conrelid_table ON conrelid_table.oid = c.conrelid
-                        JOIN pg_class confrelid_table ON confrelid_table.oid = c.confrelid
-                        WHERE c.contype = 'f'
-                          AND confrelid_table.relname = 'athletes'
-                          AND conrelid_table.relname = :table_name
-                        """
-                    ),
-                    {"table_name": TABLE},
-                ).fetchone()
-        finally:
-            engine.dispose()
-        assert row is not None
-        # ``c`` is the lowercase letter — meaning CASCADE.
-        assert row[0] == "c", (
-            f"athlete_physiology.athlete_id FK ON DELETE must be CASCADE. "
-            f"Got confdeltype={row[0]!r}"
+        fks = db_foreign_keys(TABLE)
+        athlete_fks = [
+            fk for fk in fks
+            if fk.get("referred_table") == "athletes"
+            and tuple(fk.get("constrained_columns") or ())
+            == ("athlete_id",)
+        ]
+        assert athlete_fks, (
+            "athlete_physiology.athlete_id FK must reference athletes(id)."
+        )
+        assert athlete_fks[0].get("options", {}).get("ondelete") == "CASCADE", (
+            "athlete_physiology.athlete_id FK ON DELETE must be CASCADE."
         )
 
 
@@ -377,7 +315,7 @@ class TestAthletePhysiologyMutabilityDB:
     async def test_update_lt1_succeeds(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "phys-update@example.com"
         )
         row = _physiology_factory(athlete_id=athlete.id)
@@ -408,7 +346,7 @@ class TestAthletePhysiologyMutabilityDB:
     ) -> None:
         """cp is null until a qualifying observation; populating
         it later must succeed (service layer concern)."""
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "phys-populate-cp@example.com"
         )
         row = _physiology_factory(athlete_id=athlete.id, cp=None)
@@ -438,7 +376,7 @@ class TestAthletePhysiologyRoundTripDB:
     async def test_full_physiology_row_persists(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "phys-roundtrip@example.com"
         )
         row = _physiology_factory(

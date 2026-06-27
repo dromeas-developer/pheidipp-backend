@@ -12,38 +12,31 @@ Architecture: docs/architecture/01-entities/training-goal.md (SecondaryEvent sec
 from __future__ import annotations
 
 import pytest
-from sqlalchemy import Date, ForeignKey, Index, String
+from sqlalchemy import Date, String
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 
 from app.models.enums import GoalEventType, SecondaryEventPriority
 from app.models.secondary_event import SecondaryEvent
-
-
-def _columns() -> dict[str, object]:
-    return {column.key: column for column in SecondaryEvent.__table__.columns}
-
-
-def _indexes() -> dict[str, Index]:
-    return {idx.name: idx for idx in SecondaryEvent.__table__.indexes}
+from tests.utils.model_helpers import get_columns, get_indexes, get_foreign_keys_referencing, get_enum_values
 
 
 class TestSecondaryEventRequiredColumns:
     def test_id_column_uuid_primary_key(self) -> None:
-        col = _columns()["id"]
+        col = get_columns(SecondaryEvent)["id"]
         assert col.primary_key is True
         assert isinstance(col.type, PG_UUID)
 
     def test_training_goal_id_required_uuid(self) -> None:
-        col = _columns()["training_goal_id"]
+        col = get_columns(SecondaryEvent)["training_goal_id"]
         assert col.nullable is False
         assert isinstance(col.type, PG_UUID)
 
     def test_event_type_required_enum(self) -> None:
-        col = _columns()["event_type"]
+        col = get_columns(SecondaryEvent)["event_type"]
         assert col.nullable is False
         assert isinstance(col.type, SAEnum)
-        actual = sorted(col.type.values_callable(GoalEventType))
+        actual = sorted(get_enum_values(col, GoalEventType))
         expected = sorted(
             [
                 "marathon",
@@ -58,30 +51,27 @@ class TestSecondaryEventRequiredColumns:
         assert actual == expected
 
     def test_event_date_required_date(self) -> None:
-        col = _columns()["event_date"]
+        col = get_columns(SecondaryEvent)["event_date"]
         assert col.nullable is False
         assert isinstance(col.type, Date)
 
     def test_event_name_nullable_string(self) -> None:
-        col = _columns()["event_name"]
+        col = get_columns(SecondaryEvent)["event_name"]
         assert col.nullable is True
         assert isinstance(col.type, String)
         assert col.type.length == 255
 
     def test_priority_required_enum(self) -> None:
-        col = _columns()["priority"]
+        col = get_columns(SecondaryEvent)["priority"]
         assert col.nullable is False
         assert isinstance(col.type, SAEnum)
-        actual = sorted(col.type.values_callable(SecondaryEventPriority))
+        actual = sorted(get_enum_values(col, SecondaryEventPriority))
         assert actual == ["B", "C"]
 
 
 class TestSecondaryEventForeignKey:
     def test_training_goal_id_has_fk_to_training_goals(self) -> None:
-        foreign_keys = [
-            fk for fk in SecondaryEvent.__table__.foreign_keys
-            if fk.parent.name == "training_goal_id"
-        ]
+        foreign_keys = get_foreign_keys_referencing(SecondaryEvent, "training_goal_id")
         assert foreign_keys, (
             "SecondaryEvent.training_goal_id must declare an FK to "
             "training_goals.id."
@@ -94,7 +84,7 @@ class TestSecondaryEventIndexes:
     def test_goal_index_present(self) -> None:
         matched = [
             idx
-            for idx in _indexes().values()
+            for idx in get_indexes(SecondaryEvent).values()
             if {c.key for c in idx.columns} >= {"training_goal_id"}
         ]
         assert matched, (
@@ -105,7 +95,7 @@ class TestSecondaryEventIndexes:
     def test_goal_date_index_present(self) -> None:
         matched = [
             idx
-            for idx in _indexes().values()
+            for idx in get_indexes(SecondaryEvent).values()
             if {c.key for c in idx.columns} >= {
                 "training_goal_id",
                 "event_date",
@@ -134,7 +124,7 @@ class TestSecondaryEventSchemaAntiGoals:
         ],
     )
     def test_forbidden_columns_are_absent(self, forbidden_field: str) -> None:
-        assert forbidden_field not in _columns(), (
+        assert forbidden_field not in get_columns(SecondaryEvent), (
             f"SecondaryEvent must not carry `{forbidden_field}`. The "
             "schema-only contract keeps goal-linkage fields out of "
             "supporting storage tables."

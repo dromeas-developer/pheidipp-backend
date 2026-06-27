@@ -22,79 +22,25 @@ Reference plan: docs/implementation/phase-1/phase-1-2c-p1-twin-fitness-coaching-
 
 from __future__ import annotations
 
-import os
 import uuid
 
 import pytest
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.athlete import Athlete
 from app.models.generation_event import GenerationEvent
+from tests.utils.factories import make_athlete
+from tests.utils.schema_helpers import (
+    db_check_constraints,
+    db_columns,
+    db_foreign_keys,
+    db_indexes,
+)
 
 
 TABLE = "generation_events"
-
-
-def _sync_url() -> str:
-    database_url = os.environ.get("DATABASE_URL", "")
-    if not database_url:
-        raise RuntimeError("DATABASE_URL environment variable not set")
-    if database_url.startswith("postgresql+asyncpg://"):
-        database_url = database_url.replace(
-            "postgresql+asyncpg://",
-            "postgresql+psycopg2://",
-        )
-    return database_url
-
-
-def _columns(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_columns(table))
-    finally:
-        engine.dispose()
-
-
-def _indexes(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_indexes(table))
-    finally:
-        engine.dispose()
-
-
-def _check_constraints(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_check_constraints(table))
-    finally:
-        engine.dispose()
-
-
-def _foreign_keys(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_foreign_keys(table))
-    finally:
-        engine.dispose()
-
-
-# ---------------------------------------------------------------------------
-# Helpers.
-# ---------------------------------------------------------------------------
-
-
-async def _new_athlete(db_session: AsyncSession, email: str) -> Athlete:
-    a = Athlete(email=email)
-    db_session.add(a)
-    await db_session.flush()
-    return a
 
 
 def _generation_event_factory(
@@ -147,7 +93,7 @@ class TestGenerationEventDBSchemaColumns:
     async def test_required_column_present(
         self, db_session: AsyncSession, expected_column: str
     ) -> None:
-        cols = {col["name"] for col in _columns(TABLE)}
+        cols = {col["name"] for col in db_columns(TABLE)}
         assert expected_column in cols, (
             f"generation_events.{expected_column} missing from DB schema."
         )
@@ -162,7 +108,7 @@ class TestGenerationEventFailureReasonConsistencyCheckDB:
     """``failure_reason IS NOT NULL`` iff ``success = false``."""
 
     def test_failure_reason_check_present(self) -> None:
-        checks = _check_constraints(TABLE)
+        checks = db_check_constraints(TABLE)
         found = any(
             "failure_reason" in (c.get("sqltext") or "").lower()
             and "success" in (c.get("sqltext") or "").lower()
@@ -178,7 +124,7 @@ class TestGenerationEventFailureReasonConsistencyCheckDB:
     async def test_success_row_with_failure_reason_rejected(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "ge-success-with-failure@example.com"
         )
         evt = _generation_event_factory(
@@ -194,7 +140,7 @@ class TestGenerationEventFailureReasonConsistencyCheckDB:
     async def test_failure_row_without_failure_reason_rejected(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "ge-failure-no-reason@example.com"
         )
         evt = _generation_event_factory(
@@ -210,7 +156,7 @@ class TestGenerationEventFailureReasonConsistencyCheckDB:
     async def test_success_row_no_failure_reason_accepted(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "ge-success-clean@example.com"
         )
         evt = _generation_event_factory(
@@ -227,7 +173,7 @@ class TestGenerationEventFailureReasonConsistencyCheckDB:
     async def test_failure_row_with_reason_accepted(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "ge-failure-with-reason@example.com"
         )
         evt = _generation_event_factory(
@@ -251,7 +197,7 @@ class TestGenerationEventNonNegativeCheckDB:
     async def test_negative_input_token_count_rejected(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "ge-neg-input@example.com"
         )
         evt = _generation_event_factory(
@@ -266,7 +212,7 @@ class TestGenerationEventNonNegativeCheckDB:
     async def test_negative_output_token_count_rejected(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "ge-neg-output@example.com"
         )
         evt = _generation_event_factory(
@@ -281,7 +227,7 @@ class TestGenerationEventNonNegativeCheckDB:
     async def test_negative_latency_rejected(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "ge-neg-latency@example.com"
         )
         evt = _generation_event_factory(
@@ -297,7 +243,7 @@ class TestGenerationEventNonNegativeCheckDB:
     ) -> None:
         """Zero is valid — a failure-before-counts row still
         persists with token counts at 0."""
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "ge-zero@example.com"
         )
         evt = _generation_event_factory(
@@ -323,7 +269,7 @@ class TestGenerationEventNonNegativeCheckDB:
 
 class TestGenerationEventForeignKeysDB:
     def test_athlete_id_fk_to_athletes(self) -> None:
-        fks = _foreign_keys(TABLE)
+        fks = db_foreign_keys(TABLE)
         athlete_fks = [
             fk
             for fk in fks
@@ -334,30 +280,17 @@ class TestGenerationEventForeignKeysDB:
         assert athlete_fks
 
     def test_athlete_fk_ondelete_is_cascade(self) -> None:
-        engine = create_engine(_sync_url())
-        try:
-            with engine.connect() as conn:
-                row = conn.execute(
-                    text(
-                        """
-                        SELECT c.confdeltype
-                        FROM pg_constraint c
-                        JOIN pg_class conrelid_table ON conrelid_table.oid = c.conrelid
-                        JOIN pg_class confrelid_table ON confrelid_table.oid = c.confrelid
-                        WHERE c.contype = 'f'
-                          AND confrelid_table.relname = 'athletes'
-                          AND conrelid_table.relname = :table_name
-                        """
-                    ),
-                    {"table_name": TABLE},
-                ).fetchone()
-        finally:
-            engine.dispose()
-        assert row is not None
-        assert row[0] == "c", (
-            f"generation_events.athlete_id FK ON DELETE must be CASCADE. "
-            f"Got {row[0]!r}"
+        fks = db_foreign_keys(TABLE)
+        athlete_fks = [
+            fk for fk in fks
+            if fk.get("referred_table") == "athletes"
+            and tuple(fk.get("constrained_columns") or ())
+            == ("athlete_id",)
+        ]
+        assert athlete_fks, (
+            "generation_events.athlete_id FK ON DELETE must be CASCADE."
         )
+        assert athlete_fks[0].get("options", {}).get("ondelete") == "CASCADE"
 
 
 # ---------------------------------------------------------------------------
@@ -371,7 +304,7 @@ class TestGenerationEventReadIndexesDB:
     ) -> None:
         matched = [
             idx
-            for idx in _indexes(TABLE)
+            for idx in db_indexes(TABLE)
             if set(idx.get("column_names") or ())
             == {"athlete_id", "created_at"}
         ]
@@ -385,7 +318,7 @@ class TestGenerationEventReadIndexesDB:
     ) -> None:
         matched = [
             idx
-            for idx in _indexes(TABLE)
+            for idx in db_indexes(TABLE)
             if set(idx.get("column_names") or ())
             == {"agent_name", "created_at"}
         ]
@@ -399,7 +332,7 @@ class TestGenerationEventReadIndexesDB:
     ) -> None:
         matched = [
             idx
-            for idx in _indexes(TABLE)
+            for idx in db_indexes(TABLE)
             if set(idx.get("column_names") or ())
             == {"success", "created_at"}
         ]
@@ -418,7 +351,7 @@ class TestGenerationEventRoundTripDB:
     async def test_minimal_event_persists(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "ge-roundtrip@example.com"
         )
         evt = _generation_event_factory(
@@ -452,7 +385,7 @@ class TestGenerationEventRoundTripDB:
     async def test_failure_event_persists(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "ge-failure-roundtrip@example.com"
         )
         evt = _generation_event_factory(
@@ -488,7 +421,7 @@ class TestGenerationEventServerDefaultsDB:
     async def test_default_token_counts_apply_when_omitted(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "ge-defaults@example.com"
         )
         # Provide explicit failure_reason — pass NULL for token

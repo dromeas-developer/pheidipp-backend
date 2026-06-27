@@ -30,25 +30,18 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 
 from app.models.enums import TrainingPlanStatus
 from app.models.training_plan import TrainingPlan
-
-
-def _columns() -> dict[str, object]:
-    return {column.key: column for column in TrainingPlan.__table__.columns}
-
-
-def _indexes() -> dict[str, "object"]:
-    return {idx.name: idx for idx in TrainingPlan.__table__.indexes}
+from tests.utils.model_helpers import get_columns, get_indexes, get_foreign_keys_referencing, get_enum_values
 
 
 class TestTrainingPlanRequiredColumns:
     def test_id_column_uuid_primary_key(self) -> None:
-        cols = _columns()
+        cols = get_columns(TrainingPlan)
         assert "id" in cols
         assert cols["id"].primary_key is True
         assert isinstance(cols["id"].type, PG_UUID)
 
     def test_training_goal_id_required_uuid(self) -> None:
-        col = _columns()["training_goal_id"]
+        col = get_columns(TrainingPlan)["training_goal_id"]
         assert col.nullable is False
         assert isinstance(col.type, PG_UUID)
 
@@ -61,17 +54,13 @@ class TestTrainingPlanRequiredColumns:
         must not cascade-delete the plan — the SET NULL semantics
         match the column's nullability and the architecture contract.
         """
-        col = _columns()["twin_state_id"]
+        col = get_columns(TrainingPlan)["twin_state_id"]
         assert col.nullable is True
         assert isinstance(col.type, PG_UUID)
         # Exactly one FK points at ``twin_states.id`` and it must be
         # declared SET NULL — the cascade-delete invariant is
         # explicitly NOT allowed on this FK.
-        twin_fks = [
-            fk
-            for fk in TrainingPlan.__table__.foreign_keys
-            if fk.column.table.name == "twin_states"
-        ]
+        twin_fks = get_foreign_keys_referencing(TrainingPlan, "twin_state_id")
         assert len(twin_fks) == 1, (
             "training_plans.twin_state_id must carry exactly one FK "
             "to twin_states (wired in Phase-1.2c). "
@@ -83,48 +72,46 @@ class TestTrainingPlanRequiredColumns:
         )
 
     def test_phases_summary_required_jsonb_with_default(self) -> None:
-        col = _columns()["phases_summary"]
+        col = get_columns(TrainingPlan)["phases_summary"]
         assert col.nullable is False
         assert isinstance(col.type, JSONB)
 
     def test_phase_definitions_required_jsonb_with_default(self) -> None:
-        col = _columns()["phase_definitions"]
+        col = get_columns(TrainingPlan)["phase_definitions"]
         assert col.nullable is False
         assert isinstance(col.type, JSONB)
 
     def test_weekly_distributions_required_jsonb_with_default(self) -> None:
-        col = _columns()["weekly_distributions"]
+        col = get_columns(TrainingPlan)["weekly_distributions"]
         assert col.nullable is False
         assert isinstance(col.type, JSONB)
 
     def test_status_required_enum(self) -> None:
-        col = _columns()["status"]
+        col = get_columns(TrainingPlan)["status"]
         assert col.nullable is False
         assert isinstance(col.type, SAEnum)
-        values_callable = col.type.values_callable
-        assert values_callable is not None
-        actual = sorted(values_callable(TrainingPlanStatus))
+        actual = sorted(get_enum_values(col, TrainingPlanStatus))
         assert actual == ["active", "completed", "superseded"]
 
     def test_superseded_at_nullable_datetime(self) -> None:
-        col = _columns()["superseded_at"]
+        col = get_columns(TrainingPlan)["superseded_at"]
         assert col.nullable is True
         assert isinstance(col.type, DateTime)
 
     def test_created_at_required_datetime(self) -> None:
-        col = _columns()["created_at"]
+        col = get_columns(TrainingPlan)["created_at"]
         assert col.nullable is False
         assert isinstance(col.type, DateTime)
 
     def test_strategic_rationale_nullable_jsonb(self) -> None:
         """Strategic rationale is null for fitness_improvement /
         maintenance / recovery modes — null allowed at the DB layer."""
-        col = _columns()["strategic_rationale"]
+        col = get_columns(TrainingPlan)["strategic_rationale"]
         assert col.nullable is True
         assert isinstance(col.type, JSONB)
 
     def test_checkpoint_schedule_required_jsonb(self) -> None:
-        col = _columns()["checkpoint_schedule"]
+        col = get_columns(TrainingPlan)["checkpoint_schedule"]
         assert col.nullable is False
         assert isinstance(col.type, JSONB)
 
@@ -134,7 +121,7 @@ class TestTrainingPlanIndexes:
         """Active / superseded lookup — find the current plan for a goal."""
         matched = [
             idx
-            for idx in _indexes().values()
+            for idx in get_indexes(TrainingPlan).values()
             if {c.key for c in idx.columns} >= {
                 "training_goal_id",
                 "status",
@@ -150,7 +137,7 @@ class TestTrainingPlanIndexes:
         Indexed for the production query path."""
         matched = [
             idx
-            for idx in _indexes().values()
+            for idx in get_indexes(TrainingPlan).values()
             if {c.key for c in idx.columns} >= {"twin_state_id"}
         ]
         assert matched, (
@@ -182,7 +169,7 @@ class TestTrainingPlanSchemaAntiGoals:
         ],
     )
     def test_forbidden_columns_are_absent(self, forbidden_field: str) -> None:
-        assert forbidden_field not in _columns(), (
+        assert forbidden_field not in get_columns(TrainingPlan), (
             f"TrainingPlan must not carry `{forbidden_field}`. The "
             "schema-only contract forbids it."
         )

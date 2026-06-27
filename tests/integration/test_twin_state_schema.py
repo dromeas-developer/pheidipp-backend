@@ -21,12 +21,11 @@ Reference plan: docs/implementation/phase-1/phase-1-2c-p1-twin-fitness-coaching-
 
 from __future__ import annotations
 
-import os
 import uuid
 from datetime import date, datetime, timezone
 
 import pytest
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -43,60 +42,15 @@ from app.models.enums import (
 )
 from app.models.training_goal import TrainingGoal
 from app.models.twin_state import TwinState
-
+from tests.utils.factories import make_athlete
+from tests.utils.schema_helpers import (
+    db_columns,
+    db_foreign_keys,
+    db_indexes,
+    get_sync_database_url,
+)
 
 TABLE = "twin_states"
-
-
-def _sync_url() -> str:
-    database_url = os.environ.get("DATABASE_URL", "")
-    if not database_url:
-        raise RuntimeError("DATABASE_URL environment variable not set")
-    if database_url.startswith("postgresql+asyncpg://"):
-        database_url = database_url.replace(
-            "postgresql+asyncpg://",
-            "postgresql+psycopg2://",
-        )
-    return database_url
-
-
-def _columns(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_columns(table))
-    finally:
-        engine.dispose()
-
-
-def _indexes(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_indexes(table))
-    finally:
-        engine.dispose()
-
-
-def _foreign_keys(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_foreign_keys(table))
-    finally:
-        engine.dispose()
-
-
-# ---------------------------------------------------------------------------
-# Helpers — factories / row creation.
-# ---------------------------------------------------------------------------
-
-
-async def _new_athlete(db_session: AsyncSession, email: str) -> Athlete:
-    a = Athlete(email=email)
-    db_session.add(a)
-    await db_session.flush()
-    return a
 
 
 async def _new_active_goal(
@@ -198,7 +152,7 @@ class TestTwinStateDBSchemaColumns:
     async def test_required_column_present(
         self, db_session: AsyncSession, expected_column: str
     ) -> None:
-        cols = {col["name"] for col in _columns(TABLE)}
+        cols = {col["name"] for col in db_columns(TABLE)}
         assert expected_column in cols, (
             f"twin_states.{expected_column} missing from DB schema."
         )
@@ -216,7 +170,7 @@ class TestTwinStatePartialUniqueIndexDB:
     ``IntegrityError``; two with NULL ``activity_id`` must coexist."""
 
     def _partial_unique_index(self) -> dict | None:
-        for idx in _indexes(TABLE):
+        for idx in db_indexes(TABLE):
             cols = set(idx.get("column_names") or [])
             if cols == {"athlete_id", "activity_id"} and idx.get("unique"):
                 return idx
@@ -236,7 +190,7 @@ class TestTwinStatePartialUniqueIndexDB:
     ) -> None:
         idx = self._partial_unique_index()
         assert idx is not None
-        engine = create_engine(_sync_url())
+        engine = create_engine(get_sync_database_url())
         try:
             with engine.connect() as conn:
                 row = conn.execute(
@@ -264,7 +218,7 @@ class TestTwinStateActivityUniquenessDB:
     async def test_duplicate_activity_rejected(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(db_session, "twin-dup-activity@example.com")
+        athlete = await make_athlete(db_session, "twin-dup-activity@example.com")
         goal = await _new_active_goal(db_session, athlete)
         activity = await _new_activity(db_session, athlete)
 
@@ -292,7 +246,7 @@ class TestTwinStateActivityUniquenessDB:
         wellness_update) use NULL activity_id. The partial predicate
         exempts NULL rows, so multiple TwinStates per athlete with
         NULL activity_id are allowed."""
-        athlete = await _new_athlete(db_session, "twin-null-activity@example.com")
+        athlete = await make_athlete(db_session, "twin-null-activity@example.com")
         goal = await _new_active_goal(db_session, athlete)
 
         s1 = _twin_state_factory(
@@ -326,7 +280,7 @@ class TestTwinStateActivityUniquenessDB:
     ) -> None:
         """One activity-linked TwinState plus one NULL-activity
         TwinState coexist."""
-        athlete = await _new_athlete(db_session, "twin-mixed-triggers@example.com")
+        athlete = await make_athlete(db_session, "twin-mixed-triggers@example.com")
         goal = await _new_active_goal(db_session, athlete)
         activity = await _new_activity(db_session, athlete)
 
@@ -361,7 +315,7 @@ class TestTwinStateLatestIndexDB:
     async def test_latest_index_present(self, db_session: AsyncSession) -> None:
         matched = [
             idx
-            for idx in _indexes(TABLE)
+            for idx in db_indexes(TABLE)
             if set(idx.get("column_names") or ())
             == {"athlete_id", "created_at"}
         ]
@@ -380,7 +334,7 @@ class TestTwinStateForeignKeysDB:
     """Athlete FK CASCADE, TrainingGoal FK CASCADE, Activity FK SET NULL."""
 
     def test_athlete_id_fk_cascade(self) -> None:
-        fks = _foreign_keys(TABLE)
+        fks = db_foreign_keys(TABLE)
         athlete_fks = [
             fk
             for fk in fks
@@ -393,7 +347,7 @@ class TestTwinStateForeignKeysDB:
         )
 
     def test_training_goal_id_fk_cascade(self) -> None:
-        fks = _foreign_keys(TABLE)
+        fks = db_foreign_keys(TABLE)
         goal_fks = [
             fk
             for fk in fks
@@ -406,7 +360,7 @@ class TestTwinStateForeignKeysDB:
         )
 
     def test_activity_id_fk_set_null(self) -> None:
-        fks = _foreign_keys(TABLE)
+        fks = db_foreign_keys(TABLE)
         activity_fks = [
             fk
             for fk in fks
@@ -468,7 +422,7 @@ class TestTwinStateForeignKeysDB:
             )
 
         # Verify the twin state row is gone via a sync query.
-        engine = create_engine(_sync_url())
+        engine = create_engine(get_sync_database_url())
         try:
             with engine.connect() as conn:
                 row = conn.execute(
@@ -496,7 +450,7 @@ class TestTwinStateDefaultsDB:
     async def test_metric_confidence_default_empty_dict(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(db_session, "twin-metric-default@example.com")
+        athlete = await make_athlete(db_session, "twin-metric-default@example.com")
         goal = await _new_active_goal(db_session, athlete)
 
         state = _twin_state_factory(
@@ -529,7 +483,7 @@ class TestTwinStateRequiredFieldsNotNullDB:
     ) -> None:
         goal = await _new_active_goal(
             db_session,
-            await _new_athlete(db_session, "twin-missing-athlete@example.com"),
+            await make_athlete(db_session, "twin-missing-athlete@example.com"),
         )
         state = TwinState(
             athlete_id=None,  # type: ignore[arg-type]
@@ -550,7 +504,7 @@ class TestTwinStateRequiredFieldsNotNullDB:
         await db_session.rollback()
 
     async def test_missing_form_rejected(self, db_session: AsyncSession) -> None:
-        athlete = await _new_athlete(db_session, "twin-missing-form@example.com")
+        athlete = await make_athlete(db_session, "twin-missing-form@example.com")
         goal = await _new_active_goal(db_session, athlete)
         state = TwinState(
             athlete_id=athlete.id,
@@ -582,7 +536,7 @@ class TestTwinStateRoundTripDB:
     async def test_questionnaire_trigger_persists(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(db_session, "twin-roundtrip@example.com")
+        athlete = await make_athlete(db_session, "twin-roundtrip@example.com")
         goal = await _new_active_goal(db_session, athlete)
 
         state = _twin_state_factory(
@@ -620,7 +574,7 @@ class TestTwinStateRoundTripDB:
     ) -> None:
         """JSONB ``metric_confidence`` round-trip preserves nested
         shape (lt1_hr, lt2_hr, cp, etc.)."""
-        athlete = await _new_athlete(db_session, "twin-jsonb@example.com")
+        athlete = await make_athlete(db_session, "twin-jsonb@example.com")
         goal = await _new_active_goal(db_session, athlete)
 
         confidence = {

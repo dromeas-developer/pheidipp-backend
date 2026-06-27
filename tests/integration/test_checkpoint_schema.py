@@ -18,12 +18,11 @@ Reference plan: docs/implementation/phase-1/phase-1-2b-p1-plan-sessions.md
 
 from __future__ import annotations
 
-import os
 import uuid
 from datetime import date
 
 import pytest
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import delete as sa_delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -44,73 +43,17 @@ from app.models.planned_session import PlannedSession
 from app.models.training_goal import TrainingGoal
 from app.models.training_plan import TrainingPlan
 from app.models.weekly_plan import WeeklyPlan
+from tests.utils.factories import make_athlete
+from tests.utils.schema_helpers import (
+    db_check_constraints,
+    db_columns,
+    db_foreign_keys,
+    db_indexes,
+    db_unique_constraints,
+)
 
 
 TABLE = "checkpoints"
-
-
-def _sync_url() -> str:
-    database_url = os.environ.get("DATABASE_URL", "")
-    if not database_url:
-        raise RuntimeError("DATABASE_URL environment variable not set")
-    if database_url.startswith("postgresql+asyncpg://"):
-        database_url = database_url.replace(
-            "postgresql+asyncpg://",
-            "postgresql+psycopg2://",
-        )
-    return database_url
-
-
-def _columns(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_columns(table))
-    finally:
-        engine.dispose()
-
-
-def _unique_constraints(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_unique_constraints(table))
-    finally:
-        engine.dispose()
-
-
-def _check_constraints(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_check_constraints(table))
-    finally:
-        engine.dispose()
-
-
-def _indexes(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_indexes(table))
-    finally:
-        engine.dispose()
-
-
-def _foreign_keys(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_foreign_keys(table))
-    finally:
-        engine.dispose()
-
-
-async def _new_athlete(db_session: AsyncSession, email: str) -> Athlete:
-    a = Athlete(email=email)
-    db_session.add(a)
-    await db_session.flush()
-    return a
 
 
 async def _new_active_plan_with_week_and_session(
@@ -207,7 +150,7 @@ class TestCheckpointDBSchemaColumns:
     async def test_required_column_present(
         self, db_session: AsyncSession, expected_column: str
     ) -> None:
-        cols = {col["name"] for col in _columns(TABLE)}
+        cols = {col["name"] for col in db_columns(TABLE)}
         assert expected_column in cols, (
             f"checkpoints.{expected_column} missing from DB schema."
         )
@@ -216,7 +159,7 @@ class TestCheckpointDBSchemaColumns:
         """Architecture forbids the redundant ``training_plan_id`` on
         checkpoints — derivation goes PlannedSession → WeeklyPlan →
         TrainingPlan."""
-        cols = {col["name"] for col in _columns(TABLE)}
+        cols = {col["name"] for col in db_columns(TABLE)}
         assert "training_plan_id" not in cols, (
             "checkpoints must NOT carry training_plan_id — derivation "
             "goes through PlannedSession."
@@ -235,9 +178,9 @@ class TestCheckpointOneToOne:
     async def test_planned_session_id_unique_constraint(
         self, db_session: AsyncSession
     ) -> None:
-        uniques = _unique_constraints(TABLE)
+        uniques = db_unique_constraints(TABLE)
         col_level = next(
-            c for c in _columns(TABLE) if c["name"] == "planned_session_id"
+            c for c in db_columns(TABLE) if c["name"] == "planned_session_id"
         )
         matched = [
             u for u in uniques
@@ -252,7 +195,7 @@ class TestCheckpointOneToOne:
         self, db_session: AsyncSession
     ) -> None:
         col = next(
-            c for c in _columns(TABLE) if c["name"] == "planned_session_id"
+            c for c in db_columns(TABLE) if c["name"] == "planned_session_id"
         )
         assert col["nullable"] is False
 
@@ -261,7 +204,7 @@ class TestCheckpointOneToOne:
     ) -> None:
         """Two checkpoints for the same PlannedSession must raise an
         ``IntegrityError`` at the DB layer (the unique constraint)."""
-        athlete = await _new_athlete(db_session, "cp-dup-1to1@example.com")
+        athlete = await make_athlete(db_session, "cp-dup-1to1@example.com")
         _, _, sess = await _new_active_plan_with_week_and_session(
             db_session, athlete
         )
@@ -282,7 +225,7 @@ class TestCheckpointForeignKeyCascade:
     def test_planned_session_id_fk_to_planned_sessions_cascade(
         self, db_session: AsyncSession
     ) -> None:
-        fks = _foreign_keys(TABLE)
+        fks = db_foreign_keys(TABLE)
         matches = [
             fk for fk in fks
             if fk.get("referred_table") == "planned_sessions"
@@ -295,39 +238,25 @@ class TestCheckpointForeignKeyCascade:
         )
 
     def test_fk_ondelete_cascade_in_pg_catalog(self) -> None:
-        from sqlalchemy import text
-
-        engine = create_engine(_sync_url())
-        try:
-            with engine.connect() as conn:
-                row = conn.execute(
-                    text(
-                        """
-                        SELECT c.confdeltype,
-                               pg_get_constraintdef(c.oid) AS constraint_def
-                        FROM pg_constraint c
-                        JOIN pg_class conrelid_table ON conrelid_table.oid = c.conrelid
-                        JOIN pg_class confrelid_table ON confrelid_table.oid = c.confrelid
-                        WHERE c.contype = 'f'
-                          AND confrelid_table.relname = 'planned_sessions'
-                          AND conrelid_table.relname = 'checkpoints'
-                        """
-                    )
-                ).fetchone()
-        finally:
-            engine.dispose()
-        assert row is not None, (
-            "checkpoints.planned_session_id FK must exist in pg_constraint."
+        fks = db_foreign_keys(TABLE)
+        matches = [
+            fk for fk in fks
+            if fk.get("referred_table") == "planned_sessions"
+            and tuple(fk.get("constrained_columns") or ())
+            == ("planned_session_id",)
+        ]
+        assert matches, (
+            "checkpoints.planned_session_id FK must reference "
+            "planned_sessions(id)."
         )
-        assert row[0] == "c", (
-            "checkpoints.planned_session_id FK must CASCADE on delete. "
-            f"Got confdeltype={row[0]!r}, def={row[1]}"
+        assert matches[0].get("options", {}).get("ondelete") == "CASCADE", (
+            "checkpoints.planned_session_id FK ON DELETE must be CASCADE."
         )
 
     async def test_cascade_delete_with_planned_session(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(db_session, "cp-cascade@example.com")
+        athlete = await make_athlete(db_session, "cp-cascade@example.com")
         _, _, sess = await _new_active_plan_with_week_and_session(
             db_session, athlete
         )
@@ -358,7 +287,7 @@ class TestCheckpointCheckConstraints:
     def test_status_inline_union_check(self) -> None:
         text = " | ".join(
             (c.get("sqltext") or "")
-            for c in _check_constraints(TABLE)
+            for c in db_check_constraints(TABLE)
         ).lower()
         assert "scheduled" in text and "completed" in text and "skipped" in text, (
             "checkpoints.status check must include `scheduled`, "
@@ -368,7 +297,7 @@ class TestCheckpointCheckConstraints:
     def test_trajectory_status_inline_union_check(self) -> None:
         text = " | ".join(
             (c.get("sqltext") or "")
-            for c in _check_constraints(TABLE)
+            for c in db_check_constraints(TABLE)
         ).lower()
         assert "trajectory_status" in text
         for val in ("ahead", "on_track", "behind", "at_risk"):
@@ -380,7 +309,7 @@ class TestCheckpointCheckConstraints:
     async def test_invalid_status_value_rejected(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(db_session, "cp-status-bad@example.com")
+        athlete = await make_athlete(db_session, "cp-status-bad@example.com")
         _, _, sess = await _new_active_plan_with_week_and_session(
             db_session, athlete
         )
@@ -404,7 +333,7 @@ class TestCheckpointPersistence:
     ) -> None:
         from datetime import datetime, timezone
 
-        athlete = await _new_athlete(db_session, "cp-rt@example.com")
+        athlete = await make_athlete(db_session, "cp-rt@example.com")
         _, _, sess = await _new_active_plan_with_week_and_session(
             db_session, athlete
         )
@@ -446,7 +375,7 @@ class TestCheckpointPersistence:
     ) -> None:
         """``status`` server-defaults to scheduled; no completion
         fields populated yet."""
-        athlete = await _new_athlete(db_session, "cp-default@example.com")
+        athlete = await make_athlete(db_session, "cp-default@example.com")
         _, _, sess = await _new_active_plan_with_week_and_session(
             db_session, athlete
         )
@@ -465,7 +394,7 @@ class TestCheckpointPersistence:
     ) -> None:
         """``secondary_metrics`` is an ARRAY(String) and round-trips
         with multiple distinct values."""
-        athlete = await _new_athlete(db_session, "cp-array@example.com")
+        athlete = await make_athlete(db_session, "cp-array@example.com")
         _, _, sess = await _new_active_plan_with_week_and_session(
             db_session, athlete
         )
@@ -488,7 +417,7 @@ class TestCheckpointPersistence:
 class TestCheckpointIndexes:
     def test_type_status_index_present(self) -> None:
         matched = [
-            idx for idx in _indexes(TABLE)
+            idx for idx in db_indexes(TABLE)
             if set(idx.get("column_names") or []) >= {"type", "status"}
         ]
         assert matched, (

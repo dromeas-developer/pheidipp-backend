@@ -14,43 +14,30 @@ from __future__ import annotations
 
 import pytest
 from sqlalchemy import (
-    CheckConstraint,
     Date,
     DateTime,
-    ForeignKey,
-    Index,
     Text,
-    text,
 )
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 
 from app.models.regeneration_task import RegenerationTask
-
-
-def _columns() -> dict[str, object]:
-    return {column.key: column for column in RegenerationTask.__table__.columns}
-
-
-def _indexes() -> dict[str, Index]:
-    return {idx.name: idx for idx in RegenerationTask.__table__.indexes}
-
-
-def _check_constraints() -> list[CheckConstraint]:
-    return [
-        c
-        for c in RegenerationTask.__table__.constraints
-        if isinstance(c, CheckConstraint)
-    ]
+from tests.utils.model_helpers import (
+    get_columns,
+    get_indexes,
+    get_check_constraints,
+    get_check_text,
+    get_foreign_keys_referencing,
+)
 
 
 class TestRegenerationTaskRequiredColumns:
     def test_id_column_uuid_primary_key(self) -> None:
-        col = _columns()["id"]
+        col = get_columns(RegenerationTask)["id"]
         assert col.primary_key is True
         assert isinstance(col.type, PG_UUID)
 
     def test_training_goal_id_required_uuid(self) -> None:
-        col = _columns()["training_goal_id"]
+        col = get_columns(RegenerationTask)["training_goal_id"]
         assert col.nullable is False
         assert isinstance(col.type, PG_UUID)
 
@@ -58,17 +45,17 @@ class TestRegenerationTaskRequiredColumns:
         """``training_plan_id`` is nullable: it points to the new
         plan created when the task is confirmed; for
         pending / declined / expired rows it stays null."""
-        col = _columns()["training_plan_id"]
+        col = get_columns(RegenerationTask)["training_plan_id"]
         assert col.nullable is True
         assert isinstance(col.type, PG_UUID)
 
     def test_proposed_date_required_date(self) -> None:
-        col = _columns()["proposed_date"]
+        col = get_columns(RegenerationTask)["proposed_date"]
         assert col.nullable is False
         assert isinstance(col.type, Date)
 
     def test_rationale_required_text(self) -> None:
-        col = _columns()["rationale"]
+        col = get_columns(RegenerationTask)["rationale"]
         assert col.nullable is False
         assert isinstance(col.type, Text)
 
@@ -77,37 +64,34 @@ class TestRegenerationTaskRequiredColumns:
         constraint enforcing membership in the closed vocabulary
         {trajectory_ahead | trajectory_at_risk | coach_conversation}.
         At the ORM layer it is just a Text column."""
-        col = _columns()["trigger"]
+        col = get_columns(RegenerationTask)["trigger"]
         assert col.nullable is False
         assert isinstance(col.type, Text)
 
     def test_status_required_text_with_check(self) -> None:
-        col = _columns()["status"]
+        col = get_columns(RegenerationTask)["status"]
         assert col.nullable is False
         assert isinstance(col.type, Text)
 
     def test_proposed_at_required_datetime(self) -> None:
-        col = _columns()["proposed_at"]
+        col = get_columns(RegenerationTask)["proposed_at"]
         assert col.nullable is False
         assert isinstance(col.type, DateTime)
 
     def test_decided_at_nullable_datetime(self) -> None:
-        col = _columns()["decided_at"]
+        col = get_columns(RegenerationTask)["decided_at"]
         assert col.nullable is True
         assert isinstance(col.type, DateTime)
 
     def test_expires_at_required_datetime(self) -> None:
-        col = _columns()["expires_at"]
+        col = get_columns(RegenerationTask)["expires_at"]
         assert col.nullable is False
         assert isinstance(col.type, DateTime)
 
 
 class TestRegenerationTaskForeignKeys:
     def test_training_goal_id_has_fk_to_training_goals(self) -> None:
-        foreign_keys = [
-            fk for fk in RegenerationTask.__table__.foreign_keys
-            if fk.parent.name == "training_goal_id"
-        ]
+        foreign_keys = get_foreign_keys_referencing(RegenerationTask, "training_goal_id")
         assert foreign_keys, (
             "RegenerationTask.training_goal_id must declare an FK to "
             "training_goals.id."
@@ -118,10 +102,7 @@ class TestRegenerationTaskForeignKeys:
     def test_training_plan_id_has_fk_to_training_plans(self) -> None:
         """``training_plan_id`` is nullable but carries an FK — it is
         the FK for ``training_plans.id``."""
-        foreign_keys = [
-            fk for fk in RegenerationTask.__table__.foreign_keys
-            if fk.parent.name == "training_plan_id"
-        ]
+        foreign_keys = get_foreign_keys_referencing(RegenerationTask, "training_plan_id")
         assert foreign_keys, (
             "RegenerationTask.training_plan_id must declare an FK to "
             "training_plans.id (nullable)."
@@ -131,13 +112,9 @@ class TestRegenerationTaskForeignKeys:
 
 
 class TestRegenerationTaskCheckConstraints:
-    def _check_text(self, check: CheckConstraint) -> str:
-        expr = getattr(check, "expression", None) or getattr(check, "sqltext", None)
-        return (str(expr) if expr is not None else "")
-
     def test_status_inline_union_check(self) -> None:
         text = " | ".join(
-            self._check_text(c) for c in _check_constraints()
+            get_check_text(c) for c in get_check_constraints(RegenerationTask)
         ).lower()
         for status_value in (
             "pending_confirmation",
@@ -156,7 +133,7 @@ class TestRegenerationTaskPendingPartialIndex:
     "Stagnant Proposals" alert query path."""
 
     def test_pending_partial_index_present(self) -> None:
-        indexes = _indexes()
+        indexes = get_indexes(RegenerationTask)
         assert "ix_regeneration_tasks_pending" in indexes, (
             "RegenerationTask must declare "
             "`ix_regeneration_tasks_pending` partial index."
@@ -166,7 +143,7 @@ class TestRegenerationTaskPendingPartialIndex:
         assert columns == {"training_goal_id", "status"}
 
     def test_pending_partial_predicate_is_status_pending_confirmation(self) -> None:
-        idx = _indexes()["ix_regeneration_tasks_pending"]
+        idx = get_indexes(RegenerationTask)["ix_regeneration_tasks_pending"]
         predicate = idx.dialect_options.get("postgresql", {}).get("where")
         assert predicate is not None, (
             "ix_regeneration_tasks_pending must declare a "
@@ -198,7 +175,7 @@ class TestRegenerationTaskSchemaAntiGoals:
         ],
     )
     def test_forbidden_columns_are_absent(self, forbidden_field: str) -> None:
-        assert forbidden_field not in _columns(), (
+        assert forbidden_field not in get_columns(RegenerationTask), (
             f"RegenerationTask must not carry `{forbidden_field}`. "
             "Schema-only, event-less, no approval workflow."
         )

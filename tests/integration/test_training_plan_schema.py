@@ -19,12 +19,11 @@ Reference plan: docs/implementation/phase-1/phase-1-2b-p1-plan-sessions.md
 
 from __future__ import annotations
 
-import os
 import uuid
 from datetime import datetime, timezone
 
 import pytest
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import create_engine, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -32,48 +31,10 @@ from app.models.athlete import Athlete
 from app.models.enums import GoalType, TrainingGoalStatus, TrainingPlanStatus
 from app.models.training_goal import TrainingGoal
 from app.models.training_plan import TrainingPlan
+from tests.utils.schema_helpers import db_columns, db_foreign_keys, db_indexes, get_sync_database_url
 
 
 TABLE = "training_plans"
-
-
-def _sync_url() -> str:
-    database_url = os.environ.get("DATABASE_URL", "")
-    if not database_url:
-        raise RuntimeError("DATABASE_URL environment variable not set")
-    if database_url.startswith("postgresql+asyncpg://"):
-        database_url = database_url.replace(
-            "postgresql+asyncpg://",
-            "postgresql+psycopg2://",
-        )
-    return database_url
-
-
-def _columns(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_columns(table))
-    finally:
-        engine.dispose()
-
-
-def _foreign_keys(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_foreign_keys(table))
-    finally:
-        engine.dispose()
-
-
-def _indexes(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_indexes(table))
-    finally:
-        engine.dispose()
 
 
 async def _new_athlete(db_session: AsyncSession, email: str) -> Athlete:
@@ -142,7 +103,7 @@ class TestTrainingPlanDBSchemaColumns:
     async def test_required_column_present(
         self, db_session: AsyncSession, expected_column: str
     ) -> None:
-        cols = {col["name"] for col in _columns(TABLE)}
+        cols = {col["name"] for col in db_columns(TABLE)}
         assert expected_column in cols, (
             f"training_plans.{expected_column} missing from DB schema."
         )
@@ -150,7 +111,7 @@ class TestTrainingPlanDBSchemaColumns:
     async def test_twin_state_id_is_uuid_nullable(
         self, db_session: AsyncSession
     ) -> None:
-        cols = {col["name"]: col for col in _columns(TABLE)}
+        cols = {col["name"]: col for col in db_columns(TABLE)}
         col = cols["twin_state_id"]
         assert col["nullable"] is True
         type_name = col["type"].__class__.__name__.upper()
@@ -177,7 +138,7 @@ class TestTrainingPlanTwinStateFKWired:
     def test_fk_to_twin_states_present(self) -> None:
         """Phase-1.2c must declare an FK from training_plans.twin_state_id
         to twin_states.id."""
-        fks = _foreign_keys(TABLE)
+        fks = db_foreign_keys(TABLE)
         matches = [
             fk
             for fk in fks
@@ -198,7 +159,7 @@ class TestTrainingPlanTwinStateFKWired:
         mode (e.g. RESTRICT) fails this tripwire."""
         from sqlalchemy import text
 
-        engine = create_engine(_sync_url())
+        engine = create_engine(get_sync_database_url())
         try:
             with engine.connect() as conn:
                 row = conn.execute(
@@ -283,7 +244,7 @@ class TestTrainingPlanTwinStateFKWired:
 
 class TestTrainingPlanGoalForeignKey:
     def test_training_goal_id_fk_to_training_goals(self) -> None:
-        fks = _foreign_keys(TABLE)
+        fks = db_foreign_keys(TABLE)
         matches = [
             fk for fk in fks
             if fk.get("referred_table") == "training_goals"
@@ -301,7 +262,7 @@ class TestTrainingPlanGoalForeignKey:
         ``pg_constraint.confdeltype='c'`` for the FK row above."""
         from sqlalchemy import text
 
-        engine = create_engine(_sync_url())
+        engine = create_engine(get_sync_database_url())
         try:
             with engine.connect() as conn:
                 row = conn.execute(
@@ -470,7 +431,7 @@ class TestTrainingPlanSupersession:
         assert plan_old.id != plan_new.id
 
     async def test_no_deleted_at_column(self) -> None:
-        cols = {col["name"] for col in _columns(TABLE)}
+        cols = {col["name"] for col in db_columns(TABLE)}
         assert "deleted_at" not in cols, (
             "training_plans.deleted_at must NOT exist — plans are "
             "superseded, not deleted."
@@ -486,7 +447,7 @@ class TestTrainingPlanIndexes:
     def test_goal_status_index_present(self) -> None:
         matched = [
             idx
-            for idx in _indexes(TABLE)
+            for idx in db_indexes(TABLE)
             if set(idx.get("column_names") or []) >= {
                 "training_goal_id",
                 "status",
@@ -501,7 +462,7 @@ class TestTrainingPlanIndexes:
         """Reverse-lookup TwinState → plans uses the (deferred) FK."""
         matched = [
             idx
-            for idx in _indexes(TABLE)
+            for idx in db_indexes(TABLE)
             if set(idx.get("column_names") or []) >= {"twin_state_id"}
         ]
         assert matched, (

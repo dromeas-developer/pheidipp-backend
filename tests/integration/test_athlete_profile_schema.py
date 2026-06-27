@@ -20,68 +20,16 @@ from __future__ import annotations
 from datetime import date
 
 import pytest
-from sqlalchemy import inspect
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.athlete import Athlete
 from app.models.athlete_profile import AthleteProfile
 from app.models.enums import Sex
+from tests.utils.schema_helpers import db_columns, db_unique_constraints
 
 
 TABLE = "athlete_profiles"
-
-
-import os
-
-import pytest
-from sqlalchemy import create_engine, inspect
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.models.athlete import Athlete
-from app.models.athlete_profile import AthleteProfile
-from app.models.enums import Sex
-
-
-TABLE = "athlete_profiles"
-
-
-def _columns(table: str) -> list[dict]:
-    """Get column info for a table using sync engine."""
-    database_url = os.environ.get("DATABASE_URL", "")
-    if not database_url:
-        raise RuntimeError("DATABASE_URL environment variable not set")
-    
-    # Convert asyncpg URL to psycopg2
-    if database_url.startswith("postgresql+asyncpg://"):
-        database_url = database_url.replace("postgresql+asyncpg://", "postgresql+psycopg2://")
-    
-    engine = create_engine(database_url)
-    try:
-        with engine.connect() as conn:
-            inspector = inspect(conn)
-            return list(inspector.get_columns(table))
-    finally:
-        engine.dispose()
-
-
-def _unique_constraints(table: str) -> list[dict]:
-    """Get unique constraint info using sync engine."""
-    database_url = os.environ.get("DATABASE_URL", "")
-    if not database_url:
-        raise RuntimeError("DATABASE_URL environment variable not set")
-    
-    # Convert asyncpg URL to psycopg2
-    if database_url.startswith("postgresql+asyncpg://"):
-        database_url = database_url.replace("postgresql+asyncpg://", "postgresql+psycopg2://")
-    
-    engine = create_engine(database_url)
-    try:
-        with engine.connect() as conn:
-            inspector = inspect(conn)
-            return list(inspector.get_unique_constraints(table))
-    finally:
-        engine.dispose()
 
 
 class TestAthleteProfileDBSchemaColumns:
@@ -116,7 +64,7 @@ class TestAthleteProfileDBSchemaColumns:
         db_session: AsyncSession,
         expected_column: str,
     ) -> None:
-        cols = {col["name"] for col in _columns(TABLE)}
+        cols = {col["name"] for col in db_columns(TABLE)}
         assert expected_column in cols, (
             f"athlete_profiles.{expected_column} must exist on the DB. "
             f"Missing after Phase-1.2a migration."
@@ -135,14 +83,14 @@ class TestAthleteProfileUniqueConstraintPreserved:
         # Table-level UniqueConstraint discovered via Inspector.
         table_level = any(
             tuple(uc["column_names"]) == ("athlete_id",)
-            for uc in _unique_constraints(TABLE)
+            for uc in db_unique_constraints(TABLE)
         )
         # Column-level ``unique=True`` (which SQLAlchemy renders as a
         # UNIQUE constraint too, but Inspector sometimes reports it on
         # the column description rather than as a separate ``info``).
         column_level = any(
             col.get("unique") is True
-            for col in _columns(TABLE)
+            for col in db_columns(TABLE)
             if col["name"] == "athlete_id"
         )
         assert table_level or column_level, (
@@ -314,7 +262,7 @@ class TestAthleteProfileSchemaNotDropped:
         recreate swapped it to BIGINT we'd see a migration in the
         diff and break every existing row reference."""
         columns = {
-            col["name"]: col for col in _columns(TABLE)
+            col["name"]: col for col in db_columns(TABLE)
         }
         id_col = columns["id"]
         # Postgres stores UUID type as ``uuid``. The Inspector

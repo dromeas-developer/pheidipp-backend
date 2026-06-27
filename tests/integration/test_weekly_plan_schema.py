@@ -22,12 +22,11 @@ Reference plan: docs/implementation/phase-1/phase-1-2b-p1-plan-sessions.md
 
 from __future__ import annotations
 
-import os
 import uuid
 from datetime import date
 
 import pytest
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import create_engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -43,74 +42,18 @@ from app.models.enums import (
 from app.models.training_goal import TrainingGoal
 from app.models.training_plan import TrainingPlan
 from app.models.weekly_plan import WeeklyPlan, WeeklySession
-
+from tests.utils.factories import make_athlete
+from tests.utils.schema_helpers import (
+    db_check_constraints,
+    db_columns,
+    db_foreign_keys,
+    db_indexes,
+    db_unique_constraints,
+    get_sync_database_url,
+)
 
 WEEKLY_PLANS = "weekly_plans"
 WEEKLY_SESSIONS = "weekly_sessions"
-
-
-def _sync_url() -> str:
-    database_url = os.environ.get("DATABASE_URL", "")
-    if not database_url:
-        raise RuntimeError("DATABASE_URL environment variable not set")
-    if database_url.startswith("postgresql+asyncpg://"):
-        database_url = database_url.replace(
-            "postgresql+asyncpg://",
-            "postgresql+psycopg2://",
-        )
-    return database_url
-
-
-def _columns(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_columns(table))
-    finally:
-        engine.dispose()
-
-
-def _unique_constraints(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_unique_constraints(table))
-    finally:
-        engine.dispose()
-
-
-def _check_constraints(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_check_constraints(table))
-    finally:
-        engine.dispose()
-
-
-def _indexes(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_indexes(table))
-    finally:
-        engine.dispose()
-
-
-def _foreign_keys(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_foreign_keys(table))
-    finally:
-        engine.dispose()
-
-
-async def _new_athlete(db_session: AsyncSession, email: str) -> Athlete:
-    a = Athlete(email=email)
-    db_session.add(a)
-    await db_session.flush()
-    return a
 
 
 async def _new_active_plan(
@@ -243,7 +186,7 @@ class TestWeeklyPlanDBSchemaColumns:
     async def test_required_column_present(
         self, db_session: AsyncSession, expected_column: str
     ) -> None:
-        cols = {col["name"] for col in _columns(WEEKLY_PLANS)}
+        cols = {col["name"] for col in db_columns(WEEKLY_PLANS)}
         assert expected_column in cols, (
             f"weekly_plans.{expected_column} missing from DB schema."
         )
@@ -255,7 +198,7 @@ class TestWeeklyPlanUniqueConstraint:
     async def test_plan_week_unique_constraint_present(
         self, db_session: AsyncSession
     ) -> None:
-        uniques = _unique_constraints(WEEKLY_PLANS)
+        uniques = db_unique_constraints(WEEKLY_PLANS)
         matched = [
             u
             for u in uniques
@@ -271,7 +214,7 @@ class TestWeeklyPlanUniqueConstraint:
     async def test_duplicate_week_for_same_plan_rejected(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(db_session, "dup-week@example.com")
+        athlete = await make_athlete(db_session, "dup-week@example.com")
         plan = await _new_active_plan(db_session, athlete)
         w1 = _weekly_plan_factory(training_plan_id=plan.id, week_number=3)
         w2 = _weekly_plan_factory(training_plan_id=plan.id, week_number=3)
@@ -294,7 +237,7 @@ class TestWeeklyPlanUniqueConstraint:
         independent of the goal lifecycle, so the second plan can
         stay ACTIVE.
         """
-        athlete = await _new_athlete(db_session, "week-different-plan@example.com")
+        athlete = await make_athlete(db_session, "week-different-plan@example.com")
         plan_a = await _new_active_plan(db_session, athlete)
         plan_b = await _new_active_plan_with_closed_goal(db_session, athlete)
         w_a = _weekly_plan_factory(training_plan_id=plan_a.id, week_number=2)
@@ -310,7 +253,7 @@ class TestWeeklyPlanUniqueConstraint:
 
 class TestWeeklyPlanCheckConstraints:
     def test_week_number_positive_check(self) -> None:
-        checks = _check_constraints(WEEKLY_PLANS)
+        checks = db_check_constraints(WEEKLY_PLANS)
         found = any(
             "week_number" in (c.get("sqltext") or "").lower()
             and ">=" in (c.get("sqltext") or "").lower()
@@ -322,7 +265,7 @@ class TestWeeklyPlanCheckConstraints:
         )
 
     def test_session_counters_non_negative_check(self) -> None:
-        checks = _check_constraints(WEEKLY_PLANS)
+        checks = db_check_constraints(WEEKLY_PLANS)
         text = " | ".join((c.get("sqltext") or "") for c in checks)
         found = (
             "sessions_completed" in text
@@ -336,7 +279,7 @@ class TestWeeklyPlanCheckConstraints:
         )
 
     def test_doubles_days_count_non_negative_check(self) -> None:
-        checks = _check_constraints(WEEKLY_PLANS)
+        checks = db_check_constraints(WEEKLY_PLANS)
         found = any(
             "doubles_days_count" in (c.get("sqltext") or "").lower()
             and ">=" in (c.get("sqltext") or "").lower()
@@ -350,7 +293,7 @@ class TestWeeklyPlanCheckConstraints:
     async def test_week_number_zero_rejected(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(db_session, "wn-zero@example.com")
+        athlete = await make_athlete(db_session, "wn-zero@example.com")
         plan = await _new_active_plan(db_session, athlete)
         week = _weekly_plan_factory(training_plan_id=plan.id, week_number=0)
         db_session.add(week)
@@ -361,7 +304,7 @@ class TestWeeklyPlanCheckConstraints:
     async def test_negative_week_number_rejected(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(db_session, "wn-neg@example.com")
+        athlete = await make_athlete(db_session, "wn-neg@example.com")
         plan = await _new_active_plan(db_session, athlete)
         week = _weekly_plan_factory(training_plan_id=plan.id, week_number=-1)
         db_session.add(week)
@@ -372,7 +315,7 @@ class TestWeeklyPlanCheckConstraints:
     async def test_zero_session_counters_accepted(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(db_session, "counters-zero@example.com")
+        athlete = await make_athlete(db_session, "counters-zero@example.com")
         plan = await _new_active_plan(db_session, athlete)
         week = _weekly_plan_factory(training_plan_id=plan.id)
         db_session.add(week)
@@ -386,7 +329,7 @@ class TestWeeklyPlanCheckConstraints:
     async def test_negative_session_completed_rejected(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(db_session, "sc-neg@example.com")
+        athlete = await make_athlete(db_session, "sc-neg@example.com")
         plan = await _new_active_plan(db_session, athlete)
         week = _weekly_plan_factory(training_plan_id=plan.id)
         week.sessions_completed = -1
@@ -398,7 +341,7 @@ class TestWeeklyPlanCheckConstraints:
 
 class TestWeeklyPlanForeignKeyCascade:
     def test_training_plan_id_fk_to_training_plans(self) -> None:
-        fks = _foreign_keys(WEEKLY_PLANS)
+        fks = db_foreign_keys(WEEKLY_PLANS)
         matches = [
             fk for fk in fks
             if fk.get("referred_table") == "training_plans"
@@ -413,7 +356,7 @@ class TestWeeklyPlanForeignKeyCascade:
     def test_training_plan_id_fk_cascade_in_pg_catalog(self) -> None:
         from sqlalchemy import text
 
-        engine = create_engine(_sync_url())
+        engine = create_engine(get_sync_database_url())
         try:
             with engine.connect() as conn:
                 row = conn.execute(
@@ -443,7 +386,7 @@ class TestWeeklyPlanForeignKeyCascade:
     async def test_cascade_delete_with_plan(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(db_session, "cascade-wp@example.com")
+        athlete = await make_athlete(db_session, "cascade-wp@example.com")
         plan = await _new_active_plan(db_session, athlete)
         week = _weekly_plan_factory(training_plan_id=plan.id)
         db_session.add(week)
@@ -467,7 +410,7 @@ class TestWeeklyPlanPersistence:
     async def test_full_weekly_plan_persists(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(db_session, "wp-rt@example.com")
+        athlete = await make_athlete(db_session, "wp-rt@example.com")
         plan = await _new_active_plan(db_session, athlete)
         week = _weekly_plan_factory(
             training_plan_id=plan.id,
@@ -492,7 +435,7 @@ class TestWeeklyPlanPersistence:
     ) -> None:
         """The structured ``adjusted_intent`` JSONB survives
         persistence with every key intact."""
-        athlete = await _new_athlete(db_session, "wp-jsonb@example.com")
+        athlete = await make_athlete(db_session, "wp-jsonb@example.com")
         plan = await _new_active_plan(db_session, athlete)
         intent = {
             "methodology": "linear",
@@ -540,7 +483,7 @@ class TestWeeklySessionDBSchemaColumns:
     async def test_required_column_present(
         self, db_session: AsyncSession, expected_column: str
     ) -> None:
-        cols = {col["name"] for col in _columns(WEEKLY_SESSIONS)}
+        cols = {col["name"] for col in db_columns(WEEKLY_SESSIONS)}
         assert expected_column in cols, (
             f"weekly_sessions.{expected_column} missing from DB schema."
         )
@@ -554,10 +497,10 @@ class TestWeeklySessionUniqueConstraint:
     async def test_planned_session_id_unique_constraint_present(
         self, db_session: AsyncSession
     ) -> None:
-        uniques = _unique_constraints(WEEKLY_SESSIONS)
+        uniques = db_unique_constraints(WEEKLY_SESSIONS)
         col_level = next(
             c
-            for c in _columns(WEEKLY_SESSIONS)
+            for c in db_columns(WEEKLY_SESSIONS)
             if c["name"] == "planned_session_id"
         )
         matched = [
@@ -578,7 +521,7 @@ class TestWeeklySessionUniqueConstraint:
     ) -> None:
         """Multiple NULL ``planned_session_id`` rows coexist — the
         uniqueness only kicks in when value is non-null."""
-        athlete = await _new_athlete(db_session, "ws-null-pn@example.com")
+        athlete = await make_athlete(db_session, "ws-null-pn@example.com")
         plan = await _new_active_plan(db_session, athlete)
         week = _weekly_plan_factory(training_plan_id=plan.id)
         db_session.add(week)
@@ -602,7 +545,7 @@ class TestWeeklySessionUniqueConstraint:
     async def test_two_sessions_cannot_share_same_planned_session_id(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(db_session, "ws-dup-pn@example.com")
+        athlete = await make_athlete(db_session, "ws-dup-pn@example.com")
         plan = await _new_active_plan(db_session, athlete)
         week = _weekly_plan_factory(training_plan_id=plan.id)
         db_session.add(week)
@@ -631,7 +574,7 @@ class TestWeeklySessionUniqueConstraint:
 class TestWeeklySessionCheckConstraints:
     def test_status_inline_union_check(self) -> None:
         text = " | ".join(
-            (c.get("sqltext") or "") for c in _check_constraints(WEEKLY_SESSIONS)
+            (c.get("sqltext") or "") for c in db_check_constraints(WEEKLY_SESSIONS)
         )
         for status_value in ("scheduled", "completed", "skipped", "missed"):
             assert status_value in text, (
@@ -641,7 +584,7 @@ class TestWeeklySessionCheckConstraints:
 
     def test_block_position_inline_union_check(self) -> None:
         text = " | ".join(
-            (c.get("sqltext") or "") for c in _check_constraints(WEEKLY_SESSIONS)
+            (c.get("sqltext") or "") for c in db_check_constraints(WEEKLY_SESSIONS)
         ).lower()
         assert "block_position" in text
         for pos in ("first", "middle", "last"):
@@ -653,14 +596,14 @@ class TestWeeklySessionCheckConstraints:
     def test_duration_positive_check(self) -> None:
         text = " | ".join(
             (c.get("sqltext") or "")
-            for c in _check_constraints(WEEKLY_SESSIONS)
+            for c in db_check_constraints(WEEKLY_SESSIONS)
         ).lower()
         assert "approximate_duration_minutes" in text and ">" in text
 
     async def test_zero_duration_rejected(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(db_session, "ws-dur-zero@example.com")
+        athlete = await make_athlete(db_session, "ws-dur-zero@example.com")
         plan = await _new_active_plan(db_session, athlete)
         week = _weekly_plan_factory(training_plan_id=plan.id)
         db_session.add(week)
@@ -678,7 +621,7 @@ class TestWeeklySessionCheckConstraints:
     async def test_negative_duration_rejected(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(db_session, "ws-dur-neg@example.com")
+        athlete = await make_athlete(db_session, "ws-dur-neg@example.com")
         plan = await _new_active_plan(db_session, athlete)
         week = _weekly_plan_factory(training_plan_id=plan.id)
         db_session.add(week)
@@ -698,7 +641,7 @@ class TestWeeklySessionCheckConstraints:
     ) -> None:
         """An unexpected status MUST raise an IntegrityError at the
         DB layer (the inline-union CHECK binds it)."""
-        athlete = await _new_athlete(db_session, "ws-status-bad@example.com")
+        athlete = await make_athlete(db_session, "ws-status-bad@example.com")
         plan = await _new_active_plan(db_session, athlete)
         week = _weekly_plan_factory(training_plan_id=plan.id)
         db_session.add(week)
@@ -718,7 +661,7 @@ class TestWeeklySessionPersistence:
     async def test_checkpoint_session_persists(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(db_session, "ws-cp@example.com")
+        athlete = await make_athlete(db_session, "ws-cp@example.com")
         plan = await _new_active_plan(db_session, athlete)
         week = _weekly_plan_factory(training_plan_id=plan.id)
         db_session.add(week)
@@ -745,7 +688,7 @@ class TestWeeklySessionPersistence:
     async def test_session_persists_with_block_metadata(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(db_session, "ws-block@example.com")
+        athlete = await make_athlete(db_session, "ws-block@example.com")
         plan = await _new_active_plan(db_session, athlete)
         week = _weekly_plan_factory(training_plan_id=plan.id)
         db_session.add(week)

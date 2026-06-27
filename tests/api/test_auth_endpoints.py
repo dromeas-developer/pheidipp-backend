@@ -30,6 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.models.system_event import SystemEvent
 from tests.payloads import _login_payload, _register_payload
+from tests.utils.assertions import assert_no_secrets_in_text
 
 
 # ---------------------------------------------------------------------------
@@ -80,16 +81,7 @@ class TestRegisterEndpoint:
             json=_register_payload("leak-scan@example.com"),
         )
         assert response.status_code == 201
-        body_text = response.text.lower()
-        for forbidden in (
-            "hashed_password",
-            "token_hash",
-            "provider_tokens",
-            "provider_user_id",
-        ):
-            assert forbidden not in body_text, (
-                f"{forbidden!r} leaked into /auth/register response"
-            )
+        assert_no_secrets_in_text(response.text, message="/auth/register response")
 
     async def test_register_duplicate_email_returns_409(
         self, client: AsyncClient
@@ -326,14 +318,7 @@ class TestRefreshEndpoint:
             json={"refresh_token": register.json()["refresh_token"]},
         )
         assert response.status_code == 200
-        body_text = response.text.lower()
-        for forbidden in (
-            "hashed_password",
-            "token_hash",
-            "provider_tokens",
-            "provider_user_id",
-        ):
-            assert forbidden not in body_text
+        assert_no_secrets_in_text(response.text, message="/auth/refresh response")
 
 
 # ---------------------------------------------------------------------------

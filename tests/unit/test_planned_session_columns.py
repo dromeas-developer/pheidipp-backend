@@ -25,15 +25,11 @@ from __future__ import annotations
 import pytest
 from sqlalchemy import (
     Boolean,
-    CheckConstraint,
     Date,
     DateTime,
-    ForeignKey,
-    Index,
     Integer,
     String,
     Text,
-    UniqueConstraint,
 )
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
@@ -47,47 +43,26 @@ from app.models.enums import (
     SessionType,
 )
 from app.models.planned_session import PlannedSession
-
-
-def _columns() -> dict[str, object]:
-    return {column.key: column for column in PlannedSession.__table__.columns}
-
-
-def _unique_constraints() -> list[UniqueConstraint]:
-    return [
-        c
-        for c in PlannedSession.__table__.constraints
-        if isinstance(c, UniqueConstraint)
-    ]
-
-
-def _check_constraints() -> list[CheckConstraint]:
-    return [
-        c
-        for c in PlannedSession.__table__.constraints
-        if isinstance(c, CheckConstraint)
-    ]
-
-
-def _indexes() -> dict[str, Index]:
-    return {idx.name: idx for idx in PlannedSession.__table__.indexes}
-
-
-def _foreign_keys_referencing(column_key: str) -> list[ForeignKey]:
-    """Return the list of ``ForeignKey`` objects declared for the
-    given column key. Useful when an ORM column maps multiple FKs
-    (rare, but defensive against regressions)."""
-    return [fk for fk in PlannedSession.__table__.foreign_keys if fk.parent.name == column_key]
+from tests.utils.model_helpers import (
+    get_columns,
+    get_unique_constraints,
+    get_check_constraints,
+    get_indexes,
+    get_foreign_keys_referencing,
+    get_check_text,
+    get_server_default_text,
+    get_enum_values,
+)
 
 
 class TestPlannedSessionRequiredColumns:
     def test_id_column_uuid_primary_key(self) -> None:
-        col = _columns()["id"]
+        col = get_columns(PlannedSession)["id"]
         assert col.primary_key is True
         assert isinstance(col.type, PG_UUID)
 
     def test_weekly_plan_id_required_uuid(self) -> None:
-        col = _columns()["weekly_plan_id"]
+        col = get_columns(PlannedSession)["weekly_plan_id"]
         assert col.nullable is False
         assert isinstance(col.type, PG_UUID)
 
@@ -95,33 +70,33 @@ class TestPlannedSessionRequiredColumns:
         """``training_plan_id`` is DENORMALISED — the source of truth
         remains ``WeeklyPlan.training_plan_id``. The denorm survives
         plan supersession; correct queries join through WeeklyPlan."""
-        col = _columns()["training_plan_id"]
+        col = get_columns(PlannedSession)["training_plan_id"]
         assert col.nullable is False
         assert isinstance(col.type, PG_UUID)
 
     def test_target_date_required_date(self) -> None:
-        col = _columns()["target_date"]
+        col = get_columns(PlannedSession)["target_date"]
         assert col.nullable is False
         assert isinstance(col.type, Date)
 
     def test_week_number_required_integer(self) -> None:
-        col = _columns()["week_number"]
+        col = get_columns(PlannedSession)["week_number"]
         assert col.nullable is False
         assert isinstance(col.type, Integer)
 
     def test_phase_label_required_enum(self) -> None:
-        col = _columns()["phase_label"]
+        col = get_columns(PlannedSession)["phase_label"]
         assert col.nullable is False
         assert isinstance(col.type, SAEnum)
-        actual = set(col.type.values_callable(PhaseLabel))
+        actual = set(get_enum_values(col, PhaseLabel))
         # All PhaseLabel members must appear at the DB layer.
         assert len(actual) == len(list(PhaseLabel))
 
     def test_session_type_required_enum(self) -> None:
-        col = _columns()["session_type"]
+        col = get_columns(PlannedSession)["session_type"]
         assert col.nullable is False
         assert isinstance(col.type, SAEnum)
-        actual = sorted(col.type.values_callable(SessionType))
+        actual = sorted(get_enum_values(col, SessionType))
         expected = sorted(
             [
                 "rest",
@@ -145,21 +120,21 @@ class TestPlannedSessionRequiredColumns:
         assert actual == expected
 
     def test_intent_description_required_string(self) -> None:
-        col = _columns()["intent_description"]
+        col = get_columns(PlannedSession)["intent_description"]
         assert col.nullable is False
         assert isinstance(col.type, String)
         assert col.type.length == 512
 
     def test_approximate_duration_minutes_required_integer(self) -> None:
-        col = _columns()["approximate_duration_minutes"]
+        col = get_columns(PlannedSession)["approximate_duration_minutes"]
         assert col.nullable is False
         assert isinstance(col.type, Integer)
 
     def test_checkpoint_type_nullable_enum(self) -> None:
-        col = _columns()["checkpoint_type"]
+        col = get_columns(PlannedSession)["checkpoint_type"]
         assert col.nullable is True
         assert isinstance(col.type, SAEnum)
-        actual = sorted(col.type.values_callable(CheckpointType))
+        actual = sorted(get_enum_values(col, CheckpointType))
         expected = sorted(
             [
                 "calibration",
@@ -172,16 +147,16 @@ class TestPlannedSessionRequiredColumns:
         assert actual == expected
 
     def test_checkpoint_metric_nullable_string(self) -> None:
-        col = _columns()["checkpoint_metric"]
+        col = get_columns(PlannedSession)["checkpoint_metric"]
         assert col.nullable is True
         assert isinstance(col.type, String)
         assert col.type.length == 128
 
     def test_status_required_enum(self) -> None:
-        col = _columns()["status"]
+        col = get_columns(PlannedSession)["status"]
         assert col.nullable is False
         assert isinstance(col.type, SAEnum)
-        actual = sorted(col.type.values_callable(PlannedSessionStatus))
+        actual = sorted(get_enum_values(col, PlannedSessionStatus))
         expected = sorted(
             [
                 "pending",
@@ -195,12 +170,12 @@ class TestPlannedSessionRequiredColumns:
         assert actual == expected
 
     def test_skip_reason_nullable_text(self) -> None:
-        col = _columns()["skip_reason"]
+        col = get_columns(PlannedSession)["skip_reason"]
         assert col.nullable is True
         assert isinstance(col.type, Text)
 
     def test_redistributed_to_date_nullable_date(self) -> None:
-        col = _columns()["redistributed_to_date"]
+        col = get_columns(PlannedSession)["redistributed_to_date"]
         assert col.nullable is True
         assert isinstance(col.type, Date)
 
@@ -210,7 +185,7 @@ class TestPlannedSessionRequiredColumns:
         service-layer ``session_completed`` consumer is still
         unshipped. The FK lands in a future migration once the
         activity contract is settled."""
-        col = _columns()["activity_id"]
+        col = get_columns(PlannedSession)["activity_id"]
         assert col.nullable is True
         assert isinstance(col.type, PG_UUID)
         # No mapper-level FK declared to ``activities``.
@@ -224,43 +199,43 @@ class TestPlannedSessionRequiredColumns:
 
     def test_session_slot_nullable_enum(self) -> None:
         """``session_slot`` is nullable for single-session days."""
-        col = _columns()["session_slot"]
+        col = get_columns(PlannedSession)["session_slot"]
         assert col.nullable is True
         assert isinstance(col.type, SAEnum)
-        actual = sorted(col.type.values_callable(SessionSlot))
+        actual = sorted(get_enum_values(col, SessionSlot))
         assert actual == ["am", "pm"]
 
     def test_session_priority_required_enum(self) -> None:
-        col = _columns()["session_priority"]
+        col = get_columns(PlannedSession)["session_priority"]
         assert col.nullable is False
         assert isinstance(col.type, SAEnum)
-        actual = sorted(col.type.values_callable(SessionPriority))
+        actual = sorted(get_enum_values(col, SessionPriority))
         assert actual == ["primary", "secondary"]
 
     def test_block_id_nullable_string(self) -> None:
-        col = _columns()["block_id"]
+        col = get_columns(PlannedSession)["block_id"]
         assert col.nullable is True
         assert isinstance(col.type, String)
         assert col.type.length == 64
 
     def test_block_position_nullable_string(self) -> None:
-        col = _columns()["block_position"]
+        col = get_columns(PlannedSession)["block_position"]
         assert col.nullable is True
         assert isinstance(col.type, String)
 
     def test_block_session_count_nullable_integer(self) -> None:
-        col = _columns()["block_session_count"]
+        col = get_columns(PlannedSession)["block_session_count"]
         assert col.nullable is True
         assert isinstance(col.type, Integer)
 
     def test_is_suggested_required_bool_default_false(self) -> None:
-        col = _columns()["is_suggested"]
+        col = get_columns(PlannedSession)["is_suggested"]
         assert col.nullable is False
         assert isinstance(col.type, Boolean)
-        assert col.server_default.arg in {"false", "False", "0"}
+        assert get_server_default_text(col) in {"false", "False", "0"}
 
     def test_created_at_required_datetime(self) -> None:
-        col = _columns()["created_at"]
+        col = get_columns(PlannedSession)["created_at"]
         assert col.nullable is False
         assert isinstance(col.type, DateTime)
 
@@ -270,7 +245,7 @@ class TestPlannedSessionSlotDateUniqueConstraint:
     AM/PM disambiguation contract."""
 
     def test_plan_date_slot_unique_constraint_present(self) -> None:
-        constraints = _unique_constraints()
+        constraints = get_unique_constraints(PlannedSession)
         matching = [
             c
             for c in constraints
@@ -289,13 +264,9 @@ class TestPlannedSessionSlotDateUniqueConstraint:
 
 
 class TestPlannedSessionCheckConstraints:
-    def _check_text(self, check: CheckConstraint) -> str:
-        expr = getattr(check, "expression", None) or getattr(check, "sqltext", None)
-        return (str(expr) if expr is not None else "")
-
     def test_block_position_inline_union_check(self) -> None:
         text = " | ".join(
-            self._check_text(c) for c in _check_constraints()
+            get_check_text(c) for c in get_check_constraints(PlannedSession)
         ).lower()
         assert "block_position" in text
         for pos in ("first", "middle", "last"):
@@ -305,10 +276,10 @@ class TestPlannedSessionCheckConstraints:
             )
 
     def test_duration_positive_check(self) -> None:
-        checks = _check_constraints()
+        checks = get_check_constraints(PlannedSession)
         found = any(
-            "approximate_duration_minutes" in self._check_text(c)
-            and ">" in self._check_text(c)
+            "approximate_duration_minutes" in get_check_text(c)
+            and ">" in get_check_text(c)
             for c in checks
         )
         assert found, (
@@ -317,10 +288,10 @@ class TestPlannedSessionCheckConstraints:
         )
 
     def test_week_number_positive_check(self) -> None:
-        checks = _check_constraints()
+        checks = get_check_constraints(PlannedSession)
         found = any(
-            "week_number" in self._check_text(c)
-            and ">=" in self._check_text(c)
+            "week_number" in get_check_text(c)
+            and ">=" in get_check_text(c)
             for c in checks
         )
         assert found, (
@@ -337,7 +308,7 @@ class TestPlannedSessionIndexes:
     def test_plan_date_index_present(self) -> None:
         matched = [
             idx
-            for idx in _indexes().values()
+            for idx in get_indexes(PlannedSession).values()
             if {c.key for c in idx.columns} >= {
                 "weekly_plan_id",
                 "target_date",
@@ -354,7 +325,7 @@ class TestPlannedSessionIndexes:
         denormalised FK."""
         matched = [
             idx
-            for idx in _indexes().values()
+            for idx in get_indexes(PlannedSession).values()
             if {c.key for c in idx.columns} >= {
                 "training_plan_id",
                 "target_date",
@@ -370,7 +341,7 @@ class TestPlannedSessionIndexes:
     def test_status_date_index_present(self) -> None:
         matched = [
             idx
-            for idx in _indexes().values()
+            for idx in get_indexes(PlannedSession).values()
             if {c.key for c in idx.columns} >= {"status", "target_date"}
         ]
         assert matched, (
@@ -395,6 +366,6 @@ class TestPlannedSessionSchemaAntiGoals:
         ],
     )
     def test_forbidden_columns_are_absent(self, forbidden_field: str) -> None:
-        assert forbidden_field not in _columns(), (
+        assert forbidden_field not in get_columns(PlannedSession), (
             f"PlannedSession must not carry `{forbidden_field}`."
         )

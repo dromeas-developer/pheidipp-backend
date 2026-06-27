@@ -1,77 +1,110 @@
 # implemented-state
 
 Commit:
-7d11c76
+4f12368
 
 ## Change Set
 
 Base Commit:
-7d11c76
+4f12368
 
 Current Commit:
-7d11c76
+4f12368
 
 Files Added:
-- alembic/versions/79dc97d4e433_phase_1_2c_twin_fitness_coaching_.py
-- alembic/versions/d1579f4430e7_add_training_plans_twin_state_fk.py
-- app/models/athlete_fitness.py
-- app/models/athlete_physiology.py
-- app/models/coaching_message.py
-- app/models/generated_workout.py
-- app/models/generation_event.py
-- app/models/twin_state.py
-- app/models/workout_step.py
-- reports/Phase-1.2c-P1_validation.md
-- reports/phase-1-2b-p1-plan-sessions_validation.md
-- reports/phase-1-2b-p2-test-contract-alignment_validation.md
-- reports/phase-1-2c-P1_devops.md
+- app/api/v1/onboarding.py
+- app/repositories/athlete_fitness_repository.py
+- app/repositories/athlete_physiology_repository.py
+- app/repositories/athlete_preferences_repository.py
+- app/repositories/training_goal_repository.py
+- app/repositories/twin_state_repository.py
+- app/schemas/onboarding.py
+- app/services/onboarding_errors.py
+- app/services/onboarding_results.py
+- app/services/onboarding_service.py
+- reports/phase-1-3-p1_devops.md
+- tests/api/test_onboarding_endpoints.py
+- tests/behaviour/test_onboarding_user_journey.py
+- tests/integration/test_onboarding_service.py
+- tests/test-manifest/phase-1-3.yaml
+- tests/unit/test_onboarding_errors.py
+- tests/unit/test_onboarding_service.py
+- tests/utils/__init__.py
+- tests/utils/assertions.py
+- tests/utils/factories.py
+- tests/utils/http_helpers.py
+- tests/utils/model_helpers.py
+- tests/utils/schema_helpers.py
+
+Files Modified:
+- app/api/__init__.py
+- app/api/deps.py
+- app/api/v1/__init__.py
+- app/repositories/__init__.py
+- app/schemas/__init__.py
+- app/services/__init__.py
+- reports/test_history/latest.md
+- tests/README.md
+- tests/api/test_auth_endpoints.py
+- tests/conftest.py
+- tests/integration/test_activity_schema.py
 - tests/integration/test_athlete_fitness_schema.py
 - tests/integration/test_athlete_physiology_schema.py
+- tests/integration/test_athlete_preferences_schema.py
+- tests/integration/test_athlete_profile_schema.py
+- tests/integration/test_auth_service.py
+- tests/integration/test_checkpoint_schema.py
 - tests/integration/test_coaching_message_schema.py
 - tests/integration/test_generated_workout_schema.py
 - tests/integration/test_generation_event_schema.py
-- tests/integration/test_migration_phase_1_2c.py
+- tests/integration/test_planned_session_schema.py
+- tests/integration/test_regeneration_task_schema.py
+- tests/integration/test_secondary_event_schema.py
+- tests/integration/test_training_goal_schema.py
+- tests/integration/test_training_plan_schema.py
 - tests/integration/test_twin_state_schema.py
+- tests/integration/test_weekly_plan_schema.py
 - tests/integration/test_workout_step_schema.py
-- tests/test-manifest/phase-1-2c.yaml
+- tests/payloads.py
+- tests/test-manifest/index.yaml
+- tests/unit/test_activity_columns.py
 - tests/unit/test_athlete_fitness_columns.py
 - tests/unit/test_athlete_physiology_columns.py
+- tests/unit/test_athlete_profile_columns.py
+- tests/unit/test_checkpoint_columns.py
 - tests/unit/test_coaching_message_columns.py
 - tests/unit/test_generated_workout_columns.py
 - tests/unit/test_generation_event_columns.py
+- tests/unit/test_planned_session_columns.py
+- tests/unit/test_regeneration_task_columns.py
+- tests/unit/test_secondary_event_columns.py
+- tests/unit/test_training_goal_columns.py
+- tests/unit/test_training_plan_columns.py
 - tests/unit/test_twin_state_columns.py
+- tests/unit/test_weekly_plan_columns.py
 - tests/unit/test_workout_step_columns.py
 
-Files Modified:
-- app/models/__init__.py
-- app/models/enums.py
-- app/models/training_plan.py
-- reports/test_history/latest.md
-- tests/README.md
-- tests/conftest.py
-- tests/integration/test_migration_phase_1_2b.py
-- tests/integration/test_training_plan_schema.py
-- tests/test-manifest/index.yaml
-- tests/test-manifest/phase-1-2b.yaml
-- tests/unit/test_enum_values.py
-- tests/unit/test_training_plan_columns.py
-
 Files Deleted:
-- none
+- reports/Phase-1.2c-P1_validation.md
+- reports/phase-1-2b-p1-plan-sessions_validation.md
+- reports/phase-1-2b-p2-test-contract-alignment_validation.md
+- reports/phase-1-2b_validation.md
 
 Touched Areas:
-- models
-- migrations
+- repositories
+- services
+- api
+- app
 - other
 
 Generated:
-2026-06-25T02:43:19.116945+00:00 UTC
+2026-06-27T16:36:24.058550+00:00 UTC
 
 Current DB Revision:
-d1579f4430e7 (head)
+fd373abd4b9e (head) [fallback: latest migration file]
 
 Python Files Scanned:
-61
+71
 
 ---
 
@@ -146,11 +179,16 @@ Enums:
 
 Repositories:
 - AthleteAuthRepository -> AthleteAuth (app/repositories/athlete_auth_repository.py)
+- AthleteFitnessRepository -> AthleteFitness (app/repositories/athlete_fitness_repository.py)
+- AthletePhysiologyRepository -> AthletePhysiology (app/repositories/athlete_physiology_repository.py)
+- AthletePreferencesRepository -> AthletePreferences (app/repositories/athlete_preferences_repository.py)
 - AthleteProfileRepository -> AthleteProfile (app/repositories/athlete_profile_repository.py)
 - AthleteRepository -> Athlete (app/repositories/athlete_repository.py)
 - RefreshTokenRepository -> RefreshToken (app/repositories/refresh_token_repository.py)
 - SystemEventOutboxRepository -> SystemEventOutbox (app/repositories/system_event_outbox_repository.py)
 - SystemEventRepository -> SystemEvent (app/repositories/system_event_repository.py)
+- TrainingGoalRepository -> TrainingGoal (app/repositories/training_goal_repository.py)
+- TwinStateRepository -> TwinState (app/repositories/twin_state_repository.py)
 
 Migrations:
 - 1b9e9026db1e (down: e7ffc8764335) — alembic/versions/1b9e9026db1e_phase_1_2b_plans_sessions_checkpoints.py
@@ -165,10 +203,22 @@ Migrations:
 Services:
 - AuthService — app/services/auth_service.py
 - EventPublisher — app/services/event_publisher.py
+- OnboardingService — app/services/onboarding_service.py
+- _GoalInput — app/services/onboarding_service.py
+- _PreferencesInput — app/services/onboarding_service.py
+- _ProfileInput — app/services/onboarding_service.py
 
 ### API Surface
 
 Public API:
+- GET /api/v1/athletes/{athlete_id}/onboarding (app/api/v1/onboarding.py:154 get_onboarding, router=onboarding_router)
+- POST /api/v1/athletes/{athlete_id}/onboarding (app/api/v1/onboarding.py:68 complete_onboarding, router=onboarding_router)
+- GET /api/v1/athletes/{athlete_id}/preferences (app/api/v1/onboarding.py:236 get_preferences, router=onboarding_router)
+- PATCH /api/v1/athletes/{athlete_id}/preferences (app/api/v1/onboarding.py:262 patch_preferences, router=onboarding_router)
+- GET /api/v1/athletes/{athlete_id}/profile (app/api/v1/onboarding.py:180 get_profile, router=onboarding_router)
+- PATCH /api/v1/athletes/{athlete_id}/profile (app/api/v1/onboarding.py:204 patch_profile, router=onboarding_router)
+- GET /api/v1/athletes/{athlete_id}/twin (app/api/v1/onboarding.py:290 get_twin_state, router=onboarding_router)
+- GET /api/v1/athletes/{athlete_id}/twin/history (app/api/v1/onboarding.py:312 get_twin_history, router=onboarding_router)
 - POST /api/v1/auth/login (app/api/v1/auth.py:116 login, router=auth_router)
 - POST /api/v1/auth/refresh (app/api/v1/auth.py:137 refresh, router=auth_router)
 - POST /api/v1/auth/register (app/api/v1/auth.py:91 register, router=auth_router)
@@ -185,6 +235,21 @@ Public API:
 - RegisterProfileIn — app/schemas/auth.py
 - RegisterRequest — app/schemas/auth.py
 - TokenPairResponse — app/schemas/auth.py
+- AthletePreferencesPatchIn — app/schemas/onboarding.py
+- AthletePreferencesResponse — app/schemas/onboarding.py
+- AthleteProfilePatchIn — app/schemas/onboarding.py
+- AthleteProfileResponse — app/schemas/onboarding.py
+- OnboardingPreferencesIn — app/schemas/onboarding.py
+- OnboardingProfileIn — app/schemas/onboarding.py
+- OnboardingRequest — app/schemas/onboarding.py
+- OnboardingResponse — app/schemas/onboarding.py
+- OnboardingStatusResponse — app/schemas/onboarding.py
+- OnboardingTrainingGoalIn — app/schemas/onboarding.py
+- TwinStateHistoryResponse — app/schemas/onboarding.py
+- TwinStateResponse — app/schemas/onboarding.py
+- WeeklyScheduleDayIn — app/schemas/onboarding.py
+- WeeklyScheduleDayOut — app/schemas/onboarding.py
+- WeeklyScheduleDayPatchIn — app/schemas/onboarding.py
 
 ### Registrations
 
@@ -192,20 +257,20 @@ Public API:
 - Imports: Activity, ActivitySource, Athlete, AthleteAuth, AthleteFitness, AthletePhysiology, AthletePreferences, AthleteProfile, AuthProvider, Checkpoint, CheckpointStatus, CheckpointType, CoachingMessage, DataTier, EventPublicationStatus, GeneratedWorkout, GenerationEvent, GoalEventType, GoalType, GpsSource, HrSource, InjurySeverity, MeasurementSource, MessageType, ObjectiveCategory, PhaseLabel, PhysiologicalIntent, PlannedSession, PlannedSessionStatus, PowerSource, PrimaryTrainingPlatform, RecoveryModifierLevel, RefreshToken, RegenerationTask, SecondaryEvent, SecondaryEventPriority, SessionPriority, SessionPurpose, SessionSlot, SessionType, Sex, SignalType, SportBackground, StepType, SystemEvent, SystemEventOutbox, TrainingGoal, TrainingGoalStatus, TrainingPlan, TrainingPlanStatus, TrainingTimeOfDay, TwinConfidenceLevel, TwinState, TwinTrigger, WeeklyPlan, WeeklyPlanStatus, WeeklySession, WellnessTrend, WorkoutStep, infer_data_tier
 
 - app/schemas/__init__.py
-- Imports: AthleteResponse, AuthResponse, LoginRequest, RefreshRequest, RefreshResponse, RegisterProfileIn, RegisterRequest, TokenPairResponse
+- Imports: AthletePreferencesPatchIn, AthletePreferencesResponse, AthleteProfilePatchIn, AthleteProfileResponse, AthleteResponse, AuthResponse, LoginRequest, OnboardingPreferencesIn, OnboardingProfileIn, OnboardingRequest, OnboardingResponse, OnboardingStatusResponse, OnboardingTrainingGoalIn, RefreshRequest, RefreshResponse, RegisterProfileIn, RegisterRequest, TokenPairResponse, TwinStateHistoryResponse, TwinStateResponse, WeeklyScheduleDayIn, WeeklyScheduleDayOut
 
 - app/repositories/__init__.py
-- Imports: AthleteAuthRepository, AthleteProfileRepository, AthleteRepository, RefreshTokenRepository, SystemEventOutboxRepository, SystemEventRepository
+- Imports: AthleteAuthRepository, AthleteFitnessRepository, AthletePhysiologyRepository, AthletePreferencesRepository, AthleteProfileRepository, AthleteRepository, RefreshTokenRepository, SystemEventOutboxRepository, SystemEventRepository, TrainingGoalRepository, TwinStateRepository
 
 - app/services/__init__.py
-- Imports: AuthError, AuthResult, AuthService, CrossAthleteAccessError, DuplicateEmailError, EventPublisher, InvalidCredentialsError, InvalidRefreshTokenError, IssuedTokens, OutboxEvent, UnauthenticatedError
+- Imports: AthleteNotFoundError, AuthError, AuthResult, AuthService, CrossAthleteAccessError, DuplicateEmailError, EventPublisher, InvalidCredentialsError, InvalidGoalTypeError, InvalidRefreshTokenError, IssuedTokens, OnboardingAlreadyCompleteError, OnboardingError, OnboardingIncompleteError, OnboardingResult, OnboardingService, OnboardingStatus, OutboxEvent, PreferencesSnapshot, ProfileSnapshot, TrainingGoalConflictError, UnauthenticatedError, _GoalInput, _PreferencesInput, _ProfileInput
 
 - app/api/__init__.py
-- Imports: build_auth_service, get_current_athlete_id, get_db, require_self
+- Imports: build_auth_service, build_onboarding_service, get_current_athlete_id, get_db, require_self
 
 - app/api/v1/__init__.py
-- Imports: APIRouter, auth_router, health_router
-- Includes: auth_router, health_router
+- Imports: APIRouter, auth_router, health_router, onboarding_router
+- Includes: auth_router, health_router, onboarding_router
 
 ---
 
@@ -231,13 +296,40 @@ EventPublisher
  ├── SystemEventOutboxRepository
  └── SystemEventRepository
 
+OnboardingService
+ ├── AthleteFitnessRepository
+ ├── AthletePhysiologyRepository
+ ├── AthletePreferencesRepository
+ ├── AthleteProfileRepository
+ ├── AthleteRepository
+ ├── Optional[EventPublisher]
+ ├── SystemEventOutboxRepository
+ ├── SystemEventRepository
+ ├── TrainingGoalRepository
+ └── TwinStateRepository
+
+_GoalInput
+ ├── Any
+ ├── GoalType
+ ├── Optional[date]
+ ├── Optional[float]
+ ├── Optional[int]
+ └── Optional[str]
+
+_PreferencesInput
+ └── SportBackground
+
+_ProfileInput
+ ├── Optional[dict]
+ └── Optional[float]
+
 ### Registration Status
 
 api dependencies: complete
 models: complete
 repositories: complete
 routers: complete
-schemas: complete
+schemas: partial
 services: complete
 
 ### Event Producers
@@ -245,6 +337,7 @@ services: complete
 - app/services/auth_service.py:170 AuthService.register publish -> athlete_registered [after_commit]
 - app/services/auth_service.py:274 AuthService.login publish -> athlete_logged_in [after_commit]
 - app/services/auth_service.py:367 AuthService.rotate_refresh_token publish -> athlete_logged_in [after_commit]
+- app/services/onboarding_service.py:467 OnboardingService.complete_onboarding publish -> onboarding_completed [after_commit]
 
 ### Transaction Boundaries
 
@@ -252,18 +345,30 @@ Commits:
 - app/services/auth_service.py:180 AuthService.register self.session.commit
 - app/services/auth_service.py:285 AuthService.login self.session.commit
 - app/services/auth_service.py:378 AuthService.rotate_refresh_token self.session.commit
+- app/services/onboarding_service.py:479 OnboardingService.complete_onboarding self.session.commit
+- app/services/onboarding_service.py:569 OnboardingService.update_profile self.session.commit
+- app/services/onboarding_service.py:635 OnboardingService.update_preferences self.session.commit
 - app/tasks/discard_refresh_token_ips.py:48 discard_refresh_token_ips session.commit
 
 Flushes:
 - app/repositories/athlete_auth_repository.py:56 AthleteAuthRepository.add self.session.flush
 - app/repositories/athlete_auth_repository.py:63 AthleteAuthRepository.touch_last_login self.session.flush
+- app/repositories/athlete_fitness_repository.py:42 AthleteFitnessRepository.add self.session.flush
+- app/repositories/athlete_physiology_repository.py:42 AthletePhysiologyRepository.add self.session.flush
+- app/repositories/athlete_preferences_repository.py:33 AthletePreferencesRepository.add self.session.flush
 - app/repositories/athlete_profile_repository.py:31 AthleteProfileRepository.add self.session.flush
 - app/repositories/athlete_repository.py:44 AthleteRepository.add self.session.flush
 - app/repositories/refresh_token_repository.py:41 RefreshTokenRepository.add self.session.flush
 - app/repositories/system_event_outbox_repository.py:44 SystemEventOutboxRepository.add self.session.flush
 - app/repositories/system_event_outbox_repository.py:60 SystemEventOutboxRepository.mark_published self.session.flush
 - app/repositories/system_event_repository.py:57 SystemEventRepository.add self.session.flush
+- app/repositories/training_goal_repository.py:55 TrainingGoalRepository.add self.session.flush
+- app/repositories/twin_state_repository.py:90 TwinStateRepository.insert self.session.flush
 - app/services/auth_service.py:361 AuthService.rotate_refresh_token self.session.flush
+- app/services/onboarding_service.py:334 OnboardingService.complete_onboarding self.session.flush
+- app/services/onboarding_service.py:464 OnboardingService.complete_onboarding self.session.flush
+- app/services/onboarding_service.py:568 OnboardingService.update_profile self.session.flush
+- app/services/onboarding_service.py:634 OnboardingService.update_preferences self.session.flush
 
 ### Observed Runtime Structure
 
@@ -272,13 +377,19 @@ AsyncSession imports:
 - app/api/v1/health.py
 - app/db/session.py
 - app/repositories/athlete_auth_repository.py
+- app/repositories/athlete_fitness_repository.py
+- app/repositories/athlete_physiology_repository.py
+- app/repositories/athlete_preferences_repository.py
 - app/repositories/athlete_profile_repository.py
 - app/repositories/athlete_repository.py
 - app/repositories/refresh_token_repository.py
 - app/repositories/system_event_outbox_repository.py
 - app/repositories/system_event_repository.py
+- app/repositories/training_goal_repository.py
+- app/repositories/twin_state_repository.py
 - app/services/auth_service.py
 - app/services/health_service.py
+- app/services/onboarding_service.py
 
 Repository dependencies:
 - app/services/auth_service.py: AthleteAuthRepository
@@ -287,18 +398,27 @@ Repository dependencies:
 - app/services/auth_service.py: RefreshTokenRepository
 - app/services/auth_service.py: SystemEventOutboxRepository
 - app/services/auth_service.py: SystemEventRepository
+- app/services/onboarding_service.py: AthleteFitnessRepository
+- app/services/onboarding_service.py: AthletePhysiologyRepository
+- app/services/onboarding_service.py: AthletePreferencesRepository
+- app/services/onboarding_service.py: AthleteProfileRepository
+- app/services/onboarding_service.py: AthleteRepository
+- app/services/onboarding_service.py: SystemEventOutboxRepository
+- app/services/onboarding_service.py: SystemEventRepository
+- app/services/onboarding_service.py: TrainingGoalRepository
+- app/services/onboarding_service.py: TwinStateRepository
 - app/tasks/discard_refresh_token_ips.py: RefreshTokenRepository
 
 ### Execution Readiness
 
 Current Revision:
-d1579f4430e7 (head)
+fd373abd4b9e (head) [fallback: latest migration file]
 
 Migration Pending:
-yes
+unknown
 
 Missing Exports:
-- none
+- app/schemas/__init__.py: Missing [WeeklyScheduleDayPatchIn]
 
 ### Snapshot Reliability
 

@@ -81,6 +81,7 @@ from app.db.base import Base  # noqa: E402
 from app.db.session import get_db  # noqa: E402
 from app.main import app as fastapi_app  # noqa: E402
 from app.services.auth_service import AuthService  # noqa: E402
+from app.models.enums import Sex  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -200,8 +201,9 @@ class _TestSessionFactory:
         self._session_factory = session_factory
 
     async def begin(self) -> AsyncSession:
-        self.session = self._session_factory()
-        return self.session
+        session = self._session_factory()
+        self.session = session
+        return session
 
     async def finish(self) -> None:
         if self.session is not None:
@@ -414,61 +416,20 @@ def find_record(records: Sequence[logging.LogRecord], *, event: str) -> Optional
 
 def json_payload(rec: logging.LogRecord) -> dict:
     """Extract the allow-listed extra dict from a LogRecord."""
-    return dict(getattr(rec, "__dict__", {}))
+    return dict(getattr(rec, "__dict__", {}))  # type: ignore
 
 
-@contextmanager
-def frozen_time(now: datetime):
-    """Patch ``datetime.now(timezone.utc)`` so refresh-token TTL math is exact.
-
-    The 30-day expiry invariant is asserted on absolute timestamps; this
-    keeps that assertion stable regardless of when CI runs.
-    """
-    with patch("app.services.auth_service.datetime") as ms, patch(
-        "app.core.security.token_service.datetime"
-    ) as ts:
-        for mod in (ms, ts):
-            mod.now.return_value = now
-            mod.now.side_effect = None
-        yield
-
-
-@asynccontextmanager
-async def captured_metric_context() -> AsyncIterator[dict[str, dict[str, int]]]:
-    """Yield the current metric snapshot, with restore-on-exit semantics.
-
-    Tests that assert metric deltas use this so a leaked increment from
-    an earlier test cannot masquerade as the increment under test.
-    """
-    snapshot_before = _logging_utils.snapshot_metrics()
-    try:
-        yield snapshot_before
-    finally:
-        # Reset to the pre-test snapshot so metric tests stay isolated.
-        with _logging_utils._metrics_lock:  # type: ignore[attr-defined]
-            for key in list(_logging_utils._metrics.keys()):  # type: ignore[attr-defined]
-                _logging_utils._metrics[key] = _logging_utils.CollectionsCounter()  # type: ignore[attr-defined]
-            for key, bucket in snapshot_before.items():
-                _logging_utils._metrics[key] = _logging_utils.CollectionsCounter(bucket)  # type: ignore[attr-defined]
-
-
+# Exports
 __all__ = [
-    "TEST_DATABASE_URL",
     "test_engine",
     "test_session_local",
     "db_session",
     "client",
-    "cap_auth_logs",
-    "find_record",
-    "json_payload",
-    "frozen_time",
-    "captured_metric_context",
     "make_register_payload",
     "make_login_payload",
     "password_hasher",
     "token_service",
+    "cap_auth_logs",
     "AuthService",
     "Sex",
 ]
-
-

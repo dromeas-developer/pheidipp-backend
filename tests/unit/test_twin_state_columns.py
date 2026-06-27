@@ -28,16 +28,10 @@ from __future__ import annotations
 
 import pytest
 from sqlalchemy import (
-    CheckConstraint,
     DateTime,
     Float,
-    ForeignKey,
-    Index,
     Integer,
     String,
-    Text,
-    func,
-    text,
 )
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
@@ -50,30 +44,14 @@ from app.models.enums import (
     WellnessTrend,
 )
 from app.models.twin_state import TwinState
-
-
-def _columns() -> dict[str, object]:
-    return {column.key: column for column in TwinState.__table__.columns}
-
-
-def _indexes() -> dict[str, Index]:
-    return {idx.name: idx for idx in TwinState.__table__.indexes}
-
-
-def _check_constraints() -> list[CheckConstraint]:
-    return [
-        c
-        for c in TwinState.__table__.constraints
-        if isinstance(c, CheckConstraint)
-    ]
-
-
-def _foreign_keys_referencing(column_key: str) -> list[ForeignKey]:
-    return [
-        fk
-        for fk in TwinState.__table__.foreign_keys
-        if fk.parent.name == column_key
-    ]
+from tests.utils.model_helpers import (
+    get_columns,
+    get_indexes,
+    get_check_constraints,
+    get_foreign_keys_referencing,
+    get_enum_values,
+    get_server_default_text,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -83,40 +61,40 @@ def _foreign_keys_referencing(column_key: str) -> list[ForeignKey]:
 
 class TestTwinStateRequiredColumns:
     def test_id_column_uuid_primary_key(self) -> None:
-        col = _columns()["id"]
+        col = get_columns(TwinState)["id"]
         assert col.primary_key is True
         assert isinstance(col.type, PG_UUID)
 
     def test_athlete_id_required_uuid(self) -> None:
-        col = _columns()["athlete_id"]
+        col = get_columns(TwinState)["athlete_id"]
         assert col.nullable is False
         assert isinstance(col.type, PG_UUID)
 
     def test_athlete_id_cascade_fk_to_athletes(self) -> None:
         """Athlete FK ON DELETE CASCADE — twin history is wiped when
         the athlete account is deleted."""
-        fks = _foreign_keys_referencing("athlete_id")
+        fks = get_foreign_keys_referencing(TwinState, "athlete_id")
         assert len(fks) == 1
         fk = fks[0]
         assert fk.column.table.name == "athletes"
         assert fk.ondelete == "CASCADE"
 
     def test_training_goal_id_required_uuid(self) -> None:
-        col = _columns()["training_goal_id"]
+        col = get_columns(TwinState)["training_goal_id"]
         assert col.nullable is False
         assert isinstance(col.type, PG_UUID)
 
     def test_training_goal_id_cascade_fk_to_training_goals(self) -> None:
         """TrainingGoal FK ON DELETE CASCADE — twin history is wiped
         when the goal is deleted (rare but possible)."""
-        fks = _foreign_keys_referencing("training_goal_id")
+        fks = get_foreign_keys_referencing(TwinState, "training_goal_id")
         assert len(fks) == 1
         fk = fks[0]
         assert fk.column.table.name == "training_goals"
         assert fk.ondelete == "CASCADE"
 
     def test_activity_id_nullable_uuid(self) -> None:
-        col = _columns()["activity_id"]
+        col = get_columns(TwinState)["activity_id"]
         assert col.nullable is True
         assert isinstance(col.type, PG_UUID)
 
@@ -124,7 +102,7 @@ class TestTwinStateRequiredColumns:
         """Activity FK ON DELETE SET NULL — twin history is
         preserved when an Activity is deleted (history outlives
         the source activity)."""
-        fks = _foreign_keys_referencing("activity_id")
+        fks = get_foreign_keys_referencing(TwinState, "activity_id")
         assert len(fks) == 1
         fk = fks[0]
         assert fk.column.table.name == "activities"
@@ -133,26 +111,22 @@ class TestTwinStateRequiredColumns:
     def test_data_tier_required_integer(self) -> None:
         """``data_tier`` is stored as INTEGER (the enum value's
         integer is persisted; the ORM column does NOT use SAEnum)."""
-        col = _columns()["data_tier"]
+        col = get_columns(TwinState)["data_tier"]
         assert col.nullable is False
         assert isinstance(col.type, Integer)
 
     def test_confidence_level_required_enum(self) -> None:
-        col = _columns()["confidence_level"]
+        col = get_columns(TwinState)["confidence_level"]
         assert col.nullable is False
         assert isinstance(col.type, SAEnum)
-        values_callable = col.type.values_callable
-        assert values_callable is not None
-        actual = sorted(values_callable(TwinConfidenceLevel))
+        actual = sorted(get_enum_values(col, TwinConfidenceLevel))
         assert actual == ["high", "low", "medium"]
 
     def test_trigger_required_enum(self) -> None:
-        col = _columns()["trigger"]
+        col = get_columns(TwinState)["trigger"]
         assert col.nullable is False
         assert isinstance(col.type, SAEnum)
-        values_callable = col.type.values_callable
-        assert values_callable is not None
-        actual = sorted(values_callable(TwinTrigger))
+        actual = sorted(get_enum_values(col, TwinTrigger))
         expected = sorted(
             [
                 "activity_sync",
@@ -165,13 +139,13 @@ class TestTwinStateRequiredColumns:
         assert actual == expected
 
     def test_model_version_required_string(self) -> None:
-        col = _columns()["model_version"]
+        col = get_columns(TwinState)["model_version"]
         assert col.nullable is False
         assert isinstance(col.type, String)
         assert col.type.length == 32
 
     def test_created_at_required_datetime(self) -> None:
-        col = _columns()["created_at"]
+        col = get_columns(TwinState)["created_at"]
         assert col.nullable is False
         assert isinstance(col.type, DateTime)
 
@@ -184,17 +158,17 @@ class TestTwinStateInlineSnapshotColumns:
     AthletePhysiology."""
 
     def test_fitness_required_float(self) -> None:
-        col = _columns()["fitness"]
+        col = get_columns(TwinState)["fitness"]
         assert col.nullable is False
         assert isinstance(col.type, Float)
 
     def test_fatigue_required_float(self) -> None:
-        col = _columns()["fatigue"]
+        col = get_columns(TwinState)["fatigue"]
         assert col.nullable is False
         assert isinstance(col.type, Float)
 
     def test_form_required_float(self) -> None:
-        col = _columns()["form"]
+        col = get_columns(TwinState)["form"]
         assert col.nullable is False
         assert isinstance(col.type, Float)
 
@@ -213,7 +187,7 @@ class TestTwinStateInlineSnapshotColumns:
     def test_threshold_columns_nullable_float(self, threshold_column: str) -> None:
         """All threshold snapshot columns are nullable — null when
         no qualifying signal has been recorded yet."""
-        col = _columns()[threshold_column]
+        col = get_columns(TwinState)[threshold_column]
         assert col.nullable is True, (
             f"{threshold_column} must be nullable — null when no "
             "signal has been recorded."
@@ -225,21 +199,17 @@ class TestTwinStateInlineSnapshotColumns:
 
 class TestTwinStateReadinessColumns:
     def test_readiness_level_required_enum(self) -> None:
-        col = _columns()["readiness_level"]
+        col = get_columns(TwinState)["readiness_level"]
         assert col.nullable is False
         assert isinstance(col.type, SAEnum)
-        values_callable = col.type.values_callable
-        assert values_callable is not None
-        actual = sorted(values_callable(RecoveryModifierLevel))
+        actual = sorted(get_enum_values(col, RecoveryModifierLevel))
         assert actual == ["amber", "green", "red"]
 
     def test_wellness_trend_nullable_enum(self) -> None:
-        col = _columns()["wellness_trend"]
+        col = get_columns(TwinState)["wellness_trend"]
         assert col.nullable is True
         assert isinstance(col.type, SAEnum)
-        values_callable = col.type.values_callable
-        assert values_callable is not None
-        actual = sorted(values_callable(WellnessTrend))
+        actual = sorted(get_enum_values(col, WellnessTrend))
         assert actual == ["declining", "improving", "stable"]
 
 
@@ -250,15 +220,13 @@ class TestTwinStateMetricConfidenceJsonb:
     Null fields use JSON ``null``; the default is the empty dict."""
 
     def test_metric_confidence_required_jsonb(self) -> None:
-        col = _columns()["metric_confidence"]
+        col = get_columns(TwinState)["metric_confidence"]
         assert col.nullable is False
         assert isinstance(col.type, JSONB)
 
     def test_metric_confidence_server_default_empty_dict(self) -> None:
-        col = _columns()["metric_confidence"]
-        default = col.server_default
-        assert default is not None
-        rendered = str(default.arg)
+        col = get_columns(TwinState)["metric_confidence"]
+        rendered = get_server_default_text(col)
         assert "'{}'::jsonb" in rendered, (
             "metric_confidence.server_default must be `'{}'::jsonb` "
             f"so inserts that omit it still persist a valid empty dict. "
@@ -279,7 +247,7 @@ class TestTwinStatePartialUniqueIndex:
     bypass the partial predicate via NULL ``activity_id``."""
 
     def test_athlete_activity_partial_unique_index_present(self) -> None:
-        indexes = _indexes()
+        indexes = get_indexes(TwinState)
         assert "uq_twin_states_athlete_activity" in indexes, (
             "TwinState must declare `uq_twin_states_athlete_activity` "
             "to enforce one TwinState per (athlete_id, activity_id) "
@@ -287,14 +255,14 @@ class TestTwinStatePartialUniqueIndex:
         )
 
     def test_athlete_activity_index_is_unique(self) -> None:
-        idx = _indexes()["uq_twin_states_athlete_activity"]
+        idx = get_indexes(TwinState)["uq_twin_states_athlete_activity"]
         assert idx.unique is True
 
     def test_athlete_activity_partial_predicate_present(self) -> None:
         """Without the partial predicate the index would block
         multiple non-activity triggers (questionnaire,
         physiology_input, wellness_update) per athlete."""
-        idx = _indexes()["uq_twin_states_athlete_activity"]
+        idx = get_indexes(TwinState)["uq_twin_states_athlete_activity"]
         predicate = idx.dialect_options.get("postgresql", {}).get("where")
         assert predicate is not None, (
             "uq_twin_states_athlete_activity must declare a "
@@ -303,7 +271,7 @@ class TestTwinStatePartialUniqueIndex:
         )
 
     def test_athlete_activity_partial_predicate_is_activity_not_null(self) -> None:
-        idx = _indexes()["uq_twin_states_athlete_activity"]
+        idx = get_indexes(TwinState)["uq_twin_states_athlete_activity"]
         predicate = idx.dialect_options.get("postgresql", {}).get("where")
         rendered = str(predicate).lower()
         assert "activity_id" in rendered and "is not null" in rendered, (
@@ -313,7 +281,7 @@ class TestTwinStatePartialUniqueIndex:
         )
 
     def test_athlete_activity_index_columns(self) -> None:
-        idx = _indexes()["uq_twin_states_athlete_activity"]
+        idx = get_indexes(TwinState)["uq_twin_states_athlete_activity"]
         columns = {c.key for c in idx.columns}
         assert columns == {"athlete_id", "activity_id"}
 
@@ -324,27 +292,27 @@ class TestTwinStateSecondaryIndexes:
     view."""
 
     def test_latest_index_present(self) -> None:
-        indexes = _indexes()
+        indexes = get_indexes(TwinState)
         assert "idx_twin_states_latest" in indexes, (
             "TwinState must declare `idx_twin_states_latest` on "
             "(athlete_id, created_at) for the get_latest query."
         )
 
     def test_latest_index_columns(self) -> None:
-        idx = _indexes()["idx_twin_states_latest"]
+        idx = get_indexes(TwinState)["idx_twin_states_latest"]
         columns = {c.key for c in idx.columns}
         assert columns == {"athlete_id", "created_at"}
 
     def test_training_goal_lookup_index_present(self) -> None:
         """Reverse lookup from TrainingGoal — supports the
         get_by_training_goal history path."""
-        indexes = _indexes()
+        indexes = get_indexes(TwinState)
         assert "ix_twin_states_training_goal" in indexes
 
     def test_activity_lookup_index_present(self) -> None:
         """Reverse lookup from Activity — supports the
         get_by_activity contract."""
-        indexes = _indexes()
+        indexes = get_indexes(TwinState)
         assert "ix_twin_states_activity" in indexes
 
 
@@ -411,7 +379,7 @@ class TestTwinStateSchemaAntiGoals:
         ],
     )
     def test_forbidden_columns_are_absent(self, forbidden_field: str) -> None:
-        assert forbidden_field not in _columns(), (
+        assert forbidden_field not in get_columns(TwinState), (
             f"TwinState must not carry `{forbidden_field}`. The "
             "append-only contract restricts the row shape to the "
             "documented snapshot fields only."

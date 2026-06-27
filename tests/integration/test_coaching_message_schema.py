@@ -23,12 +23,11 @@ Reference plan: docs/implementation/phase-1/phase-1-2c-p1-twin-fitness-coaching-
 
 from __future__ import annotations
 
-import os
 import uuid
 from datetime import date, datetime, timezone
 
 import pytest
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -47,69 +46,17 @@ from app.models.enums import (
 )
 from app.models.training_goal import TrainingGoal
 from app.models.twin_state import TwinState
+from tests.utils.factories import make_athlete
+from tests.utils.schema_helpers import (
+    db_check_constraints,
+    db_columns,
+    db_foreign_keys,
+    db_indexes,
+    get_sync_database_url,
+)
 
 
 TABLE = "coaching_messages"
-
-
-def _sync_url() -> str:
-    database_url = os.environ.get("DATABASE_URL", "")
-    if not database_url:
-        raise RuntimeError("DATABASE_URL environment variable not set")
-    if database_url.startswith("postgresql+asyncpg://"):
-        database_url = database_url.replace(
-            "postgresql+asyncpg://",
-            "postgresql+psycopg2://",
-        )
-    return database_url
-
-
-def _columns(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_columns(table))
-    finally:
-        engine.dispose()
-
-
-def _indexes(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_indexes(table))
-    finally:
-        engine.dispose()
-
-
-def _check_constraints(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_check_constraints(table))
-    finally:
-        engine.dispose()
-
-
-def _foreign_keys(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_foreign_keys(table))
-    finally:
-        engine.dispose()
-
-
-# ---------------------------------------------------------------------------
-# Helpers.
-# ---------------------------------------------------------------------------
-
-
-async def _new_athlete(db_session: AsyncSession, email: str) -> Athlete:
-    a = Athlete(email=email)
-    db_session.add(a)
-    await db_session.flush()
-    return a
 
 
 async def _new_active_goal(
@@ -206,7 +153,7 @@ class TestCoachingMessageDBSchemaColumns:
     async def test_required_column_present(
         self, db_session: AsyncSession, expected_column: str
     ) -> None:
-        cols = {col["name"] for col in _columns(TABLE)}
+        cols = {col["name"] for col in db_columns(TABLE)}
         assert expected_column in cols, (
             f"coaching_messages.{expected_column} missing from DB schema."
         )
@@ -222,7 +169,7 @@ class TestCoachingMessageFirstMessagePartialUniqueDB:
     ``IntegrityError``."""
 
     def _partial_unique_index(self) -> dict | None:
-        for idx in _indexes(TABLE):
+        for idx in db_indexes(TABLE):
             cols = set(idx.get("column_names") or ())
             if cols == {"athlete_id"} and idx.get("unique"):
                 return idx
@@ -242,7 +189,7 @@ class TestCoachingMessageFirstMessagePartialUniqueDB:
     ) -> None:
         idx = self._partial_unique_index()
         assert idx is not None
-        engine = create_engine(_sync_url())
+        engine = create_engine(get_sync_database_url())
         try:
             with engine.connect() as conn:
                 row = conn.execute(
@@ -265,7 +212,7 @@ class TestCoachingMessageFirstMessagePartialUniqueDB:
     async def test_two_first_message_rejected(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "msg-dup-first@example.com"
         )
         goal = await _new_active_goal(db_session, athlete)
@@ -292,7 +239,7 @@ class TestCoachingMessageFirstMessagePartialUniqueDB:
         """first_message (athlete-level) and post_workout
         (activity-level) are independent partial predicates — they
         must coexist."""
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "msg-first-and-post@example.com"
         )
         goal = await _new_active_goal(db_session, athlete)
@@ -322,7 +269,7 @@ class TestCoachingMessagePostWorkoutPartialUniqueDB:
     ``IntegrityError``."""
 
     def _activity_partial_unique_index(self) -> dict | None:
-        for idx in _indexes(TABLE):
+        for idx in db_indexes(TABLE):
             cols = set(idx.get("column_names") or ())
             if cols == {"activity_id"} and idx.get("unique"):
                 return idx
@@ -342,7 +289,7 @@ class TestCoachingMessagePostWorkoutPartialUniqueDB:
     ) -> None:
         idx = self._activity_partial_unique_index()
         assert idx is not None
-        engine = create_engine(_sync_url())
+        engine = create_engine(get_sync_database_url())
         try:
             with engine.connect() as conn:
                 row = conn.execute(
@@ -369,7 +316,7 @@ class TestCoachingMessagePostWorkoutPartialUniqueDB:
     async def test_two_post_workout_same_activity_rejected(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "msg-dup-postworkout@example.com"
         )
         goal = await _new_active_goal(db_session, athlete)
@@ -396,7 +343,7 @@ class TestCoachingMessagePostWorkoutPartialUniqueDB:
     async def test_post_workout_different_activities_coexist(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "msg-multi-postworkout@example.com"
         )
         goal = await _new_active_goal(db_session, athlete)
@@ -430,7 +377,7 @@ class TestCoachingMessagePostWorkoutPartialUniqueDB:
 
 class TestCoachingMessageContentNonEmptyCheckDB:
     def test_content_non_empty_check_present(self) -> None:
-        checks = _check_constraints(TABLE)
+        checks = db_check_constraints(TABLE)
         found = any(
             "length(content)" in (c.get("sqltext") or "")
             and "> 0" in (c.get("sqltext") or "")
@@ -444,7 +391,7 @@ class TestCoachingMessageContentNonEmptyCheckDB:
     async def test_empty_content_rejected(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "msg-empty@example.com"
         )
         goal = await _new_active_goal(db_session, athlete)
@@ -468,7 +415,7 @@ class TestCoachingMessageContentNonEmptyCheckDB:
 
 class TestCoachingMessageForeignKeysDB:
     def test_athlete_id_fk_to_athletes(self) -> None:
-        fks = _foreign_keys(TABLE)
+        fks = db_foreign_keys(TABLE)
         athlete_fks = [
             fk
             for fk in fks
@@ -479,7 +426,7 @@ class TestCoachingMessageForeignKeysDB:
         assert athlete_fks
 
     def test_twin_state_id_fk_to_twin_states(self) -> None:
-        fks = _foreign_keys(TABLE)
+        fks = db_foreign_keys(TABLE)
         twin_fks = [
             fk
             for fk in fks
@@ -492,7 +439,7 @@ class TestCoachingMessageForeignKeysDB:
         )
 
     def test_activity_id_fk_to_activities(self) -> None:
-        fks = _foreign_keys(TABLE)
+        fks = db_foreign_keys(TABLE)
         activity_fks = [
             fk
             for fk in fks
@@ -503,82 +450,43 @@ class TestCoachingMessageForeignKeysDB:
         assert activity_fks
 
     def test_athlete_fk_ondelete_is_cascade(self) -> None:
-        engine = create_engine(_sync_url())
-        try:
-            with engine.connect() as conn:
-                row = conn.execute(
-                    text(
-                        """
-                        SELECT c.confdeltype
-                        FROM pg_constraint c
-                        JOIN pg_class conrelid_table ON conrelid_table.oid = c.conrelid
-                        JOIN pg_class confrelid_table ON confrelid_table.oid = c.confrelid
-                        WHERE c.contype = 'f'
-                          AND confrelid_table.relname = 'athletes'
-                          AND conrelid_table.relname = :table_name
-                        """
-                    ),
-                    {"table_name": TABLE},
-                ).fetchone()
-        finally:
-            engine.dispose()
-        assert row is not None
-        assert row[0] == "c", (
-            f"coaching_messages.athlete_id FK ON DELETE must be CASCADE. "
-            f"Got {row[0]!r}"
+        fks = db_foreign_keys(TABLE)
+        athlete_fks = [
+            fk for fk in fks
+            if fk.get("referred_table") == "athletes"
+            and tuple(fk.get("constrained_columns") or ())
+            == ("athlete_id",)
+        ]
+        assert athlete_fks, (
+            "coaching_messages.athlete_id FK ON DELETE must be CASCADE."
         )
+        assert athlete_fks[0].get("options", {}).get("ondelete") == "CASCADE"
 
     def test_twin_state_fk_ondelete_is_cascade(self) -> None:
-        engine = create_engine(_sync_url())
-        try:
-            with engine.connect() as conn:
-                row = conn.execute(
-                    text(
-                        """
-                        SELECT c.confdeltype
-                        FROM pg_constraint c
-                        JOIN pg_class conrelid_table ON conrelid_table.oid = c.conrelid
-                        JOIN pg_class confrelid_table ON confrelid_table.oid = c.confrelid
-                        WHERE c.contype = 'f'
-                          AND confrelid_table.relname = 'twin_states'
-                          AND conrelid_table.relname = :table_name
-                        """
-                    ),
-                    {"table_name": TABLE},
-                ).fetchone()
-        finally:
-            engine.dispose()
-        assert row is not None
-        assert row[0] == "c", (
-            f"coaching_messages.twin_state_id FK ON DELETE must be CASCADE. "
-            f"Got {row[0]!r}"
+        fks = db_foreign_keys(TABLE)
+        twin_fks = [
+            fk for fk in fks
+            if fk.get("referred_table") == "twin_states"
+            and tuple(fk.get("constrained_columns") or ())
+            == ("twin_state_id",)
+        ]
+        assert twin_fks, (
+            "coaching_messages.twin_state_id FK ON DELETE must be CASCADE."
         )
+        assert twin_fks[0].get("options", {}).get("ondelete") == "CASCADE"
 
     def test_activity_fk_ondelete_is_set_null(self) -> None:
-        engine = create_engine(_sync_url())
-        try:
-            with engine.connect() as conn:
-                row = conn.execute(
-                    text(
-                        """
-                        SELECT c.confdeltype
-                        FROM pg_constraint c
-                        JOIN pg_class conrelid_table ON conrelid_table.oid = c.conrelid
-                        JOIN pg_class confrelid_table ON confrelid_table.oid = c.confrelid
-                        WHERE c.contype = 'f'
-                          AND confrelid_table.relname = 'activities'
-                          AND conrelid_table.relname = :table_name
-                        """
-                    ),
-                    {"table_name": TABLE},
-                ).fetchone()
-        finally:
-            engine.dispose()
-        assert row is not None
-        assert row[0] == "n", (
-            f"coaching_messages.activity_id FK ON DELETE must be "
-            f"SET NULL (confdeltype='n'). Got {row[0]!r}"
+        fks = db_foreign_keys(TABLE)
+        activity_fks = [
+            fk for fk in fks
+            if fk.get("referred_table") == "activities"
+            and tuple(fk.get("constrained_columns") or ())
+            == ("activity_id",)
+        ]
+        assert activity_fks, (
+            "coaching_messages.activity_id FK ON DELETE must be SET NULL."
         )
+        assert activity_fks[0].get("options", {}).get("ondelete") == "SET NULL"
 
 
 # ---------------------------------------------------------------------------
@@ -590,7 +498,7 @@ class TestCoachingMessageRoundTripDB:
     async def test_minimal_message_persists(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "msg-roundtrip@example.com"
         )
         goal = await _new_active_goal(db_session, athlete)
@@ -622,7 +530,7 @@ class TestCoachingMessageRoundTripDB:
     ) -> None:
         """``activity_id`` is NULL for every MessageType other than
         ``post_workout`` — schema permits NULL."""
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "msg-no-activity@example.com"
         )
         goal = await _new_active_goal(db_session, athlete)

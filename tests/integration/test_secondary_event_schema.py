@@ -17,10 +17,7 @@ Reference plan: docs/implementation/phase-1/phase-1-2b-p1-plan-sessions.md
 
 from __future__ import annotations
 
-import os
-
 import pytest
-from sqlalchemy import create_engine, inspect
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.athlete import Athlete
@@ -32,55 +29,15 @@ from app.models.enums import (
 )
 from app.models.secondary_event import SecondaryEvent
 from app.models.training_goal import TrainingGoal
+from tests.utils.factories import make_athlete
+from tests.utils.schema_helpers import (
+    db_columns,
+    db_foreign_keys,
+    db_indexes,
+)
 
 
 TABLE = "secondary_events"
-
-
-def _sync_url() -> str:
-    database_url = os.environ.get("DATABASE_URL", "")
-    if not database_url:
-        raise RuntimeError("DATABASE_URL environment variable not set")
-    if database_url.startswith("postgresql+asyncpg://"):
-        database_url = database_url.replace(
-            "postgresql+asyncpg://",
-            "postgresql+psycopg2://",
-        )
-    return database_url
-
-
-def _columns(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_columns(table))
-    finally:
-        engine.dispose()
-
-
-def _indexes(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_indexes(table))
-    finally:
-        engine.dispose()
-
-
-def _foreign_keys(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_foreign_keys(table))
-    finally:
-        engine.dispose()
-
-
-async def _new_athlete(db_session: AsyncSession, email: str) -> Athlete:
-    a = Athlete(email=email)
-    db_session.add(a)
-    await db_session.flush()
-    return a
 
 
 async def _new_goal(
@@ -120,7 +77,7 @@ class TestSecondaryEventDBSchemaColumns:
     async def test_required_column_present(
         self, db_session: AsyncSession, expected_column: str
     ) -> None:
-        cols = {col["name"] for col in _columns(TABLE)}
+        cols = {col["name"] for col in db_columns(TABLE)}
         assert expected_column in cols, (
             f"secondary_events.{expected_column} missing from DB schema."
         )
@@ -133,7 +90,7 @@ class TestSecondaryEventDBSchemaColumns:
 
 class TestSecondaryEventForeignKeyCascade:
     def test_training_goal_id_fk_to_training_goals(self) -> None:
-        fks = _foreign_keys(TABLE)
+        fks = db_foreign_keys(TABLE)
         matches = [
             fk for fk in fks
             if fk.get("referred_table") == "training_goals"
@@ -146,39 +103,27 @@ class TestSecondaryEventForeignKeyCascade:
         )
 
     def test_fk_ondelete_cascade_in_pg_catalog(self) -> None:
-        from sqlalchemy import text
-
-        engine = create_engine(_sync_url())
-        try:
-            with engine.connect() as conn:
-                row = conn.execute(
-                    text(
-                        """
-                        SELECT c.confdeltype,
-                               pg_get_constraintdef(c.oid) AS constraint_def
-                        FROM pg_constraint c
-                        JOIN pg_class conrelid_table ON conrelid_table.oid = c.conrelid
-                        JOIN pg_class confrelid_table ON confrelid_table.oid = c.confrelid
-                        WHERE c.contype = 'f'
-                          AND confrelid_table.relname = 'training_goals'
-                          AND conrelid_table.relname = 'secondary_events'
-                        """
-                    )
-                ).fetchone()
-        finally:
-            engine.dispose()
-        assert row is not None, (
-            "secondary_events.training_goal_id FK must exist in pg_constraint."
+        fks = db_foreign_keys(TABLE)
+        goal_fks = [
+            fk for fk in fks
+            if fk.get("referred_table") == "training_goals"
+            and tuple(fk.get("constrained_columns") or ())
+            == ("training_goal_id",)
+        ]
+        assert goal_fks, (
+            "secondary_events.training_goal_id FK must reference "
+            "training_goals(id)."
         )
-        assert row[0] == "c", (
+        options = goal_fks[0].get("options", {})
+        assert options.get("ondelete") == "CASCADE", (
             "secondary_events.training_goal_id FK must CASCADE on delete. "
-            f"Got confdeltype={row[0]!r}, def={row[1]}"
+            f"Got ondelete={options.get('ondelete')!r}"
         )
 
     async def test_cascade_delete_with_goal(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(db_session, "se-cascade@example.com")
+        athlete = await make_athlete(db_session, "se-cascade@example.com")
         goal = await _new_goal(db_session, athlete)
         from datetime import date as _date
 
@@ -217,7 +162,7 @@ class TestSecondaryEventPersistence:
     ) -> None:
         from datetime import date as _date
 
-        athlete = await _new_athlete(db_session, "se-rt@example.com")
+        athlete = await make_athlete(db_session, "se-rt@example.com")
         goal = await _new_goal(db_session, athlete)
         se = SecondaryEvent(
             training_goal_id=goal.id,
@@ -243,7 +188,7 @@ class TestSecondaryEventPersistence:
         type/date is a valid row."""
         from datetime import date as _date
 
-        athlete = await _new_athlete(db_session, "se-min@example.com")
+        athlete = await make_athlete(db_session, "se-min@example.com")
         goal = await _new_goal(db_session, athlete)
         se = SecondaryEvent(
             training_goal_id=goal.id,
@@ -266,7 +211,7 @@ class TestSecondaryEventIndexes:
     def test_goal_index_present(self) -> None:
         matched = [
             idx
-            for idx in _indexes(TABLE)
+            for idx in db_indexes(TABLE)
             if set(idx.get("column_names") or []) >= {"training_goal_id"}
         ]
         assert matched, (
@@ -277,7 +222,7 @@ class TestSecondaryEventIndexes:
     def test_goal_date_index_present(self) -> None:
         matched = [
             idx
-            for idx in _indexes(TABLE)
+            for idx in db_indexes(TABLE)
             if set(idx.get("column_names") or [])
             >= {"training_goal_id", "event_date"}
         ]

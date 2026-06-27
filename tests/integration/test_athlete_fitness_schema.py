@@ -24,12 +24,11 @@ Reference plan: docs/implementation/phase-1/phase-1-2c-p1-twin-fitness-coaching-
 
 from __future__ import annotations
 
-import os
 import uuid
 from datetime import date, datetime, timezone
 
 import pytest
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -37,69 +36,17 @@ from app.models.activity import Activity
 from app.models.athlete import Athlete
 from app.models.athlete_fitness import AthleteFitness
 from app.models.enums import ActivitySource
+from tests.utils.factories import make_athlete
+from tests.utils.schema_helpers import (
+    db_check_constraints,
+    db_columns,
+    db_foreign_keys,
+    db_indexes,
+    get_sync_database_url,
+)
 
 
 TABLE = "athlete_fitness"
-
-
-def _sync_url() -> str:
-    database_url = os.environ.get("DATABASE_URL", "")
-    if not database_url:
-        raise RuntimeError("DATABASE_URL environment variable not set")
-    if database_url.startswith("postgresql+asyncpg://"):
-        database_url = database_url.replace(
-            "postgresql+asyncpg://",
-            "postgresql+psycopg2://",
-        )
-    return database_url
-
-
-def _columns(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_columns(table))
-    finally:
-        engine.dispose()
-
-
-def _indexes(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_indexes(table))
-    finally:
-        engine.dispose()
-
-
-def _check_constraints(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_check_constraints(table))
-    finally:
-        engine.dispose()
-
-
-def _foreign_keys(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_foreign_keys(table))
-    finally:
-        engine.dispose()
-
-
-# ---------------------------------------------------------------------------
-# Helpers.
-# ---------------------------------------------------------------------------
-
-
-async def _new_athlete(db_session: AsyncSession, email: str) -> Athlete:
-    a = Athlete(email=email)
-    db_session.add(a)
-    await db_session.flush()
-    return a
 
 
 def _aggregate(
@@ -167,7 +114,7 @@ class TestAthleteFitnessDBSchemaColumns:
     async def test_required_column_present(
         self, db_session: AsyncSession, expected_column: str
     ) -> None:
-        cols = {col["name"] for col in _columns(TABLE)}
+        cols = {col["name"] for col in db_columns(TABLE)}
         assert expected_column in cols, (
             f"athlete_fitness.{expected_column} missing from DB schema."
         )
@@ -182,19 +129,19 @@ class TestAthleteFitnessUniqueIndexDB:
     def test_unique_index_present(self) -> None:
         matched = [
             idx
-            for idx in _indexes(TABLE)
+            for idx in db_indexes(TABLE)
             if set(idx.get("column_names") or ()) == {"athlete_id"}
             and idx.get("unique")
         ]
         assert matched, (
             "athlete_fitness must declare UNIQUE (athlete_id). "
-            f"Got: {[idx.get('column_names') for idx in _indexes(TABLE)]}"
+            f"Got: {[idx.get('column_names') for idx in db_indexes(TABLE)]}"
         )
 
     async def test_two_fitness_rows_same_athlete_rejected(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "fit-dup@example.com"
         )
         f1 = _fitness_factory(athlete_id=athlete.id)
@@ -215,7 +162,7 @@ class TestAthleteFitnessAggregateFormCheckDB:
     (aggregate->>'fatigue')::float`` — the architectural invariant."""
 
     def test_aggregate_form_check_present(self) -> None:
-        checks = _check_constraints(TABLE)
+        checks = db_check_constraints(TABLE)
         found = any(
             "aggregate" in (c.get("sqltext") or "").lower()
             and "fitness" in (c.get("sqltext") or "").lower()
@@ -234,7 +181,7 @@ class TestAthleteFitnessAggregateFormCheckDB:
         self, db_session: AsyncSession
     ) -> None:
         """form != fitness - fatigue must raise IntegrityError."""
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "fit-bad-form@example.com"
         )
         bad_aggregate = {"fitness": 10.0, "fatigue": 2.0, "form": 99.0}
@@ -249,7 +196,7 @@ class TestAthleteFitnessAggregateFormCheckDB:
     async def test_valid_form_in_aggregate_accepted(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "fit-good-form@example.com"
         )
         row = _fitness_factory(
@@ -266,7 +213,7 @@ class TestAthleteFitnessAggregateFormCheckDB:
     ) -> None:
         """Architecture invariant: negative ``form`` is valid (load
         phase). No lower-bound CHECK is applied to ``form``."""
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "fit-negative-form@example.com"
         )
         row = _fitness_factory(
@@ -284,7 +231,7 @@ class TestAthleteFitnessDimensionFormChecksDB:
     the dimension is populated (NULL short-circuits)."""
 
     def test_aerobic_form_check_present(self) -> None:
-        checks = _check_constraints(TABLE)
+        checks = db_check_constraints(TABLE)
         aerobic_checks = [
             c
             for c in checks
@@ -303,7 +250,7 @@ class TestAthleteFitnessDimensionFormChecksDB:
         )
 
     def test_neuromuscular_form_check_present(self) -> None:
-        checks = _check_constraints(TABLE)
+        checks = db_check_constraints(TABLE)
         neuromuscular_checks = [
             c
             for c in checks
@@ -316,7 +263,7 @@ class TestAthleteFitnessDimensionFormChecksDB:
         )
 
     def test_structural_form_check_present(self) -> None:
-        checks = _check_constraints(TABLE)
+        checks = db_check_constraints(TABLE)
         structural_checks = [
             c
             for c in checks
@@ -331,7 +278,7 @@ class TestAthleteFitnessDimensionFormChecksDB:
     async def test_null_aerobic_does_not_trigger_form_check(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "fit-null-aerobic@example.com"
         )
         # aerobic, neuromuscular, structural all NULL — only the
@@ -352,7 +299,7 @@ class TestAthleteFitnessDimensionFormChecksDB:
     async def test_populated_aerobic_with_bad_form_rejected(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "fit-bad-aerobic@example.com"
         )
         row = _fitness_factory(
@@ -371,7 +318,7 @@ class TestAthleteFitnessDimensionFormChecksDB:
     async def test_populated_aerobic_with_good_form_accepted(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "fit-good-aerobic@example.com"
         )
         row = _fitness_factory(
@@ -395,7 +342,7 @@ class TestAthleteFitnessDimensionFormChecksDB:
 
 class TestAthleteFitnessTimeConstantsSourceCheckDB:
     def test_source_check_present(self) -> None:
-        checks = _check_constraints(TABLE)
+        checks = db_check_constraints(TABLE)
         found = any(
             "time_constants" in (c.get("sqltext") or "").lower()
             and "source" in (c.get("sqltext") or "").lower()
@@ -412,7 +359,7 @@ class TestAthleteFitnessTimeConstantsSourceCheckDB:
     async def test_invalid_source_rejected(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "fit-bad-source@example.com"
         )
         row = _fitness_factory(
@@ -437,7 +384,7 @@ class TestAthleteFitnessTimeConstantsSourceCheckDB:
 
 class TestAthleteFitnessForeignKeysDB:
     def test_athlete_id_fk_to_athletes(self) -> None:
-        fks = _foreign_keys(TABLE)
+        fks = db_foreign_keys(TABLE)
         athlete_fks = [
             fk
             for fk in fks
@@ -448,7 +395,7 @@ class TestAthleteFitnessForeignKeysDB:
         assert athlete_fks
 
     def test_last_activity_id_fk_to_activities(self) -> None:
-        fks = _foreign_keys(TABLE)
+        fks = db_foreign_keys(TABLE)
         activity_fks = [
             fk
             for fk in fks
@@ -459,55 +406,33 @@ class TestAthleteFitnessForeignKeysDB:
         assert activity_fks
 
     def test_athlete_fk_ondelete_is_cascade(self) -> None:
-        engine = create_engine(_sync_url())
-        try:
-            with engine.connect() as conn:
-                row = conn.execute(
-                    text(
-                        """
-                        SELECT c.confdeltype
-                        FROM pg_constraint c
-                        JOIN pg_class conrelid_table ON conrelid_table.oid = c.conrelid
-                        JOIN pg_class confrelid_table ON confrelid_table.oid = c.confrelid
-                        WHERE c.contype = 'f'
-                          AND confrelid_table.relname = 'athletes'
-                          AND conrelid_table.relname = :table_name
-                        """
-                    ),
-                    {"table_name": TABLE},
-                ).fetchone()
-        finally:
-            engine.dispose()
-        assert row is not None
-        assert row[0] == "c", (
-            f"athlete_fitness.athlete_id FK ON DELETE must be CASCADE. "
-            f"Got confdeltype={row[0]!r}"
+        fks = db_foreign_keys(TABLE)
+        athlete_fks = [
+            fk for fk in fks
+            if fk.get("referred_table") == "athletes"
+            and tuple(fk.get("constrained_columns") or ())
+            == ("athlete_id",)
+        ]
+        assert athlete_fks, (
+            "athlete_fitness.athlete_id FK must reference athletes(id)."
+        )
+        assert athlete_fks[0].get("options", {}).get("ondelete") == "CASCADE", (
+            "athlete_fitness.athlete_id FK ON DELETE must be CASCADE."
         )
 
     def test_last_activity_fk_ondelete_is_set_null(self) -> None:
-        engine = create_engine(_sync_url())
-        try:
-            with engine.connect() as conn:
-                row = conn.execute(
-                    text(
-                        """
-                        SELECT c.confdeltype
-                        FROM pg_constraint c
-                        JOIN pg_class conrelid_table ON conrelid_table.oid = c.conrelid
-                        JOIN pg_class confrelid_table ON confrelid_table.oid = c.confrelid
-                        WHERE c.contype = 'f'
-                          AND confrelid_table.relname = 'activities'
-                          AND conrelid_table.relname = :table_name
-                        """
-                    ),
-                    {"table_name": TABLE},
-                ).fetchone()
-        finally:
-            engine.dispose()
-        assert row is not None
-        assert row[0] == "n", (
-            f"athlete_fitness.last_activity_id FK ON DELETE must be "
-            f"SET NULL (confdeltype='n'). Got {row[0]!r}"
+        fks = db_foreign_keys(TABLE)
+        activity_fks = [
+            fk for fk in fks
+            if fk.get("referred_table") == "activities"
+            and tuple(fk.get("constrained_columns") or ())
+            == ("last_activity_id",)
+        ]
+        assert activity_fks, (
+            "athlete_fitness.last_activity_id FK must reference activities(id)."
+        )
+        assert activity_fks[0].get("options", {}).get("ondelete") == "SET NULL", (
+            "athlete_fitness.last_activity_id FK ON DELETE must be SET NULL."
         )
 
     async def test_last_activity_id_set_null_on_activity_delete(
@@ -515,7 +440,7 @@ class TestAthleteFitnessForeignKeysDB:
     ) -> None:
         """When the parent Activity is deleted, last_activity_id
         is set to NULL (history outlives the source activity)."""
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "fit-activity-fk@example.com"
         )
         activity = Activity(
@@ -542,7 +467,7 @@ class TestAthleteFitnessForeignKeysDB:
         await db_session.commit()
 
         # Query via a fresh sync connection.
-        engine = create_engine(_sync_url())
+        engine = create_engine(get_sync_database_url())
         try:
             with engine.connect() as conn:
                 result = conn.execute(
@@ -570,7 +495,7 @@ class TestAthleteFitnessMutabilityDB:
     async def test_update_aggregate_succeeds(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "fit-update@example.com"
         )
         row = _fitness_factory(
@@ -598,7 +523,7 @@ class TestAthleteFitnessRoundTripDB:
     async def test_minimal_fitness_row_persists(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "fit-minimal@example.com"
         )
         row = _fitness_factory(

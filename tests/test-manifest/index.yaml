@@ -1,5 +1,5 @@
 version: "1.0"
-last_reviewed_at: "2026-06-25T00:30:00+00:00"
+last_reviewed_at: "2026-06-27T00:00:00+00:00"
 
 # ---------------------------------------------------------------------------
 # INDEX — lightweight cross-phase registry.
@@ -50,40 +50,16 @@ selection:
     - "tests/unit/test_generation_event_columns.py"
     - "tests/unit/test_generated_workout_columns.py"
     - "tests/unit/test_workout_step_columns.py"
+    # Phase-1.3 unit tests (promoted 2026-06-27)
+    - "tests/unit/test_onboarding_service.py"
+    - "tests/unit/test_onboarding_errors.py"
   feature:
-    - "tests/unit/test_enum_values.py"
-    - "tests/unit/test_training_goal_columns.py"
-    - "tests/unit/test_secondary_event_columns.py"
-    - "tests/unit/test_regeneration_task_columns.py"
-    - "tests/unit/test_training_plan_columns.py"
-    - "tests/unit/test_weekly_plan_columns.py"
-    - "tests/unit/test_planned_session_columns.py"
-    - "tests/unit/test_checkpoint_columns.py"
-    - "tests/integration/test_training_goal_schema.py"
-    - "tests/integration/test_secondary_event_schema.py"
-    - "tests/integration/test_regeneration_task_schema.py"
-    - "tests/integration/test_training_plan_schema.py"
-    - "tests/integration/test_weekly_plan_schema.py"
-    - "tests/integration/test_planned_session_schema.py"
-    - "tests/integration/test_checkpoint_schema.py"
-    - "tests/integration/test_activity_schema.py"
-    - "tests/integration/test_migration_phase_1_2b.py"
-    # Phase-1.2c — current active sub-phase
-    - "tests/unit/test_twin_state_columns.py"
-    - "tests/unit/test_athlete_physiology_columns.py"
-    - "tests/unit/test_athlete_fitness_columns.py"
-    - "tests/unit/test_coaching_message_columns.py"
-    - "tests/unit/test_generation_event_columns.py"
-    - "tests/unit/test_generated_workout_columns.py"
-    - "tests/unit/test_workout_step_columns.py"
-    - "tests/integration/test_twin_state_schema.py"
-    - "tests/integration/test_athlete_physiology_schema.py"
-    - "tests/integration/test_athlete_fitness_schema.py"
-    - "tests/integration/test_coaching_message_schema.py"
-    - "tests/integration/test_generation_event_schema.py"
-    - "tests/integration/test_generated_workout_schema.py"
-    - "tests/integration/test_workout_step_schema.py"
-    - "tests/integration/test_migration_phase_1_2c.py"
+    # Phase-1.3 — current active sub-phase
+    - "tests/unit/test_onboarding_service.py"
+    - "tests/unit/test_onboarding_errors.py"
+    - "tests/integration/test_onboarding_service.py"
+    - "tests/api/test_onboarding_endpoints.py"
+    - "tests/behaviour/test_onboarding_user_journey.py"
   regression:
     - "tests/unit/test_password_hasher.py"
     - "tests/unit/test_token_service.py"
@@ -136,6 +112,12 @@ selection:
     - "tests/integration/test_migration_phase_1_2c.py"
     - "tests/api/test_auth_endpoints.py"
     - "tests/behaviour/test_auth_user_journey.py"
+    # Phase-1.3 (promoted 2026-06-27)
+    - "tests/unit/test_onboarding_service.py"
+    - "tests/unit/test_onboarding_errors.py"
+    - "tests/integration/test_onboarding_service.py"
+    - "tests/api/test_onboarding_endpoints.py"
+    - "tests/behaviour/test_onboarding_user_journey.py"
   release:
     - "tests/unit/test_password_hasher.py"
     - "tests/unit/test_token_service.py"
@@ -188,6 +170,12 @@ selection:
     - "tests/integration/test_migration_phase_1_2c.py"
     - "tests/api/test_auth_endpoints.py"
     - "tests/behaviour/test_auth_user_journey.py"
+    # Phase-1.3 (promoted 2026-06-27)
+    - "tests/unit/test_onboarding_service.py"
+    - "tests/unit/test_onboarding_errors.py"
+    - "tests/integration/test_onboarding_service.py"
+    - "tests/api/test_onboarding_endpoints.py"
+    - "tests/behaviour/test_onboarding_user_journey.py"
 
 # ---------------------------------------------------------------------------
 # Cross-phase execution dependencies
@@ -206,6 +194,18 @@ cross_phase_dependencies:
   - from: "p1-2b-p1-migration"
     to: "p1-2c-p1-migration"
     type: runs_before
+  - from: "p1-1-p1-integration"
+    to: "p1-3-p1-integration"
+    type: runs_before
+  - from: "p1-2a-p1-integration"
+    to: "p1-3-p1-integration"
+    type: runs_before
+  - from: "p1-2b-p1-integration"
+    to: "p1-3-p1-integration"
+    type: runs_before
+  - from: "p1-2c-p1-integration"
+    to: "p1-3-p1-integration"
+    type: runs_before
 
 # ---------------------------------------------------------------------------
 # This is the aggregate view across all promoted sub-phases.
@@ -217,6 +217,15 @@ coverage:
       - "POST /api/v1/auth/register"
       - "POST /api/v1/auth/login"
       - "POST /api/v1/auth/refresh"
+      # Phase-1.3 Onboarding
+      - "POST /api/v1/athletes/{athlete_id}/onboarding"
+      - "GET /api/v1/athletes/{athlete_id}/onboarding"
+      - "GET /api/v1/athletes/{athlete_id}/profile"
+      - "PATCH /api/v1/athletes/{athlete_id}/profile"
+      - "GET /api/v1/athletes/{athlete_id}/preferences"
+      - "PATCH /api/v1/athletes/{athlete_id}/preferences"
+      - "GET /api/v1/athletes/{athlete_id}/twin"
+      - "GET /api/v1/athletes/{athlete_id}/twin/history"
     partial:
       - "GET /_protected/athletes/{athlete_id}/whoami (require_self — test-only route)"
     missing: []
@@ -226,13 +235,13 @@ coverage:
       - "athlete_registered"
       - "athlete_logged_in (token_type=access)"
       - "athlete_logged_in (token_type=refresh)"
+      - "onboarding_completed (PRODUCED in Phase-1.3 — stored in outbox PENDING)"
     partial: []
     missing:
       - "refresh_token_rotated (intentionally NOT EMITTED per ADR-005 — N/A)"
       - "activity_ingested (NOT PRODUCED in Phase-1.2a — out of scope until FIT/manual ingestion ships)"
       - "activity_calibration_eligible (NOT PRODUCED in Phase-1.2a — out of scope until load computation + calibration services ship)"
       - "session_completed (NOT CONSUMED in Phase-1.2a — out of scope until planned_sessions + session lifecycle ship)"
-      - "onboarding_completed (NOT CONSUMED in Phase-1.2a — out of scope until onboarding orchestration ships)"
 
   invariants:
     covered:
@@ -350,6 +359,33 @@ coverage:
       - "UNIQUE constraints uq_weekly_plans_plan_week and uq_planned_sessions_plan_date_slot emitted"
       - "checkpoints UNIQUE constraint on planned_session_id emitted"
       - "fk_activities_planned_session FK emitted with ondelete=SET NULL"
+      # Phase-1.3
+      - "OnboardingService atomically writes the seven-entity bootstrap row graph + onboarding_complete flip"
+      - "Re-onboarding rejected (HTTP 409 via OnboardingAlreadyCompleteError)"
+      - "Single active training goal per athlete enforced by partial unique index to 409"
+      - "Goal-type whitelist at service layer (only race_event | target_performance accepted) — others rejected 422"
+      - "Timezone validated against IANA tz database (zoneinfo) at the OnboardingProfileIn schema"
+      - "TwinState repository exposes only insert + reads — no update()/delete() — append-only invariant"
+      - "Threshold bootstrap formulas: max_hr=220-age, lt1=0.75*max_hr, lt2=0.875*max_hr"
+      - "cp / vo2max / lt-power / lt-pace NULL at bootstrap (never estimated from questionnaire)"
+      - "AthleteFitness aggregate = {0, 0, 0}; time_constants.source = population_default; documented tau values"
+      - "TwinState.confidence_level = low; trigger = questionnaire; model_version = v1-questionnaire-bootstrap"
+      - "TwinState.readiness_level = green; activity_id = NULL; wellness_trend = NULL"
+      - "metric_confidence JSON: lt1_hr/lt2_hr = low; lt1_power/lt1_pace/lt2_power/lt2_pace/cp = null"
+      - "structural_risk_flag = sport_background != RUNNING_PRIMARY (computed server-side)"
+      - "infer_data_tier wiring: TwinState.data_tier matches for every documented combination"
+      - "onboarding_completed payload: training_goal_id, twin_state_id, data_tier, confidence_level"
+      - "onboarding_completed event has paired outbox row with status=PENDING"
+      - "ADR-006: explicit session.rollback() before raising TrainingGoalConflictError after IntegrityError"
+      - "require_self returns 403 (never 404) on every onboarding endpoint"
+      - "401 vs 403 distinction preserved (missing-bearer -> 401, athlete mismatch -> 403)"
+      - "PATCH /profile immutability: date_of_birth / sex / timezone rejected with 422"
+      - "PATCH /profile accepts only height_cm / location_lat / location_lng / training_window"
+      - "PATCH /preferences merges weekly_schedule at the day level; top-level fields overwrite"
+      - "PATCH /preferences and /profile are idempotent"
+      - "GET /preferences returns 404 before onboarding completes; 200 after"
+      - "GET /twin returns 404 before TwinState bootstrap; 200 after"
+      - "GET /twin/history ?limit bounds: ge=1, le=100; newest-first ordering"
     partial:
       - "Email PII suppression in audit logs (covered behaviourally via cap_auth_logs)"
     missing:

@@ -27,28 +27,16 @@ from __future__ import annotations
 import pytest
 from sqlalchemy import (
     DateTime,
-    ForeignKey,
-    Index,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 
 from app.models.athlete_physiology import AthletePhysiology
-
-
-def _columns() -> dict[str, object]:
-    return {column.key: column for column in AthletePhysiology.__table__.columns}
-
-
-def _indexes() -> dict[str, Index]:
-    return {idx.name: idx for idx in AthletePhysiology.__table__.indexes}
-
-
-def _foreign_keys_referencing(column_key: str) -> list[ForeignKey]:
-    return [
-        fk
-        for fk in AthletePhysiology.__table__.foreign_keys
-        if fk.parent.name == column_key
-    ]
+from tests.utils.model_helpers import (
+    get_columns,
+    get_indexes,
+    get_foreign_keys_referencing,
+    get_server_default_text,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -58,19 +46,19 @@ def _foreign_keys_referencing(column_key: str) -> list[ForeignKey]:
 
 class TestAthletePhysiologyRequiredColumns:
     def test_id_column_uuid_primary_key(self) -> None:
-        col = _columns()["id"]
+        col = get_columns(AthletePhysiology)["id"]
         assert col.primary_key is True
         assert isinstance(col.type, PG_UUID)
 
     def test_athlete_id_required_uuid(self) -> None:
-        col = _columns()["athlete_id"]
+        col = get_columns(AthletePhysiology)["athlete_id"]
         assert col.nullable is False
         assert isinstance(col.type, PG_UUID)
 
     def test_athlete_id_cascade_fk_to_athletes(self) -> None:
         """Athlete FK ON DELETE CASCADE — physiology rows are wiped
         when the athlete account is deleted."""
-        fks = _foreign_keys_referencing("athlete_id")
+        fks = get_foreign_keys_referencing(AthletePhysiology, "athlete_id")
         assert len(fks) == 1
         fk = fks[0]
         assert fk.column.table.name == "athletes"
@@ -79,26 +67,26 @@ class TestAthletePhysiologyRequiredColumns:
     def test_lt1_required_jsonb(self) -> None:
         """``lt1`` is NOT NULL — always populated. Carries the three
         per-signal state objects (hr / power / pace) or JSON null."""
-        col = _columns()["lt1"]
+        col = get_columns(AthletePhysiology)["lt1"]
         assert col.nullable is False
         assert isinstance(col.type, JSONB)
 
     def test_lt2_required_jsonb(self) -> None:
         """``lt2`` is NOT NULL — same shape as lt1."""
-        col = _columns()["lt2"]
+        col = get_columns(AthletePhysiology)["lt2"]
         assert col.nullable is False
         assert isinstance(col.type, JSONB)
 
     def test_cp_nullable_jsonb(self) -> None:
         """``cp`` is NULL until first qualifying observation."""
-        col = _columns()["cp"]
+        col = get_columns(AthletePhysiology)["cp"]
         assert col.nullable is True
         assert isinstance(col.type, JSONB)
 
     def test_vo2max_nullable_jsonb(self) -> None:
         """``vo2max`` is NULL until first qualifying observation —
         either ml_kg_min or power sub-state may populate later."""
-        col = _columns()["vo2max"]
+        col = get_columns(AthletePhysiology)["vo2max"]
         assert col.nullable is True
         assert isinstance(col.type, JSONB)
 
@@ -106,21 +94,21 @@ class TestAthletePhysiologyRequiredColumns:
         """``max_hr`` is bootstrapped from 220 - age at onboarding,
         but the column is nullable at the schema level so a fresh
         row can be inserted before the service populates it."""
-        col = _columns()["max_hr"]
+        col = get_columns(AthletePhysiology)["max_hr"]
         assert col.nullable is True
         assert isinstance(col.type, JSONB)
 
     def test_updated_at_required_datetime(self) -> None:
-        col = _columns()["updated_at"]
+        col = get_columns(AthletePhysiology)["updated_at"]
         assert col.nullable is False
         assert isinstance(col.type, DateTime)
 
     def test_updated_at_has_server_default_now(self) -> None:
         """``updated_at`` server_default is ``now()`` so inserts
         without an explicit value still produce a usable timestamp."""
-        col = _columns()["updated_at"]
+        col = get_columns(AthletePhysiology)["updated_at"]
         assert col.server_default is not None
-        assert "now" in str(col.server_default.arg).lower()
+        assert "now" in get_server_default_text(col).lower()
 
 
 # ---------------------------------------------------------------------------
@@ -133,7 +121,7 @@ class TestAthletePhysiologyUniqueIndex:
     ``uq_athlete_physiology_athlete`` on ``(athlete_id)``."""
 
     def test_unique_index_present(self) -> None:
-        indexes = _indexes()
+        indexes = get_indexes(AthletePhysiology)
         assert "uq_athlete_physiology_athlete" in indexes, (
             "AthletePhysiology must declare "
             "`uq_athlete_physiology_athlete` to enforce one row "
@@ -141,11 +129,11 @@ class TestAthletePhysiologyUniqueIndex:
         )
 
     def test_unique_index_is_unique(self) -> None:
-        idx = _indexes()["uq_athlete_physiology_athlete"]
+        idx = get_indexes(AthletePhysiology)["uq_athlete_physiology_athlete"]
         assert idx.unique is True
 
     def test_unique_index_columns(self) -> None:
-        idx = _indexes()["uq_athlete_physiology_athlete"]
+        idx = get_indexes(AthletePhysiology)["uq_athlete_physiology_athlete"]
         columns = {c.key for c in idx.columns}
         assert columns == {"athlete_id"}
 
@@ -182,7 +170,7 @@ class TestAthletePhysiologySchemaAntiGoals:
         ],
     )
     def test_forbidden_columns_are_absent(self, forbidden_field: str) -> None:
-        assert forbidden_field not in _columns(), (
+        assert forbidden_field not in get_columns(AthletePhysiology), (
             f"AthletePhysiology must not carry `{forbidden_field}`. "
             "Current-state per-parameter posterior estimates only; "
             "history lives on append-only TwinState, fitness scores "

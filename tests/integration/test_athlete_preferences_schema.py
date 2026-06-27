@@ -16,7 +16,6 @@ docs/implementation/phase-1/phase-1-2a-p1-profile-preferences-activity.md
 from __future__ import annotations
 
 import pytest
-from sqlalchemy import inspect
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -30,87 +29,10 @@ from app.models.enums import (
     SportBackground,
     TrainingTimeOfDay,
 )
+from tests.utils.schema_helpers import db_columns, db_unique_constraints, db_check_constraints
 
 
 TABLE = "athlete_preferences"
-
-
-import os
-
-import pytest
-from sqlalchemy import create_engine, inspect
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.models.athlete import Athlete
-from app.models.athlete_preferences import AthletePreferences
-from app.models.enums import (
-    GpsSource,
-    HrSource,
-    PowerSource,
-    PrimaryTrainingPlatform,
-    SportBackground,
-    TrainingTimeOfDay,
-)
-
-
-TABLE = "athlete_preferences"
-
-
-def _columns(table: str) -> list[dict]:
-    """Get column info for a table using sync engine."""
-    database_url = os.environ.get("DATABASE_URL", "")
-    if not database_url:
-        raise RuntimeError("DATABASE_URL environment variable not set")
-    
-    # Convert asyncpg URL to psycopg2
-    if database_url.startswith("postgresql+asyncpg://"):
-        database_url = database_url.replace("postgresql+asyncpg://", "postgresql+psycopg2://")
-    
-    engine = create_engine(database_url)
-    try:
-        with engine.connect() as conn:
-            inspector = inspect(conn)
-            return list(inspector.get_columns(table))
-    finally:
-        engine.dispose()
-
-
-def _unique_constraints(table: str) -> list[dict]:
-    """Get unique constraint info using sync engine."""
-    database_url = os.environ.get("DATABASE_URL", "")
-    if not database_url:
-        raise RuntimeError("DATABASE_URL environment variable not set")
-    
-    # Convert asyncpg URL to psycopg2
-    if database_url.startswith("postgresql+asyncpg://"):
-        database_url = database_url.replace("postgresql+asyncpg://", "postgresql+psycopg2://")
-    
-    engine = create_engine(database_url)
-    try:
-        with engine.connect() as conn:
-            inspector = inspect(conn)
-            return list(inspector.get_unique_constraints(table))
-    finally:
-        engine.dispose()
-
-
-def _check_constraints(table: str) -> list[dict]:
-    """Get check constraint info using sync engine."""
-    database_url = os.environ.get("DATABASE_URL", "")
-    if not database_url:
-        raise RuntimeError("DATABASE_URL environment variable not set")
-    
-    # Convert asyncpg URL to psycopg2
-    if database_url.startswith("postgresql+asyncpg://"):
-        database_url = database_url.replace("postgresql+asyncpg://", "postgresql+psycopg2://")
-    
-    engine = create_engine(database_url)
-    try:
-        with engine.connect() as conn:
-            inspector = inspect(conn)
-            return list(inspector.get_check_constraints(table))
-    finally:
-        engine.dispose()
 
 
 def _valid_weekly_schedule() -> dict:
@@ -183,7 +105,7 @@ class TestAthletePreferencesDBSchemaColumns:
     async def test_required_column_present(
         self, db_session: AsyncSession, expected_column: str
     ) -> None:
-        cols = {col["name"] for col in _columns(TABLE)}
+        cols = {col["name"] for col in db_columns(TABLE)}
         assert expected_column in cols, (
             f"athlete_preferences.{expected_column} missing from DB schema. "
             f"Phase-1.2a migration must add it."
@@ -196,7 +118,7 @@ class TestAthletePreferencesUniqueness:
     async def test_athlete_id_unique_constraint_present(
         self, db_session: AsyncSession
     ) -> None:
-        uniques = _unique_constraints(TABLE)
+        uniques = db_unique_constraints(TABLE)
         # The constraint may live on the column itself (``unique=True``
         # in the mapper) rather than as a separate UniqueConstraint
         # clause. Both forms are acceptable; we need at least one.
@@ -206,7 +128,7 @@ class TestAthletePreferencesUniqueness:
         )
         has_column_level_unique = any(
             col.get("unique") is True
-            for col in _columns(TABLE)
+            for col in db_columns(TABLE)
             if col["name"] == "athlete_id"
         )
         assert has_table_constraint or has_column_level_unique, (
@@ -258,7 +180,7 @@ class TestYearsStructuredTrainingNonNegative:
     async def test_db_check_constraint_present(
         self, db_session: AsyncSession
     ) -> None:
-        checks = _check_constraints(TABLE)
+        checks = db_check_constraints(TABLE)
         # Look for a check whose SQL expression mentions the column
         # and 0.
         found = []

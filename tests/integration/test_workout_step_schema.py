@@ -21,12 +21,11 @@ Reference plan: docs/implementation/phase-1/phase-1-2c-p1-twin-fitness-coaching-
 
 from __future__ import annotations
 
-import os
 import uuid
 from datetime import date
 
 import pytest
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -54,80 +53,22 @@ from app.models.training_plan import TrainingPlan
 from app.models.twin_state import TwinState
 from app.models.weekly_plan import WeeklyPlan
 from app.models.workout_step import WorkoutStep
-
+from tests.utils.factories import make_athlete
+from tests.utils.schema_helpers import (
+    db_columns,
+    db_foreign_keys,
+    db_indexes,
+    db_unique_constraints,
+    get_sync_database_url,
+)
 
 TABLE = "workout_steps"
-
-
-def _sync_url() -> str:
-    database_url = os.environ.get("DATABASE_URL", "")
-    if not database_url:
-        raise RuntimeError("DATABASE_URL environment variable not set")
-    if database_url.startswith("postgresql+asyncpg://"):
-        database_url = database_url.replace(
-            "postgresql+asyncpg://",
-            "postgresql+psycopg2://",
-        )
-    return database_url
-
-
-def _columns(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_columns(table))
-    finally:
-        engine.dispose()
-
-
-def _indexes(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_indexes(table))
-    finally:
-        engine.dispose()
-
-
-def _check_constraints(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_check_constraints(table))
-    finally:
-        engine.dispose()
-
-
-def _unique_constraints(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_unique_constraints(table))
-    finally:
-        engine.dispose()
-
-
-def _foreign_keys(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_foreign_keys(table))
-    finally:
-        engine.dispose()
 
 
 # ---------------------------------------------------------------------------
 # Helpers — build the parent chain (athlete → goal → plan → week →
 # session → workout) so a ``WorkoutStep`` can be inserted.
 # ---------------------------------------------------------------------------
-
-
-async def _new_athlete(db_session: AsyncSession, email: str) -> Athlete:
-    a = Athlete(email=email)
-    db_session.add(a)
-    await db_session.flush()
-    return a
-
 
 async def _new_full_chain(
     db_session: AsyncSession, athlete: Athlete
@@ -262,7 +203,7 @@ class TestWorkoutStepDBSchemaColumns:
     async def test_required_column_present(
         self, db_session: AsyncSession, expected_column: str
     ) -> None:
-        cols = {col["name"] for col in _columns(TABLE)}
+        cols = {col["name"] for col in db_columns(TABLE)}
         assert expected_column in cols, (
             f"workout_steps.{expected_column} missing from DB schema."
         )
@@ -275,7 +216,7 @@ class TestWorkoutStepDBSchemaColumns:
 
 class TestWorkoutStepStepOrderUniqueDB:
     def test_step_order_unique_constraint_present(self) -> None:
-        uniques = _unique_constraints(TABLE)
+        uniques = db_unique_constraints(TABLE)
         matched = [
             u
             for u in uniques
@@ -293,7 +234,7 @@ class TestWorkoutStepStepOrderUniqueDB:
     async def test_duplicate_step_order_rejected(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "ws-dup-step@example.com"
         )
         workout, _ = await _new_full_chain(db_session, athlete)
@@ -312,7 +253,7 @@ class TestWorkoutStepStepOrderUniqueDB:
     async def test_distinct_step_orders_coexist(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "ws-distinct-orders@example.com"
         )
         workout, _ = await _new_full_chain(db_session, athlete)
@@ -355,7 +296,7 @@ class TestWorkoutStepStepOrderCheckDB:
     async def test_step_order_zero_rejected(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "ws-step-zero@example.com"
         )
         workout, _ = await _new_full_chain(db_session, athlete)
@@ -370,7 +311,7 @@ class TestWorkoutStepStepOrderCheckDB:
     async def test_step_order_negative_rejected(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "ws-step-neg@example.com"
         )
         workout, _ = await _new_full_chain(db_session, athlete)
@@ -385,7 +326,7 @@ class TestWorkoutStepStepOrderCheckDB:
     async def test_step_order_one_accepted(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "ws-step-one@example.com"
         )
         workout, _ = await _new_full_chain(db_session, athlete)
@@ -407,7 +348,7 @@ class TestWorkoutStepDurationCheckDB:
     async def test_negative_duration_rejected(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "ws-neg-duration@example.com"
         )
         workout, _ = await _new_full_chain(db_session, athlete)
@@ -424,7 +365,7 @@ class TestWorkoutStepDurationCheckDB:
     async def test_zero_duration_accepted(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "ws-zero-duration@example.com"
         )
         workout, _ = await _new_full_chain(db_session, athlete)
@@ -443,7 +384,7 @@ class TestWorkoutStepDurationCheckDB:
     ) -> None:
         """NULL is permitted — warmup / cooldown can be null for some
         workout variants. The CHECK constraint short-circuits on NULL."""
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "ws-null-duration@example.com"
         )
         workout, _ = await _new_full_chain(db_session, athlete)
@@ -467,7 +408,7 @@ class TestWorkoutStepDescriptionCheckDB:
     async def test_empty_description_rejected(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "ws-empty-desc@example.com"
         )
         workout, _ = await _new_full_chain(db_session, athlete)
@@ -489,7 +430,7 @@ class TestWorkoutStepDescriptionCheckDB:
 
 class TestWorkoutStepForeignKeysDB:
     def test_generated_workout_id_fk_to_generated_workouts(self) -> None:
-        fks = _foreign_keys(TABLE)
+        fks = db_foreign_keys(TABLE)
         workout_fks = [
             fk
             for fk in fks
@@ -500,7 +441,7 @@ class TestWorkoutStepForeignKeysDB:
         assert workout_fks
 
     def test_generated_workout_fk_ondelete_is_cascade(self) -> None:
-        engine = create_engine(_sync_url())
+        engine = create_engine(get_sync_database_url())
         try:
             with engine.connect() as conn:
                 row = conn.execute(
@@ -535,7 +476,7 @@ class TestWorkoutStepServerDefaultsDB:
     async def test_session_purpose_defaults_to_general(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "ws-default-purpose@example.com"
         )
         workout, _ = await _new_full_chain(db_session, athlete)
@@ -566,7 +507,7 @@ class TestWorkoutStepThreeLayerHierarchyDB:
     async def test_warmup_step_round_trips(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "ws-warmup@example.com"
         )
         workout, _ = await _new_full_chain(db_session, athlete)
@@ -586,7 +527,7 @@ class TestWorkoutStepThreeLayerHierarchyDB:
     async def test_work_step_round_trips(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "ws-work@example.com"
         )
         workout, _ = await _new_full_chain(db_session, athlete)
@@ -608,7 +549,7 @@ class TestWorkoutStepThreeLayerHierarchyDB:
     async def test_cooldown_step_round_trips(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "ws-cooldown@example.com"
         )
         workout, _ = await _new_full_chain(db_session, athlete)
@@ -630,7 +571,7 @@ class TestWorkoutStepThreeLayerHierarchyDB:
     ) -> None:
         """``race_specific`` is a SessionPurpose annotation — used to
         distinguish race-specific sessions from generic easy runs."""
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "ws-race-specific@example.com"
         )
         workout, _ = await _new_full_chain(db_session, athlete)
@@ -651,7 +592,7 @@ class TestWorkoutStepThreeLayerHierarchyDB:
         """``calibration`` annotates test sessions — compliance
         family uses data-quality assessment instead of standard
         compliance assessment."""
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "ws-calibration@example.com"
         )
         workout, _ = await _new_full_chain(db_session, athlete)
@@ -679,7 +620,7 @@ class TestWorkoutStepOrderedReadIndexDB:
     ) -> None:
         matched = [
             idx
-            for idx in _indexes(TABLE)
+            for idx in db_indexes(TABLE)
             if set(idx.get("column_names") or ())
             == {"generated_workout_id", "step_order"}
         ]
@@ -698,7 +639,7 @@ class TestWorkoutStepRoundTripDB:
     async def test_full_step_round_trips(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "ws-roundtrip@example.com"
         )
         workout, _ = await _new_full_chain(db_session, athlete)

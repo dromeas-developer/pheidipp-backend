@@ -32,25 +32,14 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 from app.models.athlete_profile import AthleteProfile
 from app.models.enums import Sex
-
-
-def _column_names(model) -> list[str]:
-    """Return the declared column names on ``model``."""
-    return [column.key for column in model.__table__.columns]
-
-
-def _get_column(model, name: str):
-    for column in model.__table__.columns:
-        if column.key == name:
-            return column
-    raise KeyError(name)
+from tests.utils.model_helpers import get_columns, has_column, get_enum_values
 
 
 class TestPhase11ColumnsPreserved:
     """Every Phase-1.1 column must still exist on the model."""
 
     def test_id_column_present(self) -> None:
-        col = _get_column(AthleteProfile, "id")
+        col = get_columns(AthleteProfile)["id"]
         # Primary key with UUID type.
         assert col.primary_key is True
 
@@ -59,27 +48,27 @@ class TestPhase11ColumnsPreserved:
         Phase-1.2a must preserve. DB-level uniqueness is also enforced
         via ``UniqueConstraint('athlete_id')`` — see integration tests.
         """
-        col = _get_column(AthleteProfile, "athlete_id")
+        col = get_columns(AthleteProfile)["athlete_id"]
         assert col.unique is True
 
     def test_date_of_birth_required(self) -> None:
-        col = _get_column(AthleteProfile, "date_of_birth")
+        col = get_columns(AthleteProfile)["date_of_birth"]
         assert col.nullable is False
         assert isinstance(col.type, Date)
 
     def test_sex_required_and_enum_backed(self) -> None:
-        col = _get_column(AthleteProfile, "sex")
+        col = get_columns(AthleteProfile)["sex"]
         assert col.nullable is False
         assert isinstance(col.type, SAEnum)
 
     def test_height_cm_nullable_decimal(self) -> None:
-        col = _get_column(AthleteProfile, "height_cm")
+        col = get_columns(AthleteProfile)["height_cm"]
         # Phase-1.1 contract: height is optional.
         assert col.nullable is True
         assert isinstance(col.type, Numeric)
 
     def test_updated_at_present(self) -> None:
-        col = _get_column(AthleteProfile, "updated_at")
+        col = get_columns(AthleteProfile)["updated_at"]
         assert col.nullable is False
         assert isinstance(col.type, DateTime)
 
@@ -96,13 +85,13 @@ class TestPhase12aExtensionColumns:
             "banister_constants",
             "cycle_personal_model",
         ):
-            col = _get_column(AthleteProfile, name)
+            col = get_columns(AthleteProfile)[name]
             assert col.nullable is True, f"{name} should be nullable"
             assert isinstance(col.type, JSONB), f"{name} should be JSONB"
 
     def test_location_fields_present_and_nullable(self) -> None:
         for name in ("location_lat", "location_lng"):
-            col = _get_column(AthleteProfile, name)
+            col = get_columns(AthleteProfile)[name]
             assert col.nullable is True
             assert isinstance(col.type, Numeric)
 
@@ -110,29 +99,29 @@ class TestPhase12aExtensionColumns:
         """``timezone`` is required at onboarding but NOT at registration.
         Phase-1.1 minimal profile (created at registration) leaves it
         null — Phase-1.2a onboarding populates it."""
-        col = _get_column(AthleteProfile, "timezone")
+        col = get_columns(AthleteProfile)["timezone"]
         assert col.nullable is True
         assert isinstance(col.type, String)
 
     def test_training_window_is_jsonb(self) -> None:
-        col = _get_column(AthleteProfile, "training_window")
+        col = get_columns(AthleteProfile)["training_window"]
         assert col.nullable is True
         assert isinstance(col.type, JSONB)
 
     def test_current_effort_generation_is_integer_nullable(self) -> None:
         """NULL until GapCurveFittingService sets it (defaults to 1 in
         practice, but ``NULL`` is the schema-only initial state)."""
-        col = _get_column(AthleteProfile, "current_effort_generation")
+        col = get_columns(AthleteProfile)["current_effort_generation"]
         assert col.nullable is True
         assert isinstance(col.type, Integer)
 
     def test_structural_risk_flag_is_nullable_boolean(self) -> None:
-        col = _get_column(AthleteProfile, "structural_risk_flag")
+        col = get_columns(AthleteProfile)["structural_risk_flag"]
         assert col.nullable is True
         assert isinstance(col.type, Boolean)
 
     def test_objective_thresholds_is_jsonb_nullable(self) -> None:
-        col = _get_column(AthleteProfile, "objective_thresholds")
+        col = get_columns(AthleteProfile)["objective_thresholds"]
         assert col.nullable is True
         assert isinstance(col.type, JSONB)
 
@@ -165,7 +154,7 @@ class TestSchemaCompleteness:
             "objective_thresholds",
             "updated_at",
         }
-        actual = set(_column_names(AthleteProfile))
+        actual = set(get_columns(AthleteProfile).keys())
         missing = expected - actual
         unexpected = actual - expected
         assert missing == set(), f"Missing columns: {missing}"
@@ -180,9 +169,7 @@ class TestMapperRelationships:
         Python name. This is critical: the Phase-1.1 migration
         registered the ENUM with lowercase values, so an upper-case
         regression here would crash creation/reads."""
-        col = _get_column(AthleteProfile, "sex")
+        col = get_columns(AthleteProfile)["sex"]
         assert isinstance(col.type, SAEnum)
-        values_callable = col.type.values_callable
-        assert values_callable is not None
-        produced = values_callable(Sex)
+        produced = get_enum_values(col, Sex)
         assert set(produced) == {"male", "female", "not_specified"}

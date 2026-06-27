@@ -27,12 +27,8 @@ from __future__ import annotations
 
 import pytest
 from sqlalchemy import (
-    CheckConstraint,
-    ForeignKey,
-    Index,
     Integer,
     Text,
-    UniqueConstraint,
 )
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
@@ -45,70 +41,19 @@ from app.models.enums import (
 )
 from app.models.workout_step import WorkoutStep
 
-
-def _columns() -> dict[str, object]:
-    return {column.key: column for column in WorkoutStep.__table__.columns}
-
-
-def _indexes() -> dict[str, Index]:
-    return {idx.name: idx for idx in WorkoutStep.__table__.indexes}
-
-
-def _check_constraints() -> list[CheckConstraint]:
-    return [
-        c
-        for c in WorkoutStep.__table__.constraints
-        if isinstance(c, CheckConstraint)
-    ]
+from tests.utils.model_helpers import (
+    get_columns,
+    get_unique_constraints,
+    get_foreign_keys_referencing,
+    get_indexes,
+    get_check_constraints,
+    get_check_text,
+    get_server_default_text,
+    get_enum_values,
+)
 
 
-def _unique_constraints() -> list[UniqueConstraint]:
-    return [
-        c
-        for c in WorkoutStep.__table__.constraints
-        if isinstance(c, UniqueConstraint)
-    ]
 
-
-def _foreign_keys_referencing(column_key: str) -> list[ForeignKey]:
-    return [
-        fk
-        for fk in WorkoutStep.__table__.foreign_keys
-        if fk.parent.name == column_key
-    ]
-
-
-def _check_text(check: CheckConstraint) -> str:
-    """Return the SQL expression text of a CheckConstraint as a string.
-
-    Shared helper across multiple test classes so that each class does
-    not have to redefine it. SQLAlchemy exposes the constraint's
-    expression via ``.expression`` (modern) or ``.sqltext`` (legacy) —
-    this helper accepts either.
-    """
-    expr = getattr(check, "expression", None) or getattr(
-        check, "sqltext", None
-    )
-    return str(expr) if expr is not None else ""
-
-
-def _uq_constraint_columns(u: UniqueConstraint) -> tuple[str, ...]:
-    """Return the column names of a UniqueConstraint as a tuple.
-
-    SQLAlchemy ``UniqueConstraint`` does not expose a ``.get()`` method
-    nor an ``u["column_names"]`` dict-style accessor — use ``c.columns``
-    to iterate the column objects and ``col.key`` to get each name.
-    """
-    return tuple(col.key for col in u.columns)
-
-
-def _uq_constraint_name(u: UniqueConstraint) -> str | None:
-    """Return the named constraint identifier or ``None`` if anonymous.
-
-    Mirrors the ``.name`` attribute of ``UniqueConstraint`` (None when
-    the constraint was declared without an explicit ``name=``).
-    """
-    return getattr(u, "name", None)
 
 
 # ---------------------------------------------------------------------------
@@ -118,12 +63,12 @@ def _uq_constraint_name(u: UniqueConstraint) -> str | None:
 
 class TestWorkoutStepRequiredColumns:
     def test_id_column_uuid_primary_key(self) -> None:
-        col = _columns()["id"]
+        col = get_columns(WorkoutStep)["id"]
         assert col.primary_key is True
         assert isinstance(col.type, PG_UUID)
 
     def test_generated_workout_id_required_uuid(self) -> None:
-        col = _columns()["generated_workout_id"]
+        col = get_columns(WorkoutStep)["generated_workout_id"]
         assert col.nullable is False
         assert isinstance(col.type, PG_UUID)
 
@@ -132,33 +77,29 @@ class TestWorkoutStepRequiredColumns:
     ) -> None:
         """GeneratedWorkout FK ON DELETE CASCADE — workout steps are
         wiped when the parent workout is removed."""
-        fks = _foreign_keys_referencing("generated_workout_id")
+        fks = get_foreign_keys_referencing(WorkoutStep, "generated_workout_id")
         assert len(fks) == 1
         fk = fks[0]
         assert fk.column.table.name == "generated_workouts"
         assert fk.ondelete == "CASCADE"
 
     def test_step_order_required_integer(self) -> None:
-        col = _columns()["step_order"]
+        col = get_columns(WorkoutStep)["step_order"]
         assert col.nullable is False
         assert isinstance(col.type, Integer)
 
     def test_step_type_required_enum(self) -> None:
-        col = _columns()["step_type"]
+        col = get_columns(WorkoutStep)["step_type"]
         assert col.nullable is False
         assert isinstance(col.type, SAEnum)
-        values_callable = col.type.values_callable
-        assert values_callable is not None
-        actual = sorted(values_callable(StepType))
+        actual = sorted(get_enum_values(col, StepType))
         assert actual == ["cooldown", "recovery", "warmup", "work"]
 
     def test_session_type_required_enum(self) -> None:
-        col = _columns()["session_type"]
+        col = get_columns(WorkoutStep)["session_type"]
         assert col.nullable is False
         assert isinstance(col.type, SAEnum)
-        values_callable = col.type.values_callable
-        assert values_callable is not None
-        actual = sorted(values_callable(SessionType))
+        actual = sorted(get_enum_values(col, SessionType))
         expected = sorted(
             [
                 "cross_training",
@@ -186,12 +127,10 @@ class TestWorkoutStepRequiredColumns:
         signal that gets compared against the inferred state at
         execution analysis time. Every step (warmup, cooldown, work)
         must declare one."""
-        col = _columns()["physiological_intent"]
+        col = get_columns(WorkoutStep)["physiological_intent"]
         assert col.nullable is False
         assert isinstance(col.type, SAEnum)
-        values_callable = col.type.values_callable
-        assert values_callable is not None
-        actual = sorted(values_callable(PhysiologicalIntent))
+        actual = sorted(get_enum_values(col, PhysiologicalIntent))
         expected = sorted(
             [
                 "high_aerobic",
@@ -205,23 +144,21 @@ class TestWorkoutStepRequiredColumns:
         assert actual == expected
 
     def test_session_purpose_required_enum_default_general(self) -> None:
-        col = _columns()["session_purpose"]
+        col = get_columns(WorkoutStep)["session_purpose"]
         assert col.nullable is False
         assert isinstance(col.type, SAEnum)
-        values_callable = col.type.values_callable
-        assert values_callable is not None
-        actual = sorted(values_callable(SessionPurpose))
+        actual = sorted(get_enum_values(col, SessionPurpose))
         assert actual == ["calibration", "general", "race_specific"]
         # server_default is the string literal "general".
         assert col.server_default is not None
-        assert "general" in str(col.server_default.arg)
+        assert "general" in get_server_default_text(col)
 
     def test_target_required_jsonb(self) -> None:
         """``target`` is NOT NULL — always populated with the
         WorkoutTarget shape (primary range, fallback, description).
         Numeric ranges nullable for Tier 5-6 athletes; description
         is always non-empty (CHECK enforces it)."""
-        col = _columns()["target"]
+        col = get_columns(WorkoutStep)["target"]
         assert col.nullable is False
         assert isinstance(col.type, JSONB)
 
@@ -229,12 +166,12 @@ class TestWorkoutStepRequiredColumns:
         """``duration_seconds`` is nullable — warmup / cooldown can
         be null for some workout variants. When present, the CHECK
         constraint enforces non-negative."""
-        col = _columns()["duration_seconds"]
+        col = get_columns(WorkoutStep)["duration_seconds"]
         assert col.nullable is True
         assert isinstance(col.type, Integer)
 
     def test_description_required_text(self) -> None:
-        col = _columns()["description"]
+        col = get_columns(WorkoutStep)["description"]
         assert col.nullable is False
         assert isinstance(col.type, Text)
 
@@ -249,32 +186,32 @@ class TestWorkoutStepStepOrderUniqueConstraint:
     per order position per workout."""
 
     def test_step_order_unique_constraint_present(self) -> None:
-        uniques = _unique_constraints()
+        uniques = get_unique_constraints(WorkoutStep)
         matched = [
             u
             for u in uniques
-            if _uq_constraint_columns(u)
+            if tuple(col.key for col in u.columns)
             == ("generated_workout_id", "step_order")
-            and _uq_constraint_name(u)
+            and getattr(u, "name", None)
             == "uq_workout_steps_generated_workout_step_order"
         ]
         assert matched, (
             "workout_steps must declare UNIQUE "
             "(generated_workout_id, step_order). "
-            f"Got: {[_uq_constraint_columns(u) for u in uniques]}"
+            f"Got: {[(tuple(col.key for col in u.columns), getattr(u, 'name', None)) for u in uniques]}"
         )
 
     def test_step_order_unique_constraint_columns(self) -> None:
-        uniques = _unique_constraints()
+        uniques = get_unique_constraints(WorkoutStep)
         matched = [
             u
             for u in uniques
-            if _uq_constraint_name(u)
+            if getattr(u, "name", None)
             == "uq_workout_steps_generated_workout_step_order"
         ]
         assert matched
         u = matched[0]
-        assert _uq_constraint_columns(u) == (
+        assert tuple(col.key for col in u.columns) == (
             "generated_workout_id",
             "step_order",
         )
@@ -289,11 +226,11 @@ class TestWorkoutStepStepOrderCheck:
     """``step_order`` is 1-indexed and positive."""
 
     def test_step_order_positive_check_present(self) -> None:
-        checks = _check_constraints()
+        checks = get_check_constraints(WorkoutStep)
         found = any(
-            "step_order" in _check_text(c)
-            and ">=" in _check_text(c)
-            and "1" in _check_text(c)
+            "step_order" in get_check_text(c)
+            and ">=" in get_check_text(c)
+            and "1" in get_check_text(c)
             for c in checks
         )
         assert found, (
@@ -307,11 +244,11 @@ class TestWorkoutStepDurationCheck:
     short-circuits)."""
 
     def test_duration_non_negative_check_present(self) -> None:
-        checks = _check_constraints()
+        checks = get_check_constraints(WorkoutStep)
         found = any(
-            "duration_seconds" in _check_text(c)
-            and ">=" in _check_text(c)
-            and "is null" in _check_text(c).lower()
+            "duration_seconds" in get_check_text(c)
+            and ">=" in get_check_text(c)
+            and "is null" in get_check_text(c).lower()
             for c in checks
         )
         assert found, (
@@ -325,10 +262,10 @@ class TestWorkoutStepDescriptionCheck:
     must never be blank."""
 
     def test_description_non_empty_check_present(self) -> None:
-        checks = _check_constraints()
+        checks = get_check_constraints(WorkoutStep)
         found = any(
-            "length(description)" in _check_text(c)
-            and "> 0" in _check_text(c)
+            "length(description)" in get_check_text(c)
+            and "> 0" in get_check_text(c)
             for c in checks
         )
         assert found, (
@@ -349,7 +286,7 @@ class TestWorkoutStepOrderedReadIndex:
     steps in execution order."""
 
     def test_ordered_read_index_present(self) -> None:
-        indexes = _indexes()
+        indexes = get_indexes(WorkoutStep)
         assert "ix_workout_steps_generated_workout_order" in indexes
         idx = indexes["ix_workout_steps_generated_workout_order"]
         columns = {c.key for c in idx.columns}
@@ -388,7 +325,7 @@ class TestWorkoutStepAppendOnlyContract:
     def test_no_updated_at_column(self) -> None:
         """Append-only contract: ``updated_at`` would imply a
         mutation semantic the schema must not permit."""
-        assert "updated_at" not in _columns(), (
+        assert "updated_at" not in get_columns(WorkoutStep), (
             "WorkoutStep must not carry an `updated_at` column — "
             "rows are immutable after insert."
         )
@@ -429,7 +366,7 @@ class TestWorkoutStepSchemaAntiGoals:
         ],
     )
     def test_forbidden_columns_are_absent(self, forbidden_field: str) -> None:
-        assert forbidden_field not in _columns(), (
+        assert forbidden_field not in get_columns(WorkoutStep), (
             f"WorkoutStep must not carry `{forbidden_field}`. "
             "Step row shape is restricted to workout linkage, "
             "three-layer hierarchy (session_type/physiological_intent/"

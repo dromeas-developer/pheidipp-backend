@@ -18,6 +18,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     Float,
+    Index,
     Integer,
     String,
     Text,
@@ -27,33 +28,24 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 
 from app.models.activity import Activity
 from app.models.enums import ActivitySource
-
-
-def _has_column(model, name: str) -> bool:
-    return any(column.key == name for column in model.__table__.columns)
+from tests.utils.model_helpers import get_columns, has_column, get_server_default_text, get_enum_values, get_indexes
 
 
 class TestActivityLeanSchemaFields:
     """Every required field from the architecture doc must be present."""
 
     def test_id_column_present(self) -> None:
-        cols = {
-            column.key: column for column in Activity.__table__.columns
-        }
+        cols = get_columns(Activity)
         assert "id" in cols
         assert cols["id"].primary_key is True
 
     def test_athlete_id_present(self) -> None:
-        cols = {
-            column.key: column for column in Activity.__table__.columns
-        }
+        cols = get_columns(Activity)
         assert "athlete_id" in cols
         assert cols["athlete_id"].nullable is False
 
     def test_planned_session_id_present_and_nullable_uuid(self) -> None:
-        cols = {
-            column.key: column for column in Activity.__table__.columns
-        }
+        cols = get_columns(Activity)
         assert "planned_session_id" in cols
         col = cols["planned_session_id"]
         assert col.nullable is True
@@ -62,15 +54,11 @@ class TestActivityLeanSchemaFields:
         assert isinstance(col.type, PG_UUID)
 
     def test_source_is_enum_backed_required(self) -> None:
-        cols = {
-            column.key: column for column in Activity.__table__.columns
-        }
+        cols = get_columns(Activity)
         col = cols["source"]
         assert col.nullable is False
         assert isinstance(col.type, SAEnum)
-        values_callable = col.type.values_callable
-        assert values_callable is not None
-        produced = sorted(values_callable(ActivitySource))
+        produced = sorted(get_enum_values(col, ActivitySource))
         assert produced == sorted(
             [
                 "intervals_icu",
@@ -81,80 +69,62 @@ class TestActivityLeanSchemaFields:
         )
 
     def test_external_id_is_nullable_string(self) -> None:
-        cols = {
-            column.key: column for column in Activity.__table__.columns
-        }
+        cols = get_columns(Activity)
         col = cols["external_id"]
         assert col.nullable is True
         assert isinstance(col.type, String)
         assert col.type.length == 128
 
     def test_activity_date_is_required_date(self) -> None:
-        cols = {
-            column.key: column for column in Activity.__table__.columns
-        }
+        cols = get_columns(Activity)
         col = cols["activity_date"]
         assert col.nullable is False
         assert isinstance(col.type, Date)
 
     def test_start_time_is_required_datetime(self) -> None:
-        cols = {
-            column.key: column for column in Activity.__table__.columns
-        }
+        cols = get_columns(Activity)
         col = cols["start_time"]
         assert col.nullable is False
         assert isinstance(col.type, DateTime)
 
     def test_duration_seconds_is_required_integer(self) -> None:
-        cols = {
-            column.key: column for column in Activity.__table__.columns
-        }
+        cols = get_columns(Activity)
         col = cols["duration_seconds"]
         assert col.nullable is False
         assert isinstance(col.type, Integer)
 
     def test_load_scores_are_nullable_floats(self) -> None:
-        cols = {
-            column.key: column for column in Activity.__table__.columns
-        }
+        cols = get_columns(Activity)
         for load_field in ("aerobic_load", "neuromuscular_load", "structural_load"):
             col = cols[load_field]
             assert col.nullable is True, f"{load_field} must be nullable"
             assert isinstance(col.type, Float), f"{load_field} must be Float"
 
     def test_signal_availability_booleans_default_false(self) -> None:
-        cols = {
-            column.key: column for column in Activity.__table__.columns
-        }
+        cols = get_columns(Activity)
         for field in ("has_hr", "has_rr_intervals", "has_power"):
             col = cols[field]
             assert col.nullable is False
             assert isinstance(col.type, Boolean)
             # Database-level default keeps raw inserts honest.
-            assert col.server_default.arg in {"false", "False", "0"}
+            assert get_server_default_text(col) in {"false", "False", "0"}
 
     def test_calibration_eligible_default_false(self) -> None:
-        cols = {
-            column.key: column for column in Activity.__table__.columns
-        }
+        cols = get_columns(Activity)
         col = cols["calibration_eligible"]
         assert col.nullable is False
-        assert col.server_default.arg in {"false", "False", "0"}
+        assert get_server_default_text(col) in {"false", "False", "0"}
 
     def test_quality_flags_is_required_jsonb(self) -> None:
         """``quality_flags`` is required per architecture contract;
         default ``{}`` keeps new rows honest rather than null-noise."""
-        cols = {
-            column.key: column for column in Activity.__table__.columns
-        }
+        cols = get_columns(Activity)
         col = cols["quality_flags"]
         assert col.nullable is False
         assert isinstance(col.type, JSONB)
 
     def test_fit_file_key_nullable_string(self) -> None:
-        cols = {
-            column.key: column for column in Activity.__table__.columns
-        }
+        cols = get_columns(Activity)
         col = cols["fit_file_key"]
         # Null ONLY for ``manual_entry`` — enforced at the ingestion
         # boundary; the DB column is universally nullable so the
@@ -163,9 +133,7 @@ class TestActivityLeanSchemaFields:
         assert isinstance(col.type, String)
 
     def test_versioning_fields_present_and_nullable(self) -> None:
-        cols = {
-            column.key: column for column in Activity.__table__.columns
-        }
+        cols = get_columns(Activity)
         for field in ("ingestion_pipeline_version", "cleaning_pipeline_version"):
             col = cols[field]
             assert col.nullable is True
@@ -173,17 +141,13 @@ class TestActivityLeanSchemaFields:
             assert col.type.length == 16
 
     def test_notes_is_text_nullable(self) -> None:
-        cols = {
-            column.key: column for column in Activity.__table__.columns
-        }
+        cols = get_columns(Activity)
         col = cols["notes"]
         assert col.nullable is True
         assert isinstance(col.type, Text)
 
     def test_created_at_required(self) -> None:
-        cols = {
-            column.key: column for column in Activity.__table__.columns
-        }
+        cols = get_columns(Activity)
         col = cols["created_at"]
         assert col.nullable is False
         assert isinstance(col.type, DateTime)
@@ -220,7 +184,7 @@ class TestActivityLeanSchemaAntiGoals:
     ) -> None:
         """The architecture forbids these columns. Adding any of them
         is a breaking change to the lean-schema invariant."""
-        assert not _has_column(Activity, forbidden_field), (
+        assert not has_column(Activity, forbidden_field), (
             f"Activity must not carry `{forbidden_field}`. The lean "
             f"observation index stores what the twin needs; workout "
             f"summary belongs in the FIT file or execution-analysis "
@@ -235,7 +199,8 @@ class TestActivityTableIndexes:
     (athlete_id, external_id, source) WHERE external_id IS NOT NULL."""
 
     def _get_indexes(self) -> dict[str, Index]:
-        return {idx.name: idx for idx in Activity.__table__.indexes}
+        from tests.utils.model_helpers import get_indexes
+        return get_indexes(Activity)
 
     def test_partial_unique_dedup_index_present(self) -> None:
         indexes = self._get_indexes()
@@ -268,7 +233,7 @@ class TestActivityTableIndexes:
         # the predicate (Alembic-autogen-round-trips this verbatim).
         partial_unique = [
             idx
-            for idx in Activity.__table__.indexes
+            for idx in get_indexes(Activity).values()
             if idx.unique and idx.dialect_options.get("postgresql", {}).get("where") is not None
         ]
         assert partial_unique, (

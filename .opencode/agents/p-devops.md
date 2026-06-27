@@ -56,6 +56,26 @@ pass/fail report. Do not modify any source file.
 
 ---
 
+## Service Map
+
+| Service | Role | Port |
+|---|---|---|
+| `api` | FastAPI application — tests run inside this container | 8000 |
+| `worker` | ARQ job processor — same image as api | — |
+| `db` | TimescaleDB (pg16) — hosts both `pheidipp` and `test_pheidipp` | 5432 |
+| `redis` | ARQ broker | 6379 |
+| `minio` | FIT file object storage | 9000/9001 |
+
+The `api` container must be healthy before tests can run. The `db` container
+must be healthy before any migration can run. Both depend on healthchecks
+defined in docker-compose — `docker-build.sh` waits for them.
+
+When diagnosing failures, use `bash scripts/docker-logs.sh` to inspect
+all container logs. To inspect a specific service: the script may accept
+a service name argument — check if it does before assuming it logs all services.
+
+---
+
 ## Database Architecture
 
 The project runs **two databases inside the same Docker stack**:

@@ -1,9 +1,9 @@
-date: 2026-06-24T23:45:00+00:00
-plan: phase-1-2c-p1-twin-fitness-coaching-workouts
+date: 2026-06-27T04:00:00+00:00
+plan: phase-1-3-p1-onboarding-twin-bootstrap
 execution_group: feature
-total: 1127
-passed: 1127
+total: 168
+passed: 168
 failed: 0
 skipped: 0
-duration_seconds: 157.10
+duration_seconds: 56.02
 failures: []

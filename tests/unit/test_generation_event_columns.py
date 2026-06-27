@@ -23,10 +23,7 @@ from __future__ import annotations
 import pytest
 from sqlalchemy import (
     Boolean,
-    CheckConstraint,
     DateTime,
-    ForeignKey,
-    Index,
     Integer,
     String,
     Text,
@@ -34,44 +31,14 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 
 from app.models.generation_event import GenerationEvent
-
-
-def _columns() -> dict[str, object]:
-    return {column.key: column for column in GenerationEvent.__table__.columns}
-
-
-def _indexes() -> dict[str, Index]:
-    return {idx.name: idx for idx in GenerationEvent.__table__.indexes}
-
-
-def _check_constraints() -> list[CheckConstraint]:
-    return [
-        c
-        for c in GenerationEvent.__table__.constraints
-        if isinstance(c, CheckConstraint)
-    ]
-
-
-def _foreign_keys_referencing(column_key: str) -> list[ForeignKey]:
-    return [
-        fk
-        for fk in GenerationEvent.__table__.foreign_keys
-        if fk.parent.name == column_key
-    ]
-
-
-def _check_text(check: CheckConstraint) -> str:
-    """Return the SQL expression text of a CheckConstraint as a string.
-
-    Shared helper across multiple test classes so that each class does
-    not have to redefine it. SQLAlchemy exposes the constraint's
-    expression via ``.expression`` (modern) or ``.sqltext`` (legacy) —
-    this helper accepts either.
-    """
-    expr = getattr(check, "expression", None) or getattr(
-        check, "sqltext", None
-    )
-    return str(expr) if expr is not None else ""
+from tests.utils.model_helpers import (
+    get_columns,
+    get_indexes,
+    get_check_constraints,
+    get_foreign_keys_referencing,
+    get_check_text,
+    get_server_default_text,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -81,64 +48,64 @@ def _check_text(check: CheckConstraint) -> str:
 
 class TestGenerationEventRequiredColumns:
     def test_id_column_uuid_primary_key(self) -> None:
-        col = _columns()["id"]
+        col = get_columns(GenerationEvent)["id"]
         assert col.primary_key is True
         assert isinstance(col.type, PG_UUID)
 
     def test_athlete_id_required_uuid(self) -> None:
-        col = _columns()["athlete_id"]
+        col = get_columns(GenerationEvent)["athlete_id"]
         assert col.nullable is False
         assert isinstance(col.type, PG_UUID)
 
     def test_athlete_id_cascade_fk_to_athletes(self) -> None:
         """Athlete FK ON DELETE CASCADE — audit rows are wiped when
         the athlete account is deleted."""
-        fks = _foreign_keys_referencing("athlete_id")
+        fks = get_foreign_keys_referencing(GenerationEvent, "athlete_id")
         assert len(fks) == 1
         fk = fks[0]
         assert fk.column.table.name == "athletes"
         assert fk.ondelete == "CASCADE"
 
     def test_agent_name_required_string(self) -> None:
-        col = _columns()["agent_name"]
+        col = get_columns(GenerationEvent)["agent_name"]
         assert col.nullable is False
         assert isinstance(col.type, String)
         assert col.type.length == 96
 
     def test_prompt_version_required_string(self) -> None:
-        col = _columns()["prompt_version"]
+        col = get_columns(GenerationEvent)["prompt_version"]
         assert col.nullable is False
         assert isinstance(col.type, String)
         assert col.type.length == 32
 
     def test_trigger_context_required_text(self) -> None:
-        col = _columns()["trigger_context"]
+        col = get_columns(GenerationEvent)["trigger_context"]
         assert col.nullable is False
         assert isinstance(col.type, Text)
 
     def test_input_token_count_required_integer_with_default(self) -> None:
-        col = _columns()["input_token_count"]
+        col = get_columns(GenerationEvent)["input_token_count"]
         assert col.nullable is False
         assert isinstance(col.type, Integer)
         assert col.server_default is not None
-        assert "0" in str(col.server_default.arg)
+        assert "0" in get_server_default_text(col)
 
     def test_output_token_count_required_integer_with_default(self) -> None:
-        col = _columns()["output_token_count"]
+        col = get_columns(GenerationEvent)["output_token_count"]
         assert col.nullable is False
         assert isinstance(col.type, Integer)
         assert col.server_default is not None
-        assert "0" in str(col.server_default.arg)
+        assert "0" in get_server_default_text(col)
 
     def test_latency_ms_required_integer_with_default(self) -> None:
-        col = _columns()["latency_ms"]
+        col = get_columns(GenerationEvent)["latency_ms"]
         assert col.nullable is False
         assert isinstance(col.type, Integer)
         assert col.server_default is not None
-        assert "0" in str(col.server_default.arg)
+        assert "0" in get_server_default_text(col)
 
     def test_success_required_boolean_with_default(self) -> None:
-        col = _columns()["success"]
+        col = get_columns(GenerationEvent)["success"]
         assert col.nullable is False
         assert isinstance(col.type, Boolean)
         assert col.server_default is not None
@@ -146,12 +113,12 @@ class TestGenerationEventRequiredColumns:
     def test_failure_reason_nullable_text(self) -> None:
         """``failure_reason`` is NULL on success rows, non-NULL on
         failure rows. CHECK constraint enforces consistency."""
-        col = _columns()["failure_reason"]
+        col = get_columns(GenerationEvent)["failure_reason"]
         assert col.nullable is True
         assert isinstance(col.type, Text)
 
     def test_created_at_required_datetime(self) -> None:
-        col = _columns()["created_at"]
+        col = get_columns(GenerationEvent)["created_at"]
         assert col.nullable is False
         assert isinstance(col.type, DateTime)
 
@@ -169,12 +136,12 @@ class TestGenerationEventFailureReasonConsistencyCheck:
     a contradictory row."""
 
     def test_failure_reason_consistency_check_present(self) -> None:
-        checks = _check_constraints()
+        checks = get_check_constraints(GenerationEvent)
         found = any(
-            "failure_reason" in _check_text(c)
-            and "success" in _check_text(c)
-            and "IS NULL" in _check_text(c).upper()
-            and "IS NOT NULL" in _check_text(c).upper()
+            "failure_reason" in get_check_text(c)
+            and "success" in get_check_text(c)
+            and "IS NULL" in get_check_text(c).upper()
+            and "IS NOT NULL" in get_check_text(c).upper()
             for c in checks
         )
         assert found, (
@@ -188,11 +155,11 @@ class TestGenerationEventNonNegativeCheck:
     ``latency_ms`` must all be non-negative."""
 
     def test_token_counts_non_negative_check_present(self) -> None:
-        checks = _check_constraints()
+        checks = get_check_constraints(GenerationEvent)
         found = any(
-            "input_token_count" in _check_text(c)
-            and "output_token_count" in _check_text(c)
-            and ">=" in _check_text(c)
+            "input_token_count" in get_check_text(c)
+            and "output_token_count" in get_check_text(c)
+            and ">=" in get_check_text(c)
             for c in checks
         )
         assert found, (
@@ -201,10 +168,10 @@ class TestGenerationEventNonNegativeCheck:
         )
 
     def test_latency_non_negative_check_present(self) -> None:
-        checks = _check_constraints()
+        checks = get_check_constraints(GenerationEvent)
         found = any(
-            "latency_ms" in _check_text(c)
-            and ">=" in _check_text(c)
+            "latency_ms" in get_check_text(c)
+            and ">=" in get_check_text(c)
             for c in checks
         )
         assert found, (
@@ -227,21 +194,21 @@ class TestGenerationEventReadIndexes:
 """
 
     def test_athlete_audit_index_present(self) -> None:
-        indexes = _indexes()
+        indexes = get_indexes(GenerationEvent)
         assert "ix_generation_events_athlete_at" in indexes
         idx = indexes["ix_generation_events_athlete_at"]
         columns = {c.key for c in idx.columns}
         assert columns == {"athlete_id", "created_at"}
 
     def test_agent_monitoring_index_present(self) -> None:
-        indexes = _indexes()
+        indexes = get_indexes(GenerationEvent)
         assert "ix_generation_events_agent_at" in indexes
         idx = indexes["ix_generation_events_agent_at"]
         columns = {c.key for c in idx.columns}
         assert columns == {"agent_name", "created_at"}
 
     def test_failure_dashboard_index_present(self) -> None:
-        indexes = _indexes()
+        indexes = get_indexes(GenerationEvent)
         assert "ix_generation_events_success_at" in indexes
         idx = indexes["ix_generation_events_success_at"]
         columns = {c.key for c in idx.columns}
@@ -280,7 +247,7 @@ class TestGenerationEventAppendOnlyContract:
     def test_no_updated_at_column(self) -> None:
         """Append-only contract: ``updated_at`` would imply a
         mutation semantic the schema must not permit."""
-        assert "updated_at" not in _columns(), (
+        assert "updated_at" not in get_columns(GenerationEvent), (
             "GenerationEvent must not carry an `updated_at` column — "
             "audit rows are immutable after insert."
         )
@@ -316,7 +283,7 @@ class TestGenerationEventSchemaAntiGoals:
         ],
     )
     def test_forbidden_columns_are_absent(self, forbidden_field: str) -> None:
-        assert forbidden_field not in _columns(), (
+        assert forbidden_field not in get_columns(GenerationEvent), (
             f"GenerationEvent must not carry `{forbidden_field}`. "
             "The audit log row shape is restricted to "
             "agent_name / prompt_version / trigger_context / "

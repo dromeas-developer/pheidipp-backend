@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security.token_service import TokenService
 from app.db.session import get_db as _get_db_session
 from app.services.auth_service import AuthService
+from app.services.onboarding_service import OnboardingService
 
 
 # Re-export the canonical session dependency under one name so router
@@ -32,6 +33,18 @@ def build_auth_service(
     request finishes.
     """
     return AuthService(session=session)
+
+
+def build_onboarding_service(
+    session: AsyncSession = Depends(get_db),
+) -> OnboardingService:
+    """Construct an :class:`OnboardingService` for the current request.
+
+    Mirrors :func:`build_auth_service` — every request gets its own
+    ``AsyncSession`` so the onboarding transaction is isolated from
+    concurrent requests and the underlying connection pool.
+    """
+    return OnboardingService(session=session)
 
 
 def _extract_bearer(credentials: HTTPAuthorizationCredentials | None) -> str:

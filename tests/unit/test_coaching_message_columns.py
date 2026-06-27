@@ -25,10 +25,7 @@ from __future__ import annotations
 
 import pytest
 from sqlalchemy import (
-    CheckConstraint,
     DateTime,
-    ForeignKey,
-    Index,
     String,
     Text,
 )
@@ -37,30 +34,14 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 
 from app.models.coaching_message import CoachingMessage
 from app.models.enums import MessageType
-
-
-def _columns() -> dict[str, object]:
-    return {column.key: column for column in CoachingMessage.__table__.columns}
-
-
-def _indexes() -> dict[str, Index]:
-    return {idx.name: idx for idx in CoachingMessage.__table__.indexes}
-
-
-def _check_constraints() -> list[CheckConstraint]:
-    return [
-        c
-        for c in CoachingMessage.__table__.constraints
-        if isinstance(c, CheckConstraint)
-    ]
-
-
-def _foreign_keys_referencing(column_key: str) -> list[ForeignKey]:
-    return [
-        fk
-        for fk in CoachingMessage.__table__.foreign_keys
-        if fk.parent.name == column_key
-    ]
+from tests.utils.model_helpers import (
+    get_columns,
+    get_indexes,
+    get_check_constraints,
+    get_check_text,
+    get_foreign_keys_referencing,
+    get_enum_values,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -70,19 +51,19 @@ def _foreign_keys_referencing(column_key: str) -> list[ForeignKey]:
 
 class TestCoachingMessageRequiredColumns:
     def test_id_column_uuid_primary_key(self) -> None:
-        col = _columns()["id"]
+        col = get_columns(CoachingMessage)["id"]
         assert col.primary_key is True
         assert isinstance(col.type, PG_UUID)
 
     def test_athlete_id_required_uuid(self) -> None:
-        col = _columns()["athlete_id"]
+        col = get_columns(CoachingMessage)["athlete_id"]
         assert col.nullable is False
         assert isinstance(col.type, PG_UUID)
 
     def test_athlete_id_cascade_fk_to_athletes(self) -> None:
         """Athlete FK ON DELETE CASCADE — messages are wiped when
         the athlete account is deleted."""
-        fks = _foreign_keys_referencing("athlete_id")
+        fks = get_foreign_keys_referencing(CoachingMessage, "athlete_id")
         assert len(fks) == 1
         fk = fks[0]
         assert fk.column.table.name == "athletes"
@@ -91,7 +72,7 @@ class TestCoachingMessageRequiredColumns:
     def test_twin_state_id_required_uuid(self) -> None:
         """``twin_state_id`` is NOT NULL — every message is linked
         to the active TwinState at generation time."""
-        col = _columns()["twin_state_id"]
+        col = get_columns(CoachingMessage)["twin_state_id"]
         assert col.nullable is False
         assert isinstance(col.type, PG_UUID)
 
@@ -99,7 +80,7 @@ class TestCoachingMessageRequiredColumns:
         """TwinState FK ON DELETE CASCADE — messages are wiped when
         the parent TwinState is removed (history outlives only via
         the twin-state cascade)."""
-        fks = _foreign_keys_referencing("twin_state_id")
+        fks = get_foreign_keys_referencing(CoachingMessage, "twin_state_id")
         assert len(fks) == 1
         fk = fks[0]
         assert fk.column.table.name == "twin_states"
@@ -111,7 +92,7 @@ class TestCoachingMessageRequiredColumns:
         level and the partial unique index on
         ``post_workout + activity_id IS NOT NULL`` enforces the
         1:1 contract only for that type."""
-        col = _columns()["activity_id"]
+        col = get_columns(CoachingMessage)["activity_id"]
         assert col.nullable is True
         assert isinstance(col.type, PG_UUID)
 
@@ -119,19 +100,17 @@ class TestCoachingMessageRequiredColumns:
         """Activity FK ON DELETE SET NULL — message history is
         preserved when an Activity is deleted (the activity_id
         reference is nulled out)."""
-        fks = _foreign_keys_referencing("activity_id")
+        fks = get_foreign_keys_referencing(CoachingMessage, "activity_id")
         assert len(fks) == 1
         fk = fks[0]
         assert fk.column.table.name == "activities"
         assert fk.ondelete == "SET NULL"
 
     def test_message_type_required_enum(self) -> None:
-        col = _columns()["message_type"]
+        col = get_columns(CoachingMessage)["message_type"]
         assert col.nullable is False
         assert isinstance(col.type, SAEnum)
-        values_callable = col.type.values_callable
-        assert values_callable is not None
-        actual = sorted(values_callable(MessageType))
+        actual = sorted(get_enum_values(col, MessageType))
         expected = sorted(
             [
                 "confidence_upgrade",
@@ -147,18 +126,18 @@ class TestCoachingMessageRequiredColumns:
         assert actual == expected
 
     def test_content_required_text(self) -> None:
-        col = _columns()["content"]
+        col = get_columns(CoachingMessage)["content"]
         assert col.nullable is False
         assert isinstance(col.type, Text)
 
     def test_prompt_version_required_string(self) -> None:
-        col = _columns()["prompt_version"]
+        col = get_columns(CoachingMessage)["prompt_version"]
         assert col.nullable is False
         assert isinstance(col.type, String)
         assert col.type.length == 32
 
     def test_generated_at_required_datetime(self) -> None:
-        col = _columns()["generated_at"]
+        col = get_columns(CoachingMessage)["generated_at"]
         assert col.nullable is False
         assert isinstance(col.type, DateTime)
 
@@ -175,7 +154,7 @@ class TestCoachingMessageFirstMessagePartialUniqueIndex:
     WHERE message_type = 'first_message'``."""
 
     def test_first_message_partial_unique_index_present(self) -> None:
-        indexes = _indexes()
+        indexes = get_indexes(CoachingMessage)
         assert "uq_coaching_messages_athlete_first_message" in indexes, (
             "CoachingMessage must declare "
             "`uq_coaching_messages_athlete_first_message` to "
@@ -183,11 +162,11 @@ class TestCoachingMessageFirstMessagePartialUniqueIndex:
         )
 
     def test_first_message_index_is_unique(self) -> None:
-        idx = _indexes()["uq_coaching_messages_athlete_first_message"]
+        idx = get_indexes(CoachingMessage)["uq_coaching_messages_athlete_first_message"]
         assert idx.unique is True
 
     def test_first_message_partial_predicate_present(self) -> None:
-        idx = _indexes()["uq_coaching_messages_athlete_first_message"]
+        idx = get_indexes(CoachingMessage)["uq_coaching_messages_athlete_first_message"]
         predicate = idx.dialect_options.get("postgresql", {}).get("where")
         assert predicate is not None, (
             "uq_coaching_messages_athlete_first_message must declare "
@@ -202,7 +181,7 @@ class TestCoachingMessageFirstMessagePartialUniqueIndex:
         )
 
     def test_first_message_index_columns(self) -> None:
-        idx = _indexes()["uq_coaching_messages_athlete_first_message"]
+        idx = get_indexes(CoachingMessage)["uq_coaching_messages_athlete_first_message"]
         columns = {c.key for c in idx.columns}
         assert columns == {"athlete_id"}
 
@@ -214,7 +193,7 @@ class TestCoachingMessagePostWorkoutPartialUniqueIndex:
     WHERE message_type = 'post_workout' AND activity_id IS NOT NULL``."""
 
     def test_post_workout_partial_unique_index_present(self) -> None:
-        indexes = _indexes()
+        indexes = get_indexes(CoachingMessage)
         assert "uq_coaching_messages_activity_post_workout" in indexes, (
             "CoachingMessage must declare "
             "`uq_coaching_messages_activity_post_workout` to "
@@ -222,11 +201,11 @@ class TestCoachingMessagePostWorkoutPartialUniqueIndex:
         )
 
     def test_post_workout_index_is_unique(self) -> None:
-        idx = _indexes()["uq_coaching_messages_activity_post_workout"]
+        idx = get_indexes(CoachingMessage)["uq_coaching_messages_activity_post_workout"]
         assert idx.unique is True
 
     def test_post_workout_partial_predicate_present(self) -> None:
-        idx = _indexes()["uq_coaching_messages_activity_post_workout"]
+        idx = get_indexes(CoachingMessage)["uq_coaching_messages_activity_post_workout"]
         predicate = idx.dialect_options.get("postgresql", {}).get("where")
         assert predicate is not None, (
             "uq_coaching_messages_activity_post_workout must declare "
@@ -239,7 +218,7 @@ class TestCoachingMessagePostWorkoutPartialUniqueIndex:
         """The partial predicate must include ``activity_id IS NOT
         NULL`` so non-post_workout rows with NULL activity_id are
         exempt from the uniqueness constraint."""
-        idx = _indexes()["uq_coaching_messages_activity_post_workout"]
+        idx = get_indexes(CoachingMessage)["uq_coaching_messages_activity_post_workout"]
         predicate = idx.dialect_options.get("postgresql", {}).get("where")
         rendered = str(predicate).lower()
         assert "message_type" in rendered, (
@@ -257,7 +236,7 @@ class TestCoachingMessagePostWorkoutPartialUniqueIndex:
         )
 
     def test_post_workout_index_columns(self) -> None:
-        idx = _indexes()["uq_coaching_messages_activity_post_workout"]
+        idx = get_indexes(CoachingMessage)["uq_coaching_messages_activity_post_workout"]
         columns = {c.key for c in idx.columns}
         assert columns == {"activity_id"}
 
@@ -268,14 +247,14 @@ class TestCoachingMessageSecondaryIndexes:
     GET /coach/messages feed and the per-type frequency guards."""
 
     def test_athlete_generated_at_index_present(self) -> None:
-        indexes = _indexes()
+        indexes = get_indexes(CoachingMessage)
         assert "ix_coaching_messages_athlete_generated_at" in indexes
         idx = indexes["ix_coaching_messages_athlete_generated_at"]
         columns = {c.key for c in idx.columns}
         assert columns == {"athlete_id", "generated_at"}
 
     def test_athlete_type_generated_at_index_present(self) -> None:
-        indexes = _indexes()
+        indexes = get_indexes(CoachingMessage)
         assert "ix_coaching_messages_athlete_type_generated_at" in indexes
         idx = indexes["ix_coaching_messages_athlete_type_generated_at"]
         columns = {c.key for c in idx.columns}
@@ -286,7 +265,7 @@ class TestCoachingMessageSecondaryIndexes:
         }
 
     def test_twin_state_reverse_lookup_index_present(self) -> None:
-        indexes = _indexes()
+        indexes = get_indexes(CoachingMessage)
         assert "ix_coaching_messages_twin_state" in indexes
 
 
@@ -300,22 +279,16 @@ class TestCoachingMessageContentCheck:
     blank-message rows that should be blocked at the DB layer."""
 
     def test_content_non_empty_check_present(self) -> None:
-        checks = _check_constraints()
+        checks = get_check_constraints(CoachingMessage)
         found = any(
-            "length(content)" in self._check_text(c)
-            and "> 0" in self._check_text(c)
+            "length(content)" in get_check_text(c)
+            and "> 0" in get_check_text(c)
             for c in checks
         )
         assert found, (
             "CoachingMessage must declare a CHECK constraint "
             "rejecting empty content (length(content) > 0)."
         )
-
-    def _check_text(self, check: CheckConstraint) -> str:
-        expr = getattr(check, "expression", None) or getattr(
-            check, "sqltext", None
-        )
-        return str(expr) if expr is not None else ""
 
 
 # ---------------------------------------------------------------------------
@@ -351,7 +324,7 @@ class TestCoachingMessageAppendOnlyContract:
     def test_no_updated_at_column(self) -> None:
         """Append-only contract: ``updated_at`` would imply a
         mutation semantic that the schema must not permit."""
-        assert "updated_at" not in _columns(), (
+        assert "updated_at" not in get_columns(CoachingMessage), (
             "CoachingMessage must not carry an `updated_at` column — "
             "the row is immutable after creation."
         )
@@ -387,7 +360,7 @@ class TestCoachingMessageSchemaAntiGoals:
         ],
     )
     def test_forbidden_columns_are_absent(self, forbidden_field: str) -> None:
-        assert forbidden_field not in _columns(), (
+        assert forbidden_field not in get_columns(CoachingMessage), (
             f"CoachingMessage must not carry `{forbidden_field}`. "
             "The row is immutable; LLM audit fields live on "
             "GenerationEvent."

@@ -22,12 +22,11 @@ Reference plan: docs/implementation/phase-1/phase-1-2c-p1-twin-fitness-coaching-
 
 from __future__ import annotations
 
-import os
 import uuid
 from datetime import date
 
 import pytest
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -51,79 +50,23 @@ from app.models.training_goal import TrainingGoal
 from app.models.training_plan import TrainingPlan
 from app.models.twin_state import TwinState
 from app.models.weekly_plan import WeeklyPlan
+from tests.utils.factories import make_athlete
+from tests.utils.schema_helpers import (
+    db_check_constraints,
+    db_columns,
+    db_foreign_keys,
+    db_indexes,
+    db_unique_constraints,
+)
 
 
 TABLE = "generated_workouts"
-
-
-def _sync_url() -> str:
-    database_url = os.environ.get("DATABASE_URL", "")
-    if not database_url:
-        raise RuntimeError("DATABASE_URL environment variable not set")
-    if database_url.startswith("postgresql+asyncpg://"):
-        database_url = database_url.replace(
-            "postgresql+asyncpg://",
-            "postgresql+psycopg2://",
-        )
-    return database_url
-
-
-def _columns(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_columns(table))
-    finally:
-        engine.dispose()
-
-
-def _indexes(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_indexes(table))
-    finally:
-        engine.dispose()
-
-
-def _check_constraints(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_check_constraints(table))
-    finally:
-        engine.dispose()
-
-
-def _unique_constraints(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_unique_constraints(table))
-    finally:
-        engine.dispose()
-
-
-def _foreign_keys(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_foreign_keys(table))
-    finally:
-        engine.dispose()
 
 
 # ---------------------------------------------------------------------------
 # Helpers — build up the parent chain (athlete → goal → plan → week →
 # session) so that a ``GeneratedWorkout`` can be inserted.
 # ---------------------------------------------------------------------------
-
-
-async def _new_athlete(db_session: AsyncSession, email: str) -> Athlete:
-    a = Athlete(email=email)
-    db_session.add(a)
-    await db_session.flush()
-    return a
 
 
 async def _new_goal_plan_week_session(
@@ -217,8 +160,8 @@ def _generated_workout_factory(
     *,
     planned_session_id: uuid.UUID,
     twin_state_id: uuid.UUID,
-    theoretical_targets: dict | None = None,
-    adjusted_targets: dict | None = None,
+    theoretical_targets: object = None,
+    adjusted_targets: object = None,
     recovery_modifier_level: RecoveryModifierLevel = RecoveryModifierLevel.GREEN,
     recovery_modifier_reason: str | None = None,
     generation_date: date = date(2026, 6, 24),
@@ -257,7 +200,7 @@ class TestGeneratedWorkoutDBSchemaColumns:
     async def test_required_column_present(
         self, db_session: AsyncSession, expected_column: str
     ) -> None:
-        cols = {col["name"] for col in _columns(TABLE)}
+        cols = {col["name"] for col in db_columns(TABLE)}
         assert expected_column in cols, (
             f"generated_workouts.{expected_column} missing from DB schema."
         )
@@ -270,7 +213,7 @@ class TestGeneratedWorkoutDBSchemaColumns:
 
 class TestGeneratedWorkoutIdempotencyUniqueDB:
     def test_idempotency_unique_constraint_present(self) -> None:
-        uniques = _unique_constraints(TABLE)
+        uniques = db_unique_constraints(TABLE)
         matched = [
             u
             for u in uniques
@@ -288,7 +231,7 @@ class TestGeneratedWorkoutIdempotencyUniqueDB:
     async def test_duplicate_session_date_rejected(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "gw-dup@example.com"
         )
         _, _, _, session = await _new_goal_plan_week_session(
@@ -326,7 +269,7 @@ class TestGeneratedWorkoutIdempotencyUniqueDB:
     ) -> None:
         """Two workouts for the same planned session on different
         generation dates coexist (the next day's regeneration)."""
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "gw-multi-date@example.com"
         )
         _, _, _, session = await _new_goal_plan_week_session(
@@ -366,7 +309,7 @@ class TestGeneratedWorkoutIdempotencyUniqueDB:
 
 class TestGeneratedWorkoutTargetsAreObjectsCheckDB:
     def test_targets_are_objects_check_present(self) -> None:
-        checks = _check_constraints(TABLE)
+        checks = db_check_constraints(TABLE)
         found = any(
             "jsonb_typeof" in (c.get("sqltext") or "").lower()
             and "theoretical_targets" in (c.get("sqltext") or "").lower()
@@ -383,7 +326,7 @@ class TestGeneratedWorkoutTargetsAreObjectsCheckDB:
     async def test_non_object_targets_rejected(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "gw-bad-targets@example.com"
         )
         _, _, _, session = await _new_goal_plan_week_session(
@@ -418,7 +361,7 @@ class TestGeneratedWorkoutTargetsAreObjectsCheckDB:
 
 class TestGeneratedWorkoutRecoveryModifierLevelCheckDB:
     def test_modifier_level_check_present(self) -> None:
-        checks = _check_constraints(TABLE)
+        checks = db_check_constraints(TABLE)
         found = any(
             "recovery_modifier_level" in (c.get("sqltext") or "").lower()
             and "green" in (c.get("sqltext") or "").lower()
@@ -440,7 +383,7 @@ class TestGeneratedWorkoutRecoveryModifierLevelCheckDB:
 
 class TestGeneratedWorkoutForeignKeysDB:
     def test_planned_session_id_fk_to_planned_sessions(self) -> None:
-        fks = _foreign_keys(TABLE)
+        fks = db_foreign_keys(TABLE)
         session_fks = [
             fk
             for fk in fks
@@ -451,7 +394,7 @@ class TestGeneratedWorkoutForeignKeysDB:
         assert session_fks
 
     def test_twin_state_id_fk_to_twin_states(self) -> None:
-        fks = _foreign_keys(TABLE)
+        fks = db_foreign_keys(TABLE)
         twin_fks = [
             fk
             for fk in fks
@@ -464,56 +407,31 @@ class TestGeneratedWorkoutForeignKeysDB:
         )
 
     def test_planned_session_fk_ondelete_is_cascade(self) -> None:
-        engine = create_engine(_sync_url())
-        try:
-            with engine.connect() as conn:
-                row = conn.execute(
-                    text(
-                        """
-                        SELECT c.confdeltype
-                        FROM pg_constraint c
-                        JOIN pg_class conrelid_table ON conrelid_table.oid = c.conrelid
-                        JOIN pg_class confrelid_table ON confrelid_table.oid = c.confrelid
-                        WHERE c.contype = 'f'
-                          AND confrelid_table.relname = 'planned_sessions'
-                          AND conrelid_table.relname = :table_name
-                        """
-                    ),
-                    {"table_name": TABLE},
-                ).fetchone()
-        finally:
-            engine.dispose()
-        assert row is not None
-        assert row[0] == "c", (
-            f"generated_workouts.planned_session_id FK ON DELETE "
-            f"must be CASCADE. Got {row[0]!r}"
+        fks = db_foreign_keys(TABLE)
+        session_fks = [
+            fk for fk in fks
+            if fk.get("referred_table") == "planned_sessions"
+            and tuple(fk.get("constrained_columns") or ())
+            == ("planned_session_id",)
+        ]
+        assert session_fks, (
+            "generated_workouts.planned_session_id FK ON DELETE "
+            "must be CASCADE."
         )
+        assert session_fks[0].get("options", {}).get("ondelete") == "CASCADE"
 
     def test_twin_state_fk_ondelete_is_cascade(self) -> None:
-        engine = create_engine(_sync_url())
-        try:
-            with engine.connect() as conn:
-                row = conn.execute(
-                    text(
-                        """
-                        SELECT c.confdeltype
-                        FROM pg_constraint c
-                        JOIN pg_class conrelid_table ON conrelid_table.oid = c.conrelid
-                        JOIN pg_class confrelid_table ON confrelid_table.oid = c.confrelid
-                        WHERE c.contype = 'f'
-                          AND confrelid_table.relname = 'twin_states'
-                          AND conrelid_table.relname = :table_name
-                        """
-                    ),
-                    {"table_name": TABLE},
-                ).fetchone()
-        finally:
-            engine.dispose()
-        assert row is not None
-        assert row[0] == "c", (
-            f"generated_workouts.twin_state_id FK ON DELETE must be "
-            f"CASCADE. Got {row[0]!r}"
+        fks = db_foreign_keys(TABLE)
+        twin_fks = [
+            fk for fk in fks
+            if fk.get("referred_table") == "twin_states"
+            and tuple(fk.get("constrained_columns") or ())
+            == ("twin_state_id",)
+        ]
+        assert twin_fks, (
+            "generated_workouts.twin_state_id FK ON DELETE must be CASCADE."
         )
+        assert twin_fks[0].get("options", {}).get("ondelete") == "CASCADE"
 
 
 # ---------------------------------------------------------------------------
@@ -527,7 +445,7 @@ class TestGeneratedWorkoutSecondaryIndexesDB:
     ) -> None:
         matched = [
             idx
-            for idx in _indexes(TABLE)
+            for idx in db_indexes(TABLE)
             if set(idx.get("column_names") or ()) == {"twin_state_id"}
         ]
         assert matched, (
@@ -539,7 +457,7 @@ class TestGeneratedWorkoutSecondaryIndexesDB:
     ) -> None:
         matched = [
             idx
-            for idx in _indexes(TABLE)
+            for idx in db_indexes(TABLE)
             if set(idx.get("column_names") or ())
             == {"planned_session_id", "generated_at"}
         ]
@@ -558,7 +476,7 @@ class TestGeneratedWorkoutServerDefaultsDB:
     async def test_recovery_modifier_level_defaults_to_green(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "gw-default-modifier@example.com"
         )
         _, _, _, session = await _new_goal_plan_week_session(
@@ -597,7 +515,7 @@ class TestGeneratedWorkoutRoundTripDB:
     async def test_minimal_workout_persists(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "gw-roundtrip@example.com"
         )
         _, _, _, session = await _new_goal_plan_week_session(
@@ -663,7 +581,7 @@ class TestGeneratedWorkoutRoundTripDB:
         """GREEN modifier, no weather adjustment — both target
         columns identical. The two-column display contract allows
         identical values."""
-        athlete = await _new_athlete(
+        athlete = await make_athlete(
             db_session, "gw-identical@example.com"
         )
         _, _, _, session = await _new_goal_plan_week_session(

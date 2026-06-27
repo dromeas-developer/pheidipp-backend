@@ -30,11 +30,10 @@ Reference plan: docs/implementation/phase-1/phase-1-2b-p1-plan-sessions.md
 
 from __future__ import annotations
 
-import os
 import uuid
 
 import pytest
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -46,72 +45,17 @@ from app.models.enums import (
     TrainingGoalStatus,
 )
 from app.models.training_goal import TrainingGoal
-
+from tests.utils.factories import make_athlete
+from tests.utils.schema_helpers import (
+    db_check_constraints,
+    db_columns,
+    db_foreign_keys,
+    db_indexes,
+    db_unique_constraints,
+    get_sync_database_url,
+)
 
 TABLE = "training_goals"
-
-
-# ---------------------------------------------------------------------------
-# Sync-engine helpers — using psycopg2 instead of asyncpg per tests/README.md
-# (avoids the MissingGreenlet error inside async tests).
-# ---------------------------------------------------------------------------
-
-
-def _sync_url() -> str:
-    database_url = os.environ.get("DATABASE_URL", "")
-    if not database_url:
-        raise RuntimeError("DATABASE_URL environment variable not set")
-    if database_url.startswith("postgresql+asyncpg://"):
-        database_url = database_url.replace(
-            "postgresql+asyncpg://",
-            "postgresql+psycopg2://",
-        )
-    return database_url
-
-
-def _columns(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_columns(table))
-    finally:
-        engine.dispose()
-
-
-def _unique_constraints(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_unique_constraints(table))
-    finally:
-        engine.dispose()
-
-
-def _check_constraints(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_check_constraints(table))
-    finally:
-        engine.dispose()
-
-
-def _indexes(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_indexes(table))
-    finally:
-        engine.dispose()
-
-
-def _foreign_keys(table: str) -> list[dict]:
-    engine = create_engine(_sync_url())
-    try:
-        with engine.connect() as conn:
-            return list(inspect(conn).get_foreign_keys(table))
-    finally:
-        engine.dispose()
 
 
 # ---------------------------------------------------------------------------
@@ -154,13 +98,6 @@ def _goal_factory(
     )
 
 
-async def _new_athlete(db_session: AsyncSession, email: str) -> Athlete:
-    athlete = Athlete(email=email)
-    db_session.add(athlete)
-    await db_session.flush()
-    return athlete
-
-
 # ---------------------------------------------------------------------------
 # DB column presence.
 # ---------------------------------------------------------------------------
@@ -195,7 +132,7 @@ class TestTrainingGoalDBSchemaColumns:
     async def test_required_column_present(
         self, db_session: AsyncSession, expected_column: str
     ) -> None:
-        cols = {col["name"] for col in _columns(TABLE)}
+        cols = {col["name"] for col in db_columns(TABLE)}
         assert expected_column in cols, (
             f"training_goals.{expected_column} missing from DB schema."
         )
@@ -211,7 +148,7 @@ class TestTrainingGoalActivePartialUniqueIndex:
     ``athlete_id WHERE status = 'active'``)."""
 
     def _active_partial_index(self) -> dict | None:
-        for idx in _indexes(TABLE):
+        for idx in db_indexes(TABLE):
             cols = set(idx.get("column_names") or [])
             if cols >= {"athlete_id"} and idx.get("unique"):
                 return idx
@@ -234,7 +171,7 @@ class TestTrainingGoalActivePartialUniqueIndex:
         confirm the predicate text contains ``status = 'active'``."""
         idx = self._active_partial_index()
         assert idx is not None
-        engine = create_engine(_sync_url())
+        engine = create_engine(get_sync_database_url())
         try:
             with engine.connect() as conn:
                 row = conn.execute(
@@ -262,7 +199,7 @@ class TestActiveGoalUniquenessAtDB:
     async def test_two_active_goals_same_athlete_rejected(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(db_session, "dup-active-goal@example.com")
+        athlete = await make_athlete(db_session, "dup-active-goal@example.com")
         g1 = _goal_factory(athlete_id=athlete.id, status=TrainingGoalStatus.ACTIVE)
         g2 = _goal_factory(athlete_id=athlete.id, status=TrainingGoalStatus.ACTIVE)
         db_session.add_all([g1, g2])
@@ -276,7 +213,7 @@ class TestActiveGoalUniquenessAtDB:
         """A completed goal does NOT participate in the partial
         predicate — the partial index must allow the same athlete
         to keep a completed goal and have a new active one."""
-        athlete = await _new_athlete(db_session, "active-and-completed@example.com")
+        athlete = await make_athlete(db_session, "active-and-completed@example.com")
         g_done = _goal_factory(
             athlete_id=athlete.id, status=TrainingGoalStatus.COMPLETED
         )
@@ -292,7 +229,7 @@ class TestActiveGoalUniquenessAtDB:
     async def test_one_active_one_abandoned_coexist(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(db_session, "active-and-abandoned@example.com")
+        athlete = await make_athlete(db_session, "active-and-abandoned@example.com")
         g_done = _goal_factory(
             athlete_id=athlete.id, status=TrainingGoalStatus.ABANDONED
         )
@@ -315,7 +252,7 @@ class TestTrainingGoalVolumeChecks:
     async def test_weekly_volume_hours_non_negative_check_present(
         self, db_session: AsyncSession
     ) -> None:
-        checks = _check_constraints(TABLE)
+        checks = db_check_constraints(TABLE)
         found = any(
             "weekly_volume_hours" in (c.get("sqltext") or "").lower()
             and ">=" in (c.get("sqltext") or "").lower()
@@ -329,7 +266,7 @@ class TestTrainingGoalVolumeChecks:
     async def test_weekly_volume_km_non_negative_check_present(
         self, db_session: AsyncSession
     ) -> None:
-        checks = _check_constraints(TABLE)
+        checks = db_check_constraints(TABLE)
         found = any(
             "weekly_volume_km" in (c.get("sqltext") or "").lower()
             and ">=" in (c.get("sqltext") or "").lower()
@@ -343,7 +280,7 @@ class TestTrainingGoalVolumeChecks:
     async def test_negative_weekly_volume_hours_rejected(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(db_session, "neg-hours@example.com")
+        athlete = await make_athlete(db_session, "neg-hours@example.com")
         goal = _goal_factory(athlete_id=athlete.id, weekly_volume_hours=-0.5)
         db_session.add(goal)
         with pytest.raises(IntegrityError):
@@ -353,7 +290,7 @@ class TestTrainingGoalVolumeChecks:
     async def test_zero_weekly_volume_hours_accepted(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(db_session, "zero-hours@example.com")
+        athlete = await make_athlete(db_session, "zero-hours@example.com")
         goal = _goal_factory(athlete_id=athlete.id, weekly_volume_hours=0)
         db_session.add(goal)
         await db_session.flush()
@@ -365,7 +302,7 @@ class TestTrainingGoalFitnessLevelRange:
     async def test_fitness_level_range_check_present(
         self, db_session: AsyncSession
     ) -> None:
-        checks = _check_constraints(TABLE)
+        checks = db_check_constraints(TABLE)
         found = any(
             "fitness_level" in (c.get("sqltext") or "").lower()
             and ">=" in (c.get("sqltext") or "").lower()
@@ -380,7 +317,7 @@ class TestTrainingGoalFitnessLevelRange:
     async def test_fitness_level_zero_rejected(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(db_session, "fitness-zero@example.com")
+        athlete = await make_athlete(db_session, "fitness-zero@example.com")
         goal = _goal_factory(athlete_id=athlete.id, fitness_level=0)
         db_session.add(goal)
         with pytest.raises(IntegrityError):
@@ -390,7 +327,7 @@ class TestTrainingGoalFitnessLevelRange:
     async def test_fitness_level_six_rejected(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(db_session, "fitness-six@example.com")
+        athlete = await make_athlete(db_session, "fitness-six@example.com")
         goal = _goal_factory(athlete_id=athlete.id, fitness_level=6)
         db_session.add(goal)
         with pytest.raises(IntegrityError):
@@ -402,7 +339,7 @@ class TestTrainingGoalFitnessLevelRange:
         self, db_session: AsyncSession, level: int
     ) -> None:
         email = f"fitness-ok-{level}-{uuid.uuid4().hex[:6]}@example.com"
-        athlete = await _new_athlete(db_session, email)
+        athlete = await make_athlete(db_session, email)
         goal = _goal_factory(athlete_id=athlete.id, fitness_level=level)
         db_session.add(goal)
         await db_session.flush()
@@ -414,7 +351,7 @@ class TestTrainingGoalCustomDistanceCheck:
     async def test_custom_distance_positive_check_present(
         self, db_session: AsyncSession
     ) -> None:
-        checks = _check_constraints(TABLE)
+        checks = db_check_constraints(TABLE)
         found = any(
             "custom_distance_km" in (c.get("sqltext") or "").lower()
             and "is null" in (c.get("sqltext") or "").lower()
@@ -429,7 +366,7 @@ class TestTrainingGoalCustomDistanceCheck:
     async def test_custom_distance_zero_rejected(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(db_session, "cd-zero@example.com")
+        athlete = await make_athlete(db_session, "cd-zero@example.com")
         goal = _goal_factory(
             athlete_id=athlete.id,
             goal_event_type=GoalEventType.CUSTOM,
@@ -443,7 +380,7 @@ class TestTrainingGoalCustomDistanceCheck:
     async def test_custom_distance_negative_rejected(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(db_session, "cd-neg@example.com")
+        athlete = await make_athlete(db_session, "cd-neg@example.com")
         goal = _goal_factory(
             athlete_id=athlete.id,
             goal_event_type=GoalEventType.CUSTOM,
@@ -457,7 +394,7 @@ class TestTrainingGoalCustomDistanceCheck:
     async def test_custom_distance_null_accepted(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(db_session, "cd-null@example.com")
+        athlete = await make_athlete(db_session, "cd-null@example.com")
         goal = _goal_factory(athlete_id=athlete.id, custom_distance_km=None)
         db_session.add(goal)
         await db_session.flush()
@@ -469,7 +406,7 @@ class TestTrainingGoalTargetPerformanceChecks:
     async def test_target_distance_positive_check_present(
         self, db_session: AsyncSession
     ) -> None:
-        checks = _check_constraints(TABLE)
+        checks = db_check_constraints(TABLE)
         found = any(
             "target_distance_km" in (c.get("sqltext") or "").lower()
             and "is null" in (c.get("sqltext") or "").lower()
@@ -484,7 +421,7 @@ class TestTrainingGoalTargetPerformanceChecks:
     async def test_target_time_positive_check_present(
         self, db_session: AsyncSession
     ) -> None:
-        checks = _check_constraints(TABLE)
+        checks = db_check_constraints(TABLE)
         found = any(
             "target_time_minutes" in (c.get("sqltext") or "").lower()
             and "is null" in (c.get("sqltext") or "").lower()
@@ -499,7 +436,7 @@ class TestTrainingGoalTargetPerformanceChecks:
     async def test_target_distance_zero_rejected(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(db_session, "td-zero@example.com")
+        athlete = await make_athlete(db_session, "td-zero@example.com")
         goal = _goal_factory(
             athlete_id=athlete.id,
             goal_type=GoalType.TARGET_PERFORMANCE,
@@ -514,7 +451,7 @@ class TestTrainingGoalTargetPerformanceChecks:
     async def test_target_time_negative_rejected(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(db_session, "tt-neg@example.com")
+        athlete = await make_athlete(db_session, "tt-neg@example.com")
         goal = _goal_factory(
             athlete_id=athlete.id,
             goal_type=GoalType.TARGET_PERFORMANCE,
@@ -536,7 +473,7 @@ class TestTrainingGoalForeignKeyCascade:
     async def test_goal_rows_cascade_with_athlete(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(db_session, "cascade-goal@example.com")
+        athlete = await make_athlete(db_session, "cascade-goal@example.com")
         goal = _goal_factory(athlete_id=athlete.id)
         db_session.add(goal)
         await db_session.flush()
@@ -558,7 +495,7 @@ class TestTrainingGoalForeignKeyCascade:
 
     def test_athlete_id_fk_to_athletes_table(self) -> None:
         """``sport_background`` style: name-independent FK check."""
-        fks = _foreign_keys(TABLE)
+        fks = db_foreign_keys(TABLE)
         matches = [
             fk for fk in fks
             if fk.get("referred_table") == "athletes"
@@ -581,7 +518,7 @@ class TestTrainingGoalPersistence:
     ) -> None:
         from datetime import date
 
-        athlete = await _new_athlete(db_session, "round-trip@example.com")
+        athlete = await make_athlete(db_session, "round-trip@example.com")
         goal = _goal_factory(
             athlete_id=athlete.id,
             goal_type=GoalType.RACE_EVENT,
@@ -613,7 +550,7 @@ class TestTrainingGoalPersistence:
     async def test_recovery_goal_with_injury_severity(
         self, db_session: AsyncSession
     ) -> None:
-        athlete = await _new_athlete(db_session, "recovery-goal@example.com")
+        athlete = await make_athlete(db_session, "recovery-goal@example.com")
         goal = _goal_factory(
             athlete_id=athlete.id,
             goal_type=GoalType.RECOVERY,
@@ -630,7 +567,7 @@ class TestTrainingGoalPersistence:
         self, db_session: AsyncSession
     ) -> None:
         """``fitness_improvement`` goals have no event fields populated."""
-        athlete = await _new_athlete(db_session, "minimal-goal@example.com")
+        athlete = await make_athlete(db_session, "minimal-goal@example.com")
         goal = _goal_factory(
             athlete_id=athlete.id, goal_type=GoalType.FITNESS_IMPROVEMENT
         )

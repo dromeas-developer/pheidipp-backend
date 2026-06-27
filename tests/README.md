@@ -7,6 +7,95 @@ This directory contains the test suite for the Pheidipp backend. Tests are organ
 - `integration/` — Integration tests with database (transactional)
 - `api/` — HTTP API tests using FastAPI test client
 - `behaviour/` — End-to-end user journey tests
+- `utils/` — Shared test utilities and helpers
+
+## Shared Utilities (`tests/utils/`)
+
+To avoid duplication and ensure consistency across the test suite, common helpers are centralized in `tests/utils/`:
+
+### `tests/utils/schema_helpers.py`
+
+Database schema introspection helpers that use a synchronous psycopg2 engine:
+
+```python
+from tests.utils.schema_helpers import db_columns, db_foreign_keys, db_indexes, get_sync_database_url
+
+cols = db_columns("training_plans")
+fks = db_foreign_keys("training_plans")
+idxs = db_indexes("training_plans")
+```
+
+**Why separate sync engine?** Schema inspection requires a synchronous connection. These helpers automatically convert the asyncpg URL to psycopg2.
+
+### `tests/utils/model_helpers.py`
+
+ORM model introspection helpers for unit tests (no database required):
+
+```python
+from tests.utils.model_helpers import get_columns, get_indexes, get_check_constraints, has_column
+
+cols = get_columns(TrainingPlan)  # dict[str, Column]
+idxs = get_indexes(TrainingPlan)  # dict[str, Index]
+has_col = has_column(TrainingPlan, "status")  # bool
+```
+
+### `tests/utils/factories.py`
+
+Async factory functions for creating domain model instances in integration tests:
+
+```python
+from tests.utils.factories import make_athlete, make_auth, make_refresh_token
+
+athlete = await make_athlete(db_session)
+auth = await make_auth(db_session, athlete_id=athlete.id)
+token = await make_refresh_token(db_session, athlete_id=athlete.id)
+```
+
+### `tests/utils/assertions.py`
+
+Shared assertion patterns for security and domain invariants:
+
+```python
+from tests.utils.assertions import assert_no_secrets_in_text, assert_no_secrets_in_logs, SECRET_LEAKAGE_FIELDS
+
+assert_no_secrets_in_text(response_text)
+assert_no_secrets_in_logs(log_records)
+```
+
+**Forbidden fields checked:** `hashed_password`, `token_hash`, `provider_tokens`, `provider_user_id`, `password`.
+
+## Migration from Inline Helpers
+
+Legacy test files may contain inline `_columns()`, `_indexes()`, `_sync_url()` helpers. These have been consolidated into the shared utilities above. When updating existing tests:
+
+**Before:**
+```python
+import os
+from sqlalchemy import create_engine, inspect
+
+def _sync_url() -> str:
+    database_url = os.environ.get("DATABASE_URL", "")
+    if database_url.startswith("postgresql+asyncpg://"):
+        database_url = database_url.replace(
+            "postgresql+asyncpg://", "postgresql+psycopg2://"
+        )
+    return database_url
+
+def _columns(table: str) -> list[dict]:
+    engine = create_engine(_sync_url())
+    try:
+        with engine.connect() as conn:
+            return list(inspect(conn).get_columns(table))
+    finally:
+        engine.dispose()
+```
+
+**After:**
+```python
+from tests.utils.schema_helpers import db_columns
+
+cols = db_columns("training_plans")
+```
 
 ## Test Isolation
 

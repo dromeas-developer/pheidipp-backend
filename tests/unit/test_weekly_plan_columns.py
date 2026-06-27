@@ -21,18 +21,26 @@ from __future__ import annotations
 
 import pytest
 from sqlalchemy import (
-    CheckConstraint,
     Date,
     DateTime,
     Integer,
     String,
-    UniqueConstraint,
 )
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 
 from app.models.enums import CheckpointType, SessionType, WeeklyPlanStatus
 from app.models.weekly_plan import WeeklyPlan, WeeklySession
+from tests.utils.model_helpers import (
+    get_columns,
+    get_indexes,
+    get_unique_constraints,
+    get_check_constraints,
+    get_check_text,
+    get_foreign_keys_referencing,
+    get_server_default_text,
+    get_enum_values,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -40,56 +48,32 @@ from app.models.weekly_plan import WeeklyPlan, WeeklySession
 # ---------------------------------------------------------------------------
 
 
-def _weekly_plan_columns() -> dict[str, object]:
-    return {column.key: column for column in WeeklyPlan.__table__.columns}
-
-
-def _weekly_plan_indexes() -> dict[str, "object"]:
-    return {idx.name: idx for idx in WeeklyPlan.__table__.indexes}
-
-
-def _weekly_plan_unique_constraints() -> list[UniqueConstraint]:
-    return [
-        c
-        for c in WeeklyPlan.__table__.constraints
-        if isinstance(c, UniqueConstraint)
-    ]
-
-
-def _weekly_plan_check_constraints() -> list[CheckConstraint]:
-    return [
-        c
-        for c in WeeklyPlan.__table__.constraints
-        if isinstance(c, CheckConstraint)
-    ]
-
-
 class TestWeeklyPlanRequiredColumns:
     def test_id_column_uuid_primary_key(self) -> None:
-        col = _weekly_plan_columns()["id"]
+        col = get_columns(WeeklyPlan)["id"]
         assert col.primary_key is True
         assert isinstance(col.type, PG_UUID)
 
     def test_training_plan_id_required_uuid(self) -> None:
-        col = _weekly_plan_columns()["training_plan_id"]
+        col = get_columns(WeeklyPlan)["training_plan_id"]
         assert col.nullable is False
         assert isinstance(col.type, PG_UUID)
 
     def test_week_number_required_integer(self) -> None:
-        col = _weekly_plan_columns()["week_number"]
+        col = get_columns(WeeklyPlan)["week_number"]
         assert col.nullable is False
         assert isinstance(col.type, Integer)
 
     def test_adjusted_intent_required_jsonb(self) -> None:
-        col = _weekly_plan_columns()["adjusted_intent"]
+        col = get_columns(WeeklyPlan)["adjusted_intent"]
         assert col.nullable is False
         assert isinstance(col.type, JSONB)
 
     def test_status_required_enum(self) -> None:
-        col = _weekly_plan_columns()["status"]
+        col = get_columns(WeeklyPlan)["status"]
         assert col.nullable is False
         assert isinstance(col.type, SAEnum)
-        actual = sorted(col.type.values_callable(WeeklyPlanStatus))
+        actual = sorted(get_enum_values(col, WeeklyPlanStatus))
         assert actual == ["active", "completed", "synthesised"]
 
     @pytest.mark.parametrize(
@@ -104,28 +88,28 @@ class TestWeeklyPlanRequiredColumns:
     def test_execution_counter_required_with_zero_default(
         self, counter_field: str, expected_default: str
     ) -> None:
-        col = _weekly_plan_columns()[counter_field]
+        col = get_columns(WeeklyPlan)[counter_field]
         assert col.nullable is False
         assert isinstance(col.type, Integer)
         # server_default must be "0" — the column is auto-populated.
-        assert col.server_default.arg == expected_default
+        assert get_server_default_text(col) == expected_default
 
     def test_accumulated_fatigue_delta_required_with_zero_default(self) -> None:
-        col = _weekly_plan_columns()["accumulated_fatigue_delta"]
+        col = get_columns(WeeklyPlan)["accumulated_fatigue_delta"]
         assert col.nullable is False
 
     def test_created_at_required_datetime(self) -> None:
-        col = _weekly_plan_columns()["created_at"]
+        col = get_columns(WeeklyPlan)["created_at"]
         assert col.nullable is False
         assert isinstance(col.type, DateTime)
 
     def test_week_starts_at_required_date(self) -> None:
-        col = _weekly_plan_columns()["week_starts_at"]
+        col = get_columns(WeeklyPlan)["week_starts_at"]
         assert col.nullable is False
         assert isinstance(col.type, Date)
 
     def test_week_ends_at_required_date(self) -> None:
-        col = _weekly_plan_columns()["week_ends_at"]
+        col = get_columns(WeeklyPlan)["week_ends_at"]
         assert col.nullable is False
         assert isinstance(col.type, Date)
 
@@ -134,7 +118,7 @@ class TestWeeklyPlanUniqueConstraint:
     """One WeeklyPlan per week per TrainingPlan."""
 
     def test_plan_week_unique_constraint_present(self) -> None:
-        constraints = _weekly_plan_unique_constraints()
+        constraints = get_unique_constraints(WeeklyPlan)
         matching = [
             c
             for c in constraints
@@ -150,15 +134,11 @@ class TestWeeklyPlanUniqueConstraint:
 
 
 class TestWeeklyPlanCheckConstraints:
-    def _check_text(self, check: CheckConstraint) -> str:
-        expr = getattr(check, "expression", None) or getattr(check, "sqltext", None)
-        return (str(expr) if expr is not None else "")
-
     def test_week_number_positive_check(self) -> None:
-        checks = _weekly_plan_check_constraints()
+        checks = get_check_constraints(WeeklyPlan)
         found = any(
-            "week_number" in self._check_text(c)
-            and ">=" in self._check_text(c)
+            "week_number" in get_check_text(c)
+            and ">=" in get_check_text(c)
             for c in checks
         )
         assert found, (
@@ -167,12 +147,12 @@ class TestWeeklyPlanCheckConstraints:
         )
 
     def test_session_counters_non_negative_check(self) -> None:
-        checks = _weekly_plan_check_constraints()
+        checks = get_check_constraints(WeeklyPlan)
         found = any(
-            "sessions_completed" in self._check_text(c)
-            and "sessions_missed" in self._check_text(c)
-            and "sessions_skipped" in self._check_text(c)
-            and ">=" in self._check_text(c)
+            "sessions_completed" in get_check_text(c)
+            and "sessions_missed" in get_check_text(c)
+            and "sessions_skipped" in get_check_text(c)
+            and ">=" in get_check_text(c)
             for c in checks
         )
         assert found, (
@@ -181,10 +161,10 @@ class TestWeeklyPlanCheckConstraints:
         )
 
     def test_doubles_days_count_non_negative_check(self) -> None:
-        checks = _weekly_plan_check_constraints()
+        checks = get_check_constraints(WeeklyPlan)
         found = any(
-            "doubles_days_count" in self._check_text(c)
-            and ">=" in self._check_text(c)
+            "doubles_days_count" in get_check_text(c)
+            and ">=" in get_check_text(c)
             for c in checks
         )
         assert found, (
@@ -197,7 +177,7 @@ class TestWeeklyPlanIndexes:
     def test_plan_status_index_present(self) -> None:
         matched = [
             idx
-            for idx in _weekly_plan_indexes().values()
+            for idx in get_indexes(WeeklyPlan).values()
             if {c.key for c in idx.columns} >= {
                 "training_plan_id",
                 "status",
@@ -224,7 +204,7 @@ class TestWeeklyPlanSchemaAntiGoals:
         ],
     )
     def test_forbidden_columns_are_absent(self, forbidden_field: str) -> None:
-        assert forbidden_field not in _weekly_plan_columns(), (
+        assert forbidden_field not in get_columns(WeeklyPlan), (
             f"WeeklyPlan must not carry `{forbidden_field}`."
         )
 
@@ -234,47 +214,30 @@ class TestWeeklyPlanSchemaAntiGoals:
 # ---------------------------------------------------------------------------
 
 
-def _weekly_session_columns() -> dict[str, object]:
-    return {column.key: column for column in WeeklySession.__table__.columns}
 
-
-def _weekly_session_unique_constraints() -> list[UniqueConstraint]:
-    return [
-        c
-        for c in WeeklySession.__table__.constraints
-        if isinstance(c, UniqueConstraint)
-    ]
-
-
-def _weekly_session_check_constraints() -> list[CheckConstraint]:
-    return [
-        c
-        for c in WeeklySession.__table__.constraints
-        if isinstance(c, CheckConstraint)
-    ]
 
 
 class TestWeeklySessionRequiredColumns:
     def test_id_column_uuid_primary_key(self) -> None:
-        col = _weekly_session_columns()["id"]
+        col = get_columns(WeeklySession)["id"]
         assert col.primary_key is True
         assert isinstance(col.type, PG_UUID)
 
     def test_weekly_plan_id_required_uuid(self) -> None:
-        col = _weekly_session_columns()["weekly_plan_id"]
+        col = get_columns(WeeklySession)["weekly_plan_id"]
         assert col.nullable is False
         assert isinstance(col.type, PG_UUID)
 
     def test_target_date_required_date(self) -> None:
-        col = _weekly_session_columns()["target_date"]
+        col = get_columns(WeeklySession)["target_date"]
         assert col.nullable is False
         assert isinstance(col.type, Date)
 
     def test_session_type_required_enum(self) -> None:
-        col = _weekly_session_columns()["session_type"]
+        col = get_columns(WeeklySession)["session_type"]
         assert col.nullable is False
         assert isinstance(col.type, SAEnum)
-        actual = sorted(col.type.values_callable(SessionType))
+        actual = sorted(get_enum_values(col, SessionType))
         expected = sorted(
             [
                 "rest",
@@ -298,26 +261,26 @@ class TestWeeklySessionRequiredColumns:
         assert actual == expected
 
     def test_intent_description_required_string(self) -> None:
-        col = _weekly_session_columns()["intent_description"]
+        col = get_columns(WeeklySession)["intent_description"]
         assert col.nullable is False
         assert isinstance(col.type, String)
         assert col.type.length == 512
 
     def test_approximate_duration_minutes_required_integer(self) -> None:
-        col = _weekly_session_columns()["approximate_duration_minutes"]
+        col = get_columns(WeeklySession)["approximate_duration_minutes"]
         assert col.nullable is False
         assert isinstance(col.type, Integer)
 
     def test_is_checkpoint_required_bool_default_false(self) -> None:
-        col = _weekly_session_columns()["is_checkpoint"]
+        col = get_columns(WeeklySession)["is_checkpoint"]
         assert col.nullable is False
-        assert col.server_default.arg in {"false", "False", "0"}
+        assert get_server_default_text(col) in {"false", "False", "0"}
 
     def test_checkpoint_type_nullable_enum(self) -> None:
-        col = _weekly_session_columns()["checkpoint_type"]
+        col = get_columns(WeeklySession)["checkpoint_type"]
         assert col.nullable is True
         assert isinstance(col.type, SAEnum)
-        actual = sorted(col.type.values_callable(CheckpointType))
+        actual = sorted(get_enum_values(col, CheckpointType))
         expected = sorted(
             [
                 "calibration",
@@ -330,7 +293,7 @@ class TestWeeklySessionRequiredColumns:
         assert actual == expected
 
     def test_checkpoint_metric_nullable_string(self) -> None:
-        col = _weekly_session_columns()["checkpoint_metric"]
+        col = get_columns(WeeklySession)["checkpoint_metric"]
         assert col.nullable is True
         assert isinstance(col.type, String)
         assert col.type.length == 128
@@ -339,7 +302,7 @@ class TestWeeklySessionRequiredColumns:
         """``WeeklySession.status`` uses an inline-union (``scheduled |
         completed | skipped | missed``) distinct from
         ``WeeklyPlanStatus``."""
-        col = _weekly_session_columns()["status"]
+        col = get_columns(WeeklySession)["status"]
         assert col.nullable is False
 
     def test_planned_session_id_nullable_uuid_unique_when_set(self) -> None:
@@ -349,23 +312,23 @@ class TestWeeklySessionRequiredColumns:
         The mapper declares ``unique=True`` on the column — this
         results in a UNIQUE constraint with the column being null-
         tolerant. We assert nullable=True and unique=True."""
-        col = _weekly_session_columns()["planned_session_id"]
+        col = get_columns(WeeklySession)["planned_session_id"]
         assert col.nullable is True
         assert col.unique is True
 
     def test_block_id_nullable_string(self) -> None:
-        col = _weekly_session_columns()["block_id"]
+        col = get_columns(WeeklySession)["block_id"]
         assert col.nullable is True
         assert isinstance(col.type, String)
         assert col.type.length == 64
 
     def test_block_position_nullable_string(self) -> None:
-        col = _weekly_session_columns()["block_position"]
+        col = get_columns(WeeklySession)["block_position"]
         assert col.nullable is True
         assert isinstance(col.type, String)
 
     def test_block_session_count_nullable_integer(self) -> None:
-        col = _weekly_session_columns()["block_session_count"]
+        col = get_columns(WeeklySession)["block_session_count"]
         assert col.nullable is True
         assert isinstance(col.type, Integer)
 
@@ -374,14 +337,14 @@ class TestWeeklySessionUniqueConstraint:
     def test_planned_session_id_unique_constraint_present(self) -> None:
         """The mapper's ``unique=True`` on ``planned_session_id`` is
         surfaced as a UNIQUE constraint."""
-        constraints = _weekly_session_unique_constraints()
+        constraints = get_unique_constraints(WeeklySession)
         # Check via the underlying column-level unique as a fallback.
         matching = [
             c
             for c in constraints
             if tuple(col.key for col in c.columns) == ("planned_session_id",)
         ]
-        col_unique = _weekly_session_columns()["planned_session_id"].unique
+        col_unique = get_columns(WeeklySession)["planned_session_id"].unique
         assert matching or col_unique, (
             "WeeklySession.planned_session_id must be uniquely "
             "constrained so one WeeklySession maps to at most one "
@@ -390,13 +353,9 @@ class TestWeeklySessionUniqueConstraint:
 
 
 class TestWeeklySessionCheckConstraints:
-    def _check_text(self, check: CheckConstraint) -> str:
-        expr = getattr(check, "expression", None) or getattr(check, "sqltext", None)
-        return (str(expr) if expr is not None else "")
-
     def test_status_inline_union_check(self) -> None:
-        checks = _weekly_session_check_constraints()
-        text = " | ".join(self._check_text(c) for c in checks).lower()
+        checks = get_check_constraints(WeeklySession)
+        text = " | ".join(get_check_text(c) for c in checks).lower()
         for status_value in ("scheduled", "completed", "skipped", "missed"):
             assert status_value in text, (
                 f"WeeklySession.status check must include "
@@ -404,8 +363,8 @@ class TestWeeklySessionCheckConstraints:
             )
 
     def test_block_position_inline_union_check(self) -> None:
-        checks = _weekly_session_check_constraints()
-        text = " | ".join(self._check_text(c) for c in checks).lower()
+        checks = get_check_constraints(WeeklySession)
+        text = " | ".join(get_check_text(c) for c in checks).lower()
         assert "block_position" in text
         for pos in ("first", "middle", "last"):
             assert pos in text, (
@@ -414,10 +373,10 @@ class TestWeeklySessionCheckConstraints:
             )
 
     def test_duration_positive_check(self) -> None:
-        checks = _weekly_session_check_constraints()
+        checks = get_check_constraints(WeeklySession)
         found = any(
-            "approximate_duration_minutes" in self._check_text(c)
-            and ">" in self._check_text(c)
+            "approximate_duration_minutes" in get_check_text(c)
+            and ">" in get_check_text(c)
             for c in checks
         )
         assert found, (
@@ -441,7 +400,7 @@ class TestWeeklySessionSchemaAntiGoals:
         ],
     )
     def test_forbidden_columns_are_absent(self, forbidden_field: str) -> None:
-        assert forbidden_field not in _weekly_session_columns(), (
+        assert forbidden_field not in get_columns(WeeklySession), (
             f"WeeklySession must not carry `{forbidden_field}`. The "
             "schema-only contract places workout prescription on "
             "PlannedSession only."

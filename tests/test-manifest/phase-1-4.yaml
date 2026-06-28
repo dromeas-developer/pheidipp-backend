@@ -1,0 +1,447 @@
+version: "1.0"
+plan_id: "phase-1-4-p1-plan-generation"
+generated_at: "2026-06-27T00:00:00+00:00"
+last_reviewed_at: "2026-06-27T12:00:00+00:00"
+
+# Plan covered by this sub-phase file:
+#   docs/implementation/phase-1/phase-1-4-p1-plan-generation.md
+# Validator report: docs/implementation/phase-1/phase-1-4-p1-plan-generation_validation.md
+# No new migration required for this plan (Step 8 of plan = no-op;
+# Phase-1.2b tables training_plans / weekly_plans / weekly_sessions /
+# planned_sessions / checkpoints already exist with the required JSONB
+# defaults and indexes).
+
+features:
+  phase-1-4-plan-generation-templates:
+    status: promoted
+    plan: "docs/implementation/phase-1/phase-1-4-p1-plan-generation.md"
+    owned_by_plan:
+      - "phase-1-4-p1-plan-generation"
+    description: >-
+      Pure-Python deterministic templates driving PlanGenerationService:
+      race_event phase proportions (40% base / 30% threshold / 15%
+      race_specific + fixed 2-week taper + 1-week race-week),
+      training-length gate, experience-level mapping, structural
+      session-type sets (QUALITY_SESSION_TYPES,
+      SANDWICHED_SESSION_TYPES), checkpoint scheduling algorithm.
+    protects:
+      - "Service is pure Python — no LLM, no external API calls"
+      - "evaluate_training_length_gate returns action='proceed' for valid inputs"
+      - "evaluate_training_length_gate returns action='propose_intermediate' (gate_reason=goal_too_far) when weeks_until_goal > per-(event, experience) threshold"
+      - "evaluate_training_length_gate returns action='propose_shorter_goal' (gate_reason=fitness_insufficient_for_distance) for short horizons with fitness_level <= 2"
+      - "derive_experience_level maps < 2 years -> novice, 2..5 -> intermediate, > 5 -> experienced"
+      - "QUALITY_SESSION_TYPES includes THRESHOLD, VO2MAX, LONG_RUN and other heavy types"
+      - "SANDWICHED_SESSION_TYPES is exactly {THRESHOLD, VO2MAX} and is a subset of QUALITY_SESSION_TYPES"
+      - "allocate_race_event_phases produces five phases in canonical order when total_weeks > 3"
+      - "allocate_race_event_phases sums to total_weeks for every total in {4, 8, 12, 16, 20, 24, 30}"
+      - "allocate_race_event_phases reserves exactly 2 weeks for TAPER and 1 week for RACE_WEEK"
+      - "allocate_race_event_phases falls back to TAPER + RACE_WEEK when total_weeks <= 3"
+      - "allocate_race_event_phases raises ValueError on total_weeks <= 0"
+      - "to_phase_definition_record carries canonical keys (phase, objectives, weeks, distribution, specificity, approach, recovery_cycle)"
+      - "to_phase_definition_record sets approach='linear' and recovery_cycle='frequent' for TAPER and RACE_WEEK phases"
+      - "schedule_checkpoints produces no two checkpoints in the same week"
+      - "schedule_checkpoints sorts CheckpointRecord rows by week_number ascending"
+      - "schedule_checkpoints includes at least one CALIBRATION on phase transitions when twin metric confidence is low"
+      - "schedule_checkpoints includes BENCHMARK + PROGRESS_REVIEW for 16+ week plans"
+      - "schedule_checkpoints includes RACE_SIMULATION when goal_event_type is a race distance and the plan is long enough"
+    impacts:
+      - "phase-1-4-plan-generation-service"
+      - "phase-1-4-plan-router"
+    execution_prerequisites:
+      migrations: false
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit:
+        - path: "tests/unit/test_plan_generation_templates.py"
+          owner: "phase-1-4-p1-plan-generation"
+      integration: []
+      api: []
+      behaviour: []
+      release: []
+
+  phase-1-4-plan-generation-errors:
+    status: promoted
+    plan: "docs/implementation/phase-1/phase-1-4-p1-plan-generation.md"
+    owned_by_plan:
+      - "phase-1-4-p1-plan-generation"
+    description: >-
+      Domain exception surface for plan generation: PlanGenerationError
+      (base), TrainingLengthGateError (action / message / gate_reason
+      attributes), and InvalidGoalTypeError (re-exported identity-
+      equal from app.services.onboarding_errors so the type identity
+      is preserved across subsystem boundaries).
+    protects:
+      - "PlanGenerationError is the common base class"
+      - "TrainingLengthGateError inherits PlanGenerationError"
+      - "TrainingLengthGateError exposes action / message / gate_reason attributes"
+      - "plan_generation.InvalidGoalTypeError is identity-equal to onboarding.InvalidGoalTypeError"
+      - "TrainingLengthGateError is catchable via PlanGenerationError"
+    impacts:
+      - "phase-1-4-plan-generation-service"
+      - "phase-1-4-plan-router"
+    execution_prerequisites:
+      migrations: false
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit:
+        - path: "tests/unit/test_plan_generation_errors.py"
+          owner: "phase-1-4-p1-plan-generation"
+      integration: []
+      api: []
+      behaviour: []
+      release: []
+
+  phase-1-4-plan-repositories:
+    status: promoted
+    plan: "docs/implementation/phase-1/phase-1-4-p1-plan-generation.md"
+    owned_by_plan:
+      - "phase-1-4-p1-plan-generation"
+    description: >-
+      Three persistence abstractions for the plan hierarchy:
+      TrainingPlanRepository (insert + supersede + get_active_for_*
+      lookups), WeeklyPlanRepository + WeeklySessionRepository
+      (bulk-insert + read paths), CheckpointRepository (bulk insert,
+      get_for_training_plan joining through PlannedSession → WeeklyPlan).
+    protects:
+      - "TrainingPlanRepository.add persists the row inside the caller's transaction (flush, no commit)"
+      - "TrainingPlanRepository.get_active_for_goal returns the latest active plan (or None)"
+      - "TrainingPlanRepository.get_active_for_athlete joins through TrainingGoal to find the active plan"
+      - "TrainingPlanRepository.supersede() mutates status to SUPERSEDED and stamps superseded_at, leaving the row in place"
+      - "Superseded plans are never deleted — superseded_at is the only mutation"
+      - "WeeklyPlanRepository.add_many persists all rows in one flush and refreshes each"
+      - "WeeklyPlanRepository.get_for_training_plan orders by week_number ascending"
+      - "WeeklyPlanRepository.get_by_plan_and_week returns the exact (plan_id, week_number) row"
+      - "WeeklySessionRepository.add_many persists all sessions in one flush"
+      - "CheckpointRepository.add_many persists all checkpoints in one flush"
+      - "CheckpointRepository.get_for_training_plan joins through PlannedSession → WeeklyPlan and orders by target_date"
+      - "CheckpointRepository.get_for_training_plan excludes checkpoints belonging to other plans"
+    impacts:
+      - "phase-1-2b-training-plan-schema"
+      - "phase-1-2b-weekly-plan-schema"
+      - "phase-1-2b-checkpoint-schema"
+      - "phase-1-4-plan-generation-service"
+    execution_prerequisites:
+      migrations: false
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit: []
+      integration:
+        - path: "tests/integration/test_plan_repositories.py"
+          owner: "phase-1-4-p1-plan-generation"
+      api: []
+      behaviour: []
+      release: []
+
+  phase-1-4-plan-generation-service:
+    status: promoted
+    plan: "docs/implementation/phase-1/phase-1-4-p1-plan-generation.md"
+    owned_by_plan:
+      - "phase-1-4-p1-plan-generation"
+    description: >-
+      Atomic plan-generation transaction for race_event and
+      target_performance goals: gates to entry conditions, builds the
+      full plan hierarchy (TrainingPlan -> WeeklyPlan[] ->
+      WeeklySession[] -> PlannedSession[] -> Checkpoint[]), supersedes
+      any prior active plan, persists the training_plan_generated
+      event in the same transaction, and commits exactly once.
+      OnboardingService.complete_onboarding invokes generate_plan
+      atomically at the end of onboarding so onboarding and plan
+      generation commit together.
+    protects:
+      - "PlanGenerationService.generate_plan is the sole writer of the plan hierarchy"
+      - "Race-event plan generates the documented phase sequence: aerobic_base -> threshold_build -> specific_endurance -> taper -> race_week"
+      - "Phase date ranges are non-overlapping, ordered, contiguous from plan_start to goal_event_date"
+      - "WeeklyPlan and PlannedSession rows cover the full duration with one WeeklyPlan per (training_plan_id, week_number)"
+      - "All PlannedSession rows start with status='scheduled'"
+      - "All Checkpoint rows start with status='scheduled'"
+      - "No two consecutive quality sessions appear in any week unless they share a block_id"
+      - "Long run is always followed by rest or recovery_run"
+      - "Threshold and VO2max sessions are always sandwiched between easy/rest days"
+      - "For a long plan: at least one calibration, one benchmark, one progress_review checkpoint"
+      - "Generate-plan-then-generate-again supersedes the previous plan atomically (status=SUPERSEDED, superseded_at populated) and a new active plan is left in place (one-active-per-goal)"
+      - "Old plans are never deleted — superseded_at is the only mutation"
+      - "Generating for an unsupported goal_type raises InvalidGoalTypeError"
+      - "Generating with a too-far-out goal raises TrainingLengthGateError (gate_reason=goal_too_far)"
+      - "Generating with missing TwinState raises PlanGenerationError"
+      - "Generating with a non-existent athlete raises PlanGenerationError"
+      - "training_plan_generated event persists to SystemEvent + SystemEventOutbox (status=PENDING) in the same transaction"
+      - "event payload carries training_plan_id, training_goal_id, phase_definitions_count, total_weeks, supersedes_plan_id, trigger"
+    impacts:
+      - "phase-1-4-plan-generation-templates"
+      - "phase-1-4-plan-repositories"
+      - "phase-1-4-plan-event-contract"
+      - "phase-1-4-plan-router"
+      - "phase-1-3-onboarding-service-transaction"
+      - "phase-1-3-onboarding-endpoints"
+    execution_prerequisites:
+      migrations: false
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit: []
+      integration:
+        - path: "tests/integration/test_plan_generation_service.py"
+          owner: "phase-1-4-p1-plan-generation"
+      api: []
+      behaviour: []
+      release: []
+
+  phase-1-4-plan-router:
+    status: promoted
+    plan: "docs/implementation/phase-1/phase-1-4-p1-plan-generation.md"
+    owned_by_plan:
+      - "phase-1-4-p1-plan-generation"
+    description: >-
+      Four read-only endpoints mounted on plan_router behind
+      ``require_self``: GET /athletes/{id}/plan, /plan/sessions,
+      /plan/upcoming, /plan/checkpoints. All responses use Pydantic
+      ``model_validate`` via ``from_attributes=True``; no ORM -> dict
+      ``.dict()`` paths.
+    protects:
+      - "GET /plan returns TrainingPlanResponse with phases, phase_definitions, weekly_distributions, status, strategic_rationale, checkpoint_schedule"
+      - "GET /plan strategic_rationale is set for race_event (and target_performance) modes"
+      - "GET /plan/sessions returns list[PlannedSessionResponse] ordered by target_date ASC, session_slot ASC; every session status='scheduled'"
+      - "GET /plan/sessions joins through WeeklyPlan.training_plan_id (denormalised PlannedSession.training_plan_id is not used for current-plan queries)"
+      - "GET /plan/upcoming returns UpcomingSessionsResponse with the next 5 sessions from today onwards, capped at 5"
+      - "GET /plan/checkpoints returns list[CheckpointResponse] joining PlannedSession -> WeeklyPlan -> TrainingPlan and ordered by target_date ASC"
+      - "Every endpoint returns 404 when no active plan exists"
+      - "Every endpoint returns 403 when the JWT athlete_id does not match the path parameter (require_self 403, never 404)"
+      - "Every endpoint returns 401 on missing/malformed Bearer"
+    impacts:
+      - "phase-1-4-plan-generation-service"
+      - "phase-1-1-require-self-dependency"
+      - "phase-1-3-onboarding-endpoints"
+    execution_prerequisites:
+      migrations: false
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit: []
+      integration: []
+      api:
+        - path: "tests/api/test_plan_endpoints.py"
+          owner: "phase-1-4-p1-plan-generation"
+      behaviour: []
+      release: []
+
+  phase-1-4-onboarding-plan-integration:
+    status: promoted
+    plan: "docs/implementation/phase-1/phase-1-4-p1-plan-generation.md"
+    owned_by_plan:
+      - "phase-1-4-p1-plan-generation"
+    description: >-
+      OnboardingService integration with PlanGenerationService: when a
+      PlanGenerationService is injected (via
+      build_onboarding_service_with_plan), complete_onboarding invokes
+      generate_plan at the end of the onboarding transaction. The plan
+      service owns the final commit; a plan-generation failure rolls
+      the whole transaction back so onboarding_complete stays False.
+    protects:
+      - "POST /athletes/{id}/onboarding returns 201 and lands an active plan after complete_onboarding"
+      - "GET /plan returns the plan generated by onboarding without a second call"
+      - "GET /plan/checkpoints exposes calibration + benchmark + progress_review checkpoints generated during onboarding"
+      - "Onboarding failure rolls back plan-generation rollback — onboarding_complete stays False and no plan rows persist"
+      - "Cross-athlete access to plan endpoints returns 403 (never 404)"
+      - "A registered-but-not-onboarded athlete returns 404 on every plan endpoint"
+    impacts:
+      - "phase-1-4-plan-generation-service"
+      - "phase-1-4-plan-router"
+      - "phase-1-3-onboarding-service-transaction"
+      - "phase-1-3-onboarding-endpoints"
+    execution_prerequisites:
+      migrations: false
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit: []
+      integration: []
+      api: []
+      behaviour:
+        - path: "tests/behaviour/test_plan_user_journey.py"
+          owner: "phase-1-4-p1-plan-generation"
+      release: []
+
+  phase-1-4-plan-event-contract:
+    status: promoted
+    plan: "docs/implementation/phase-1/phase-1-4-p1-plan-generation.md"
+    owned_by_plan:
+      - "phase-1-4-p1-plan-generation"
+    description: >-
+      training_plan_generated event contract — payload shape
+      (training_plan_id, training_goal_id, phase_definitions_count,
+      total_weeks, supersedes_plan_id, trigger), persistence via the
+      transactional outbox (SystemEvent + SystemEventOutbox
+      status=PENDING) inside the same DB transaction as the producing
+      domain state per ADR-004.
+    protects:
+      - "training_plan_generated row exists with full payload"
+      - "SystemEventOutbox row exists with publication_status='pending' paired with the SystemEvent row"
+      - "Payload trigger='new_goal' for the first generation"
+      - "Payload trigger='regenerate' when a new plan supersedes an existing one (supersedes_plan_id present)"
+      - "Event fires only after athlete_registered and onboarding_completed (ordering invariant)"
+    impacts:
+      - "phase-1-4-plan-generation-service"
+      - "phase-1-3-onboarding-service-transaction"
+    execution_prerequisites:
+      migrations: false
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit: []
+      integration:
+        - path: "tests/integration/test_plan_generation_service.py"
+          owner: "phase-1-4-p1-plan-generation"
+      api: []
+      behaviour: []
+      release: []
+
+# ---------------------------------------------------------------------------
+# Execution groups for this sub-phase only.
+# Cross-phase depends_on edges live in tests/test-manifest/index.yaml.
+# ---------------------------------------------------------------------------
+
+execution_groups:
+  smoke-phase-1-4:
+    scope: smoke
+    phase: "phase-1"
+    tests:
+      - "tests/unit/test_plan_generation_templates.py"
+      - "tests/unit/test_plan_generation_errors.py"
+    depends_on: []
+
+  feature-phase-1-4:
+    scope: feature
+    phase: "phase-1"
+    tests:
+      - "tests/unit/test_plan_generation_templates.py"
+      - "tests/unit/test_plan_generation_errors.py"
+      - "tests/integration/test_plan_repositories.py"
+      - "tests/integration/test_plan_generation_service.py"
+      - "tests/api/test_plan_endpoints.py"
+      - "tests/behaviour/test_plan_user_journey.py"
+    depends_on:
+      - "smoke-phase-1-4"
+
+# ---------------------------------------------------------------------------
+# Coverage for this sub-phase only.
+# ---------------------------------------------------------------------------
+
+coverage:
+  routes:
+    covered:
+      - "GET /api/v1/athletes/{athlete_id}/plan"
+      - "GET /api/v1/athletes/{athlete_id}/plan/sessions"
+      - "GET /api/v1/athletes/{athlete_id}/plan/upcoming"
+      - "GET /api/v1/athletes/{athlete_id}/plan/checkpoints"
+    partial: []
+    missing: []
+
+  events:
+    covered:
+      - "training_plan_generated (payload + outbox row in pending status)"
+    partial: []
+    missing: []
+
+  invariants:
+    covered:
+      - "Pure-Python service — no LLM, no external API"
+      - "Deterministic templates: phase proportions (40/30/15 + 2-week taper + 1-week race-week)"
+      - "Training length gate (proceed / propose_intermediate / propose_shorter_goal)"
+      - "One active plan per TrainingGoal — supersession replaces (not double-active)"
+      - "Old plans never deleted — superseded_at is the only mutation"
+      - "Phases non-overlapping, ordered, contiguous from plan_start to goal_event_date"
+      - "PlannedSession rows cover full duration with no gaps"
+      - "All PlannedSession rows start with status='scheduled'"
+      - "All Checkpoint rows start with status='scheduled'"
+      - "No consecutive quality sessions without block_id (per-week invariant)"
+      - "Long run always followed by rest or recovery_run"
+      - "Threshold / VO2max sessions sandwiched between easy/rest days"
+      - "WeeklyPlan sessions array immutable (status=synthesised at plan-generation time)"
+      - "One WeeklyPlan per (training_plan_id, week_number) — DB unique"
+      - "PlannedSession.training_plan_id is denormalised — stale-aware queries join through WeeklyPlan"
+      - "One Checkpoint per PlannedSession — DB-enforced 1:1"
+      - "Checkpoint cannot be created retroactively — only at plan synthesis"
+      - "strategic_rationale set only for race_event / target_performance modes"
+      - "training_plan_generated event via transactional outbox inside the same DB transaction"
+      - "require_self returns 403 on cross-athlete access (never 404)"
+      - "Onboarding -> plan-generation atomicity: plan failure rolls onboarding back"
+      - "Event payload: training_plan_id, training_goal_id, phase_definitions_count, total_weeks, supersedes_plan_id, trigger"
+      - "Ordering: training_plan_generated fires only after athlete_registered and onboarding_completed"
+    partial:
+      - "Pure-Python performance < 200ms — no wall-clock assertion; behaviour test bounds the journey runtime"
+    missing:
+      - "LLM-driven hypothesis exploration (out of Phase 1.4 scope)"
+      - "Plan regeneration on confidence upgrade (deferred to Phase 2)"
+      - "Session lifecycle management (skip / miss / redistribute) — deferred to Phase 4"
+      - "Workout library and workout generation — deferred to Phase 1.5b / Phase 4"
+      - "Pre-week review and session redistribution logic (deferred)"
+      - "Phase-1.5a first-coach-message emission tied to this plan"
+
+# ---------------------------------------------------------------------------
+# Audit history for this sub-phase.
+# ---------------------------------------------------------------------------
+
+history:
+  - date: "2026-06-27"
+    plan: "phase-1-4-p1-plan-generation"
+    tests_added: 6
+    tests_modified: 0
+    tests_removed: 0
+    result: "PASS"
+    coverage_delta: >
+      Phase-1.4-P1 test pack generated on 2026-06-27. New tests:
+      tests/unit/test_plan_generation_templates.py,
+      tests/unit/test_plan_generation_errors.py,
+      tests/integration/test_plan_repositories.py,
+      tests/integration/test_plan_generation_service.py,
+      tests/api/test_plan_endpoints.py,
+      tests/behaviour/test_plan_user_journey.py. Manifest entries added:
+      templates, errors, repositories, generation-service, router,
+      onboarding-plan-integration, plan-event-contract (7 features).
+      index.yaml selection.feature group set to point at Phase-1.4 test
+      files (previous Phase-1.3 paths removed). All entries at status=generated;
+      promotion to status=promoted awaits DevOps PASS report.
+  - date: "2026-06-27"
+    plan: "phase-1-4-p1-plan-generation"
+    tests_added: 0
+    tests_modified: 0
+    tests_removed: 0
+    result: "PROMOTED"
+    coverage_delta: >
+      All 7 features advanced from status=generated to status=promoted
+      following DevOps PASS report. Index.yaml updated: selection.smoke
+      comment cleaned, selection.feature cleared, selection.regression
+      and selection.release extended with all 6 Phase-1.4 test paths.
+      Phase-1.4 is now fully promoted and will appear in every regression
+      and release run going forward.

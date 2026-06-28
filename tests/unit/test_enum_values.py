@@ -618,6 +618,7 @@ class TestPlannedSessionStatusContract:
             "skipped",
             "missed",
             "redistributed",
+            "scheduled",
         }
 
     def test_pending_status_exists(self) -> None:

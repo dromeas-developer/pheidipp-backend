@@ -83,6 +83,15 @@ class SystemEventOutbox(Base):
     the producer cannot write the event's outbox entry twice. Publication
     state transitions are the only allowed mutation on event-related
     tables ADR-004 rule "Outbox Status Management".
+
+    The DB column is named ``status`` (per the original
+    ADR-004 schema: a single mutable state column on the outbox
+    row). Public callers and the test manifest canonically refer
+    to the same field as ``publication_status``. The
+    ``publication_status`` mapped attribute below aliases the
+    ``status`` column so both names read from the same underlying
+    state — no schema change, no app breakage when callers use
+    either name in tests.
     """
 
     __tablename__ = "system_event_outbox"
@@ -103,7 +112,38 @@ class SystemEventOutbox(Base):
         nullable=False,
         default=EventPublicationStatus.PENDING,
         server_default=EventPublicationStatus.PENDING.value,
+        name="status",
+        doc=(
+            "Publication state for this outbox row. See "
+            "``publication_status`` for the canonical public-facing "
+            "alias used by API and test contracts."
+        ),
     )
+
+    @property
+    def publication_status(self) -> EventPublicationStatus:
+        """Canonical public-facing alias for ``status``.
+
+        Mirrors ``docs/architecture/04-platform/system-event.md``
+        (``EventPublicationStatus``) and the
+        ``tests/test-manifest/phase-1-4.yaml`` contract
+        ("SystemEventOutbox row exists with publication_status='pending'
+        paired with the SystemEvent row"). Returns the underlying
+        ``status`` so writes through ``status = ...`` and reads
+        through ``publication_status`` always agree.
+        """
+        return self.status
+
+    @publication_status.setter
+    def publication_status(self, value: EventPublicationStatus) -> None:
+        """Allow callers to write through the public alias too.
+
+        The publisher worker may flip either field to
+        ``PUBLISHED`` / ``FAILED`` / ``DLQ``; both writes land on the
+        same DB column thanks to the Python-level setter route.
+        """
+        self.status = value
+
     attempts: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0, server_default="0"
     )

@@ -319,6 +319,7 @@ class PlannedSessionStatus(str, Enum):
 
     PENDING = "pending"
     GENERATED = "generated"
+    SCHEDULED = "scheduled"
     COMPLETED = "completed"
     SKIPPED = "skipped"
     MISSED = "missed"

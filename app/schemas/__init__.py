@@ -26,6 +26,13 @@ from app.schemas.onboarding import (
     WeeklyScheduleDayIn,
     WeeklyScheduleDayOut,
 )
+from app.schemas.plan import (
+    CheckpointResponse,
+    PhaseDescriptorResponse,
+    PlannedSessionResponse,
+    TrainingPlanResponse,
+    UpcomingSessionsResponse,
+)
 
 __all__ = [
     "AthletePreferencesPatchIn",
@@ -34,6 +41,7 @@ __all__ = [
     "AthleteProfileResponse",
     "AthleteResponse",
     "AuthResponse",
+    "CheckpointResponse",
     "LoginRequest",
     "OnboardingPreferencesIn",
     "OnboardingProfileIn",
@@ -41,13 +49,17 @@ __all__ = [
     "OnboardingResponse",
     "OnboardingStatusResponse",
     "OnboardingTrainingGoalIn",
+    "PhaseDescriptorResponse",
+    "PlannedSessionResponse",
     "RefreshRequest",
     "RefreshResponse",
     "RegisterProfileIn",
     "RegisterRequest",
     "TokenPairResponse",
+    "TrainingPlanResponse",
     "TwinStateHistoryResponse",
     "TwinStateResponse",
+    "UpcomingSessionsResponse",
     "WeeklyScheduleDayIn",
     "WeeklyScheduleDayOut",
 ]

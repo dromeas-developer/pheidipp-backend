@@ -39,14 +39,14 @@ Validates closed ontology membership for all Phase 1.2b enums:
 - `SessionType` (16 values)
 - `SessionSlot` (2 values)
 - `SessionPriority` (2 values)
-- `PlannedSessionStatus` (6 values)
+- `PlannedSessionStatus` (7 values: pending, generated, completed, skipped, missed, redistributed, scheduled)
 - `WeeklyPlanStatus` (3 values)
 - `CheckpointType` (5 values)
 - `CheckpointStatus` (3 values)
 - `ObjectiveCategory` (9 values)
 
 **Bug Fixes During This Phase:**
-- Fixed `PlannedSessionStatus.SCHEDULED` → `PlannedSessionStatus.PENDING` (line 592 in `test_activity_schema.py`)
+- `PlannedSessionStatus.SCHEDULED` now exists as the 7th enum member (previously absent from the closed ontology). Tests that previously substituted `PENDING` as a workaround should be reviewed for alignment with the current schema contract. Both integration tests in `test_plan_repositories.py` (lines 399, 506) already reference `PlannedSessionStatus.SCHEDULED` directly and are consistent with the updated contract.
 - Added required `session_priority=SessionPriority.PRIMARY` to `PlannedSession` test factory (line 594)
 
 ---

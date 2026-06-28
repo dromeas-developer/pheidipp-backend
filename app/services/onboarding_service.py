@@ -43,7 +43,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime, timezone
-from typing import Any, Mapping, Optional
+from typing import Any, Mapping, Optional, TYPE_CHECKING
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -89,6 +89,13 @@ from app.services.onboarding_results import (
     OnboardingStatus,
 )
 
+if TYPE_CHECKING:
+    # Imported only for type-checking so the runtime dependency graph
+    # between the onboarding and plan-generation services stays
+    # one-way. ``OnboardingService.__init__`` accepts an optional
+    # ``PlanGenerationService`` instance built on the same
+    # ``AsyncSession`` so the two services share a single transaction.
+    from app.services.plan_generation_service import PlanGenerationService
 
 # ---------------------------------------------------------------------------
 # Constants — bootstrapped from architecture documents.
@@ -244,12 +251,21 @@ class OnboardingService:
     after the full bootstrap sequence has landed and the
     ``onboarding_completed`` event has been written through the
     transactional outbox.
+
+    Phase-1.4 onboarding integration: when ``plan_service`` is
+    provided, plan generation is wired into the same transaction so
+    the plan and onboarding land atomically. The commit boundary is
+    then moved to ``plan_service.generate_plan`` (the plan service
+    owns the final ``commit``); when ``plan_service is None``,
+    ``complete_onboarding`` commits directly. This is the only way
+    plan-service failures roll back onboarding state.
     """
 
     def __init__(
         self,
         session: AsyncSession,
         events: Optional[EventPublisher] = None,
+        plan_service: Optional["PlanGenerationService"] = None,
     ) -> None:
         self.session = session
         self.athletes = AthleteRepository(session)
@@ -259,6 +275,7 @@ class OnboardingService:
         self.physiology = AthletePhysiologyRepository(session)
         self.fitness = AthleteFitnessRepository(session)
         self.twin_states = TwinStateRepository(session)
+        self.plan_service = plan_service
         if events is None:
             # Build a real publisher on demand — keep the constructor
             # signature thin while preserving atomic event writes.
@@ -474,6 +491,25 @@ class OnboardingService:
                 "confidence_level": TwinConfidenceLevel.LOW.value,
             },
         )
+
+        # 9. Plan generation — Phase-1.4. When ``plan_service`` is
+        #    wired, atomically generate the initial plan in this same
+        #    transaction. The plan service commits once at the end of
+        #    its work, so we skip the standalone commit below; any
+        #    plan-generation error rolls the entire transaction back
+        #    so ``onboarding_complete`` stays ``False``.
+        #    When ``plan_service is None``, onboarding commits directly
+        #    (graceful degradation for unit tests that do not exercise
+        #    the plan path).
+        if self.plan_service is not None:
+            await self.plan_service.generate_plan(athlete_id=athlete_id)
+            return OnboardingResult(
+                twin_state=twin_state,
+                training_goal=goal_row,
+                preferences=prefs_row,
+                profile=profile_row,
+                data_tier=int(data_tier.value),
+            )
 
         # 9. Commit the whole bootstrap atomically.
         await self.session.commit()

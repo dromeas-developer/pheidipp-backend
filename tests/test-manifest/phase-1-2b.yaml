@@ -28,7 +28,7 @@ features:
       - "SessionType has exactly 16 values; race_specific is NOT a SessionType"
       - "SessionSlot values are exactly am, pm"
       - "SessionPriority values are exactly primary, secondary"
-      - "PlannedSessionStatus values are exactly pending, generated, completed, skipped, missed, redistributed"
+      - "PlannedSessionStatus values are exactly pending, generated, completed, skipped, missed, redistributed, scheduled"
       - "WeeklyPlanStatus values are exactly synthesised, active, completed"
       - "CheckpointType values are exactly calibration, benchmark, race_simulation, secondary_race, progress_review"
       - "CheckpointStatus values are exactly scheduled, completed, skipped"

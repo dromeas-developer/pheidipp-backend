@@ -1,9 +1,9 @@
-date: 2026-06-27T04:00:00+00:00
-plan: phase-1-3-p1-onboarding-twin-bootstrap
+date: 2026-06-27T18:00:00+00:00
+plan: phase-1-4-p1-plan-generation
 execution_group: feature
-total: 168
-passed: 168
+total: 110
+passed: 110
 failed: 0
 skipped: 0
-duration_seconds: 56.02
+duration_seconds: 34.52
 failures: []

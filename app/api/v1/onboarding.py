@@ -26,7 +26,11 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from app.api.deps import build_onboarding_service, require_self
+from app.api.deps import (
+    build_onboarding_service,
+    build_onboarding_service_with_plan,
+    require_self,
+)
 from app.schemas.onboarding import (
     AthletePreferencesPatchIn,
     AthletePreferencesResponse,
@@ -50,6 +54,10 @@ from app.services.onboarding_service import (
     _PreferencesInput,
     _ProfileInput,
 )
+from app.services.plan_generation_errors import (
+    PlanGenerationError,
+    TrainingLengthGateError,
+)
 
 
 onboarding_router = APIRouter(prefix="/athletes", tags=["onboarding"])
@@ -69,14 +77,20 @@ async def complete_onboarding(
     payload: OnboardingRequest,
     athlete_id: uuid.UUID,
     auth_athlete_id: uuid.UUID = Depends(require_self),
-    service: OnboardingService = Depends(build_onboarding_service),
+    service: OnboardingService = Depends(build_onboarding_service_with_plan),
 ) -> OnboardingResponse:
     """Run the atomic onboarding transaction for the path athlete.
 
+    Phase-1.4: the onboarding service is built with a
+    :class:`PlanGenerationService` so ``complete_onboarding`` invokes
+    plan generation atomically at the end of the transaction. The plan
+    service owns the commit; any plan-generation failure rolls the
+    transaction back so ``onboarding_complete`` stays ``False``.
+
     201 on success; 409 when the athlete is already onboarded or when
-    the partial unique index fires on a duplicate active goal; 422 for
-    invalid input (handled by Pydantic upstream of this handler); 403
-    when the JWT does not match the path athlete.
+    the partial unique index fires on a duplicate active goal; 422
+    for invalid input (handled by Pydantic upstream of this handler);
+    403 when the JWT does not match the path athlete.
     """
     profile_input = _ProfileInput(
         timezone=payload.profile.timezone,
@@ -129,6 +143,19 @@ async def complete_onboarding(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="The supplied goal type is not permitted at onboarding.",
+        )
+    except TrainingLengthGateError as exc:
+        # Plan-generation gate refused to start a plan — surface the
+        # gate's plain-language message so the API consumer can
+        # present a coaching-style explanation to the athlete.
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=exc.message,
+        )
+    except PlanGenerationError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Plan generation could not be completed.",
         )
     except AthleteNotFoundError:
         raise HTTPException(

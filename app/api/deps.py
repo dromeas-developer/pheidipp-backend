@@ -13,6 +13,7 @@ from app.core.security.token_service import TokenService
 from app.db.session import get_db as _get_db_session
 from app.services.auth_service import AuthService
 from app.services.onboarding_service import OnboardingService
+from app.services.plan_generation_service import PlanGenerationService
 
 
 # Re-export the canonical session dependency under one name so router
@@ -43,8 +44,47 @@ def build_onboarding_service(
     Mirrors :func:`build_auth_service` — every request gets its own
     ``AsyncSession`` so the onboarding transaction is isolated from
     concurrent requests and the underlying connection pool.
+
+    The Plan-1.4 onboarding integration requires the onboarding service
+    to share its session with a :class:`PlanGenerationService` so
+    ``complete_onboarding`` and ``generate_plan`` participate in the
+    same transaction. To avoid silently regressing the
+    Phase-1.3-transaction boundary, we keep the legacy factory
+    (``OnboardingService`` without a ``plan_service``) for the read
+    endpoints (which never call ``complete_onboarding``) and expose a
+    separate :func:`build_onboarding_service_with_plan` for the POST
+    handler that drives onboarding completion.
     """
     return OnboardingService(session=session)
+
+
+def build_onboarding_service_with_plan(
+    session: AsyncSession = Depends(get_db),
+) -> OnboardingService:
+    """Construct an :class:`OnboardingService` for the POST onboarding path.
+
+    Wires a :class:`PlanGenerationService` that shares the same
+    ``AsyncSession`` so plan generation lands atomically with
+    onboarding. Used only by the ``complete_onboarding`` route.
+    """
+    plan_service = PlanGenerationService(session=session)
+    return OnboardingService(
+        session=session,
+        plan_service=plan_service,
+    )
+
+
+def build_plan_service(
+    session: AsyncSession = Depends(get_db),
+) -> PlanGenerationService:
+    """Construct a :class:`PlanGenerationService` for the current request.
+
+    Used by :func:`build_onboarding_service_with_plan` to wire plan
+    generation into onboarding. Read-only ``GET /plan`` family does
+    not depend on this — those endpoints query repositories directly
+    through ``get_db``.
+    """
+    return PlanGenerationService(session=session)
 
 
 def _extract_bearer(credentials: HTTPAuthorizationCredentials | None) -> str:

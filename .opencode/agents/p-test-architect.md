@@ -1,5 +1,5 @@
 ---
-model: litellm-proxy/cloudflare/kimi-k2.7-code
+model: litellm-proxy/nvidia/minimax-m2.7
 temperature: 0.1
 
 permission:

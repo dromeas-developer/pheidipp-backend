@@ -31,6 +31,15 @@ from app.services.onboarding_service import (
     _PreferencesInput,
     _ProfileInput,
 )
+from app.services.plan_generation_errors import (
+    PlanGenerationError,
+    TrainingLengthGateError,
+)
+from app.services.plan_generation_service import (
+    PlanGenerationResult,
+    PlanGenerationService,
+    SessionDayAssignment,
+)
 
 __all__ = [
     "AthleteNotFoundError",
@@ -51,9 +60,14 @@ __all__ = [
     "OnboardingService",
     "OnboardingStatus",
     "OutboxEvent",
+    "PlanGenerationError",
+    "PlanGenerationResult",
+    "PlanGenerationService",
     "PreferencesSnapshot",
     "ProfileSnapshot",
+    "SessionDayAssignment",
     "TrainingGoalConflictError",
+    "TrainingLengthGateError",
     "UnauthenticatedError",
     "_GoalInput",
     "_PreferencesInput",

@@ -1,5 +1,5 @@
 ---
-model: litellm-proxy/openrouter/nemotron-3-ultra
+model: opencode/deepseek-v4-flash-free
 temperature: 0.1
 
 permission:

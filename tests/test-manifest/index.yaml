@@ -1,5 +1,5 @@
 version: "1.0"
-last_reviewed_at: "2026-06-27T00:00:00+00:00"
+last_reviewed_at: "2026-06-27T12:00:00+00:00"
 
 # ---------------------------------------------------------------------------
 # INDEX — lightweight cross-phase registry.
@@ -53,13 +53,10 @@ selection:
     # Phase-1.3 unit tests (promoted 2026-06-27)
     - "tests/unit/test_onboarding_service.py"
     - "tests/unit/test_onboarding_errors.py"
-  feature:
-    # Phase-1.3 — current active sub-phase
-    - "tests/unit/test_onboarding_service.py"
-    - "tests/unit/test_onboarding_errors.py"
-    - "tests/integration/test_onboarding_service.py"
-    - "tests/api/test_onboarding_endpoints.py"
-    - "tests/behaviour/test_onboarding_user_journey.py"
+    # Phase-1.4 unit tests (promoted 2026-06-27)
+    - "tests/unit/test_plan_generation_templates.py"
+    - "tests/unit/test_plan_generation_errors.py"
+  feature: []
   regression:
     - "tests/unit/test_password_hasher.py"
     - "tests/unit/test_token_service.py"
@@ -118,6 +115,13 @@ selection:
     - "tests/integration/test_onboarding_service.py"
     - "tests/api/test_onboarding_endpoints.py"
     - "tests/behaviour/test_onboarding_user_journey.py"
+    # Phase-1.4 (promoted 2026-06-27)
+    - "tests/unit/test_plan_generation_templates.py"
+    - "tests/unit/test_plan_generation_errors.py"
+    - "tests/integration/test_plan_repositories.py"
+    - "tests/integration/test_plan_generation_service.py"
+    - "tests/api/test_plan_endpoints.py"
+    - "tests/behaviour/test_plan_user_journey.py"
   release:
     - "tests/unit/test_password_hasher.py"
     - "tests/unit/test_token_service.py"
@@ -176,6 +180,13 @@ selection:
     - "tests/integration/test_onboarding_service.py"
     - "tests/api/test_onboarding_endpoints.py"
     - "tests/behaviour/test_onboarding_user_journey.py"
+    # Phase-1.4 (promoted 2026-06-27)
+    - "tests/unit/test_plan_generation_templates.py"
+    - "tests/unit/test_plan_generation_errors.py"
+    - "tests/integration/test_plan_repositories.py"
+    - "tests/integration/test_plan_generation_service.py"
+    - "tests/api/test_plan_endpoints.py"
+    - "tests/behaviour/test_plan_user_journey.py"
 
 # ---------------------------------------------------------------------------
 # Cross-phase execution dependencies
@@ -313,7 +324,7 @@ coverage:
       - "SessionType has exactly 16 values; race_specific is NOT a SessionType"
       - "SessionSlot is bounded to {am, pm}"
       - "SessionPriority is bounded to {primary, secondary}"
-      - "PlannedSessionStatus is bounded to {pending, generated, completed, skipped, missed, redistributed}"
+      - "PlannedSessionStatus is bounded to {pending, generated, completed, skipped, missed, redistributed, scheduled}"
       - "WeeklyPlanStatus is bounded to {synthesised, active, completed}"
       - "CheckpointType is bounded to {calibration, benchmark, race_simulation, secondary_race, progress_review}"
       - "CheckpointStatus is bounded to {scheduled, completed, skipped}"

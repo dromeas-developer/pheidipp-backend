@@ -1,5 +1,5 @@
 ---
-model: litellm-proxy/openrouter/nex-n2-pro
+model: litellm-proxy/alibaba/qwen
 temperature: 0.1
 
 permission:

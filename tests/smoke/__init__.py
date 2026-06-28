@@ -1,0 +1,1 @@
+# Smoke tests — run only in smoke/release execution groups

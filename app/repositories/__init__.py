@@ -11,6 +11,12 @@ from app.repositories.athlete_preferences_repository import (
 from app.repositories.athlete_profile_repository import AthleteProfileRepository
 from app.repositories.athlete_repository import AthleteRepository
 from app.repositories.checkpoint_repository import CheckpointRepository
+from app.repositories.coaching_message_repository import (
+    CoachingMessageRepository,
+)
+from app.repositories.generation_event_repository import (
+    GenerationEventRepository,
+)
 from app.repositories.refresh_token_repository import RefreshTokenRepository
 from app.repositories.system_event_outbox_repository import (
     SystemEventOutboxRepository,
@@ -32,6 +38,8 @@ __all__ = [
     "AthleteProfileRepository",
     "AthleteRepository",
     "CheckpointRepository",
+    "CoachingMessageRepository",
+    "GenerationEventRepository",
     "RefreshTokenRepository",
     "SystemEventOutboxRepository",
     "SystemEventRepository",

@@ -1,0 +1,178 @@
+"""Coach endpoints — first message and message list.
+
+Implements Phase-1.5a contracts:
+- POST /athletes/{athlete_id}/coach/first-message
+- GET /athletes/{athlete_id}/coach/messages
+
+All endpoints live under /athletes/{athlete_id} and depend on
+require_self so the JWT's athlete_id must equal the path parameter.
+"""
+
+from __future__ import annotations
+
+import uuid
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.api.deps import get_db, require_self
+from app.models.coaching_message import CoachingMessage
+from app.models.enums import MessageType
+from app.repositories.athlete_preferences_repository import (
+    AthletePreferencesRepository,
+)
+from app.repositories.athlete_profile_repository import AthleteProfileRepository
+from app.repositories.coaching_message_repository import (
+    CoachingMessageRepository,
+)
+from app.repositories.generation_event_repository import (
+    GenerationEventRepository,
+)
+from app.repositories.training_goal_repository import TrainingGoalRepository
+from app.repositories.training_plan_repository import TrainingPlanRepository
+from app.repositories.twin_state_repository import TwinStateRepository
+from app.schemas.coaching import (
+    CoachingMessageResponse,
+    FirstMessageConflictResponse,
+    MessagesListResponse,
+)
+from app.services.context_budget_service import ContextBudgetService
+from app.services.first_message_agent import (
+    FirstMessageAgent,
+    FirstMessageAlreadyExistsError,
+    LLMServiceUnavailableError,
+)
+from app.core.prompt_registry import PromptRegistry
+
+
+coach_router = APIRouter(prefix="/athletes", tags=["coach"])
+
+
+def build_coaching_message_repository(
+    session: AsyncSession = Depends(get_db),
+) -> CoachingMessageRepository:
+    """Construct a CoachingMessageRepository for the current request."""
+    return CoachingMessageRepository(session=session)
+
+
+def build_first_message_agent(
+    session: AsyncSession = Depends(get_db),
+) -> FirstMessageAgent:
+    """Construct a FirstMessageAgent with all required dependencies."""
+    coaching_messages = CoachingMessageRepository(session)
+    generation_events = GenerationEventRepository(session)
+    twin_states = TwinStateRepository(session)
+    context_budget = ContextBudgetService(
+        twin_states=twin_states,
+        training_goals=TrainingGoalRepository(session),
+        plans=TrainingPlanRepository(session),
+        profiles=AthleteProfileRepository(session),
+        preferences=AthletePreferencesRepository(session),
+    )
+    prompt_registry = PromptRegistry()
+
+    return FirstMessageAgent(
+        session=session,
+        coaching_messages=coaching_messages,
+        generation_events=generation_events,
+        context_budget=context_budget,
+        prompt_registry=prompt_registry,
+        training_goals=TrainingGoalRepository(session),
+        plans=TrainingPlanRepository(session),
+        twin_states=twin_states,
+    )
+
+
+@coach_router.post(
+    "/{athlete_id}/coach/first-message",
+    response_model=CoachingMessageResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def post_first_message(
+    athlete_id: uuid.UUID,
+    auth_athlete_id: uuid.UUID = Depends(require_self),
+    agent: FirstMessageAgent = Depends(build_first_message_agent),
+    session: AsyncSession = Depends(get_db),
+) -> CoachingMessageResponse:
+    """Generate the first coach message for the athlete.
+
+    201 on success.
+    409 if a first_message already exists (existing message_id in response).
+    503 if the LLM service is unavailable.
+
+    Transaction ownership: ``FirstMessageAgent`` does not commit the
+    session (see its docstring — Pattern B). The route handler owns the
+    commit boundary so all flushed writes (``GenerationEvent``,
+    ``CoachingMessage``, outbox rows) become durable before the response
+    is returned. Without this commit, ``get_db`` would close the session
+    on context exit and silently roll back the entire generation.
+    """
+    try:
+        result = await agent.generate(athlete_id)
+    except FirstMessageAlreadyExistsError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=FirstMessageConflictResponse(
+                existing_message_id=exc.existing_message_id
+            ).model_dump(mode="json"),
+        )
+    except LLMServiceUnavailableError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Coach service temporarily unavailable.",
+        )
+    await session.commit()
+    return result
+
+
+@coach_router.get(
+    "/{athlete_id}/coach/messages",
+    response_model=MessagesListResponse,
+)
+async def get_coach_messages(
+    athlete_id: uuid.UUID,
+    auth_athlete_id: uuid.UUID = Depends(require_self),
+    coaching_messages: CoachingMessageRepository = Depends(
+        build_coaching_message_repository
+    ),
+    session: AsyncSession = Depends(get_db),
+    message_type: Optional[str] = Query(default=None),
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+) -> MessagesListResponse:
+    """Return all coaching messages for the athlete.
+
+    Ordered by generated_at DESC (newest first).
+    Optional filter by message_type.
+    """
+    mt: Optional[MessageType] = None
+    if message_type:
+        try:
+            mt = MessageType(message_type)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Invalid message_type: {message_type}",
+            )
+
+    messages = await coaching_messages.get_by_athlete_id(
+        athlete_id, message_type=mt, limit=limit, offset=offset
+    )
+
+    # Compute total count.
+    count_stmt = select(func.count()).where(
+        CoachingMessage.athlete_id == athlete_id
+    )
+    if mt is not None:
+        count_stmt = count_stmt.where(
+            CoachingMessage.message_type == mt
+        )
+    result = await session.execute(count_stmt)
+    total = result.scalar_one()
+
+    return MessagesListResponse(
+        messages=[CoachingMessageResponse.model_validate(m) for m in messages],
+        total=total,
+    )

@@ -61,6 +61,8 @@ class SportBackground(str, Enum):
     """
 
     RUNNING_PRIMARY = "running_primary"
+    CYCLING_PRIMARY = "cycling_primary"
+    SWIMMING_PRIMARY = "swimming_primary"
     CYCLING = "cycling"
     SWIMMING = "swimming"
     TRIATHLON = "triathlon"

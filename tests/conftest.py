@@ -325,7 +325,7 @@ async def client(db_session: AsyncSession) -> AsyncIterator[AsyncClient]:
         fastapi_app._test_protected_mounted = True  # type: ignore[attr-defined]
 
     transport = ASGITransport(app=fastapi_app)
-    async with AsyncClient(transport=transport, base_url="http://testserver") as ac:
+    async with AsyncClient(transport=transport, base_url="http://testserver/api/v1") as ac:
         yield ac
 
     fastapi_app.dependency_overrides.clear()

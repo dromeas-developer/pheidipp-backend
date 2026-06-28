@@ -1,48 +1,47 @@
 # implemented-state
 
 Commit:
-9cee56c
+e92af8e
 
 ## Change Set
 
 Base Commit:
-9cee56c
+e92af8e
 
 Current Commit:
-9cee56c
+e92af8e
 
 Files Added:
-- app/api/v1/plan.py
-- app/repositories/checkpoint_repository.py
-- app/repositories/training_plan_repository.py
-- app/repositories/weekly_plan_repository.py
-- app/schemas/plan.py
-- app/services/plan_generation_errors.py
-- app/services/plan_generation_service.py
-- app/services/plan_generation_templates.py
-- reports/phase-1-4_devops.md
-- tests/api/test_plan_endpoints.py
-- tests/behaviour/test_plan_user_journey.py
-- tests/integration/test_plan_generation_service.py
-- tests/integration/test_plan_repositories.py
-- tests/test-manifest/phase-1-4.yaml
-- tests/unit/test_plan_generation_errors.py
-- tests/unit/test_plan_generation_templates.py
+- app/api/v1/coach.py
+- app/core/prompt_registry.py
+- app/core/prompts/first_message_v1.md
+- app/repositories/coaching_message_repository.py
+- app/repositories/generation_event_repository.py
+- app/schemas/coaching.py
+- app/services/context_budget_service.py
+- app/services/first_message_agent.py
+- app/services/twin_context_assembler.py
+- reports/phase-1-5a_P1_devops.md
+- tests/integration/test_coach_endpoints.py
+- tests/smoke/__init__.py
+- tests/smoke/test_litellm_connectivity.py
+- tests/test-manifest/phase-1-5a.yaml
+- tests/unit/test_coaching_repositories.py
+- tests/unit/test_context_budget_service.py
+- tests/unit/test_first_message_agent.py
+- tests/unit/test_prompt_registry.py
+- tests/unit/test_twin_context_assembler.py
 
 Files Modified:
-- app/api/deps.py
 - app/api/v1/__init__.py
-- app/api/v1/onboarding.py
 - app/models/enums.py
-- app/models/system_event.py
 - app/repositories/__init__.py
+- app/repositories/refresh_token_repository.py
 - app/schemas/__init__.py
 - app/services/__init__.py
-- app/services/onboarding_service.py
 - reports/test_history/latest.md
+- tests/conftest.py
 - tests/test-manifest/index.yaml
-- tests/test-manifest/phase-1-2b.yaml
-- tests/unit/test_enum_values.py
 
 Files Deleted:
 - none
@@ -56,13 +55,13 @@ Touched Areas:
 - other
 
 Generated:
-2026-06-28T01:31:43.916120+00:00 UTC
+2026-06-28T20:26:13.703749+00:00 UTC
 
 Current DB Revision:
 d1579f4430e7 (head)
 
 Python Files Scanned:
-79
+87
 
 ---
 
@@ -143,6 +142,8 @@ Repositories:
 - AthleteProfileRepository -> AthleteProfile (app/repositories/athlete_profile_repository.py)
 - AthleteRepository -> Athlete (app/repositories/athlete_repository.py)
 - CheckpointRepository -> Checkpoint (app/repositories/checkpoint_repository.py)
+- CoachingMessageRepository -> CoachingMessage (app/repositories/coaching_message_repository.py)
+- GenerationEventRepository -> GenerationEvent (app/repositories/generation_event_repository.py)
 - RefreshTokenRepository -> RefreshToken (app/repositories/refresh_token_repository.py)
 - SystemEventOutboxRepository -> SystemEventOutbox (app/repositories/system_event_outbox_repository.py)
 - SystemEventRepository -> SystemEvent (app/repositories/system_event_repository.py)
@@ -164,7 +165,10 @@ Migrations:
 
 Services:
 - AuthService — app/services/auth_service.py
+- ContextBudgetService — app/services/context_budget_service.py
 - EventPublisher — app/services/event_publisher.py
+- FirstMessageAgent — app/services/first_message_agent.py
+- FirstMessageAlreadyExistsError — app/services/first_message_agent.py
 - OnboardingService — app/services/onboarding_service.py
 - _GoalInput — app/services/onboarding_service.py
 - _PreferencesInput — app/services/onboarding_service.py
@@ -175,6 +179,8 @@ Services:
 ### API Surface
 
 Public API:
+- POST /api/v1/athletes/{athlete_id}/coach/first-message (app/api/v1/coach.py:93 post_first_message, router=coach_router)
+- GET /api/v1/athletes/{athlete_id}/coach/messages (app/api/v1/coach.py:134 get_coach_messages, router=coach_router)
 - GET /api/v1/athletes/{athlete_id}/onboarding (app/api/v1/onboarding.py:181 get_onboarding, router=onboarding_router)
 - POST /api/v1/athletes/{athlete_id}/onboarding (app/api/v1/onboarding.py:76 complete_onboarding, router=onboarding_router)
 - GET /api/v1/athletes/{athlete_id}/plan (app/api/v1/plan.py:105 get_plan, router=plan_router)
@@ -203,6 +209,9 @@ Public API:
 - RegisterProfileIn — app/schemas/auth.py
 - RegisterRequest — app/schemas/auth.py
 - TokenPairResponse — app/schemas/auth.py
+- CoachingMessageResponse — app/schemas/coaching.py
+- FirstMessageConflictResponse — app/schemas/coaching.py
+- MessagesListResponse — app/schemas/coaching.py
 - AthletePreferencesPatchIn — app/schemas/onboarding.py
 - AthletePreferencesResponse — app/schemas/onboarding.py
 - AthleteProfilePatchIn — app/schemas/onboarding.py
@@ -230,20 +239,20 @@ Public API:
 - Imports: Activity, ActivitySource, Athlete, AthleteAuth, AthleteFitness, AthletePhysiology, AthletePreferences, AthleteProfile, AuthProvider, Checkpoint, CheckpointStatus, CheckpointType, CoachingMessage, DataTier, EventPublicationStatus, GeneratedWorkout, GenerationEvent, GoalEventType, GoalType, GpsSource, HrSource, InjurySeverity, MeasurementSource, MessageType, ObjectiveCategory, PhaseLabel, PhysiologicalIntent, PlannedSession, PlannedSessionStatus, PowerSource, PrimaryTrainingPlatform, RecoveryModifierLevel, RefreshToken, RegenerationTask, SecondaryEvent, SecondaryEventPriority, SessionPriority, SessionPurpose, SessionSlot, SessionType, Sex, SignalType, SportBackground, StepType, SystemEvent, SystemEventOutbox, TrainingGoal, TrainingGoalStatus, TrainingPlan, TrainingPlanStatus, TrainingTimeOfDay, TwinConfidenceLevel, TwinState, TwinTrigger, WeeklyPlan, WeeklyPlanStatus, WeeklySession, WellnessTrend, WorkoutStep, infer_data_tier
 
 - app/schemas/__init__.py
-- Imports: AthletePreferencesPatchIn, AthletePreferencesResponse, AthleteProfilePatchIn, AthleteProfileResponse, AthleteResponse, AuthResponse, CheckpointResponse, LoginRequest, OnboardingPreferencesIn, OnboardingProfileIn, OnboardingRequest, OnboardingResponse, OnboardingStatusResponse, OnboardingTrainingGoalIn, PhaseDescriptorResponse, PlannedSessionResponse, RefreshRequest, RefreshResponse, RegisterProfileIn, RegisterRequest, TokenPairResponse, TrainingPlanResponse, TwinStateHistoryResponse, TwinStateResponse, UpcomingSessionsResponse, WeeklyScheduleDayIn, WeeklyScheduleDayOut
+- Imports: AthletePreferencesPatchIn, AthletePreferencesResponse, AthleteProfilePatchIn, AthleteProfileResponse, AthleteResponse, AuthResponse, CheckpointResponse, CoachingMessageResponse, FirstMessageConflictResponse, LoginRequest, MessagesListResponse, OnboardingPreferencesIn, OnboardingProfileIn, OnboardingRequest, OnboardingResponse, OnboardingStatusResponse, OnboardingTrainingGoalIn, PhaseDescriptorResponse, PlannedSessionResponse, RefreshRequest, RefreshResponse, RegisterProfileIn, RegisterRequest, TokenPairResponse, TrainingPlanResponse, TwinStateHistoryResponse, TwinStateResponse, UpcomingSessionsResponse, WeeklyScheduleDayIn, WeeklyScheduleDayOut, WeeklyScheduleDayPatchIn
 
 - app/repositories/__init__.py
-- Imports: AthleteAuthRepository, AthleteFitnessRepository, AthletePhysiologyRepository, AthletePreferencesRepository, AthleteProfileRepository, AthleteRepository, CheckpointRepository, RefreshTokenRepository, SystemEventOutboxRepository, SystemEventRepository, TrainingGoalRepository, TrainingPlanRepository, TwinStateRepository, WeeklyPlanRepository, WeeklySessionRepository
+- Imports: AthleteAuthRepository, AthleteFitnessRepository, AthletePhysiologyRepository, AthletePreferencesRepository, AthleteProfileRepository, AthleteRepository, CheckpointRepository, CoachingMessageRepository, GenerationEventRepository, RefreshTokenRepository, SystemEventOutboxRepository, SystemEventRepository, TrainingGoalRepository, TrainingPlanRepository, TwinStateRepository, WeeklyPlanRepository, WeeklySessionRepository
 
 - app/services/__init__.py
-- Imports: AthleteNotFoundError, AuthError, AuthResult, AuthService, CrossAthleteAccessError, DuplicateEmailError, EventPublisher, InvalidCredentialsError, InvalidGoalTypeError, InvalidRefreshTokenError, IssuedTokens, OnboardingAlreadyCompleteError, OnboardingError, OnboardingIncompleteError, OnboardingResult, OnboardingService, OnboardingStatus, OutboxEvent, PlanGenerationError, PlanGenerationResult, PlanGenerationService, PreferencesSnapshot, ProfileSnapshot, SessionDayAssignment, TrainingGoalConflictError, TrainingLengthGateError, UnauthenticatedError, _GoalInput, _PreferencesInput, _ProfileInput
+- Imports: AthleteNotFoundError, AthleteTwinContext, AuthError, AuthResult, AuthService, ComputedObservations, ContextBudgetService, CrossAthleteAccessError, DuplicateEmailError, EventPublisher, FirstMessageAgent, FirstMessageAlreadyExistsError, InvalidCredentialsError, InvalidGoalTypeError, InvalidRefreshTokenError, IssuedTokens, LLMServiceUnavailableError, OnboardingAlreadyCompleteError, OnboardingError, OnboardingIncompleteError, OnboardingResult, OnboardingService, OnboardingStatus, OutboxEvent, PlanGenerationError, PlanGenerationResult, PlanGenerationService, PreferencesSnapshot, ProfileSnapshot, PromptNotFoundError, PromptRegistry, SessionDayAssignment, TrainingGoalConflictError, TrainingLengthGateError, TwinContextAssembler, TwinContextSummary, UnauthenticatedError, _GoalInput, _PreferencesInput, _ProfileInput
 
 - app/api/__init__.py
 - Imports: build_auth_service, build_onboarding_service, get_current_athlete_id, get_db, require_self
 
 - app/api/v1/__init__.py
-- Imports: APIRouter, auth_router, health_router, onboarding_router, plan_router
-- Includes: auth_router, health_router, onboarding_router, plan_router
+- Imports: APIRouter, auth_router, coach_router, health_router, onboarding_router, plan_router
+- Includes: auth_router, coach_router, health_router, onboarding_router, plan_router
 
 ---
 
@@ -265,9 +274,31 @@ AuthService
  ├── SystemEventRepository
  └── TokenService
 
+ContextBudgetService
+ ├── 'AthletePreferencesRepository'
+ ├── 'AthleteProfileRepository'
+ ├── 'TrainingGoalRepository'
+ ├── 'TrainingPlanRepository'
+ └── 'TwinStateRepository'
+
 EventPublisher
  ├── SystemEventOutboxRepository
  └── SystemEventRepository
+
+FirstMessageAgent
+ ├── 'TrainingGoalRepository'
+ ├── 'TrainingPlanRepository'
+ ├── 'TwinStateRepository'
+ ├── CoachingMessageRepository
+ ├── ContextBudgetService
+ ├── GenerationEventRepository
+ ├── Optional[EventPublisher]
+ ├── PromptRegistry
+ ├── SystemEventOutboxRepository
+ └── SystemEventRepository
+
+FirstMessageAlreadyExistsError
+ └── uuid.UUID
 
 OnboardingService
  ├── AthleteFitnessRepository
@@ -319,7 +350,7 @@ api dependencies: partial
 models: complete
 repositories: complete
 routers: complete
-schemas: partial
+schemas: complete
 services: complete
 
 ### Event Producers
@@ -327,12 +358,14 @@ services: complete
 - app/services/auth_service.py:170 AuthService.register publish -> athlete_registered [after_commit]
 - app/services/auth_service.py:274 AuthService.login publish -> athlete_logged_in [after_commit]
 - app/services/auth_service.py:367 AuthService.rotate_refresh_token publish -> athlete_logged_in [after_commit]
+- app/services/first_message_agent.py:303 FirstMessageAgent.generate publish -> coaching_message_generated [uncommitted]
 - app/services/onboarding_service.py:484 OnboardingService.complete_onboarding publish -> onboarding_completed [after_commit]
 - app/services/plan_generation_service.py:750 PlanGenerationService._persist_full_plan publish -> training_plan_generated [after_commit]
 
 ### Transaction Boundaries
 
 Commits:
+- app/api/v1/coach.py:126 post_first_message session.commit
 - app/services/auth_service.py:180 AuthService.register self.session.commit
 - app/services/auth_service.py:285 AuthService.login self.session.commit
 - app/services/auth_service.py:378 AuthService.rotate_refresh_token self.session.commit
@@ -351,7 +384,9 @@ Flushes:
 - app/repositories/athlete_profile_repository.py:31 AthleteProfileRepository.add self.session.flush
 - app/repositories/athlete_repository.py:44 AthleteRepository.add self.session.flush
 - app/repositories/checkpoint_repository.py:41 CheckpointRepository.add_many self.session.flush
-- app/repositories/refresh_token_repository.py:41 RefreshTokenRepository.add self.session.flush
+- app/repositories/coaching_message_repository.py:43 CoachingMessageRepository.insert self.session.flush
+- app/repositories/generation_event_repository.py:38 GenerationEventRepository.insert self.session.flush
+- app/repositories/refresh_token_repository.py:42 RefreshTokenRepository.add self.session.flush
 - app/repositories/system_event_outbox_repository.py:44 SystemEventOutboxRepository.add self.session.flush
 - app/repositories/system_event_outbox_repository.py:60 SystemEventOutboxRepository.mark_published self.session.flush
 - app/repositories/system_event_repository.py:57 SystemEventRepository.add self.session.flush
@@ -374,6 +409,7 @@ Flushes:
 
 AsyncSession imports:
 - app/api/deps.py
+- app/api/v1/coach.py
 - app/api/v1/health.py
 - app/api/v1/plan.py
 - app/db/session.py
@@ -384,6 +420,8 @@ AsyncSession imports:
 - app/repositories/athlete_profile_repository.py
 - app/repositories/athlete_repository.py
 - app/repositories/checkpoint_repository.py
+- app/repositories/coaching_message_repository.py
+- app/repositories/generation_event_repository.py
 - app/repositories/refresh_token_repository.py
 - app/repositories/system_event_outbox_repository.py
 - app/repositories/system_event_repository.py
@@ -397,6 +435,13 @@ AsyncSession imports:
 - app/services/plan_generation_service.py
 
 Repository dependencies:
+- app/api/v1/coach.py: AthletePreferencesRepository
+- app/api/v1/coach.py: AthleteProfileRepository
+- app/api/v1/coach.py: CoachingMessageRepository
+- app/api/v1/coach.py: GenerationEventRepository
+- app/api/v1/coach.py: TrainingGoalRepository
+- app/api/v1/coach.py: TrainingPlanRepository
+- app/api/v1/coach.py: TwinStateRepository
 - app/api/v1/plan.py: TrainingPlanRepository
 - app/services/auth_service.py: AthleteAuthRepository
 - app/services/auth_service.py: AthleteProfileRepository
@@ -404,6 +449,8 @@ Repository dependencies:
 - app/services/auth_service.py: RefreshTokenRepository
 - app/services/auth_service.py: SystemEventOutboxRepository
 - app/services/auth_service.py: SystemEventRepository
+- app/services/first_message_agent.py: SystemEventOutboxRepository
+- app/services/first_message_agent.py: SystemEventRepository
 - app/services/onboarding_service.py: AthleteFitnessRepository
 - app/services/onboarding_service.py: AthletePhysiologyRepository
 - app/services/onboarding_service.py: AthletePreferencesRepository
@@ -435,7 +482,6 @@ yes
 
 Missing Exports:
 - app/api/__init__.py: Missing [build_onboarding_service_with_plan, build_plan_service]
-- app/schemas/__init__.py: Missing [WeeklyScheduleDayPatchIn]
 
 ### Snapshot Reliability
 

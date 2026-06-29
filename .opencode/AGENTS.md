@@ -58,6 +58,25 @@ is sufficient for most tasks.
   from content retrieved earlier in the session if the file may have changed
 - Do NOT create files unless the task explicitly requires it
 
+### Edit Tool Protocol (opencode `edit` tool)
+
+The `edit` tool performs exact string replacement. It will fail or replace
+the wrong location if `old_str` does not match the file exactly.
+
+**Copy `old_str` verbatim from the retrieved content.**
+Never reconstruct it from memory or paraphrase it. Every character,
+space, blank line, and indentation level must match exactly. Copy
+directly from the most recent `get_files` result for that file.
+
+**`old_str` must be unique within the file.**
+If the string appears more than once, extend both `old_str` and
+`new_str` with surrounding lines until the match is unique. Include
+2–3 lines of context before and after the target change.
+
+**One logical change per `edit` call.**
+Do not combine unrelated changes into a single `old_str`/`new_str`
+pair. Multiple `edit` calls on the same file are correct and expected.
+
 ---
 
 ## Atomic Behaviour

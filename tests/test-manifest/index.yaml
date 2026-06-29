@@ -1,7 +1,7 @@
 # Test manifest index — cross-phase selection groups and coverage summary
 # This file is rebuilt by the Test Architect when any sub-phase file changes.
 version: "1.0"
-last_reviewed_at: "2026-06-28T00:00:00Z"
+last_reviewed_at: "2026-06-28T04:00:00Z"
 
 # Resolved selection groups — paths only, no feature metadata.
 # Rebuilt by Test Architect when any sub-phase file changes promotion state.
@@ -12,6 +12,8 @@ selection:
     - "tests/unit/test_twin_context_assembler.py"
     - "tests/smoke/test_litellm_connectivity.py"
 
+  # Empty — no sub-phase currently under construction. Resets when the
+  # next Test Architect cycle opens a new sub-phase manifest.
   feature: []
 
   regression:
@@ -21,6 +23,13 @@ selection:
     - "tests/unit/test_prompt_registry.py"
     - "tests/unit/test_coaching_repositories.py"
     - "tests/integration/test_coach_endpoints.py"
+    # Phase-1.5b — Workout Generation (promoted 2026-06-28)
+    - "tests/unit/test_generated_workout_repository.py"
+    - "tests/unit/test_workout_step_repository.py"
+    - "tests/unit/test_planned_session_repository.py"
+    - "tests/unit/test_workout_target_types.py"
+    - "tests/unit/test_workout_generation_agent.py"
+    - "tests/integration/test_workout_endpoints.py"
 
   release:
     - "tests/unit/test_first_message_agent.py"
@@ -29,6 +38,13 @@ selection:
     - "tests/unit/test_prompt_registry.py"
     - "tests/unit/test_coaching_repositories.py"
     - "tests/integration/test_coach_endpoints.py"
+    # Phase-1.5b — Workout Generation (promoted 2026-06-28)
+    - "tests/unit/test_generated_workout_repository.py"
+    - "tests/unit/test_workout_step_repository.py"
+    - "tests/unit/test_planned_session_repository.py"
+    - "tests/unit/test_workout_target_types.py"
+    - "tests/unit/test_workout_generation_agent.py"
+    - "tests/integration/test_workout_endpoints.py"
 
 # Cross-phase coverage summary — updated when features are promoted.
 coverage:
@@ -36,12 +52,15 @@ coverage:
     covered:
       - "POST /athletes/{id}/coach/first-message"
       - "GET /athletes/{id}/coach/messages"
+      - "GET /athletes/{id}/today"
+      - "POST /athletes/{id}/sessions/{sid}/generate-workout"
     partial: []
     missing: []
 
   events:
     covered:
       - "coaching_message_generated"
+      - "workout_generated"
     partial: []
     missing: []
 
@@ -52,6 +71,12 @@ coverage:
       - "GenerationEvent.failure_reason non-null when success=false"
       - "Messages are immutable"
       - "Append-only repositories"
+      - "WorkoutStep.physiological_intent is never null"
+      - "GeneratedWorkout idempotent for (planned_session_id, generation_date)"
+      - "theoretical_targets and adjusted_targets both always written"
+      - "Target type depends on data tier (power/gap/description)"
+      - "Steps never updated after creation — append-only"
+      - "warmup step first, cooldown step last"
     partial: []
     missing: []
 

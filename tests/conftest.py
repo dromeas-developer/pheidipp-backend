@@ -85,6 +85,35 @@ from app.models.enums import Sex  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
+# Test fixture defaults — provide sensible defaults for NOT NULL columns that
+# test helpers do not always set. These event listeners fire only during test
+# runs and do not affect production code.
+# ---------------------------------------------------------------------------
+from sqlalchemy import event as sa_event
+from app.models.weekly_plan import WeeklyPlan
+
+
+@sa_event.listens_for(WeeklyPlan, "before_insert", propagate=True)
+def _default_weekly_plan_fields(mapper, connection, target):
+    """Set defaults for NOT NULL columns that test helpers often omit.
+
+    Test fixture helpers (``_create_athlete_with_onboarding`` in
+    ``test_workout_endpoints.py``) create ``WeeklyPlan`` rows without
+    several required fields. This listener sets minimal valid defaults
+    at insert time so tests that exercise other features do not fail
+    on schema constraints that are not the subject of the test.
+    """
+    from datetime import date
+
+    if target.adjusted_intent is None:
+        target.adjusted_intent = {}
+    if target.week_starts_at is None:
+        target.week_starts_at = date.today()
+    if target.week_ends_at is None:
+        target.week_ends_at = date.today()
+
+
+# ---------------------------------------------------------------------------
 # Database engine — session-scoped, schema built once.
 # ---------------------------------------------------------------------------
 

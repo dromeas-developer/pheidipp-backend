@@ -39,6 +39,16 @@ from app.schemas.plan import (
     TrainingPlanResponse,
     UpcomingSessionsResponse,
 )
+from app.schemas.workout import (
+    GenerateWorkoutResponse,
+    GeneratedWorkoutResponse,
+    TargetSetResponse,
+    TodayResponse,
+    WorkoutAlreadyGeneratedConflictResponse,
+    WorkoutStepResponse,
+    WorkoutTargetPrimaryResponse,
+    WorkoutTargetResponse,
+)
 
 __all__ = [
     "AthletePreferencesPatchIn",
@@ -50,6 +60,8 @@ __all__ = [
     "CheckpointResponse",
     "CoachingMessageResponse",
     "FirstMessageConflictResponse",
+    "GenerateWorkoutResponse",
+    "GeneratedWorkoutResponse",
     "LoginRequest",
     "MessagesListResponse",
     "OnboardingPreferencesIn",
@@ -64,7 +76,9 @@ __all__ = [
     "RefreshResponse",
     "RegisterProfileIn",
     "RegisterRequest",
+    "TargetSetResponse",
     "TokenPairResponse",
+    "TodayResponse",
     "TrainingPlanResponse",
     "TwinStateHistoryResponse",
     "TwinStateResponse",
@@ -72,4 +86,8 @@ __all__ = [
     "WeeklyScheduleDayIn",
     "WeeklyScheduleDayOut",
     "WeeklyScheduleDayPatchIn",
+    "WorkoutAlreadyGeneratedConflictResponse",
+    "WorkoutStepResponse",
+    "WorkoutTargetPrimaryResponse",
+    "WorkoutTargetResponse",
 ]

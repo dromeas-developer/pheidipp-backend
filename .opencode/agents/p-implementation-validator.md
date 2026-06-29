@@ -283,7 +283,7 @@ Check three categories independently.
 
 ## Output Format
 
-Save report using `write` as `docs/implementation/phase-N/<plan-id>_validation.md`.
+Save report using `write` as `reports/<plan-id>_validation.md`.
 
 ```markdown
 # Validation Report — <Plan ID>

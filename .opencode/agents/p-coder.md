@@ -170,8 +170,24 @@ Only after steps 1–5 are complete.
 * Complete one file fully before moving to the next
 * EXISTING files → `edit` tool
 * NEW files → `write` tool
-* After editing a file, if further edits to that same file are needed,
-  call `get_files` on it again before the next edit — never edit from stale memory
+
+### Coder-Specific Edit Rules
+
+**Re-fetch after every edit.**
+After any successful `edit` call, call `get_files` on that file again
+before the next edit to it. The file has changed; your in-context copy
+is stale. This applies even for two consecutive edits to the same file.
+
+**Never fall back to full `write` on an existing file.**
+If an `edit` call fails, diagnose before retrying:
+- Stale context? → re-fetch and retry
+- `old_str` not unique? → extend with surrounding lines and retry
+- Whitespace mismatch? → copy `old_str` verbatim from the retrieved
+  content rather than reconstructing from memory
+
+Full `write` on an existing file overwrites history and risks discarding
+changes outside your scope. If three targeted retries all fail, STOP
+and report: the specific `old_str` that is failing and why.
 
 ---
 

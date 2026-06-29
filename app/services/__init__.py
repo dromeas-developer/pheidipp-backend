@@ -47,6 +47,19 @@ from app.services.plan_generation_service import (
     SessionDayAssignment,
 )
 from app.core.prompt_registry import PromptNotFoundError, PromptRegistry
+from app.services.workout_generation_agent import WorkoutGenerationAgent
+from app.services.workout_generation_errors import (
+    LLMServiceUnavailableError as WorkoutLLMServiceUnavailableError,
+    PlannedSessionNotFoundError,
+    WorkoutAlreadyGeneratedError,
+    WorkoutGenerationContractError,
+    WorkoutGenerationError,
+)
+from app.services.workout_target_types import (
+    DATA_TIER_TARGET_TYPE,
+    SESSION_INTENT_MAP,
+    get_step_physiological_intent,
+)
 from app.services.twin_context_assembler import (
     AthleteTwinContext,
     ComputedObservations,
@@ -62,6 +75,7 @@ __all__ = [
     "AuthService",
     "ContextBudgetService",
     "CrossAthleteAccessError",
+    "DATA_TIER_TARGET_TYPE",
     "DuplicateEmailError",
     "EventPublisher",
     "FirstMessageAgent",
@@ -81,18 +95,26 @@ __all__ = [
     "PlanGenerationError",
     "PlanGenerationResult",
     "PlanGenerationService",
+    "PlannedSessionNotFoundError",
     "PreferencesSnapshot",
     "ProfileSnapshot",
     "PromptNotFoundError",
     "PromptRegistry",
+    "SESSION_INTENT_MAP",
     "SessionDayAssignment",
     "TrainingGoalConflictError",
     "TrainingLengthGateError",
     "TwinContextAssembler",
     "TwinContextSummary",
     "UnauthenticatedError",
+    "WorkoutAlreadyGeneratedError",
+    "WorkoutGenerationAgent",
+    "WorkoutGenerationContractError",
+    "WorkoutGenerationError",
+    "WorkoutLLMServiceUnavailableError",
     "_GoalInput",
     "_PreferencesInput",
     "_ProfileInput",
     "ComputedObservations",
+    "get_step_physiological_intent",
 ]

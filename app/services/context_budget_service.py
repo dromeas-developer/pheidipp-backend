@@ -33,6 +33,9 @@ if TYPE_CHECKING:
         AthletePreferencesRepository,
     )
     from app.repositories.athlete_profile_repository import AthleteProfileRepository
+    from app.repositories.planned_session_repository import (
+        PlannedSessionRepository,
+    )
     from app.repositories.training_goal_repository import TrainingGoalRepository
     from app.repositories.training_plan_repository import TrainingPlanRepository
     from app.repositories.twin_state_repository import TwinStateRepository
@@ -128,6 +131,128 @@ class FirstBlockPreview:
     session_types_in_week_1: list[str]
     session_types_in_week_2: list[str]
     primary_focus: str
+
+
+@dataclass(frozen=True)
+class WorkoutSessionSummary:
+    """Planned-session summary fed to ``WorkoutGenerationAgent``.
+
+    Captures the atomic session metadata the workout agent must
+    respect: ``session_type`` (drives target structure via
+    :data:`SESSION_INTENT_MAP`), phase label and week number (so the
+    prompt understands the plan position), intent description
+    (literal copy from the weekly synthesis), and the approximate
+    duration budget for the whole session.
+    """
+
+    session_type: str  # SessionType value
+    phase_label: str  # PhaseLabel value
+    week_number: int
+    intent_description: str
+    approximate_duration_minutes: int
+
+
+@dataclass(frozen=True)
+class WorkoutReadinessDigest:
+    """Coaching-language translation of the current TwinState for workouts.
+
+    Mirrors the ``readiness`` sub-shape in the
+    ``WorkoutGenerationContext`` contract from
+    ``docs/architecture/03-agents/workout-generation-agent.md``.
+    Numeric threshold estimates (e.g. ``lt2_pace_sec_per_km``) are
+    null when twin confidence is LOW — confidence-appropriate
+    precision is expressed via ``threshold_target_description``
+    instead.
+    """
+
+    recovery_modifier_level: str  # RecoveryModifierLevel value
+    recovery_modifier_reason: Optional[str]
+    confidence_level: str  # TwinConfidenceLevel value
+    fitness_form_descriptor: str
+    threshold_target_description: str
+    lt2_pace_sec_per_km: Optional[float]
+
+
+@dataclass
+class WorkoutGenerationContext:
+    """Context bundle for ``WorkoutGenerationAgent``.
+
+    Composed from the planned session, the TwinState digest
+    (assembled by :class:`TwinContextAssembler`), and the
+    ath­lete's preferences / profile. The dataclass is mutable
+    (``dataclass`` not ``frozen``) so token-budget truncation can
+    drop sections in place and the agent still receives a single
+    bundle without re-querying repositories.
+
+    ``relevant_objectives`` is an empty list at this phase;
+    objectives land in Phase 4. The prompt handles the empty case
+    gracefully — no objective-driven framing in v1.
+    """
+
+    session: Optional[WorkoutSessionSummary] = None
+    readiness: Optional[WorkoutReadinessDigest] = None
+    data_tier: Optional[int] = None  # DataTier enum value
+    target_type: Optional[str] = None  # 'power' | 'gap' | 'description'
+    relevant_objectives: list[dict[str, Any]] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize to a plain dict for token estimation and prompt rendering."""
+        return {
+            "session": {
+                "session_type": self.session.session_type
+                if self.session
+                else None,
+                "phase_label": self.session.phase_label
+                if self.session
+                else None,
+                "week_number": self.session.week_number
+                if self.session
+                else None,
+                "intent_description": self.session.intent_description
+                if self.session
+                else None,
+                "approximate_duration_minutes": (
+                    self.session.approximate_duration_minutes
+                    if self.session
+                    else None
+                ),
+            }
+            if self.session
+            else None,
+            "readiness": {
+                "recovery_modifier_level": (
+                    self.readiness.recovery_modifier_level
+                    if self.readiness
+                    else None
+                ),
+                "recovery_modifier_reason": (
+                    self.readiness.recovery_modifier_reason
+                    if self.readiness
+                    else None
+                ),
+                "confidence_level": self.readiness.confidence_level
+                if self.readiness
+                else None,
+                "fitness_form_descriptor": (
+                    self.readiness.fitness_form_descriptor
+                    if self.readiness
+                    else None
+                ),
+                "threshold_target_description": (
+                    self.readiness.threshold_target_description
+                    if self.readiness
+                    else None
+                ),
+                "lt2_pace_sec_per_km": self.readiness.lt2_pace_sec_per_km
+                if self.readiness
+                else None,
+            }
+            if self.readiness
+            else None,
+            "data_tier": self.data_tier,
+            "target_type": self.target_type,
+            "relevant_objectives": self.relevant_objectives,
+        }
 
 
 @dataclass
@@ -248,12 +373,18 @@ class ContextBudgetService:
         plans: "TrainingPlanRepository",
         profiles: "AthleteProfileRepository",
         preferences: "AthletePreferencesRepository",
+        planned_sessions: Optional["PlannedSessionRepository"] = None,
     ) -> None:
         self._twin_states = twin_states
         self._training_goals = training_goals
         self._plans = plans
         self._profiles = profiles
         self._preferences = preferences
+        # ``built_workout_context`` (Phase 1.5b) requires loading the
+        # target ``PlannedSession``; optional so the Phase-1.5a callers
+        # that pre-date the workout agent keep working without a
+        # forced dependency.
+        self._planned_sessions = planned_sessions
 
     @staticmethod
     def estimate_tokens(obj: dict[str, Any]) -> int:
@@ -406,3 +537,180 @@ first_block_preview=first_block_preview,
             _logger.warning(...)
         # MVP: return full context without truncation (see TODO above)
         return context
+
+    async def build_workout_context(
+        self,
+        athlete_id: uuid.UUID,
+        planned_session_id: uuid.UUID,
+    ) -> WorkoutGenerationContext:
+        """Assemble and budget-enforce the context for ``WorkoutGenerationAgent``.
+
+        Implements the Phase-1.5b contract for the workout-generation
+        prompt's input. Fetches:
+
+        * the latest :class:`TwinState` for the athlete (via the
+          injected :class:`TwinStateRepository`),
+        * the target :class:`PlannedSession` (via the injected
+          :class:`PlannedSessionRepository`),
+        * the athlete's :class:`AthletePreferences` and
+          :class:`AthleteProfile` for the readiness digest.
+
+        The readiness payload is composed via the in-service
+        ``_compose_readiness_digest`` helper so the agent receives
+        a coaching-language bundle (``fitness_form_descriptor``
+        phrasing, threshold-confidence precision) rather than raw
+        twin column values. ``target_type`` is resolved from
+        :data:`DATA_TIER_TARGET_TYPE` in
+        :mod:`app.services.workout_target_types`.
+
+        Budget enforcement: matches :meth:`build_first_message_context`
+        — logs a warning if the estimated token count exceeds the
+        3000-token budget but returns the full context anyway.
+        Priority-weighted truncation remains deferred per the
+        Phase-1.5a tracking TODO in :meth:`build_first_message_context`
+        and is shared by both agents in this phase.
+        """
+        if self._planned_sessions is None:
+            raise RuntimeError(
+                "build_workout_context requires a PlannedSessionRepository; "
+                "construct ContextBudgetService with planned_sessions=..."
+            )
+
+        # -----------------------------------------------------------------
+        # 1. Fetch data.
+        # -----------------------------------------------------------------
+        twin_state = await self._twin_states.get_latest(athlete_id)
+        session = await self._planned_sessions.get_by_id(planned_session_id)
+        preferences = await self._preferences.get_by_athlete_id(athlete_id)
+
+        # -----------------------------------------------------------------
+        # 2. Build context sections.
+        # -----------------------------------------------------------------
+        session_summary: WorkoutSessionSummary | None = None
+        if session is not None:
+            session_summary = WorkoutSessionSummary(
+                session_type=session.session_type.value,
+                phase_label=session.phase_label.value,
+                week_number=session.week_number,
+                intent_description=session.intent_description,
+                approximate_duration_minutes=(
+                    session.approximate_duration_minutes
+                ),
+            )
+
+        readiness: WorkoutReadinessDigest | None = None
+        data_tier: int | None = None
+        target_type: str | None = None
+        if twin_state is not None:
+            data_tier_value = int(twin_state.data_tier)
+            # Local import avoids a static cycle between
+            # ``workout_target_types`` and ``context_budget_service``.
+            from app.services.workout_target_types import (
+                DATA_TIER_TARGET_TYPE,
+            )
+
+            data_tier = data_tier_value
+            target_type = DATA_TIER_TARGET_TYPE.get(
+                twin_state.data_tier, "description"
+            )
+            readiness = self._compose_readiness_digest(twin_state)
+
+        # ``relevant_objectives`` is intentionally empty at this phase
+        # — objectives land in Phase 4 (see architecture
+        # docs/architecture/01-entities/objective.md). The prompt
+        # handles the empty list gracefully without referencing the
+        # field.
+        relevant_objectives: list[dict[str, Any]] = []
+
+        context = WorkoutGenerationContext(
+            session=session_summary,
+            readiness=readiness,
+            data_tier=data_tier,
+            target_type=target_type,
+            relevant_objectives=relevant_objectives,
+        )
+
+        # -----------------------------------------------------------------
+        # 3. Enforce budget (warn-only).
+        # -----------------------------------------------------------------
+        context_dict = context.to_dict()
+        estimated = self.estimate_tokens(context_dict)
+        if estimated > MAX_TOKENS["workout_generation"]:
+            _logger.warning(
+                "context_budget.truncated",
+                extra={
+                    "agent": "WorkoutGenerationAgent",
+                    "estimated_tokens": estimated,
+                    "max_tokens": MAX_TOKENS["workout_generation"],
+                },
+            )
+        # TODO (DEV-001): Implement priority-weighted truncation per
+        # architecture contract (matches the TODO in
+        # build_first_message_context). Truncation deferred per
+        # Phase-1.5a tracking; returns the full context here.
+        return context
+
+    def _compose_readiness_digest(
+        self, twin_state
+    ) -> WorkoutReadinessDigest:
+        """Translate a TwinState into the workout-context readiness shape.
+
+        Mirrors the readiness sub-shape from
+        ``docs/architecture/03-agents/workout-generation-agent.md``.
+        ``threshold_target_description`` reflects the architecture's
+        confidence-appropriate precision rule (LOW → effort
+        descriptions, MEDIUM → ranges, HIGH → point estimates). The
+        exact phrasing maps onto the descriptors already published by
+        :class:`TwinContextAssembler`; the value here is derived
+        from ``confidence_level`` plus ``lt2_pace_sec_per_km`` so the
+        numeric field stays null when LOW.
+        """
+        from app.services.twin_context_assembler import (
+            TwinContextAssembler,
+        )
+
+        assembler = TwinContextAssembler()
+        twin_summary = assembler.assemble_twin_context(twin_state)
+
+        # Confidence-appropriate threshold language. The phrasing
+        # below intentionally mirrors ``twin-context-assembler.md``
+        # so the workout prompt receives vocabulary aligned with the
+        # first-message prompt's voice rule.
+        if twin_state.confidence_level.value == "low":
+            threshold_desc = (
+                "easy aerobic effort and comfortably hard intervals — "
+                "thresholds are population-based estimates at this point"
+            )
+        elif twin_state.confidence_level.value == "medium":
+            if twin_state.lt2_pace_sec_per_km is not None:
+                threshold_desc = (
+                    f"around {int(round(twin_state.lt2_pace_sec_per_km / 60))}m"
+                    f"{int(round(twin_state.lt2_pace_sec_per_km % 60)):02d}"
+                    "/km threshold equivalent and a small range around it"
+                )
+            else:
+                threshold_desc = (
+                    "comfortably hard sustained effort and a small range "
+                    "around it as confidence builds from real training"
+                )
+        else:  # HIGH confidence
+            if twin_state.lt2_pace_sec_per_km is not None:
+                threshold_desc = (
+                    f"{int(round(twin_state.lt2_pace_sec_per_km / 60))}m"
+                    f"{int(round(twin_state.lt2_pace_sec_per_km % 60)):02d}"
+                    "/km threshold equivalent"
+                )
+            else:
+                threshold_desc = (
+                    "threshold equivalent from training stressing a small "
+                    "deviation around your established threshold"
+                )
+
+        return WorkoutReadinessDigest(
+            recovery_modifier_level=twin_state.readiness_level.value,
+            recovery_modifier_reason=None,
+            confidence_level=twin_state.confidence_level.value,
+            fitness_form_descriptor=twin_summary.fitness_form_descriptor,
+            threshold_target_description=threshold_desc,
+            lt2_pace_sec_per_km=twin_state.lt2_pace_sec_per_km,
+        )

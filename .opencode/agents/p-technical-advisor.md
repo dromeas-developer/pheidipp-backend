@@ -14,7 +14,7 @@ tools:
   grep:       false
   glob:       false
   todowrite:  false
-  webfetch:   false
+  webfetch:   true
   skill:      false
 
   # Architecture retrieval

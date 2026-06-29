@@ -1,9 +1,9 @@
-date: 2026-06-28
-plan: Phase-1.5a-P1
+date: 2026-06-28T23:18:00Z
+plan: phase-1-5b
 execution_group: feature
-total: 107
-passed: 107
+total: 77
+passed: 77
 failed: 0
 skipped: 0
-duration_seconds: 6.39
+duration_seconds: 3.89
 failures: []

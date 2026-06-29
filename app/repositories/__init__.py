@@ -17,7 +17,14 @@ from app.repositories.coaching_message_repository import (
 from app.repositories.generation_event_repository import (
     GenerationEventRepository,
 )
+from app.repositories.generated_workout_repository import (
+    GeneratedWorkoutRepository,
+)
+from app.repositories.planned_session_repository import (
+    PlannedSessionRepository,
+)
 from app.repositories.refresh_token_repository import RefreshTokenRepository
+from app.repositories.workout_step_repository import WorkoutStepRepository
 from app.repositories.system_event_outbox_repository import (
     SystemEventOutboxRepository,
 )
@@ -40,6 +47,8 @@ __all__ = [
     "CheckpointRepository",
     "CoachingMessageRepository",
     "GenerationEventRepository",
+    "GeneratedWorkoutRepository",
+    "PlannedSessionRepository",
     "RefreshTokenRepository",
     "SystemEventOutboxRepository",
     "SystemEventRepository",
@@ -48,4 +57,5 @@ __all__ = [
     "TwinStateRepository",
     "WeeklyPlanRepository",
     "WeeklySessionRepository",
+    "WorkoutStepRepository",
 ]

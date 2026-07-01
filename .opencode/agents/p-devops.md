@@ -41,14 +41,20 @@ pass/fail report. Do not modify any source file.
 
 - NEVER modify application source files (models, services, repositories, routes)
 - Migration files in `alembic/versions/` MAY be created and edited
-- `tests/test_manifest.yaml` MAY be updated, but ONLY for `validation.executable`
-  and `validation.passed` fields, and ONLY after verified test execution —
-  see Step 5 for the exact update protocol
+- The current sub-phase file (`tests/test-manifest/phase-N-Mx.yaml`) MAY
+  be updated, but ONLY for `validation.executable` and `validation.passed`
+  fields, and ONLY after verified test execution — see Step 5 for the
+  exact update protocol. `index.yaml` MAY be read but MUST NOT be
+  modified — it belongs to the Test Architect
 - Do NOT modify any other manifest field — schema, features, coverage,
   selection groups, status, and owned_by_plan all belong to the Test Architect
 - Test infrastructure files MAY be edited when tests fail due to framework,
   connection, fixture, or environment errors — see Step 5a for the full
   permitted file list and allowed failure categories
+- `tests/README.md` and `tests/MOCKING_CONTRACT.md` MAY be read for
+  diagnostic context but MUST NOT be edited — these are Test Architect
+  owned artifacts, even though they sit alongside directories (e.g.
+  `tests/utils/**`) that DevOps may edit
 - NEVER modify `test_*.py` assertion files — what tests assert belongs to
   the Test Architect
 - Do NOT run alembic, python, pytest, or pip directly — use `scripts/` wrappers
@@ -63,7 +69,6 @@ pass/fail report. Do not modify any source file.
 | `api` | FastAPI application — tests run inside this container | 8000 |
 | `worker` | ARQ job processor — same image as api | — |
 | `db` | TimescaleDB (pg16) — hosts both `pheidipp` and `test_pheidipp` | 5432 |
-| `redis` | ARQ broker | 6379 |
 | `minio` | FIT file object storage | 9000/9001 |
 
 The `api` container must be healthy before tests can run. The `db` container
@@ -239,7 +244,7 @@ the plan's Scope section alone (less reliable — flag this in the report).
 
 Run `bash scripts/docker-build.sh`.
 
-Confirm api, db, redis, and minio are all healthy before proceeding.
+Confirm api, db, and minio are all healthy before proceeding.
 
 On failure: capture logs via `bash scripts/docker-logs.sh`, record output,
 and STOP — no point running migrations against a broken stack.
@@ -380,6 +385,20 @@ DevOps MAY edit the following test infrastructure files:
 DevOps MUST NOT modify:
 - Any `tests/**/test_*.py` file — assertions belong to the Test Architect
 - Application source files
+- `tests/README.md` or `tests/MOCKING_CONTRACT.md` — read them, don't
+  write them (see Boundaries)
+
+Before remediating, use `find_files` to check whether
+`tests/MOCKING_CONTRACT.md` exists. If it does, check its Known
+Anti-Patterns section for an entry matching this failure. In the Reason
+column of the Infrastructure Fixes table (see Output Format below), either
+name the matching entry or state explicitly that none exists ("no existing
+contract entry — new pattern"). This is what lets the Test Architect's
+mandatory infrastructure-fix review tell a recurring pattern from a new
+one without re-deriving it from the traceback — do not skip this even when
+the fix itself is trivial. If the file does not exist yet, note "no
+MOCKING_CONTRACT.md present" in the Reason column instead and proceed —
+this is not a blocking condition.
 
 Remediation is allowed ONLY when the failure is caused by:
 - Test framework configuration

@@ -1,4 +1,4 @@
-# Storage Topology — Database, Object Storage, and Cache
+# Storage Topology — Database and Object Storage
 
 ## Purpose
 - Defines what lives where, why, and what consistency guarantees each layer provides
@@ -40,6 +40,8 @@ All relational entity data. Strong consistency. Indefinite retention.
 ### Object Storage (S3-compatible)
 Large binary data. Eventual consistency. Indefinite retention.
 
+**Early-stage implementation: MinIO (self-hosted, S3-compatible).** Future migration to AWS S3 requires zero code changes — the S3 interface is the architectural contract, not the provider.
+
 ```
 fit-files/{athlete_id}/{activity_date}/{uuid}.fit        → raw FIT files (immutable)
 cleaned-streams/{athlete_id}/{activity_id}/stream.gz      → cleaned sensor streams
@@ -49,24 +51,13 @@ models/hmm/athlete_{id}_v1.pkl                            → per-athlete HMM mo
 
 **Invariant:** Raw FIT files are never overwritten or deleted. They are the reprocessing anchor.
 
-### Redis (Cache + Queue)
-- **Queue backend:** Celery/ARQ task queues and dead-letter queue
-- **Cache:** short-lived; session tokens, rate limiting, frequently-read TwinState (latest only)
-
-```typescript
-// Cache strategy for TwinState (most frequently read):
-// Key: twin_state:latest:{athlete_id}
-// TTL: 60 seconds (refreshed on every TwinState insert)
-// Fallback: PostgreSQL query on cache miss
-```
-
 ## Key Design Decisions
 
 **Why JSONB for personalisation models:** `AthleteProfile.gap_curve_model`, `banister_constants`, `cycle_personal_model`, `weather_response_model` are infrequently read (only during workout generation and plan generation), never queried across athletes, and have evolving schemas. JSONB avoids migrations as these models gain fields.
 
-**Why object storage for cleaned streams:** Cleaned time-series data is large (typically 5-50MB per session) and rarely accessed (only during segmentation and reprocessing). Storing in PostgreSQL BYTEA would balloon the DB size; object storage is cheaper and more appropriate for large binary data.
+**Why object storage for cleaned streams:** Cleaned time-series data is large (typically 5-50MB per session) and rarely accessed (only during segmentation and reprocessing). Storing in PostgreSQL BYTEA would balloon the DB size; object storage is cheaper and more appropriate for large binary data. Early-stage uses MinIO; production migration to AWS S3 is transparent to application code.
 
-**Why Redis for the task queue (not PostgreSQL):** PostgreSQL-backed queues (using SELECT FOR UPDATE SKIP LOCKED) are viable but add contention to the primary database. Redis provides lower-latency queue operations and native pub/sub for event routing without DB load.
+**Why PostgreSQL for the task queue (not Redis in early stage):** PostgreSQL-backed queues (`procrastinate 2.x`) are viable for early scale. While Redis provides lower-latency queue operations, the operational simplicity of a two-system stack (PostgreSQL + MinIO) outweighs the latency benefit at current scale. Procrastinate is treated as a transitional queue: if task volume grows, the intended migration is to Redis/Celery, not to Procrastinate 3.x. This justifies keeping the simpler 2.x URL-based configuration rather than adopting the psycopg3 connector required by 3.x.
 
 ## Index Strategy
 

@@ -19,7 +19,7 @@ Rules:
 - schemas/ → Pydantic contracts
 - services/ → business logic
 - repositories/ → DB access only
-- worker/ → ARQ jobs
+- worker/ → procrastinate jobs
 - agents/ → LangGraph DAGs
 
 ## Database
@@ -33,9 +33,10 @@ Rules:
 - CPU tasks → asyncio.to_thread()
 
 ## Background Jobs
-- ARQ + Redis
+- procrastinate (PostgreSQL-native async queue)
 - async def only
 - separate worker service
+- No Redis; job state lives in PostgreSQL alongside application data
 
 ## Storage
 - MinIO (S3-compatible)
@@ -46,12 +47,12 @@ Rules:
 - api:8000
 - worker
 - postgres:5432
-- redis:6379
 - minio:9000
+- litellm-proxy:4000
 
 Rules:
 - Frontend → API only
-- Worker triggered via Redis
+- Worker triggered via procrastinate (PostgreSQL-backed)
 
 ## List Endpoints (Non-Negotiable)
 - list_* service methods MUST return `tuple[list[Model], int]` — items and total count together
@@ -75,8 +76,12 @@ Rules:
 ## LLM Access (STRICT)
 ONLY app.core.llm_router.get_llm()
 
+LiteLLM proxy is the sole gateway to all models. The router calls the
+proxy endpoint; no agent or service ever calls a provider directly.
+
 Forbidden:
-- Provider SDKs
+- Direct provider SDKs (OpenAI, Anthropic, etc.)
 - Custom retries
 - Rate limiting logic
 - Provider-specific configs
+- Calling LiteLLM SDK directly — always go through get_llm()

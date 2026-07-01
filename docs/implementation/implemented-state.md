@@ -1,53 +1,52 @@
 # implemented-state
 
 Commit:
-80046e4
+489279f
 
 ## Change Set
 
 Base Commit:
-80046e4
+489279f
 
 Current Commit:
-80046e4
+489279f
 
 Files Added:
-- app/api/v1/workout.py
-- app/core/prompts/workout_gen_v1.md
-- app/repositories/generated_workout_repository.py
-- app/repositories/planned_session_repository.py
-- app/repositories/workout_step_repository.py
-- app/schemas/workout.py
-- app/services/workout_generation_agent.py
-- app/services/workout_generation_errors.py
-- app/services/workout_target_types.py
-- reports/Phase-1-2c-P1_validation.md
-- reports/phase-1-2b-p1-plan-sessions_validation.md
-- reports/phase-1-2b-p2-test-contract-alignment_validation.md
-- reports/phase-1-2b_validation.md
-- reports/phase-1-3-p1-onboarding-twin-bootstrap_validation.md
-- reports/phase-1-3-p1-onboarding-twin-bootstrap_validation_rerun.md
-- reports/phase-1-4-p1-plan-generation_validation.md
-- reports/phase-1-5a-P1_validation.md
-- reports/phase-1-5b-p1-workout-generation_validation.md
-- reports/phase-1-5b-p1-workout-generation_validation_updated.md
-- reports/phase-1-5b_devops.md
-- tests/integration/test_workout_endpoints.py
-- tests/test-manifest/phase-1-5b.yaml
-- tests/unit/test_generated_workout_repository.py
-- tests/unit/test_planned_session_repository.py
-- tests/unit/test_workout_generation_agent.py
-- tests/unit/test_workout_step_repository.py
-- tests/unit/test_workout_target_types.py
+- app/agents/post_workout_agent.py
+- app/api/v1/activity.py
+- app/core/prompts/post_workout_v1.md
+- app/repositories/activity_repository.py
+- app/schemas/activity.py
+- app/services/activity_ingestion_service.py
+- app/services/calibration_eligibility_service.py
+- app/services/compliance_service.py
+- app/services/fit_parser_service.py
+- app/services/load_computation_service.py
+- app/services/object_storage_client.py
+- app/services/twin_recalibration_service.py
+- app/worker/app.py
+- reports/Phase-1.7-P1_devops.md
+- reports/phase-1-6-7-8-p1_comprehensive_validation.md
+- reports/phase-1-6-p1_phase-1-7-p1_validation.md
+- tests/integration/test_activity_endpoints.py
+- tests/test-manifest/phase-1-6.yaml
+- tests/unit/test_activity_ingestion_service.py
+- tests/unit/test_calibration_eligibility_service.py
+- tests/unit/test_compliance_service.py
+- tests/unit/test_fit_parser_service.py
+- tests/unit/test_load_computation_service.py
+- tests/unit/test_object_storage_client.py
+- tests/unit/test_post_workout_agent.py
+- tests/unit/test_twin_recalibration_service.py
 
 Files Modified:
+- .env.test
 - app/api/v1/__init__.py
-- app/repositories/__init__.py
-- app/schemas/__init__.py
+- app/config.py
+- app/repositories/coaching_message_repository.py
 - app/services/__init__.py
-- app/services/context_budget_service.py
-- reports/test_history/latest.md
-- tests/conftest.py
+- docker-compose.yml
+- requirements.txt
 - tests/test-manifest/index.yaml
 
 Files Deleted:
@@ -58,16 +57,18 @@ Touched Areas:
 - services
 - api
 - app
+- requirements
+- root
 - other
 
 Generated:
-2026-06-29T03:41:56.142841+00:00 UTC
+2026-07-01T02:39:00.142247+00:00 UTC
 
 Current DB Revision:
-d1579f4430e7 (head)
+fd373abd4b9e (head) [fallback: latest migration file]
 
 Python Files Scanned:
-95
+107
 
 ---
 
@@ -141,6 +142,7 @@ Enums:
 ### Persistence Layer
 
 Repositories:
+- ActivityRepository -> Activity (app/repositories/activity_repository.py)
 - AthleteAuthRepository -> AthleteAuth (app/repositories/athlete_auth_repository.py)
 - AthleteFitnessRepository -> AthleteFitness (app/repositories/athlete_fitness_repository.py)
 - AthletePhysiologyRepository -> AthletePhysiology (app/repositories/athlete_physiology_repository.py)
@@ -173,17 +175,21 @@ Migrations:
 ### Service Layer
 
 Services:
+- ActivityIngestionService — app/services/activity_ingestion_service.py
 - AuthService — app/services/auth_service.py
 - ContextBudgetService — app/services/context_budget_service.py
 - EventPublisher — app/services/event_publisher.py
 - FirstMessageAgent — app/services/first_message_agent.py
 - FirstMessageAlreadyExistsError — app/services/first_message_agent.py
+- _BytesReader — app/services/fit_parser_service.py
+- ObjectStorageClient — app/services/object_storage_client.py
 - OnboardingService — app/services/onboarding_service.py
 - _GoalInput — app/services/onboarding_service.py
 - _PreferencesInput — app/services/onboarding_service.py
 - _ProfileInput — app/services/onboarding_service.py
 - TrainingLengthGateError — app/services/plan_generation_errors.py
 - PlanGenerationService — app/services/plan_generation_service.py
+- TwinRecalibrationService — app/services/twin_recalibration_service.py
 - WorkoutGenerationAgent — app/services/workout_generation_agent.py
 - PlannedSessionNotFoundError — app/services/workout_generation_errors.py
 - WorkoutAlreadyGeneratedError — app/services/workout_generation_errors.py
@@ -191,6 +197,11 @@ Services:
 ### API Surface
 
 Public API:
+- GET /api/v1/athletes/{athlete_id}/activities (app/api/v1/activity.py:257 list_activities, router=activity_router)
+- POST /api/v1/athletes/{athlete_id}/activities/upload (app/api/v1/activity.py:167 post_upload_activity, router=activity_router)
+- GET /api/v1/athletes/{athlete_id}/activities/{activity_id} (app/api/v1/activity.py:289 get_activity, router=activity_router)
+- POST /api/v1/athletes/{athlete_id}/activities/{activity_id}/analyse (app/api/v1/activity.py:309 post_analyse_activity, router=activity_router)
+- GET /api/v1/athletes/{athlete_id}/activities/{activity_id}/analysis (app/api/v1/activity.py:367 get_activity_analysis, router=activity_router)
 - POST /api/v1/athletes/{athlete_id}/coach/first-message (app/api/v1/coach.py:93 post_first_message, router=coach_router)
 - GET /api/v1/athletes/{athlete_id}/coach/messages (app/api/v1/coach.py:134 get_coach_messages, router=coach_router)
 - GET /api/v1/athletes/{athlete_id}/onboarding (app/api/v1/onboarding.py:181 get_onboarding, router=onboarding_router)
@@ -215,6 +226,13 @@ Public API:
 
 ### Contracts
 
+- ActivityListResponse — app/schemas/activity.py
+- ActivityNotFoundResponse — app/schemas/activity.py
+- ActivityResponse — app/schemas/activity.py
+- ActivityUploadResponse — app/schemas/activity.py
+- CoachingMessageSummary — app/schemas/activity.py
+- FitParseErrorResponse — app/schemas/activity.py
+- PostWorkoutAnalysisResponse — app/schemas/activity.py
 - AthleteResponse — app/schemas/auth.py
 - AuthResponse — app/schemas/auth.py
 - LoginRequest — app/schemas/auth.py
@@ -267,14 +285,14 @@ Public API:
 - Imports: AthleteAuthRepository, AthleteFitnessRepository, AthletePhysiologyRepository, AthletePreferencesRepository, AthleteProfileRepository, AthleteRepository, CheckpointRepository, CoachingMessageRepository, GeneratedWorkoutRepository, GenerationEventRepository, PlannedSessionRepository, RefreshTokenRepository, SystemEventOutboxRepository, SystemEventRepository, TrainingGoalRepository, TrainingPlanRepository, TwinStateRepository, WeeklyPlanRepository, WeeklySessionRepository, WorkoutStepRepository
 
 - app/services/__init__.py
-- Imports: AthleteNotFoundError, AthleteTwinContext, AuthError, AuthResult, AuthService, ComputedObservations, ContextBudgetService, CrossAthleteAccessError, DATA_TIER_TARGET_TYPE, DuplicateEmailError, EventPublisher, FirstMessageAgent, FirstMessageAlreadyExistsError, InvalidCredentialsError, InvalidGoalTypeError, InvalidRefreshTokenError, IssuedTokens, LLMServiceUnavailableError, OnboardingAlreadyCompleteError, OnboardingError, OnboardingIncompleteError, OnboardingResult, OnboardingService, OnboardingStatus, OutboxEvent, PlanGenerationError, PlanGenerationResult, PlanGenerationService, PlannedSessionNotFoundError, PreferencesSnapshot, ProfileSnapshot, PromptNotFoundError, PromptRegistry, SESSION_INTENT_MAP, SessionDayAssignment, TrainingGoalConflictError, TrainingLengthGateError, TwinContextAssembler, TwinContextSummary, UnauthenticatedError, WorkoutAlreadyGeneratedError, WorkoutGenerationAgent, WorkoutGenerationContractError, WorkoutGenerationError, WorkoutLLMServiceUnavailableError, _GoalInput, _PreferencesInput, _ProfileInput, get_step_physiological_intent
+- Imports: ActivityIngestionError, ActivityIngestionResult, ActivityIngestionService, AthleteNotFoundError, AthleteNotFoundForIngestionError, AthleteTwinContext, AuthError, AuthResult, AuthService, BanisterUpdateResult, CalibrationEligibilityService, ComplianceError, ComplianceFindings, ComplianceService, ComputedObservations, ContextBudgetService, CrossAthleteAccessError, DATA_TIER_TARGET_TYPE, DuplicateEmailError, EventPublisher, FirstMessageAgent, FirstMessageAlreadyExistsError, FitParseEmptyError, FitParseError, FitParserService, InvalidCredentialsError, InvalidGoalTypeError, InvalidRefreshTokenError, IssuedTokens, LLMServiceUnavailableError, LoadComputationError, LoadComputationInputs, LoadComputationService, LoadScores, MissingAthleteFitnessError, MissingHeartRateError, MissingTrainingGoalError, ObjectStorageClient, ObjectStorageConflictError, ObjectStorageError, ObjectStorageFailureError, ObjectStorageNotConfiguredError, ObjectStorageUploadError, OnboardingAlreadyCompleteError, OnboardingError, OnboardingIncompleteError, OnboardingResult, OnboardingService, OnboardingStatus, OutboxEvent, ParsedFitData, PlanGenerationError, PlanGenerationResult, PlanGenerationService, PlannedSessionNotFoundError, PreferencesSnapshot, ProfileSnapshot, PromptNotFoundError, PromptRegistry, RecalibrationResult, SESSION_INTENT_MAP, SessionDayAssignment, StoredFitObject, TrainingGoalConflictError, TrainingLengthGateError, TwinContextAssembler, TwinContextSummary, TwinRecalibrationError, TwinRecalibrationFailureError, TwinRecalibrationService, UnauthenticatedError, WorkoutAlreadyGeneratedError, WorkoutGenerationAgent, WorkoutGenerationContractError, WorkoutGenerationError, WorkoutLLMServiceUnavailableError, _BytesReader, _GoalInput, _PreferencesInput, _ProfileInput, estimate_max_hr_from_age, get_object_storage_client, get_step_physiological_intent, reset_object_storage_client
 
 - app/api/__init__.py
 - Imports: build_auth_service, build_onboarding_service, get_current_athlete_id, get_db, require_self
 
 - app/api/v1/__init__.py
-- Imports: APIRouter, auth_router, coach_router, health_router, onboarding_router, plan_router, workout_router
-- Includes: auth_router, coach_router, health_router, onboarding_router, plan_router, workout_router
+- Imports: APIRouter, activity_router, auth_router, coach_router, health_router, onboarding_router, plan_router, workout_router
+- Includes: activity_router, auth_router, coach_router, health_router, onboarding_router, plan_router, workout_router
 
 ---
 
@@ -283,9 +301,32 @@ Public API:
 ### Dependency Changes
 
 requirements.txt
-No changes detected
+Added:
+- boto3>=1.34.0
+- fitparse>=1.2.0
+- procrastinate>=2.0,<3.0
+- python-multipart>=0.0.9
+
+Updated:
+- none
+
+Removed:
+- none
 
 ### Service Wiring
+
+ActivityIngestionService
+ ├── ActivityRepository
+ ├── CalibrationEligibilityService
+ ├── FitParserService
+ ├── LoadComputationService
+ ├── Optional[CalibrationEligibilityService]
+ ├── Optional[EventPublisher]
+ ├── Optional[FitParserService]
+ ├── Optional[LoadComputationService]
+ ├── Optional[ObjectStorageClient]
+ ├── Optional[TwinRecalibrationService]
+ ... +3 more
 
 AuthService
  ├── AthleteAuthRepository
@@ -323,6 +364,9 @@ FirstMessageAgent
 FirstMessageAlreadyExistsError
  └── uuid.UUID
 
+ObjectStorageClient
+ └── none
+
 OnboardingService
  ├── AthleteFitnessRepository
  ├── AthletePhysiologyRepository
@@ -355,6 +399,12 @@ PlannedSessionNotFoundError
 TrainingLengthGateError
  └── none
 
+TwinRecalibrationService
+ ├── AthleteFitnessRepository
+ ├── AthletePhysiologyRepository
+ ├── TrainingGoalRepository
+ └── TwinStateRepository
+
 WorkoutAlreadyGeneratedError
  └── uuid.UUID
 
@@ -369,6 +419,9 @@ WorkoutGenerationAgent
  ├── SystemEventRepository
  ├── TwinStateRepository
  └── WorkoutStepRepository
+
+_BytesReader
+ └── bytes
 
 _GoalInput
  ├── Any
@@ -389,13 +442,16 @@ _ProfileInput
 
 api dependencies: partial
 models: complete
-repositories: complete
+repositories: partial
 routers: complete
-schemas: complete
+schemas: partial
 services: complete
 
 ### Event Producers
 
+- app/agents/post_workout_agent.py:380 PostWorkoutAgent.generate publish -> coaching_message_generated [uncommitted]
+- app/services/activity_ingestion_service.py:358 ActivityIngestionService.ingest publish -> activity_ingested [uncommitted]
+- app/services/activity_ingestion_service.py:436 ActivityIngestionService.ingest_async publish -> activity_ingested [uncommitted]
 - app/services/auth_service.py:170 AuthService.register publish -> athlete_registered [after_commit]
 - app/services/auth_service.py:274 AuthService.login publish -> athlete_logged_in [after_commit]
 - app/services/auth_service.py:367 AuthService.rotate_refresh_token publish -> athlete_logged_in [after_commit]
@@ -407,6 +463,8 @@ services: complete
 ### Transaction Boundaries
 
 Commits:
+- app/api/v1/activity.py:233 post_upload_activity session.commit
+- app/api/v1/activity.py:346 post_analyse_activity session.commit
 - app/api/v1/coach.py:126 post_first_message session.commit
 - app/api/v1/workout.py:174 get_today session.commit
 - app/api/v1/workout.py:262 post_generate_workout session.commit
@@ -418,8 +476,13 @@ Commits:
 - app/services/onboarding_service.py:671 OnboardingService.update_preferences self.session.commit
 - app/services/plan_generation_service.py:766 PlanGenerationService._persist_full_plan self.session.commit
 - app/tasks/discard_refresh_token_ips.py:48 discard_refresh_token_ips session.commit
+- app/worker/app.py:133 fit_ingest session.commit
+- app/worker/app.py:189 recalibrate_twin session.commit
 
 Flushes:
+- app/repositories/activity_repository.py:62 ActivityRepository.add self.session.flush
+- app/repositories/activity_repository.py:88 ActivityRepository.update_load_scores self.session.flush
+- app/repositories/activity_repository.py:109 ActivityRepository.update_calibration_eligibility self.session.flush
 - app/repositories/athlete_auth_repository.py:56 AthleteAuthRepository.add self.session.flush
 - app/repositories/athlete_auth_repository.py:63 AthleteAuthRepository.touch_last_login self.session.flush
 - app/repositories/athlete_fitness_repository.py:42 AthleteFitnessRepository.add self.session.flush
@@ -442,6 +505,7 @@ Flushes:
 - app/repositories/weekly_plan_repository.py:44 WeeklyPlanRepository.add_many self.session.flush
 - app/repositories/weekly_plan_repository.py:102 WeeklySessionRepository.add_many self.session.flush
 - app/repositories/workout_step_repository.py:64 WorkoutStepRepository.insert_many self.session.flush
+- app/services/activity_ingestion_service.py:540 ActivityIngestionService._run_ingestion_pipeline self.session.flush
 - app/services/auth_service.py:361 AuthService.rotate_refresh_token self.session.flush
 - app/services/onboarding_service.py:351 OnboardingService.complete_onboarding self.session.flush
 - app/services/onboarding_service.py:481 OnboardingService.complete_onboarding self.session.flush
@@ -455,11 +519,13 @@ Flushes:
 
 AsyncSession imports:
 - app/api/deps.py
+- app/api/v1/activity.py
 - app/api/v1/coach.py
 - app/api/v1/health.py
 - app/api/v1/plan.py
 - app/api/v1/workout.py
 - app/db/session.py
+- app/repositories/activity_repository.py
 - app/repositories/athlete_auth_repository.py
 - app/repositories/athlete_fitness_repository.py
 - app/repositories/athlete_physiology_repository.py
@@ -479,12 +545,21 @@ AsyncSession imports:
 - app/repositories/twin_state_repository.py
 - app/repositories/weekly_plan_repository.py
 - app/repositories/workout_step_repository.py
+- app/services/activity_ingestion_service.py
 - app/services/auth_service.py
 - app/services/health_service.py
 - app/services/onboarding_service.py
 - app/services/plan_generation_service.py
+- app/services/twin_recalibration_service.py
 
 Repository dependencies:
+- app/agents/post_workout_agent.py: SystemEventOutboxRepository
+- app/agents/post_workout_agent.py: SystemEventRepository
+- app/api/v1/activity.py: ActivityRepository
+- app/api/v1/activity.py: CoachingMessageRepository
+- app/api/v1/activity.py: GenerationEventRepository
+- app/api/v1/activity.py: PlannedSessionRepository
+- app/api/v1/activity.py: TwinStateRepository
 - app/api/v1/coach.py: AthletePreferencesRepository
 - app/api/v1/coach.py: AthleteProfileRepository
 - app/api/v1/coach.py: CoachingMessageRepository
@@ -502,6 +577,9 @@ Repository dependencies:
 - app/api/v1/workout.py: TrainingPlanRepository
 - app/api/v1/workout.py: TwinStateRepository
 - app/api/v1/workout.py: WorkoutStepRepository
+- app/services/activity_ingestion_service.py: ActivityRepository
+- app/services/activity_ingestion_service.py: SystemEventOutboxRepository
+- app/services/activity_ingestion_service.py: SystemEventRepository
 - app/services/auth_service.py: AthleteAuthRepository
 - app/services/auth_service.py: AthleteProfileRepository
 - app/services/auth_service.py: AthleteRepository
@@ -529,20 +607,27 @@ Repository dependencies:
 - app/services/plan_generation_service.py: TwinStateRepository
 - app/services/plan_generation_service.py: WeeklyPlanRepository
 - app/services/plan_generation_service.py: WeeklySessionRepository
+- app/services/twin_recalibration_service.py: AthleteFitnessRepository
+- app/services/twin_recalibration_service.py: AthletePhysiologyRepository
+- app/services/twin_recalibration_service.py: TrainingGoalRepository
+- app/services/twin_recalibration_service.py: TwinStateRepository
 - app/services/workout_generation_agent.py: SystemEventOutboxRepository
 - app/services/workout_generation_agent.py: SystemEventRepository
 - app/tasks/discard_refresh_token_ips.py: RefreshTokenRepository
+- app/worker/app.py: ActivityRepository
 
 ### Execution Readiness
 
 Current Revision:
-d1579f4430e7 (head)
+fd373abd4b9e (head) [fallback: latest migration file]
 
 Migration Pending:
-yes
+unknown
 
 Missing Exports:
 - app/api/__init__.py: Missing [build_onboarding_service_with_plan, build_plan_service]
+- app/repositories/__init__.py: Missing [ActivityRepository]
+- app/schemas/__init__.py: Missing [ActivityListResponse, ActivityNotFoundResponse, ActivityResponse, ActivityUploadResponse, CoachingMessageSummary, FitParseErrorResponse, PostWorkoutAnalysisResponse]
 
 ### Snapshot Reliability
 

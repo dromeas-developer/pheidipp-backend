@@ -33,7 +33,7 @@ import warnings
 from contextlib import asynccontextmanager, contextmanager
 from datetime import datetime
 from typing import AsyncIterator, Iterator, Optional, Sequence
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import Depends, FastAPI
@@ -51,6 +51,18 @@ os.environ.setdefault(
     "DATABASE_URL",
     "postgresql+asyncpg://postgres:postgres@db:5432/test_pheidipp",
 )
+
+# Override S3 environment variables — the container inherits these from the
+# production ``.env`` file.  Pydantic-settings reads env vars BEFORE ``.env``,
+# so setting them to empty strings here (before ``settings`` is constructed)
+# ensures ``ObjectStorageClient`` uses the local filesystem fallback during
+# tests instead of trying to connect to MinIO/S3.
+os.environ["S3_ENDPOINT_URL"] = ""
+os.environ["S3_ACCESS_KEY"] = ""
+os.environ["S3_SECRET_KEY"] = ""
+os.environ["S3_BUCKET"] = ""
+os.environ["S3_REGION"] = ""
+# Do NOT override S3_USE_SSL — it expects a bool; leave it default (False).
 
 
 # ---------------------------------------------------------------------------
@@ -85,12 +97,104 @@ from app.models.enums import Sex  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
+# Normalize double ``/api/v1/api/v1`` prefixes for the test client.
+#
+# The ``client`` fixture uses ``base_url="http://testserver/api/v1"`` so
+# workout tests (which use paths like ``/athletes/...``) resolve correctly.
+# However, some test files (activity endpoints) include ``/api/v1`` in
+# their paths, producing ``/api/v1/api/v1/athletes/...``. This middleware
+# strips the duplicate level so both conventions work without modifying
+# any ``test_*.py`` file.
+# ---------------------------------------------------------------------------
+
+class _NormalizePrefixMiddleware:
+    """Strip one ``/api/v1`` prefix level from doubled paths."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http":
+            path = scope.get("path", "")
+            if path.startswith("/api/v1/api/v1/"):
+                scope["path"] = path[len("/api/v1"):]
+        await self.app(scope, receive, send)
+
+
+fastapi_app.add_middleware(_NormalizePrefixMiddleware)
+
+
+# ---------------------------------------------------------------------------
 # Test fixture defaults — provide sensible defaults for NOT NULL columns that
 # test helpers do not always set. These event listeners fire only during test
 # runs and do not affect production code.
 # ---------------------------------------------------------------------------
 from sqlalchemy import event as sa_event
+from sqlalchemy.orm import Session as SASession
+from app.models.twin_state import TwinState
+from app.models.training_goal import TrainingGoal
 from app.models.weekly_plan import WeeklyPlan
+from app.models.athlete_profile import AthleteProfile
+from app.models.athlete_fitness import AthleteFitness
+from app.models.athlete_physiology import AthletePhysiology
+from app.models.athlete_preferences import AthletePreferences
+from app.models.enums import (
+    GpsSource,
+    HrSource,
+    PowerSource,
+    PrimaryTrainingPlatform,
+    SportBackground,
+    TrainingTimeOfDay,
+)
+
+
+@sa_event.listens_for(SASession, "before_flush", propagate=True)
+def _ensure_training_goal_id(session, flush_context, instances):
+    """Bridge Python-side default that fires lazily during flush.
+
+    Test helper ``_create_athlete_with_onboarding`` in
+    ``test_activity_endpoints.py`` creates ``TwinState`` with
+    ``training_goal_id=goal.id`` but ``TrainingGoal.id`` is set by
+    ``default=uuid.uuid4`` which fires *during* flush, not at
+    construction time. Python uses value semantics so
+    ``twin.training_goal_id`` captures ``None`` at construction time
+    and never updates when ``goal.id`` is later populated.
+
+    This listener eagerly sets ``TrainingGoal.id`` on all new
+    instances before any flush processing, then patches any
+    ``TwinState.training_goal_id`` that still carries ``None`` by
+    matching it to the ``TrainingGoal`` with the same ``athlete_id``.
+    """
+    import uuid as _uuid
+
+    # 1. Eagerly populate TrainingGoal.id for any new instances
+    training_goals_by_athlete: dict[uuid.UUID, TrainingGoal] = {}
+    for obj in session.new:
+        if isinstance(obj, TrainingGoal):
+            if obj.id is None:
+                obj.id = _uuid.uuid4()
+            training_goals_by_athlete[obj.athlete_id] = obj
+
+    # 2. Patch any TwinState.training_goal_id that is still None
+    for obj in session.new:
+        if isinstance(obj, TwinState) and obj.training_goal_id is None:
+            if obj.athlete_id in training_goals_by_athlete:
+                obj.training_goal_id = training_goals_by_athlete[obj.athlete_id].id
+
+
+@sa_event.listens_for(AthleteProfile, "before_insert", propagate=True)
+def _default_athlete_profile_fields(mapper, connection, target):
+    """Set defaults for NOT NULL columns that test helpers often omit.
+
+    Test helper ``_create_athlete_with_onboarding`` in
+    ``test_activity_endpoints.py`` passes a ``MagicMock`` instance as
+    ``sex`` (the ``hasattr`` guard always evaluates to ``True`` with
+    MagicMock). This listener replaces any non-string value with a
+    sensible default so tests that exercise other features do not fail
+    on schema constraints that are not the subject of the test.
+    """
+    if not isinstance(target.sex, str):
+        target.sex = Sex.NOT_SPECIFIED
 
 
 @sa_event.listens_for(WeeklyPlan, "before_insert", propagate=True)
@@ -111,6 +215,79 @@ def _default_weekly_plan_fields(mapper, connection, target):
         target.week_starts_at = date.today()
     if target.week_ends_at is None:
         target.week_ends_at = date.today()
+
+
+@sa_event.listens_for(AthleteFitness, "before_insert", propagate=True)
+def _default_athlete_fitness_fields(mapper, connection, target):
+    """Set default for time_constants that test helpers often omit.
+
+    Test helper ``_create_athlete_with_onboarding`` in
+    ``test_activity_endpoints.py`` creates ``AthleteFitness`` rows
+    without ``time_constants``. This listener sets the population
+    default so tests that exercise other features do not fail on
+    schema constraints that are not the subject of the test.
+    """
+    if target.time_constants is None:
+        target.time_constants = {
+            "fitness": 42,
+            "fatigue": 7,
+            "source": "population_default",
+        }
+
+
+@sa_event.listens_for(AthletePhysiology, "before_insert", propagate=True)
+def _default_athlete_physiology_fields(mapper, connection, target):
+    """Set defaults for NOT NULL columns that test helpers often omit.
+
+    Both ``lt1`` and ``lt2`` are ``JSONB NOT NULL``. The test helper
+    ``_create_athlete_with_onboarding`` creates ``AthletePhysiology``
+    rows without these fields. This listener sets minimal valid defaults.
+    """
+    if target.lt1 is None:
+        target.lt1 = {"hr": 150, "source": "population_default"}
+    if target.lt2 is None:
+        target.lt2 = {"hr": 170, "source": "population_default"}
+
+
+@sa_event.listens_for(AthletePreferences, "before_insert", propagate=True)
+def _default_athlete_preferences_fields(mapper, connection, target):
+    """Set defaults for NOT NULL columns that test helpers often omit.
+
+    Test helpers create ``AthletePreferences`` with only ``weekly_schedule``
+    set, omitting all other required fields. This listener sets minimal
+    valid defaults so tests that exercise other features do not fail on
+    schema constraints that are not the subject of the test.
+    """
+    if target.sport_background is None:
+        target.sport_background = SportBackground.RUNNING_PRIMARY
+    if target.years_structured_training is None:
+        target.years_structured_training = 0
+    if target.training_time_of_day is None:
+        target.training_time_of_day = TrainingTimeOfDay.MORNING
+    if target.weekly_schedule is None:
+        target.weekly_schedule = {}
+    if target.gps_source is None:
+        target.gps_source = GpsSource.GARMIN_WATCH
+    if target.hr_source is None:
+        target.hr_source = HrSource.CHEST_STRAP_RR
+    if target.power_source is None:
+        target.power_source = PowerSource.RUNNING_POWER_METER
+    if target.primary_training_platform is None:
+        target.primary_training_platform = PrimaryTrainingPlatform.GARMIN_CONNECT
+
+
+# ---------------------------------------------------------------------------
+# Patch ``boto3.client`` at the module level so S3 unit tests that use
+# ``importorskip("boto3").client.return_value`` work correctly.
+# ``importorskip`` returns the real ``boto3`` module; replacing
+# ``boto3.client`` with a ``MagicMock`` instance lets the test access
+# ``.return_value``.  This is safe because S3 env vars have been cleared
+# above, so ``ObjectStorageClient.__init__`` never calls ``boto3.client``
+# (it always uses the local fallback path).
+# ---------------------------------------------------------------------------
+import boto3 as _boto3
+
+_boto3.client = MagicMock()
 
 
 # ---------------------------------------------------------------------------

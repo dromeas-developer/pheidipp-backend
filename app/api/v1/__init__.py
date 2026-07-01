@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter
 
+from app.api.v1.activity import activity_router
 from app.api.v1.auth import auth_router
 from app.api.v1.coach import coach_router
 from app.api.v1.health import health_router
@@ -17,3 +18,4 @@ api_router.include_router(onboarding_router)
 api_router.include_router(plan_router)
 api_router.include_router(coach_router)
 api_router.include_router(workout_router)
+api_router.include_router(activity_router)

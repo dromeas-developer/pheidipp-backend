@@ -1,5 +1,13 @@
 """Service layer for Pheidipp domain operations."""
 
+from app.services.activity_ingestion_service import (
+    ActivityIngestionError,
+    ActivityIngestionResult,
+    ActivityIngestionService,
+    AthleteNotFoundForIngestionError,
+    ObjectStorageFailureError,
+    TwinRecalibrationFailureError,
+)
 from app.services.auth_errors import (
     AuthError,
     CrossAthleteAccessError,
@@ -10,12 +18,45 @@ from app.services.auth_errors import (
 )
 from app.services.auth_results import AuthResult, IssuedTokens
 from app.services.auth_service import AuthService
+from app.services.calibration_eligibility_service import (
+    CalibrationEligibilityService,
+)
+from app.services.compliance_service import (
+    ComplianceError,
+    ComplianceFindings,
+    ComplianceService,
+)
 from app.services.context_budget_service import ContextBudgetService
 from app.services.event_publisher import EventPublisher, OutboxEvent
+from app.services.fit_parser_service import (
+    FitParseEmptyError,
+    FitParseError,
+    FitParserService,
+    ParsedFitData,
+    _BytesReader,
+)
 from app.services.first_message_agent import (
     FirstMessageAgent,
     FirstMessageAlreadyExistsError,
     LLMServiceUnavailableError,
+)
+from app.services.load_computation_service import (
+    LoadComputationError,
+    LoadComputationInputs,
+    LoadComputationService,
+    LoadScores,
+    MissingHeartRateError,
+    estimate_max_hr_from_age,
+)
+from app.services.object_storage_client import (
+    ObjectStorageClient,
+    ObjectStorageConflictError,
+    ObjectStorageError,
+    ObjectStorageNotConfiguredError,
+    ObjectStorageUploadError,
+    StoredFitObject,
+    get_object_storage_client,
+    reset_object_storage_client,
 )
 from app.services.onboarding_errors import (
     AthleteNotFoundError,
@@ -47,6 +88,14 @@ from app.services.plan_generation_service import (
     SessionDayAssignment,
 )
 from app.core.prompt_registry import PromptNotFoundError, PromptRegistry
+from app.services.twin_recalibration_service import (
+    BanisterUpdateResult,
+    MissingAthleteFitnessError,
+    MissingTrainingGoalError,
+    RecalibrationResult,
+    TwinRecalibrationError,
+    TwinRecalibrationService,
+)
 from app.services.workout_generation_agent import WorkoutGenerationAgent
 from app.services.workout_generation_errors import (
     LLMServiceUnavailableError as WorkoutLLMServiceUnavailableError,
@@ -68,16 +117,28 @@ from app.services.twin_context_assembler import (
 )
 
 __all__ = [
+    "ActivityIngestionError",
+    "ActivityIngestionResult",
+    "ActivityIngestionService",
     "AthleteNotFoundError",
+    "AthleteNotFoundForIngestionError",
     "AthleteTwinContext",
     "AuthError",
     "AuthResult",
     "AuthService",
+    "BanisterUpdateResult",
+    "CalibrationEligibilityService",
+    "ComplianceError",
+    "ComplianceFindings",
+    "ComplianceService",
     "ContextBudgetService",
     "CrossAthleteAccessError",
     "DATA_TIER_TARGET_TYPE",
     "DuplicateEmailError",
     "EventPublisher",
+    "FitParseEmptyError",
+    "FitParseError",
+    "FitParserService",
     "FirstMessageAgent",
     "FirstMessageAlreadyExistsError",
     "InvalidCredentialsError",
@@ -85,6 +146,19 @@ __all__ = [
     "InvalidRefreshTokenError",
     "IssuedTokens",
     "LLMServiceUnavailableError",
+    "LoadComputationError",
+    "LoadComputationInputs",
+    "LoadComputationService",
+    "LoadScores",
+    "MissingAthleteFitnessError",
+    "MissingHeartRateError",
+    "MissingTrainingGoalError",
+    "ObjectStorageClient",
+    "ObjectStorageConflictError",
+    "ObjectStorageError",
+    "ObjectStorageFailureError",
+    "ObjectStorageNotConfiguredError",
+    "ObjectStorageUploadError",
     "OnboardingAlreadyCompleteError",
     "OnboardingError",
     "OnboardingIncompleteError",
@@ -92,6 +166,7 @@ __all__ = [
     "OnboardingService",
     "OnboardingStatus",
     "OutboxEvent",
+    "ParsedFitData",
     "PlanGenerationError",
     "PlanGenerationResult",
     "PlanGenerationService",
@@ -100,21 +175,30 @@ __all__ = [
     "ProfileSnapshot",
     "PromptNotFoundError",
     "PromptRegistry",
+    "RecalibrationResult",
     "SESSION_INTENT_MAP",
     "SessionDayAssignment",
+    "StoredFitObject",
     "TrainingGoalConflictError",
     "TrainingLengthGateError",
     "TwinContextAssembler",
     "TwinContextSummary",
+    "TwinRecalibrationError",
+    "TwinRecalibrationFailureError",
+    "TwinRecalibrationService",
     "UnauthenticatedError",
     "WorkoutAlreadyGeneratedError",
     "WorkoutGenerationAgent",
     "WorkoutGenerationContractError",
     "WorkoutGenerationError",
     "WorkoutLLMServiceUnavailableError",
+    "_BytesReader",
     "_GoalInput",
     "_PreferencesInput",
     "_ProfileInput",
     "ComputedObservations",
+    "estimate_max_hr_from_age",
+    "get_object_storage_client",
     "get_step_physiological_intent",
+    "reset_object_storage_client",
 ]

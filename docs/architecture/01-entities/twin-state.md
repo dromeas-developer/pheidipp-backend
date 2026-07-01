@@ -231,7 +231,7 @@ Auth: Bearer JWT, require_self
 -   Reads from single TwinState record; no joins needed.
 -   `get_latest(athlete_id)` is the most frequent query in the system — indexed on `(athlete_id, created_at DESC)`.
 -   History endpoint bounded by `limit` parameter (max 100).
--   p95 latency for `GET /twin`: < 50ms.
+-   p95 latency for `GET /twin`: < 50ms (served directly from PostgreSQL covering index; cache re-evaluated if latency degrades at scale).
 
 ## Index Strategy
 

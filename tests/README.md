@@ -357,3 +357,64 @@ bash scripts/run-tests.sh tests/ -v
 - `pytest.ini` — Pytest configuration
 - `docs/vision/` — Product vision and constraints
 - `docs/adr/` — Architecture decision records
+
+---
+
+## Dated Lessons (2026-07-01)
+
+### planned_session_id must be explicitly set to None in post_workout_agent tests
+
+**Symptom:** Test receives real LLM response (~5 paragraphs) instead of mocked 3-paragraph response; validation fails with `PostWorkoutContractError`.
+
+**Root cause:** When `MagicMock(spec=Activity)` is created without explicitly setting `planned_session_id`, the auto-created `MagicMock()` value is truthy. This causes the agent to enter the `if activity.planned_session_id is not None` branch, calling `_format_phase_position` with a MagicMock planned session, which produces garbage strings in the LLM context.
+
+**Pattern that failed:**
+```python
+mock_activity = MagicMock(spec=Activity)
+# planned_session_id not set → auto-creates truthy MagicMock
+```
+
+**Pattern to use instead:**
+```python
+mock_activity = MagicMock(spec=Activity)
+mock_activity.planned_session_id = None  # Explicitly set to skip planned session path
+```
+
+### Patch target must match import style in post_workout_agent
+
+**Symptom:** Mock doesn't intercept; real LiteLLM call goes through; test fails with real response instead of mock.
+
+**Root cause:** `from openai import AsyncOpenAI` creates a local reference in `app.agents.post_workout_agent`. `patch("openai.AsyncOpenAI")` replaces the module-level name but the agent already has its own copy.
+
+**Pattern that failed:**
+```python
+@patch("openai.AsyncOpenAI")  # Wrong target
+```
+
+**Pattern to use instead:**
+```python
+@patch("app.agents.post_workout_agent.AsyncOpenAI")  # Correct target
+```
+
+### Method name mismatch: update vs update_load_scores
+
+**Symptom:** Mock assertion fails with "Expected 'update' to have been called once. Called 0 times."
+
+**Root cause:** Test mocks `mock_repo.update` but the actual code calls `mock_repo.update_load_scores`. The mock was set up for the wrong method name.
+
+**Pattern that failed:**
+```python
+mock_repo.update = AsyncMock()
+# ... later ...
+mock_repo.update.assert_called_once()  # Code calls update_load_scores, not update!
+```
+
+**Pattern to use instead:**
+```python
+mock_repo.update_load_scores = AsyncMock()
+# ... later ...
+mock_repo.update_load_scores.assert_called_once()
+# Optionally verify parameters:
+call_args = mock_repo.update_load_scores.call_args
+assert call_args.kwargs["aerobic_load"] == expected_value
+```

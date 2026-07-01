@@ -1,0 +1,348 @@
+# Test manifest for Phase-1.6-P1 — Simple FIT Import & Post-Workout
+# Plan IDs: Phase-1.6-P1, Phase-1.7-P1, Phase-1.8-P1
+#
+# Architecture context (per Phase-1.7-P1 and Phase-1.8-P1):
+# - Procrastinate replaces ARQ/Redis as the task queue backend
+# - MinIO is the object storage backend (S3-compatible, local fallback for dev)
+# - POST /upload returns 202 Accepted with task_id (not 201 Created)
+# - Heavy processing (FIT parsing, load computation, twin recalibration) runs async
+# - activity_ingested event is published AFTER the producing transaction commits
+# - _BytesReader is exported from app.services (Phase-1.8 fix)
+version: "1.0"
+plan_id: "Phase-1.6-P1"
+
+generated_at: "2026-06-30T00:00:00Z"
+last_reviewed_at: "2026-06-30T00:00:00Z"
+
+features:
+  fit_parser_service:
+    status: generated
+    plan: "docs/implementation/phase-1/phase-1-6-p1-simple-fit-import.md"
+    owned_by_plan:
+      - "Phase-1.6-P1"
+    description: "FitParserService — parse FIT files, extract HR records, duration, start_time"
+    protects:
+      - "FitParserService must receive raw records, not summary stats"
+      - "No avg_hr, avg_pace stored on Activity"
+      - "FitParseError raised for corrupt/unsupported files"
+      - "FitParseEmptyError raised when no HR records found"
+    impacts: []
+    execution_prerequisites:
+      migrations: false
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit:
+        - path: "tests/unit/test_fit_parser_service.py"
+          owner: "Phase-1.6-P1"
+
+  load_computation_service:
+    status: generated
+    plan: "docs/implementation/phase-1/phase-1-6-p1-simple-fit-import.md"
+    owned_by_plan:
+      - "Phase-1.6-P1"
+    description: "LoadComputationService — compute aerobic_load from HR data (HR-reserve formula)"
+    protects:
+      - "LoadComputationService receives raw HR records from FitParserService"
+      - "aerobic_load computed, neuromuscular_load and structural_load always None in Phase 1.6"
+      - "MissingHeartRateError raised when parsed FIT has no HR records"
+    impacts: []
+    execution_prerequisites:
+      migrations: false
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit:
+        - path: "tests/unit/test_load_computation_service.py"
+          owner: "Phase-1.6-P1"
+
+  twin_recalibration_service:
+    status: generated
+    plan: "docs/implementation/phase-1/phase-1-6-p1-simple-fit-import.md"
+    owned_by_plan:
+      - "Phase-1.6-P1"
+    description: "TwinRecalibrationService — Banister update + append-only TwinState"
+    protects:
+      - "TwinState append-only — new record inserted, never updated"
+      - "Banister update writes in-place to AthleteFitness.aggregate block"
+      - "form = fitness - fatigue invariant enforced by DB constraint"
+      - "MissingTrainingGoalError when no active TrainingGoal"
+      - "MissingAthleteFitnessError when no AthleteFitness row"
+      - "New TwinState has trigger = activity_sync"
+    impacts: []
+    execution_prerequisites:
+      migrations: true
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit:
+        - path: "tests/unit/test_twin_recalibration_service.py"
+          owner: "Phase-1.6-P1"
+
+  compliance_service:
+    status: generated
+    plan: "docs/implementation/phase-1/phase-1-6-p1-simple-fit-import.md"
+    owned_by_plan:
+      - "Phase-1.6-P1"
+    description: "ComplianceService — compare actual session to prescribed PlannedSession"
+    protects:
+      - "duration_delta_pct computed as (actual - prescribed) / prescribed * 100"
+      - "session_type_match: True when no prescribed session or source != manual_entry"
+      - "No prescribed session returns has_prescribed_session=False"
+    impacts: []
+    execution_prerequisites:
+      migrations: true
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit:
+        - path: "tests/unit/test_compliance_service.py"
+          owner: "Phase-1.6-P1"
+
+  calibration_eligibility_service:
+    status: generated
+    plan: "docs/implementation/phase-1/phase-1-6-p1-simple-fit-import.md"
+    owned_by_plan:
+      - "Phase-1.6-P1"
+    description: "CalibrationEligibilityService — gate for calibration eligibility (Phase 1.6: always False)"
+    protects:
+      - "Phase 1.6: all activities return calibration_eligible = False"
+      - "Gate is hard-wired, never manually overridden"
+    impacts: []
+    execution_prerequisites:
+      migrations: false
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit:
+        - path: "tests/unit/test_calibration_eligibility_service.py"
+          owner: "Phase-1.6-P1"
+
+  object_storage_client:
+    status: generated
+    plan: "docs/implementation/phase-1/phase-1-6-p1-simple-fit-import.md"
+    owned_by_plan:
+      - "Phase-1.7-P1"
+    description: "ObjectStorageClient — S3-compatible FIT file storage with MinIO support and local fallback"
+    protects:
+      - "Raw FIT files are never overwritten or deleted"
+      - "ObjectStorageConflictError raised when key already exists"
+      - "Local fallback used when S3_ENDPOINT_URL and credentials are not set"
+      - "upload_fit returns StoredFitObject with key, byte_count, content_md5"
+    impacts: []
+    execution_prerequisites:
+      migrations: false
+      seed_data: false
+      external_services:
+        - "MinIO (or local filesystem fallback)"
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit:
+        - path: "tests/unit/test_object_storage_client.py"
+          owner: "Phase-1.6-P1"
+
+  post_workout_agent:
+    status: generated
+    plan: "docs/implementation/phase-1/phase-1-6-p1-simple-fit-import.md"
+    owned_by_plan:
+      - "Phase-1.6-P1"
+    description: "PostWorkoutAgent — idempotent three-paragraph post-workout message generation"
+    protects:
+      - "Idempotent: second call returns existing CoachingMessage without LLM call"
+      - "Every LLM call writes GenerationEvent before the call"
+      - "GenerationEvent.failure_reason non-null when success=false"
+      - "Three-paragraph output enforced by _validate_three_paragraphs"
+      - "Agent does NOT commit — caller owns transaction boundary"
+    impacts: []
+    execution_prerequisites:
+      migrations: true
+      seed_data: false
+      external_services:
+        - "LiteLLM proxy"
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit:
+        - path: "tests/unit/test_post_workout_agent.py"
+          owner: "Phase-1.6-P1"
+
+  activity_ingestion_service:
+    status: generated
+    plan: "docs/implementation/phase-1/phase-1-6-p1-simple-fit-import.md"
+    owned_by_plan:
+      - "Phase-1.6-P1"
+      - "Phase-1.8-P1"
+    description: "ActivityIngestionService — orchestrate FIT upload pipeline (staging + async pipeline)"
+    protects:
+      - "Object storage upload happens BEFORE Activity record creation"
+      - "fit_file_key always set for source != manual_entry"
+      - "Load scores null at initial creation, populated by LoadComputationService"
+      - "calibration_eligible = false (Phase 1.6 simplification)"
+      - "TwinState append-only via ingest_async"
+      - "activity_ingested event published inside same transaction as Activity updates"
+      - "Service does NOT commit — caller owns transaction boundary"
+    impacts: []
+    execution_prerequisites:
+      migrations: true
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit:
+        - path: "tests/unit/test_activity_ingestion_service.py"
+          owner: "Phase-1.6-P1"
+
+  activity_api_endpoints:
+    status: generated
+    plan: "docs/implementation/phase-1/phase-1-6-p1-simple-fit-import.md"
+    owned_by_plan:
+      - "Phase-1.6-P1"
+      - "Phase-1.8-P1"
+    description: "Activity API endpoints — POST /upload (202), GET, POST /analyse, GET /analysis"
+    protects:
+      - "POST /upload returns 202 Accepted with task_id (not 201 Created)"
+      - "POST /upload commits BEFORE enqueueing fit_ingest task"
+      - "Object storage failure returns 503 and creates no Activity"
+      - "POST /analyse is idempotent — returns existing message on second call"
+      - "require_self auth: JWT athlete_id must match path parameter (403 on mismatch)"
+      - "Cross-athlete access returns 403 (require_self)"
+    impacts:
+      - "activity_ingestion_service"
+    execution_prerequisites:
+      migrations: true
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: false
+      passed: false
+    tests:
+      integration:
+        - path: "tests/integration/test_activity_endpoints.py"
+          owner: "Phase-1.6-P1"
+
+  activity_dedup_invariant:
+    status: generated
+    plan: "docs/implementation/phase-1/phase-1-2a-p1-profile-preferences-activity.md"
+    owned_by_plan:
+      - "Phase-1.2a-P1"
+    description: "Activity deduplication: (athlete_id, external_id, source) unique where external_id IS NOT NULL"
+    protects:
+      - "Duplicate (athlete_id, external_id, source) with non-null external_id raises IntegrityError"
+      - "manual_entry with external_id=NULL can have multiple rows (no dedup index)"
+    impacts: []
+    execution_prerequisites:
+      migrations: true
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: false
+      passed: false
+    tests:
+      integration:
+        - path: "tests/integration/test_activity_schema.py"
+          owner: "Phase-1.2a-P1"
+
+execution_groups:
+  phase_1_6_unit:
+    scope: feature
+    phase: 1
+    tests:
+      - "tests/unit/test_fit_parser_service.py"
+      - "tests/unit/test_load_computation_service.py"
+      - "tests/unit/test_twin_recalibration_service.py"
+      - "tests/unit/test_compliance_service.py"
+      - "tests/unit/test_calibration_eligibility_service.py"
+      - "tests/unit/test_object_storage_client.py"
+      - "tests/unit/test_post_workout_agent.py"
+      - "tests/unit/test_activity_ingestion_service.py"
+    depends_on:
+      - "phase_1_5b_feature"
+
+  phase_1_6_integration:
+    scope: feature
+    phase: 1
+    tests:
+      - "tests/integration/test_activity_endpoints.py"
+    depends_on:
+      - "phase_1_6_unit"
+
+coverage:
+  routes:
+    covered:
+      - "POST /athletes/{id}/activities/upload"
+      - "GET /athletes/{id}/activities"
+      - "GET /athletes/{id}/activities/{aid}"
+      - "POST /athletes/{id}/activities/{aid}/analyse"
+      - "GET /athletes/{id}/activities/{aid}/analysis"
+    partial: []
+    missing: []
+
+  events:
+    covered:
+      - "activity_ingested"
+      - "coaching_message_generated"
+    partial: []
+    missing: []
+
+  invariants:
+    covered:
+      - "Object storage upload BEFORE Activity record creation"
+      - "fit_file_key always set for source != manual_entry"
+      - "Load scores null at initial creation"
+      - "calibration_eligible = false for all sessions (Phase 1.6)"
+      - "TwinState append-only"
+      - "PostWorkoutAgent idempotent"
+      - "Every LLM call writes GenerationEvent"
+      - "activity_ingested event published AFTER commit"
+      - "POST /upload returns 202 with task_id"
+      - "Activity dedup: (athlete_id, external_id, source) unique where external_id IS NOT NULL"
+    partial: []
+    missing: []
+
+history:
+  - date: "2026-06-30"
+    plan: "Phase-1.6-P1"
+    tests_added: 9
+    tests_modified: 0
+    tests_removed: 0
+    result: "PARTIAL"
+    coverage_delta: >
+      Initial test generation for Phase-1.6-P1 (Simple FIT Import & Post-Workout)
+      incorporating fixes from Phase-1.7-P1 (architecture simplification with
+      procrastinate/MinIO) and Phase-1.8-P1 (event ordering fix, async processing,
+      202 response). Generated unit tests for FitParserService,
+      LoadComputationService, TwinRecalibrationService, ComplianceService,
+      CalibrationEligibilityService, ObjectStorageClient, PostWorkoutAgent, and
+      ActivityIngestionService. Generated integration tests for Activity API
+      endpoints. All tests set to validation.executable=false; DevOps will
+      execute and update to passed/failed after running.

@@ -7,8 +7,14 @@
 ## Infrastructure
 
 ```typescript
-// Queue backend: Redis
-// Worker framework: Celery (Python) or ARQ (async Python)
+// Queue backend: PostgreSQL (via procrastinate 2.x)
+// Worker framework: Procrastinate (async Python)
+// Connector: Psycopg2Connector (sync-compatible, built on psycopg2)
+// Version constraint: procrastinate>=2.0,<3.0
+//   - Procrastinate 2.x and 3.x both use connector-based API (keyword-only constructor).
+//   - Pinned to 2.x to use Psycopg2Connector (psycopg2-based) rather than 3.x's PsycopgConnector (psycopg3-based).
+//   - Worker tasks run in separate process; sync connector acceptable for current scale.
+// Migration path: Redis/Celery is planned replacement if queue contention appears
 // Task visibility: task_id returned from async-triggering API endpoints (202 Accepted)
 ```
 
@@ -122,7 +128,7 @@ Timeout: 30s
 ```typescript
 // At-least-once delivery: tasks may execute more than once
 // All tasks must be idempotent or have idempotency checks
-// Dead-letter queue: tasks that fail max retries → DLQ; alert fires
+// Dead-letter queue: failed jobs tracked in procrastinate failure log; mirrored to system_event_outbox for alerting
 
 // Task visibility for athlete-facing operations:
 // FIT upload → 202 Accepted + task_id

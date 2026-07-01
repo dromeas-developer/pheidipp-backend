@@ -20,7 +20,7 @@
 
 6. **No global session averages are persisted.** Average HR, pace, power — none of these are on `Activity`. Ever.
 
-7. **All heavy processing is async.** FIT parsing, twin recalibration, post-workout analysis — all run in a worker queue (Celery or ARQ over Redis). API responses never wait for these.
+7. **All heavy processing is async.** FIT parsing, twin recalibration, post-workout analysis — all run in a worker queue. API responses never wait for these. The queue backend is decoupled; early-stage implementation uses PostgreSQL-backed workers (`procrastinate`), with a defined migration path to Redis if queue contention requires it.
 
 8. **Non-running activities are excluded from twin calibration.** They appear in the training record. They never feed load computation, threshold detection, execution analysis, or adaptation modelling. *(Implements vision principle "Non-Running Data Does Not Corrupt the Running Model" from `docs/vision/twin/data-philosophy.md`.)*
 

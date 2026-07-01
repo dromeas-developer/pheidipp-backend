@@ -114,6 +114,31 @@ class CoachingMessageRepository:
         )
         return result.scalar_one_or_none()
 
+    async def get_by_activity_and_type(
+        self,
+        *,
+        athlete_id: uuid.UUID,
+        activity_id: uuid.UUID,
+        message_type: MessageType,
+    ) -> Optional[CoachingMessage]:
+        """Return the ``post_workout`` message for *activity_id* (if any).
+
+        Backed by the partial unique index
+        ``uq_coaching_messages_activity_post_workout`` — the lookup
+        is O(1) and returns at most one row. Used by
+        ``PostWorkoutAgent`` for the idempotency gate so a second
+        call returns the existing message without re-invoking the
+        LLM.
+        """
+        result = await self.session.execute(
+            select(CoachingMessage).where(
+                CoachingMessage.athlete_id == athlete_id,
+                CoachingMessage.activity_id == activity_id,
+                CoachingMessage.message_type == message_type,
+            )
+        )
+        return result.scalar_one_or_none()
+
     async def get_all_count(
         self,
         athlete_id: uuid.UUID,

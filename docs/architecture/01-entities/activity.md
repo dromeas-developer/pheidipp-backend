@@ -40,6 +40,9 @@ type Activity = {
   calibration_eligible: boolean
   quality_flags: QualityFlags
 
+  // Performance Expression
+  power_profile_id: string | null   // FK → ActivityPowerProfile; null if no power data or Tier 6
+
   // Reprocessing anchor — REQUIRED for all non-manual-entry sources
   fit_file_key: string | null       // null ONLY for source = 'manual_entry'
 
@@ -58,6 +61,7 @@ type Activity = {
 - `calibration_eligible` is set by `CalibrationEligibilityService` and never manually overridden.
 - Source `manual_entry` activities always have `calibration_eligible = false`, null load scores, and null `fit_file_key`. These are not error conditions.
 - Deduplication: `(athlete_id, external_id, source)` is unique where `external_id` is non-null. Duplicate ingestion attempts for the same external session create one Activity.
+- `power_profile_id` is null for Tier 6 activities and for all activities where `has_power = false`. It references `ActivityPowerProfile` when power data is available and calibration-eligible.
 
 ## State Transitions
 
@@ -144,12 +148,14 @@ Owns:
 - The lean observation index
 - The `fit_file_key` reprocessing anchor
 - Calibration eligibility flag
+- Reference to power profile (`power_profile_id`) when power data is available
 
 Does Not Own:
 - Load score formulas → `02-computations/load-computation.md`
 - Segmentation records → `01-entities/physiological-segment.md`
 - Execution analysis → `01-entities/execution-observation.md`
 - Session lifecycle (planned_session_id linkage) → `01-entities/planned-session.md`
+- Power-duration curve computation → `01-entities/activity-power-profile.md`
 
 ## Idempotency
 - FIT file ingestion is idempotent for the same `(athlete_id, external_id, source)` — second call returns the existing Activity

@@ -10,6 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.athlete import Athlete
+from app.utils.email_utils import normalize_email
 
 
 class AthleteRepository:
@@ -30,7 +31,7 @@ class AthleteRepository:
         """Look up an athlete by case-insensitive email match."""
         result = await self.session.execute(
             select(Athlete).where(
-                Athlete.email == normalized_email.lower().strip()
+                Athlete.email == normalize_email(normalized_email)
             )
         )
         return result.scalar_one_or_none()
@@ -53,7 +54,7 @@ class AthleteRepository:
         """
         result = await self.session.execute(
             select(Athlete.id).where(
-                Athlete.email == normalized_email.lower().strip()
+                Athlete.email == normalize_email(normalized_email)
             )
         )
         return result.scalar_one_or_none() is not None

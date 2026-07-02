@@ -146,8 +146,12 @@ Weather per athlete per training date. Heat index computation formula. Heat and 
 **Read for:** heat index formula; weather adjustment formulas; how luteal modifier stacks; failure degradation.
 
 ### `01-entities/execution-observation.md`
-Pre-computed execution findings. Python-derived; never LLM-derived. Phase evolution (lap-v1 → segment-v1). `coaching_observations` schema. Null handling for manual entries.
-**Read for:** `coaching_observations` structure; what is Python-computed vs LLM-written; phase evolution of analysis depth.
+Pre-computed execution findings. Python-derived; never LLM-derived. Phase evolution (lap-v1 → segment-v1). `coaching_observations` schema. Null handling for manual entries. Structural capability metrics (decoupling ratio, W' depletion, intensity clustering) map to Tier-3 intelligence concepts.
+**Read for:** `coaching_observations` structure; what is Python-computed vs LLM-written; phase evolution of analysis depth; structural capability metrics.
+
+### `01-entities/activity-power-profile.md`
+Performance expression snapshot. One-to-one with Activity when `has_power = true`. Stores power-duration curve anchors (5s, 1m, 5m, 20m). Optional step-level decomposition (`step_profiles`) for zone-specific analysis. Used for progression analysis, not athlete-facing dashboards.
+**Read for:** PDC schema; step-level decomposition; how it feeds LLM context; relationship to Activity; computation basis values.
 
 ### `01-entities/physiological-segment.md`
 Stable interface across all segmentation generations. Three segment types: `PlannedSegment` (intended), `DeviceSegment` (device-recorded), `PhysiologicalSegment` (inferred). `state_probabilities` null in Gen 1, populated in Gen 3. Supersession pattern.

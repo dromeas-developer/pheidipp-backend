@@ -66,6 +66,7 @@ from app.services.auth_errors import (
 )
 from app.services.auth_results import AuthResult, IssuedTokens
 from app.services.event_publisher import EventPublisher
+from app.utils.email_utils import normalize_email
 from app.utils.ip_utils import truncate_ip
 
 
@@ -113,7 +114,7 @@ class AuthService:
         already exists; the entire transaction is rolled back so no
         partial state remains.
         """
-        normalized_email = self._normalize_email(email)
+        normalized_email = normalize_email(email)
         athlete = Athlete(email=normalized_email, onboarding_complete=False)
         password_hash = self.password_hasher.hash(password)
 
@@ -216,7 +217,7 @@ class AuthService:
         exception type is the same in every case so the API cannot leak
         which condition failed.
         """
-        normalized_email = self._normalize_email(email)
+        normalized_email = normalize_email(email)
         auth_record = await self.auths.get_email_auth_by_normalized_email(
             normalized_email
         )
@@ -453,10 +454,6 @@ class AuthService:
             ip_address=ip_address,
             user_agent=user_agent,
         )
-
-    @staticmethod
-    def _normalize_email(email: str) -> str:
-        return email.strip().lower()
 
     def _password_hasher_constant_time_dummy(self) -> None:
         """Run a bcrypt verify against a throwaway hash to defend the

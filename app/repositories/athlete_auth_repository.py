@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.athlete import Athlete
 from app.models.athlete_auth import AthleteAuth
 from app.models.enums import AuthProvider
+from app.utils.email_utils import normalize_email
 
 
 class AthleteAuthRepository:
@@ -45,7 +46,7 @@ class AthleteAuthRepository:
             .join(Athlete, Athlete.id == AthleteAuth.athlete_id)
             .where(
                 AthleteAuth.provider == AuthProvider.EMAIL,
-                Athlete.email == normalized_email.lower().strip(),
+                Athlete.email == normalize_email(normalized_email),
             )
         )
         return result.scalar_one_or_none()

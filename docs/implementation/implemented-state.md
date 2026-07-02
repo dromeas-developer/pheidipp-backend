@@ -1,53 +1,24 @@
 # implemented-state
 
 Commit:
-489279f
+b22c6da
 
 ## Change Set
 
 Base Commit:
-489279f
+b22c6da
 
 Current Commit:
-489279f
+b22c6da
 
 Files Added:
-- app/agents/post_workout_agent.py
-- app/api/v1/activity.py
-- app/core/prompts/post_workout_v1.md
-- app/repositories/activity_repository.py
-- app/schemas/activity.py
-- app/services/activity_ingestion_service.py
-- app/services/calibration_eligibility_service.py
-- app/services/compliance_service.py
-- app/services/fit_parser_service.py
-- app/services/load_computation_service.py
-- app/services/object_storage_client.py
-- app/services/twin_recalibration_service.py
-- app/worker/app.py
-- reports/Phase-1.7-P1_devops.md
-- reports/phase-1-6-7-8-p1_comprehensive_validation.md
-- reports/phase-1-6-p1_phase-1-7-p1_validation.md
-- tests/integration/test_activity_endpoints.py
-- tests/test-manifest/phase-1-6.yaml
-- tests/unit/test_activity_ingestion_service.py
-- tests/unit/test_calibration_eligibility_service.py
-- tests/unit/test_compliance_service.py
-- tests/unit/test_fit_parser_service.py
-- tests/unit/test_load_computation_service.py
-- tests/unit/test_object_storage_client.py
-- tests/unit/test_post_workout_agent.py
-- tests/unit/test_twin_recalibration_service.py
+- app/utils/email_utils.py
 
 Files Modified:
-- .env.test
-- app/api/v1/__init__.py
-- app/config.py
-- app/repositories/coaching_message_repository.py
-- app/services/__init__.py
-- docker-compose.yml
-- requirements.txt
-- tests/test-manifest/index.yaml
+- app/repositories/athlete_auth_repository.py
+- app/repositories/athlete_repository.py
+- app/services/activity_ingestion_service.py
+- app/services/auth_service.py
 
 Files Deleted:
 - none
@@ -55,20 +26,16 @@ Files Deleted:
 Touched Areas:
 - repositories
 - services
-- api
 - app
-- requirements
-- root
-- other
 
 Generated:
-2026-07-01T02:39:00.142247+00:00 UTC
+2026-07-02T01:55:37.766208+00:00 UTC
 
 Current DB Revision:
-fd373abd4b9e (head) [fallback: latest migration file]
+d1579f4430e7 (head)
 
 Python Files Scanned:
-107
+108
 
 ---
 
@@ -301,17 +268,7 @@ Public API:
 ### Dependency Changes
 
 requirements.txt
-Added:
-- boto3>=1.34.0
-- fitparse>=1.2.0
-- procrastinate>=2.0,<3.0
-- python-multipart>=0.0.9
-
-Updated:
-- none
-
-Removed:
-- none
+No changes detected
 
 ### Service Wiring
 
@@ -450,11 +407,11 @@ services: complete
 ### Event Producers
 
 - app/agents/post_workout_agent.py:380 PostWorkoutAgent.generate publish -> coaching_message_generated [uncommitted]
-- app/services/activity_ingestion_service.py:358 ActivityIngestionService.ingest publish -> activity_ingested [uncommitted]
-- app/services/activity_ingestion_service.py:436 ActivityIngestionService.ingest_async publish -> activity_ingested [uncommitted]
-- app/services/auth_service.py:170 AuthService.register publish -> athlete_registered [after_commit]
-- app/services/auth_service.py:274 AuthService.login publish -> athlete_logged_in [after_commit]
-- app/services/auth_service.py:367 AuthService.rotate_refresh_token publish -> athlete_logged_in [after_commit]
+- app/services/activity_ingestion_service.py:363 ActivityIngestionService.ingest publish -> activity_ingested [uncommitted]
+- app/services/activity_ingestion_service.py:445 ActivityIngestionService.ingest_async publish -> activity_ingested [uncommitted]
+- app/services/auth_service.py:171 AuthService.register publish -> athlete_registered [after_commit]
+- app/services/auth_service.py:275 AuthService.login publish -> athlete_logged_in [after_commit]
+- app/services/auth_service.py:368 AuthService.rotate_refresh_token publish -> athlete_logged_in [after_commit]
 - app/services/first_message_agent.py:303 FirstMessageAgent.generate publish -> coaching_message_generated [uncommitted]
 - app/services/onboarding_service.py:484 OnboardingService.complete_onboarding publish -> onboarding_completed [after_commit]
 - app/services/plan_generation_service.py:750 PlanGenerationService._persist_full_plan publish -> training_plan_generated [after_commit]
@@ -468,9 +425,9 @@ Commits:
 - app/api/v1/coach.py:126 post_first_message session.commit
 - app/api/v1/workout.py:174 get_today session.commit
 - app/api/v1/workout.py:262 post_generate_workout session.commit
-- app/services/auth_service.py:180 AuthService.register self.session.commit
-- app/services/auth_service.py:285 AuthService.login self.session.commit
-- app/services/auth_service.py:378 AuthService.rotate_refresh_token self.session.commit
+- app/services/auth_service.py:181 AuthService.register self.session.commit
+- app/services/auth_service.py:286 AuthService.login self.session.commit
+- app/services/auth_service.py:379 AuthService.rotate_refresh_token self.session.commit
 - app/services/onboarding_service.py:515 OnboardingService.complete_onboarding self.session.commit
 - app/services/onboarding_service.py:605 OnboardingService.update_profile self.session.commit
 - app/services/onboarding_service.py:671 OnboardingService.update_preferences self.session.commit
@@ -483,13 +440,13 @@ Flushes:
 - app/repositories/activity_repository.py:62 ActivityRepository.add self.session.flush
 - app/repositories/activity_repository.py:88 ActivityRepository.update_load_scores self.session.flush
 - app/repositories/activity_repository.py:109 ActivityRepository.update_calibration_eligibility self.session.flush
-- app/repositories/athlete_auth_repository.py:56 AthleteAuthRepository.add self.session.flush
-- app/repositories/athlete_auth_repository.py:63 AthleteAuthRepository.touch_last_login self.session.flush
+- app/repositories/athlete_auth_repository.py:57 AthleteAuthRepository.add self.session.flush
+- app/repositories/athlete_auth_repository.py:64 AthleteAuthRepository.touch_last_login self.session.flush
 - app/repositories/athlete_fitness_repository.py:42 AthleteFitnessRepository.add self.session.flush
 - app/repositories/athlete_physiology_repository.py:42 AthletePhysiologyRepository.add self.session.flush
 - app/repositories/athlete_preferences_repository.py:33 AthletePreferencesRepository.add self.session.flush
 - app/repositories/athlete_profile_repository.py:31 AthleteProfileRepository.add self.session.flush
-- app/repositories/athlete_repository.py:44 AthleteRepository.add self.session.flush
+- app/repositories/athlete_repository.py:45 AthleteRepository.add self.session.flush
 - app/repositories/checkpoint_repository.py:41 CheckpointRepository.add_many self.session.flush
 - app/repositories/coaching_message_repository.py:43 CoachingMessageRepository.insert self.session.flush
 - app/repositories/generated_workout_repository.py:62 GeneratedWorkoutRepository.insert self.session.flush
@@ -505,8 +462,8 @@ Flushes:
 - app/repositories/weekly_plan_repository.py:44 WeeklyPlanRepository.add_many self.session.flush
 - app/repositories/weekly_plan_repository.py:102 WeeklySessionRepository.add_many self.session.flush
 - app/repositories/workout_step_repository.py:64 WorkoutStepRepository.insert_many self.session.flush
-- app/services/activity_ingestion_service.py:540 ActivityIngestionService._run_ingestion_pipeline self.session.flush
-- app/services/auth_service.py:361 AuthService.rotate_refresh_token self.session.flush
+- app/services/activity_ingestion_service.py:549 ActivityIngestionService._run_ingestion_pipeline self.session.flush
+- app/services/auth_service.py:362 AuthService.rotate_refresh_token self.session.flush
 - app/services/onboarding_service.py:351 OnboardingService.complete_onboarding self.session.flush
 - app/services/onboarding_service.py:481 OnboardingService.complete_onboarding self.session.flush
 - app/services/onboarding_service.py:604 OnboardingService.update_profile self.session.flush
@@ -619,10 +576,10 @@ Repository dependencies:
 ### Execution Readiness
 
 Current Revision:
-fd373abd4b9e (head) [fallback: latest migration file]
+d1579f4430e7 (head)
 
 Migration Pending:
-unknown
+yes
 
 Missing Exports:
 - app/api/__init__.py: Missing [build_onboarding_service_with_plan, build_plan_service]

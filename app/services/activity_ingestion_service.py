@@ -355,6 +355,11 @@ class ActivityIngestionService:
         # object is fully consumed before the caller sees it. The
         # worker path (:meth:`ingest_async`) does the same; the
         # difference is purely who owns the orchestrating transaction.
+        # Publish event within the current transaction. The EventPublisher
+        # writes to the outbox tables (system_events + system_event_outbox);
+        # the external publisher worker reads from the outbox after this
+        # transaction commits. This follows the same transactional outbox
+        # pattern as sync services — see docs/architecture/04-platform/event-topology.md
         await self.events.publish(
             event_type="activity_ingested",
             athlete_id=athlete_id,
@@ -433,6 +438,10 @@ class ActivityIngestionService:
                 f"Activity {activity_id} disappeared mid-pipeline"
             )
 
+        # Publish event within the worker's transaction. The worker commits
+        # after this method returns; the external publisher reads from the
+        # outbox post-commit. Same transactional outbox pattern as sync
+        # services — see docs/architecture/04-platform/event-topology.md
         await self.events.publish(
             event_type="activity_ingested",
             athlete_id=athlete_id,

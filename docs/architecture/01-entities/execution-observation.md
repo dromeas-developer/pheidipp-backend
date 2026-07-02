@@ -48,6 +48,11 @@ type CoachingObservations = {
     sandbagging_flag?: boolean
     positive_split_flag?: boolean
     controlled_fade_score?: number
+    // Structural capability metrics (all session types):
+    w_prime_depletion_pct?: number
+    high_depletion_sessions_count?: number
+    supra_threshold_joules?: number
+    intensity_clustering_index?: number
   }
   per_rep_analysis?: RepAnalysis[]   // null until Phase 5c (segment-level analysis)
   recovery_analysis?: RecoveryAnalysis[]
@@ -162,6 +167,42 @@ Maps vision concepts from `vision/twin/execution-patterns.md` to `coaching_obser
 | Pacing instincts | `session_shape` distribution | `ComparableSessionService` matches on shape patterns |
 | Recovery patterns | `recovery_analysis[].hr_decline_rate_bpm_per_min` | Trend tracked by `ObjectiveUpdateService` |
 | Recurring patterns → coaching objectives | `ObjectiveUpdateService` | Reads `coaching_observations` to evaluate objective direction |
+
+### Structural Capability Metrics
+
+Maps vision concepts from `docs/vision/twin/load-fatigue.md` and `docs/vision/twin/execution-patterns.md` to the structural capability metrics computed during execution analysis. These metrics answer: "How did this athlete's system behave under stress?" rather than simply "how much stress did they accumulate?"
+
+These are the architecturally-grounded equivalents of Montis.icu's Tier-3 metrics:
+- `decoupling_ratio` → **ISDM analog** (durability measurement)
+- `w_prime_depletion_pct` + `supra_threshold_joules` → **WDRM analog** (anaerobic repeatability)
+- `intensity_clustering_index` → **NDLI analog** (neural load density)
+
+#### Metric Definitions
+
+| Metric | Computed For | Signal Source | Meaning |
+|---|---|---|---|
+| `decoupling_ratio` | Aerobic sessions (LT1, threshold) | HR and GAP time-series | % divergence between HR and pace/power. >5% indicates aerobic drift under fatigue. |
+| `cardiac_drift_score` | Aerobic sessions with HR | HR time-series | Normalised HR rise while maintaining pace. |
+| `w_prime_depletion_pct` | Threshold/VO₂ sessions with power | Power time-series | Estimated W′ depletion depth. >80% indicates high anaerobic stress. |
+| `high_depletion_sessions_count` | Rolling 7-day context | Multiple sessions | Number of sessions exceeding depletion threshold. Used for recovery planning. |
+| `supra_threshold_joules` | All sessions with power | Power > LT2 threshold | Total mechanical work above threshold. Key input for neural load assessment. |
+| `intensity_clustering_index` | All sessions with HR ± power | Intensity time-series | Quantifies bunched high-intensity effort. >0.7 suggests intensity stacking risk. |
+
+#### Usage in Coaching Context
+
+These metrics are **never surfaced to athletes as numbers or charts**. They are:
+- Passed to LLM agents as structured context for coaching narratives
+- Used by `ObjectiveUpdateService` to evaluate progress on `structural_tolerance` and `durability` objectives
+- Aggregated into rolling trends for pre-week review decisions
+- Referenced by the coach for "can vs. should" reasoning when generating daily workouts
+
+#### Gaps Requiring Implementation Decisions
+
+| Gap | Status | Resolution Needed |
+|---|---|---|
+| W′ modeling uses population CP curve until individual CP is known | Acknowledged | Implementation must use `AthletePhysiology.cp` when available, else population default |
+| Intensity clustering threshold (0.7) | Tentative | May need individual fitting like other metrics |
+| Rolling window aggregation for capability trends | Not yet implemented | Will be added in a dedicated `CapabilityTrend` service |
 
 ### Gaps Requiring Implementation Decisions
 

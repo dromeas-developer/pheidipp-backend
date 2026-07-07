@@ -118,6 +118,23 @@ class PowerSource(str, Enum):
     NONE = "none"
 
 
+class SportType(str, Enum):
+    """Sport type detected from FIT file sport message.
+
+    See docs/architecture/01-entities/activity.md → SportType enum.
+    Values are used for calibration eligibility gating (Principle #8:
+    non-running activities excluded from twin calibration).
+    """
+
+    RUNNING = "running"
+    CYCLING = "cycling"
+    SWIMMING = "swimming"
+    STRENGTH = "strength"
+    YOGA_MOBILITY = "yoga_mobility"
+    OTHER = "other"
+    UNKNOWN = "unknown"
+
+
 class PrimaryTrainingPlatform(str, Enum):
     """Primary platform used by the athlete for activity uploads."""
 

@@ -189,3 +189,29 @@ class ActivityRepository:
             )
         )
         return result.scalar_one_or_none()
+
+    async def get_recent_structural_load(
+        self,
+        athlete_id: uuid.UUID,
+        since_date: date,
+    ) -> float:
+        """Sum ``structural_load`` for calibration-eligible activities
+        in the time window starting at ``since_date``.
+
+        Filters on ``calibration_eligible = true`` and
+        ``structural_load IS NOT NULL`` per the architecture doc.
+        Used by the structural load density-penalty calculation.
+        Returns 0.0 when no qualifying activities exist.
+        """
+        stmt = (
+            select(func.coalesce(func.sum(Activity.structural_load), 0.0))
+            .where(
+                Activity.athlete_id == athlete_id,
+                Activity.calibration_eligible.is_(True),
+                Activity.structural_load.isnot(None),
+                Activity.activity_date >= since_date,
+            )
+        )
+        result = await self.session.execute(stmt)
+        total = result.scalar_one()
+        return float(total) if total is not None else 0.0

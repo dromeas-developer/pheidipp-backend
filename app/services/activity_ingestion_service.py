@@ -78,16 +78,23 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.models.activity import Activity
-from app.models.enums import ActivitySource
+from app.models.enums import ActivitySource, DataTier, SportType
 from app.models.twin_state import TwinState
 from app.repositories.activity_repository import ActivityRepository
+from app.repositories.athlete_profile_repository import AthleteProfileRepository
+from app.repositories.athlete_preferences_repository import (
+    AthletePreferencesRepository,
+)
+from app.repositories.athlete_physiology_repository import (
+    AthletePhysiologyRepository,
+)
 from app.services.calibration_eligibility_service import (
     CalibrationEligibilityService,
 )
@@ -116,6 +123,11 @@ from app.services.twin_recalibration_service import (
     RecalibrationResult,
     TwinRecalibrationService,
 )
+
+# Additional imports for Phase-2.1
+from app.models.athlete_preferences import AthletePreferences, infer_data_tier
+from app.models.athlete_profile import AthleteProfile
+from app.models.athlete_physiology import AthletePhysiology
 
 
 # ---------------------------------------------------------------------------
@@ -192,10 +204,20 @@ class ActivityIngestionService:
         load_computation: Optional[LoadComputationService] = None,
         twin_recalibration: Optional[TwinRecalibrationService] = None,
         calibration_eligibility: Optional[CalibrationEligibilityService] = None,
+        athlete_profiles: Optional[AthleteProfileRepository] = None,
+        athlete_preferences: Optional[AthletePreferencesRepository] = None,
+        athlete_physiology: Optional[AthletePhysiologyRepository] = None,
         events: Optional[EventPublisher] = None,
     ) -> None:
         self.session = session
         self.activities = ActivityRepository(session)
+        self.athlete_profiles = athlete_profiles or AthleteProfileRepository(session)
+        self.athlete_preferences = (
+            athlete_preferences or AthletePreferencesRepository(session)
+        )
+        self.athlete_physiology = (
+            athlete_physiology or AthletePhysiologyRepository(session)
+        )
         self.object_storage = object_storage or ObjectStorageClient()
         self.fit_parser = fit_parser or FitParserService()
         self.load_computation = load_computation or LoadComputationService()
@@ -329,8 +351,9 @@ class ActivityIngestionService:
         Convenience wrapper used by tests and debugging. Calls
         :meth:`stage_upload` to persist the file + empty Activity
         row, then :meth:`_run_ingestion_pipeline` to run the heavy
-        steps, then publishes the ``activity_ingested`` event
-        inside the caller's transaction. The caller commits once.
+        steps + publish both ``activity_ingested`` and
+        ``activity_calibration_eligible`` events inside the caller's
+        transaction. The caller commits once.
 
         Production traffic uses the two-step flow instead — see
         :meth:`stage_upload` + :meth:`ingest_async` — so the API
@@ -349,30 +372,6 @@ class ActivityIngestionService:
             athlete_id=athlete_id,
             activity_id=activity.id,
             file_bytes=file_bytes,
-        )
-
-        # Sync mode publishes the event inline so the result
-        # object is fully consumed before the caller sees it. The
-        # worker path (:meth:`ingest_async`) does the same; the
-        # difference is purely who owns the orchestrating transaction.
-        # Publish event within the current transaction. The EventPublisher
-        # writes to the outbox tables (system_events + system_event_outbox);
-        # the external publisher worker reads from the outbox after this
-        # transaction commits. This follows the same transactional outbox
-        # pattern as sync services — see docs/architecture/04-platform/event-topology.md
-        await self.events.publish(
-            event_type="activity_ingested",
-            athlete_id=athlete_id,
-            payload={
-                "activity_id": str(activity.id),
-                "date": activity.activity_date.isoformat(),
-                "duration": activity.duration_seconds,
-                "has_hr": activity.has_hr,
-                "has_rr": activity.has_rr_intervals,
-                "has_power": activity.has_power,
-                "fit_file_key": activity.fit_file_key,
-                "aerobic_load": scores.aerobic_load,
-            },
         )
 
         return ActivityIngestionResult(
@@ -406,14 +405,12 @@ class ActivityIngestionService:
         Steps:
 
             3. Parse the FIT file
-            4. Compute aerobic_load
-            5. Update Activity with load scores
-            6. Set calibration_eligible = false (Phase-1.6 hard-off)
+            4. Compute all load scores
+            5. Update Activity with load scores and signal flags
+            6. Evaluate calibration eligibility
             7. Apply Banister update + append TwinState
-            9. Fire ``activity_ingested`` event inside this
-               transaction so the outbox row only becomes visible
-               to the publisher worker after the producing
-               transaction commits.
+            8. Fire ``activity_ingested`` event
+            9. Fire ``activity_calibration_eligible`` event when eligible
 
         The caller (worker task) commits the surrounding
         transaction exactly once, after this method returns.
@@ -438,25 +435,6 @@ class ActivityIngestionService:
                 f"Activity {activity_id} disappeared mid-pipeline"
             )
 
-        # Publish event within the worker's transaction. The worker commits
-        # after this method returns; the external publisher reads from the
-        # outbox post-commit. Same transactional outbox pattern as sync
-        # services — see docs/architecture/04-platform/event-topology.md
-        await self.events.publish(
-            event_type="activity_ingested",
-            athlete_id=athlete_id,
-            payload={
-                "activity_id": str(activity.id),
-                "date": activity.activity_date.isoformat(),
-                "duration": activity.duration_seconds,
-                "has_hr": activity.has_hr,
-                "has_rr": activity.has_rr_intervals,
-                "has_power": activity.has_power,
-                "fit_file_key": activity.fit_file_key,
-                "aerobic_load": scores.aerobic_load,
-            },
-        )
-
         return ActivityIngestionResult(
             activity=activity,
             twin_state=recalibration.twin_state,
@@ -479,11 +457,12 @@ class ActivityIngestionService:
         Steps:
 
             3. Parse the FIT file with FitParserService
-            4. Compute aerobic_load with LoadComputationService
-            5. Update the Activity with load scores
-            6. Set calibration_eligible = false (Phase-1.6 hard-off)
+            4. Compute all load scores with LoadComputationService
+            5. Update the Activity with load scores and signal flags
+            6. Evaluate calibration eligibility with full five-rule gate
             7. Apply Banister update via TwinRecalibrationService
             8. Append new TwinState (trigger = activity_sync)
+            9. Fire ``activity_calibration_eligible`` event when eligible
 
         Does **NOT** publish events; the caller is responsible for
         firing ``activity_ingested`` within the same transaction so
@@ -505,8 +484,22 @@ class ActivityIngestionService:
                 f"Activity {activity_id} not found"
             )
 
+        # Fetch athlete profile for date of birth (max HR estimation)
         athlete_profile_birth_date = await self._read_profile_date_of_birth(
             athlete_id
+        )
+        
+        # Fetch athlete preferences for data tier inference
+        athlete_preferences = await self._read_athlete_preferences(athlete_id)
+        
+        # Fetch athlete physiology for CP estimate
+        athlete_physiology = await self._read_athlete_physiology(athlete_id)
+        
+        # Fetch recent structural load for density penalty computation
+        seventy_two_hours_ago = datetime.now(timezone.utc) - timedelta(hours=72)
+        recent_structural_load = await self.activities.get_recent_structural_load(
+            athlete_id=athlete_id,
+            since_date=seventy_two_hours_ago.date()
         )
 
         try:
@@ -520,13 +513,45 @@ class ActivityIngestionService:
                 f"FIT parse failed: {exc}"
             ) from exc
 
+        # Set sport_type on the activity from parsed FIT data
+        # (Phase-2.1-P3 — sport type detection from FIT sport message)
+        activity.sport_type = parsed.sport_type
+        activity.sport_type_detection_version = parsed.detection_version
+        
+        # Infer data tier from athlete preferences
+        data_tier = self._infer_data_tier(athlete_preferences)
+        
+        # Override data_tier to TIER_6 for non-running activities
+        # (architecture invariant: sport_type != 'running' → data_tier = 6)
+        # This takes precedence over the hardware-based tier inference
+        if parsed.sport_type != SportType.RUNNING:
+            data_tier = DataTier.TIER_6
+        
+        # Estimate max HR from age
         max_hr_estimate = self._resolve_max_hr_estimate(
             athlete_birth_date=athlete_profile_birth_date,
         )
+        
+        # Get CP estimate from physiology or use population default
+        cp_estimate = self._resolve_cp_estimate(athlete_physiology)
+        
+        # Get structural risk flag from profile
+        structural_risk_flag = await self._read_structural_risk_flag(athlete_id)
+        
+        # Create comprehensive load computation inputs
         load_inputs = LoadComputationInputs(
             parsed_fit=parsed,
             max_hr_estimate=max_hr_estimate,
+            data_tier=data_tier,
+            cp_estimate=cp_estimate,
+            total_distance_m=parsed.total_distance_m,
+            total_ascent_m=parsed.total_ascent_m,
+            recent_structural_load_72h=recent_structural_load,
+            structural_risk_flag=structural_risk_flag,
+            sport_type=parsed.sport_type,
+            sport_type_detection_version=parsed.detection_version,
         )
+        
         try:
             scores = self.load_computation.compute_aerobic_load(load_inputs)
         except Exception as exc:
@@ -534,6 +559,7 @@ class ActivityIngestionService:
                 f"load computation failed: {exc}"
             ) from exc
 
+        # Update activity with load scores and signal flags
         await self.activities.update_load_scores(
             activity_id=activity.id,
             aerobic_load=scores.aerobic_load,
@@ -543,16 +569,90 @@ class ActivityIngestionService:
         activity.has_hr = parsed.has_hr
         activity.has_rr_intervals = parsed.has_rr_intervals
         activity.has_power = parsed.has_power
+        activity.has_gps = parsed.has_gps
         activity.duration_seconds = parsed.duration_seconds
         activity.start_time = parsed.start_time
         activity.activity_date = parsed.start_time.date()
+        # sport_type and sport_type_detection_version were set earlier
+        # (right after parse), but we ensure they are explicitly set here
+        # for clarity (they may have been set directly on the object already)
+        
+        # Compute quality flags
+        quality_flags = self._compute_quality_flags(parsed)
+        activity.quality_flags = quality_flags
+        
         await self.session.flush()
 
+        # Fire sport_type_detected event (Phase-2.1-P3) BEFORE activity_ingested.
+        # This event fires for all non-manual-entry sources regardless of
+        # whether the sport is running or not — the detection result is the
+        # event, not the eligibility outcome.
+        # Does NOT fire for manual_entry activities (no FIT file, no detection).
+        if activity.source != ActivitySource.MANUAL_ENTRY:
+            await self.events.publish(
+                event_type="sport_type_detected",
+                athlete_id=athlete_id,
+                payload={
+                    "activity_id": str(activity.id),
+                    "sport_type": activity.sport_type.value,
+                    "detection_confidence": parsed.detection_confidence,
+                    "detection_version": parsed.detection_version,
+                },
+            )
+
+        # Evaluate calibration eligibility with full five-rule gate.
+        # Tier 5-6 activities are NEVER calibration eligible even if all
+        # five rule criteria pass.
         eligible = self.calibration_eligibility.evaluate(activity)
+        if (
+            eligible
+            and data_tier in (DataTier.TIER_5, DataTier.TIER_6)
+        ):
+            eligible = False
         if eligible != activity.calibration_eligible:
             await self.activities.update_calibration_eligibility(
                 activity_id=activity.id,
                 calibration_eligible=eligible,
+            )
+
+        # Fire activity_ingested event first. The EventPublisher writes to
+        # the outbox tables (system_events + system_event_outbox); the
+        # external publisher worker reads from the outbox after this
+        # transaction commits in insertion order. Same transactional
+        # outbox pattern as sync services — see
+        # docs/architecture/04-platform/event-topology.md.
+        # Phase-2.1-P3: Added sport_type to payload for downstream consumers
+        await self.events.publish(
+            event_type="activity_ingested",
+            athlete_id=athlete_id,
+            payload={
+                "activity_id": str(activity.id),
+                "date": activity.activity_date.isoformat(),
+                "duration": activity.duration_seconds,
+                "has_hr": activity.has_hr,
+                "has_rr": activity.has_rr_intervals,
+                "has_power": activity.has_power,
+                "has_gps": activity.has_gps,
+                "fit_file_key": activity.fit_file_key,
+                "aerobic_load": scores.aerobic_load,
+                "sport_type": activity.sport_type.value,
+            },
+        )
+
+        # Fire activity_calibration_eligible event when eligible and load
+        # scores are non-null. The outbox publisher reads events in
+        # insertion order so this naturally lands AFTER the
+        # activity_ingested event written above.
+        if eligible and scores.aerobic_load is not None:
+            await self.events.publish(
+                event_type="activity_calibration_eligible",
+                athlete_id=athlete_id,
+                payload={
+                    "activity_id": str(activity.id),
+                    "aerobic_load": scores.aerobic_load,
+                    "neuromuscular_load": scores.neuromuscular_load,
+                    "structural_load": scores.structural_load,
+                },
             )
 
         try:
@@ -579,22 +679,12 @@ class ActivityIngestionService:
 
         Returns ``None`` when the profile is missing — the caller
         falls back to the population default
-        (``POPULATION_MAX_HR_FALLBACK_BPM``). The lookup is
-        performed via raw SQL to avoid coupling this service to the
-        ``AthleteProfileRepository`` constructor (which is built
-        per-request and not currently imported by the ingestion
-        service).
+        (``POPULATION_MAX_HR_FALLBACK_BPM``).
         """
-        from sqlalchemy import text
-
-        result = await self.session.execute(
-            text("SELECT date_of_birth FROM athlete_profiles WHERE athlete_id = :id"),
-            {"id": str(athlete_id)},
-        )
-        row = result.first()
-        if row is None or row[0] is None:
+        profile = await self.athlete_profiles.get_by_athlete_id(athlete_id)
+        if profile is None or profile.date_of_birth is None:
             return None
-        return row[0]
+        return profile.date_of_birth
 
     def _resolve_max_hr_estimate(
         self,
@@ -613,6 +703,143 @@ class ActivityIngestionService:
         if athlete_birth_date is None:
             return settings.POPULATION_MAX_HR_FALLBACK_BPM
         return estimate_max_hr_from_age(athlete_birth_date)
+
+    async def _read_athlete_preferences(
+        self, athlete_id: uuid.UUID
+    ) -> Optional[AthletePreferences]:
+        """Look up the athlete's preferences for data tier inference.
+
+        Returns ``None`` when preferences are missing — the caller
+        falls back to Tier 6 (manual entry path).
+        """
+        return await self.athlete_preferences.get_by_athlete_id(athlete_id)
+
+    def _infer_data_tier(
+        self, preferences: Optional[AthletePreferences]
+    ) -> DataTier:
+        """Infer the data tier from athlete preferences.
+        
+        Returns Tier 6 when preferences are missing.
+        """
+        if preferences is None:
+            return DataTier.TIER_6
+        return infer_data_tier(
+            hr_source=preferences.hr_source,
+            power_source=preferences.power_source,
+        )
+
+    async def _read_athlete_physiology(
+        self, athlete_id: uuid.UUID
+    ) -> Optional[AthletePhysiology]:
+        """Look up the athlete's physiology for CP estimate.
+
+        Returns ``None`` when physiology is missing.
+        """
+        return await self.athlete_physiology.get_by_athlete_id(athlete_id)
+
+    def _resolve_cp_estimate(
+        self, physiology: Optional[AthletePhysiology]
+    ) -> Optional[int]:
+        """Extract CP estimate from physiology JSONB.
+        
+        Returns None when physiology or CP is missing.
+        """
+        if physiology is None or physiology.cp is None:
+            return None
+        # CP is stored as JSONB with shape {"value": int, "uncertainty": float, ...}
+        cp_data = physiology.cp
+        if isinstance(cp_data, dict):
+            value = cp_data.get("value")
+            if isinstance(value, (int, float)):
+                return int(value)
+        return None
+
+    async def _read_structural_risk_flag(
+        self, athlete_id: uuid.UUID
+    ) -> bool:
+        """Look up the structural risk flag for crossover athletes.
+        
+        Returns False when profile is missing.
+        """
+        profile = await self.athlete_profiles.get_by_athlete_id(athlete_id)
+        if profile is None or profile.structural_risk_flag is None:
+            return False
+        return bool(profile.structural_risk_flag)
+
+    def _compute_quality_flags(
+        self, parsed: ParsedFitData
+    ) -> dict:
+        """Compute quality flags from parsed FIT data.
+        
+        Returns dict with:
+        - hr_dropout_pct: percentage of HR record gaps (>5s gaps)
+        - gps_loss: whether GPS data has continuous loss (>30s)
+        - sensor_malfunction: whether sensor readings are anomalous
+        - has_gps_spikes: whether GPS speed spikes detected (>25 m/s)
+        - has_rr_intervals: pass through to quality_flags
+        """
+        quality_flags = {}
+        
+        # HR dropout: percentage of gaps in HR records > 5 seconds
+        if not parsed.hr_records:
+            quality_flags["hr_dropout_pct"] = 1.0
+        else:
+            # Estimate gap count based on actual HR records vs expected
+            duration = parsed.duration_seconds
+            expected_samples = duration  # 1 per second
+            actual_samples = len(parsed.hr_records)
+            if expected_samples > 0:
+                dropout_pct = max(0.0, 1.0 - (actual_samples / expected_samples))
+                quality_flags["hr_dropout_pct"] = dropout_pct
+            else:
+                quality_flags["hr_dropout_pct"] = 0.0
+        
+        # GPS loss detection: find continuous gaps > 30s with no GPS data
+        if not parsed.has_gps:
+            gps_loss = False          # no GPS to lose; preserve current behaviour
+        elif not parsed.gps_records:
+            gps_loss = True           # claimed GPS but zero records; preserve current behaviour
+        else:
+            # Continuous-gap detection per Phase-2.1-P1 Handoff Note #2.
+            # gps_records arrives in chronological order from FitParserService.
+            gps_timestamps = [r.timestamp for r in parsed.gps_records]
+            if len(gps_timestamps) <= 1:
+                # Only one or no GPS record - no gap to measure
+                gps_loss = False
+            else:
+                previous_ts = gps_timestamps[0]
+                max_continuous_gap_s = 0.0
+                for record_ts in gps_timestamps[1:]:
+                    delta = (record_ts - previous_ts).total_seconds()
+                    # Only treat forward gaps (delta < 0 means out-of-order; ignore)
+                    if delta > max_continuous_gap_s:
+                        max_continuous_gap_s = delta
+                    previous_ts = record_ts
+                gps_loss = max_continuous_gap_s > 30.0
+
+            # GPS spike detection (unchanged from original)
+            spike_count = sum(
+                1 for r in parsed.gps_records
+                if r.speed is not None and r.speed > 25.0
+            )
+            quality_flags["gps_spike_count"] = spike_count
+            
+        quality_flags["gps_loss"] = gps_loss
+        
+        # Sensor malfunction: heuristic check for anomalous HR/power values
+        # Already filtered in parsing, so flag if values are extreme
+        sensor_malfunction = False
+        if parsed.hr_records:
+            # Check for sustained HR > 220 (likely malfunction)
+            if any(hr > 220 or hr < 30 for hr in parsed.hr_records):
+                sensor_malfunction = True
+        if parsed.power_records:
+            # Check for power > 2000W (impossible for running)
+            if any(p > 2000 for p in parsed.power_records):
+                sensor_malfunction = True
+        quality_flags["sensor_malfunction"] = sensor_malfunction
+        
+        return quality_flags
 
     @staticmethod
     def _build_default_publisher(

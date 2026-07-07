@@ -112,8 +112,10 @@ The vision commits to logging non-running activities but never calibrating them 
 | Philosophy Element | Architecture Implementation |
 |---|---|
 | Non-running excluded from calibration | Invariant #8 in `principles.md`: "Non-running activities are excluded from twin calibration" |
+| Sport type detection at ingestion | `sport_type` field on `Activity` populated by `FitParserService` or Intervals.icu metadata |
 | No conversion factors | Anti-goal #11 in `principles.md`: "no multi-sport conversion factors" enforced as architectural constraint |
 | Activities logged but not calibrated | `calibration_eligible = false` for non-running; Activity record exists but twin does not learn from it |
+| Detection mechanism | See `02-computations/sport-type-detection.md` for FIT/Intervals.icu sport type mappings |
 
 ### 5. The Honesty Invariant
 
@@ -169,6 +171,7 @@ Owns:
 Does Not Own:
 - The load formulas themselves → `02-computations/load-computation.md`
 - The threshold detection algorithms → `02-computations/threshold-detection.md`
+- The sport type detection mechanism → `02-computations/sport-type-detection.md`
 
 ## Implementation Notes
 - Tier is stored on `TwinState.data_tier` at the time of the TwinState creation

@@ -1,112 +1,106 @@
-# Test manifest index — cross-phase selection groups and coverage summary
-# This file is rebuilt by the Test Architect when any sub-phase file changes.
-version: "1.0"
-last_reviewed_at: "2026-06-30T00:00:00Z"
-
-# Resolved selection groups — paths only, no feature metadata.
-# Rebuilt by Test Architect when any sub-phase file changes promotion state.
+version: '1.0'
+last_reviewed_at: '2026-07-02T00:00:00Z'
 selection:
   smoke:
-    - "tests/unit/test_first_message_agent.py"
-    - "tests/unit/test_context_budget_service.py"
-    - "tests/unit/test_twin_context_assembler.py"
-    - "tests/smoke/test_litellm_connectivity.py"
-
-  # Phase-1.6-P1 — Simple FIT Import & Post-Workout
-  # Reset when this sub-phase is complete and promoted.
+  - tests/unit/test_first_message_agent.py
+  - tests/unit/test_context_budget_service.py
+  - tests/unit/test_twin_context_assembler.py
+  - tests/smoke/test_litellm_connectivity.py
   feature:
-    - "tests/unit/test_fit_parser_service.py"
-    - "tests/unit/test_load_computation_service.py"
-    - "tests/unit/test_twin_recalibration_service.py"
-    - "tests/unit/test_compliance_service.py"
-    - "tests/unit/test_calibration_eligibility_service.py"
-    - "tests/unit/test_object_storage_client.py"
-    - "tests/unit/test_post_workout_agent.py"
-    - "tests/unit/test_activity_ingestion_service.py"
-    - "tests/integration/test_activity_endpoints.py"
-
+  - tests/unit/test_fit_parser_service.py
+  - tests/unit/test_load_computation_service.py
+  - tests/unit/test_twin_recalibration_service.py
+  - tests/unit/test_compliance_service.py
+  - tests/unit/test_calibration_eligibility_service.py
+  - tests/unit/test_object_storage_client.py
+  - tests/unit/test_post_workout_agent.py
+  - tests/unit/test_activity_ingestion_service.py
+  - tests/integration/test_activity_endpoints.py
   regression:
-    - "tests/unit/test_first_message_agent.py"
-    - "tests/unit/test_context_budget_service.py"
-    - "tests/unit/test_twin_context_assembler.py"
-    - "tests/unit/test_prompt_registry.py"
-    - "tests/unit/test_coaching_repositories.py"
-    - "tests/integration/test_coach_endpoints.py"
-    # Phase-1.5b — Workout Generation (promoted 2026-06-28)
-    - "tests/unit/test_generated_workout_repository.py"
-    - "tests/unit/test_workout_step_repository.py"
-    - "tests/unit/test_planned_session_repository.py"
-    - "tests/unit/test_workout_target_types.py"
-    - "tests/unit/test_workout_generation_agent.py"
-    - "tests/integration/test_workout_endpoints.py"
-
+  - tests/unit/test_first_message_agent.py
+  - tests/unit/test_context_budget_service.py
+  - tests/unit/test_twin_context_assembler.py
+  - tests/unit/test_prompt_registry.py
+  - tests/unit/test_coaching_repositories.py
+  - tests/integration/test_coach_endpoints.py
+  - tests/unit/test_generated_workout_repository.py
+  - tests/unit/test_workout_step_repository.py
+  - tests/unit/test_planned_session_repository.py
+  - tests/unit/test_workout_target_types.py
+  - tests/unit/test_workout_generation_agent.py
+  - tests/integration/test_workout_endpoints.py
+  - tests/unit/test_fit_parser_service.py
+  - tests/unit/test_load_computation_service.py
+  - tests/unit/test_twin_recalibration_service.py
+  - tests/unit/test_compliance_service.py
+  - tests/unit/test_calibration_eligibility_service.py
+  - tests/unit/test_object_storage_client.py
+  - tests/unit/test_post_workout_agent.py
+  - tests/unit/test_activity_ingestion_service.py
   release:
-    - "tests/unit/test_first_message_agent.py"
-    - "tests/unit/test_context_budget_service.py"
-    - "tests/unit/test_twin_context_assembler.py"
-    - "tests/unit/test_prompt_registry.py"
-    - "tests/unit/test_coaching_repositories.py"
-    - "tests/integration/test_coach_endpoints.py"
-    # Phase-1.5b — Workout Generation (promoted 2026-06-28)
-    - "tests/unit/test_generated_workout_repository.py"
-    - "tests/unit/test_workout_step_repository.py"
-    - "tests/unit/test_planned_session_repository.py"
-    - "tests/unit/test_workout_target_types.py"
-    - "tests/unit/test_workout_generation_agent.py"
-    - "tests/integration/test_workout_endpoints.py"
-
-# Cross-phase coverage summary — updated when features are promoted.
+  - tests/unit/test_first_message_agent.py
+  - tests/unit/test_context_budget_service.py
+  - tests/unit/test_twin_context_assembler.py
+  - tests/unit/test_prompt_registry.py
+  - tests/unit/test_coaching_repositories.py
+  - tests/integration/test_coach_endpoints.py
+  - tests/unit/test_generated_workout_repository.py
+  - tests/unit/test_workout_step_repository.py
+  - tests/unit/test_planned_session_repository.py
+  - tests/unit/test_workout_target_types.py
+  - tests/unit/test_workout_generation_agent.py
+  - tests/integration/test_workout_endpoints.py
 coverage:
   routes:
     covered:
-      - "POST /athletes/{id}/coach/first-message"
-      - "GET /athletes/{id}/coach/messages"
-      - "GET /athletes/{id}/today"
-      - "POST /athletes/{id}/sessions/{sid}/generate-workout"
-      # Phase-1.6 — Activity & FIT Import
-      - "POST /athletes/{id}/activities/upload"
-      - "GET /athletes/{id}/activities"
-      - "GET /athletes/{id}/activities/{aid}"
-      - "POST /athletes/{id}/activities/{aid}/analyse"
-      - "GET /athletes/{id}/activities/{aid}/analysis"
+    - POST /athletes/{id}/coach/first-message
+    - GET /athletes/{id}/coach/messages
+    - GET /athletes/{id}/today
+    - POST /athletes/{id}/sessions/{sid}/generate-workout
+    - POST /athletes/{id}/activities/upload
+    - GET /athletes/{id}/activities
+    - GET /athletes/{id}/activities/{aid}
+    - POST /athletes/{id}/activities/{aid}/analyse
+    - GET /athletes/{id}/activities/{aid}/analysis
     partial: []
     missing: []
-
   events:
     covered:
-      - "coaching_message_generated"
-      - "workout_generated"
-      # Phase-1.6 — FIT Import events
-      - "activity_ingested"
+    - coaching_message_generated
+    - workout_generated
+    - activity_ingested
+    - activity_calibration_eligible
     partial: []
     missing: []
-
   invariants:
     covered:
-      - "first_message — only one per athlete"
-      - "Every CoachingMessage has a corresponding GenerationEvent"
-      - "GenerationEvent.failure_reason non-null when success=false"
-      - "Messages are immutable"
-      - "Append-only repositories"
-      - "WorkoutStep.physiological_intent is never null"
-      - "GeneratedWorkout idempotent for (planned_session_id, generation_date)"
-      - "theoretical_targets and adjusted_targets both always written"
-      - "Target type depends on data tier (power/gap/description)"
-      - "Steps never updated after creation — append-only"
-      - "warmup step first, cooldown step last"
-      # Phase-1.6 — FIT Import invariants
-      - "Object storage upload BEFORE Activity record creation"
-      - "fit_file_key always set for source != manual_entry"
-      - "Load scores null at initial creation, populated by LoadComputationService"
-      - "calibration_eligible = false for all sessions (Phase 1.6)"
-      - "TwinState append-only"
-      - "PostWorkoutAgent idempotent (second call returns existing message)"
-      - "Every LLM call writes GenerationEvent"
-      - "activity_ingested event published AFTER commit"
-      - "POST /upload returns 202 with task_id"
+    - "first_message \u2014 only one per athlete"
+    - Every CoachingMessage has a corresponding GenerationEvent
+    - GenerationEvent.failure_reason non-null when success=false
+    - Messages are immutable
+    - Append-only repositories
+    - WorkoutStep.physiological_intent is never null
+    - GeneratedWorkout idempotent for (planned_session_id, generation_date)
+    - theoretical_targets and adjusted_targets both always written
+    - Target type depends on data tier (power/gap/description)
+    - "Steps never updated after creation \u2014 append-only"
+    - warmup step first, cooldown step last
+    - Object storage upload BEFORE Activity record creation
+    - fit_file_key always set for source != manual_entry
+    - Load scores null at initial creation, populated by LoadComputationService
+    - TwinState append-only
+    - PostWorkoutAgent idempotent (second call returns existing message)
+    - Every LLM call writes GenerationEvent
+    - activity_ingested event published AFTER commit
+    - POST /upload returns 202 with task_id
+    - calibration_eligible set by CalibrationEligibilityService and never manually
+      overridden
+    - Signal availability flags (has_power, has_rr_intervals, has_gps) set during
+      ingestion pipeline
+    - Tier 5-6 activities are never calibration-eligible
+    - Power-based aerobic load for Tier 1-2 athletes
+    - Neuromuscular load computed for Tier 1-4 athletes
+    - Structural load computed from GPS data
     partial: []
     missing: []
-
-# Cross-phase execution group dependencies.
-# Intra-phase ordering lives in the sub-phase files.
 cross_phase_dependencies: {}

@@ -42,7 +42,7 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
-from app.models.enums import ActivitySource
+from app.models.enums import ActivitySource, SportType
 
 
 class Activity(Base):
@@ -111,6 +111,26 @@ class Activity(Base):
     duration_seconds: Mapped[int] = mapped_column(Integer, nullable=False)
 
     # ------------------------------------------------------------------
+    # Sport type — detection result from FIT file ingest.
+    # Used for calibration eligibility gating (Principle #8: non-running
+    # activities excluded from twin calibration).
+    # ------------------------------------------------------------------
+    sport_type: Mapped[SportType] = mapped_column(
+        SAEnum(
+            SportType,
+            name="sport_type",
+            native_enum=False,
+            length=32,
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        nullable=False,
+        server_default="unknown",
+    )
+    sport_type_detection_version: Mapped[str | None] = mapped_column(
+        String(16), nullable=True
+    )
+
+    # ------------------------------------------------------------------
     # Load scores (nullable; populated by LoadComputationService).
     # ------------------------------------------------------------------
     aerobic_load: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -129,6 +149,9 @@ class Activity(Base):
         Boolean, nullable=False, default=False, server_default="false"
     )
     has_power: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    has_gps: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"
     )
 
@@ -175,6 +198,14 @@ class Activity(Base):
         ),
         Index("ix_activities_athlete_date", "athlete_id", "activity_date"),
         Index("ix_activities_athlete_start_time", "athlete_id", "start_time"),
+        # Filtered index for calibration-eligible activities — used for
+        # recent structural load queries.
+        Index(
+            "ix_activities_athlete_calibration_eligible",
+            "athlete_id",
+            "activity_date",
+            postgresql_where=text("calibration_eligible = true"),
+        ),
         # FK index — supports reverse lookup from planned_session_id
         # (e.g. ``session_completed`` consumer resolving the planned
         # session) and follows the "always index FK columns"

@@ -24,7 +24,7 @@ All generated tests MUST conform to this contract.
 | `db_session` | `tests/conftest.py` | function | AsyncSession with auto-rollback and post-test truncation. Use for all DB tests. |
 | `test_engine` | `tests/conftest.py` | function | AsyncEngine for each test function (avoids loop errors). |
 | `client` | `tests/conftest.py` | function | `httpx.AsyncClient` wired to FastAPI app with `db_session` override. |
-| `mock_activity` | Not yet canonical — each test builds its own | N/A | Tests currently use inline `MagicMock(spec=Activity)`; consider consolidating if pattern repeats. |
+| `mock_activity` | Not yet canonical — each test builds its own | N/A | Tests currently use inline `MagicMock(spec=Activity)`. Consider consolidating if pattern repeats. |
 
 ---
 
@@ -40,6 +40,8 @@ Quick reference for common mocking failures. Full details in `tests/README.md` d
 | `session.flush()` with `MagicMock` instead of `AsyncMock` | README.md: "Common Pitfalls" → `expire()` section |
 | Schema inspection with `sync_session.connection()` | README.md: "Schema Inspection in Async Tests" section |
 | Tests asserting JWT access token uniqueness | README.md: "JWT Token Uniqueness in Tests" section |
+| Mocking `session.execute()` when implementation uses repository methods | README.md: "Repository mocking requires scalar_one_or_none() not first()" (2026-07-07) |
+| Omitting `sport_type` in Activity factory after sport-type gate implementation | README.md: "sport_type field must be set in Activity factory" (2026-07-07) |
 
 ---
 
@@ -47,4 +49,5 @@ Quick reference for common mocking failures. Full details in `tests/README.md` d
 
 | Date | Change | Author |
 |------|--------|--------|
-| 2026-07-01 | Initial seeding from README lessons and DevOps incident #phase-1-6-7-8-p1 | p-test-architect
+| 2026-07-01 | Initial seeding from README lessons and DevOps incident #phase-1-6-7-8-p1 | p-test-architect |
+| 2026-07-07 | Added scalar_one_or_none anti-pattern; documented repository mocking strategy; added sport_type factory requirement | p-test-architect |

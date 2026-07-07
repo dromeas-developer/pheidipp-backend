@@ -22,7 +22,7 @@
 
 7. **All heavy processing is async.** FIT parsing, twin recalibration, post-workout analysis — all run in a worker queue. API responses never wait for these. The queue backend is decoupled; early-stage implementation uses PostgreSQL-backed workers (`procrastinate`), with a defined migration path to Redis if queue contention requires it.
 
-8. **Non-running activities are excluded from twin calibration.** They appear in the training record. They never feed load computation, threshold detection, execution analysis, or adaptation modelling. *(Implements vision principle "Non-Running Data Does Not Corrupt the Running Model" from `docs/vision/twin/data-philosophy.md`.)*
+8. **Non-running activities are excluded from twin calibration.** Activities with `sport_type != 'running'` (detected at ingestion from FIT file sport field or Intervals.icu metadata) are logged in the training record but are never calibration-eligible. They do not feed load computation, threshold detection, execution analysis, or adaptation modelling. See `02-computations/sport-type-detection.md` for the detection mechanism and `02-computations/load-computation.md` for the `CalibrationEligibilityService` gate.
 
 9. **Raw pace is never used.** Grade-adjusted pace (GAP) is the standard input throughout. See `02-computations/effort-normalisation.md`. *(Implements vision principle "Real Signals, Not Assumptions" from `docs/vision/twin/data-philosophy.md`.)*
 
@@ -132,7 +132,7 @@ Maps constraints from `docs/vision/product/constraints.md` to architecture enfor
 
 | Vision Constraint | Architecture Implementation | Enforced By |
 |---|---|---|
-| **Running-Only Twin Model** — no multi-sport conversion factors | Non-running activities logged in training record but excluded from twin calibration | Principle #8, `activity.md` calibration eligibility |
+| **Running-Only Twin Model** — no multi-sport conversion factors | Non-running activities detected via FIT sport field; `sport_type` field filters them from twin calibration pipeline | Principle #8, `activity.md` sport_type invariant, `sport-type-detection.md` |
 | **No Workout Builder** — athletes cannot create/edit workouts | Athletes have three choices: accept, substitute, or skip | Principle #11 (anti-goal), `planned-session.md` status machine |
 | **No Raw Data Surfaces** — no HR/pace/power charts; only twin-context visualisations | Fitness API returns `form_descriptor` only; raw scores never exposed | `athlete-fitness.md` API contract, `form_descriptor` pattern |
 | **Unsynced Workout Handling** — ask before assuming when data gaps occur | `fit_file_key` prerequisite; coach surfaces ambiguity-first check-in | `activity.md` invariant, agent prompt behavior |

@@ -512,3 +512,417 @@ class TestGetActivityAnalysis:
 
         assert response.status_code == 404
         assert "POST /analyse" in response.json()["detail"]
+
+
+# ===========================================================================
+# Phase-2.1: Signal availability flags (has_power, has_rr_intervals, has_gps)
+# ===========================================================================
+
+
+class TestSignalAvailabilityFlags:
+    """Phase-2.1: GET /activities/{aid} returns all signal availability flags."""
+
+    @pytest.mark.asyncio
+    async def test_get_activity_returns_all_signal_flags(self, client: AsyncClient, db_session: AsyncSession) -> None:
+        """GET returns has_hr, has_power, has_rr_intervals, has_gps."""
+        athlete, goal, twin = await _create_athlete_with_onboarding(db_session)
+        token = _access_token(athlete.id)
+
+        activity = Activity(
+            athlete_id=athlete.id,
+            source=ActivitySource.MANUAL_UPLOAD,
+            activity_date=date(2026, 6, 15),
+            start_time=datetime(2026, 6, 15, 8, 0, tzinfo=timezone.utc),
+            duration_seconds=3600,
+            aerobic_load=85.0,
+            has_hr=True,
+            has_power=True,
+            has_rr_intervals=True,
+            has_gps=True,
+            calibration_eligible=True,
+            quality_flags={},
+            fit_file_key="fit-files/test.fit",
+        )
+        db_session.add(activity)
+        await db_session.flush()
+
+        response = await client.get(
+            f"/api/v1/athletes/{athlete.id}/activities/{activity.id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["has_hr"] is True
+        assert data["has_power"] is True
+        assert data["has_rr_intervals"] is True
+        assert data["has_gps"] is True
+
+    @pytest.mark.asyncio
+    async def test_get_activity_with_power_only(self, client: AsyncClient, db_session: AsyncSession) -> None:
+        """GET returns has_power=True when only power data is available."""
+        athlete, goal, twin = await _create_athlete_with_onboarding(db_session)
+        token = _access_token(athlete.id)
+
+        activity = Activity(
+            athlete_id=athlete.id,
+            source=ActivitySource.MANUAL_UPLOAD,
+            activity_date=date(2026, 6, 15),
+            start_time=datetime(2026, 6, 15, 8, 0, tzinfo=timezone.utc),
+            duration_seconds=3600,
+            aerobic_load=85.0,
+            has_hr=True,
+            has_power=True,
+            has_rr_intervals=False,
+            has_gps=False,
+            calibration_eligible=True,
+            quality_flags={},
+            fit_file_key="fit-files/test.fit",
+        )
+        db_session.add(activity)
+        await db_session.flush()
+
+        response = await client.get(
+            f"/api/v1/athletes/{athlete.id}/activities/{activity.id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["has_power"] is True
+        assert data["has_rr_intervals"] is False
+        assert data["has_gps"] is False
+
+    @pytest.mark.asyncio
+    async def test_get_activity_with_rr_intervals_only(self, client: AsyncClient, db_session: AsyncSession) -> None:
+        """GET returns has_rr_intervals=True when only RR interval data is available."""
+        athlete, goal, twin = await _create_athlete_with_onboarding(db_session)
+        token = _access_token(athlete.id)
+
+        activity = Activity(
+            athlete_id=athlete.id,
+            source=ActivitySource.MANUAL_UPLOAD,
+            activity_date=date(2026, 6, 15),
+            start_time=datetime(2026, 6, 15, 8, 0, tzinfo=timezone.utc),
+            duration_seconds=3600,
+            aerobic_load=85.0,
+            has_hr=True,
+            has_power=False,
+            has_rr_intervals=True,
+            has_gps=False,
+            calibration_eligible=True,
+            quality_flags={},
+            fit_file_key="fit-files/test.fit",
+        )
+        db_session.add(activity)
+        await db_session.flush()
+
+        response = await client.get(
+            f"/api/v1/athletes/{athlete.id}/activities/{activity.id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["has_rr_intervals"] is True
+        assert data["has_power"] is False
+        assert data["has_gps"] is False
+
+    @pytest.mark.asyncio
+    async def test_get_activity_with_gps_only(self, client: AsyncClient, db_session: AsyncSession) -> None:
+        """GET returns has_gps=True when GPS data is available."""
+        athlete, goal, twin = await _create_athlete_with_onboarding(db_session)
+        token = _access_token(athlete.id)
+
+        activity = Activity(
+            athlete_id=athlete.id,
+            source=ActivitySource.MANUAL_UPLOAD,
+            activity_date=date(2026, 6, 15),
+            start_time=datetime(2026, 6, 15, 8, 0, tzinfo=timezone.utc),
+            duration_seconds=3600,
+            aerobic_load=85.0,
+            has_hr=True,
+            has_power=False,
+            has_rr_intervals=False,
+            has_gps=True,
+            calibration_eligible=True,
+            quality_flags={},
+            fit_file_key="fit-files/test.fit",
+        )
+        db_session.add(activity)
+        await db_session.flush()
+
+        response = await client.get(
+            f"/api/v1/athletes/{athlete.id}/activities/{activity.id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["has_gps"] is True
+        assert data["has_power"] is False
+        assert data["has_rr_intervals"] is False
+
+    @pytest.mark.asyncio
+    async def test_list_activities_returns_signal_flags(self, client: AsyncClient, db_session: AsyncSession) -> None:
+        """GET /activities list returns signal flags for each activity."""
+        athlete, goal, twin = await _create_athlete_with_onboarding(db_session)
+        token = _access_token(athlete.id)
+
+        activity = Activity(
+            athlete_id=athlete.id,
+            source=ActivitySource.MANUAL_UPLOAD,
+            activity_date=date(2026, 6, 15),
+            start_time=datetime(2026, 6, 15, 8, 0, tzinfo=timezone.utc),
+            duration_seconds=3600,
+            aerobic_load=85.0,
+            has_hr=True,
+            has_power=True,
+            has_rr_intervals=False,
+            has_gps=True,
+            calibration_eligible=True,
+            quality_flags={},
+            fit_file_key="fit-files/test.fit",
+        )
+        db_session.add(activity)
+        await db_session.flush()
+
+        response = await client.get(
+            f"/api/v1/athletes/{athlete.id}/activities",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["activities"]) == 1
+        assert data["activities"][0]["has_power"] is True
+        assert data["activities"][0]["has_rr_intervals"] is False
+        assert data["activities"][0]["has_gps"] is True
+
+    @pytest.mark.asyncio
+    async def test_get_activity_calibration_eligible_flag(self, client: AsyncClient, db_session: AsyncSession) -> None:
+        """GET returns calibration_eligible flag populated by CalibrationEligibilityService."""
+        athlete, goal, twin = await _create_athlete_with_onboarding(db_session)
+        token = _access_token(athlete.id)
+
+        activity = Activity(
+            athlete_id=athlete.id,
+            source=ActivitySource.MANUAL_UPLOAD,
+            activity_date=date(2026, 6, 15),
+            start_time=datetime(2026, 6, 15, 8, 0, tzinfo=timezone.utc),
+            duration_seconds=3600,
+            aerobic_load=85.0,
+            has_hr=True,
+            has_power=True,
+            has_rr_intervals=False,
+            has_gps=True,
+            calibration_eligible=True,
+            quality_flags={},
+            fit_file_key="fit-files/test.fit",
+        )
+        db_session.add(activity)
+        await db_session.flush()
+
+        response = await client.get(
+            f"/api/v1/athletes/{athlete.id}/activities/{activity.id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["calibration_eligible"] is True
+
+
+class TestSportTypeResponse:
+    """Phase-2.1-P3: GET /activities/{aid} returns sport_type and sport_type_detection_version.
+
+    Reference: docs/implementation/phase-2/phase-2-1-p3-sport-type-filtering.md
+    """
+
+    @pytest.mark.asyncio
+    async def test_get_activity_returns_sport_type(self, client: AsyncClient, db_session: AsyncSession) -> None:
+        """GET /activities/{aid} returns sport_type field populated from parsed FIT."""
+        athlete, goal, twin = await _create_athlete_with_onboarding(db_session)
+        token = _access_token(athlete.id)
+
+        activity = Activity(
+            athlete_id=athlete.id,
+            source=ActivitySource.MANUAL_UPLOAD,
+            activity_date=date(2026, 6, 15),
+            start_time=datetime(2026, 6, 15, 8, 0, tzinfo=timezone.utc),
+            duration_seconds=3600,
+            aerobic_load=85.0,
+            has_hr=True,
+            has_power=True,
+            has_rr_intervals=False,
+            has_gps=True,
+            calibration_eligible=True,
+            quality_flags={},
+            fit_file_key="fit-files/test.fit",
+            sport_type="running",
+            sport_type_detection_version="v1",
+        )
+        db_session.add(activity)
+        await db_session.flush()
+
+        response = await client.get(
+            f"/api/v1/athletes/{athlete.id}/activities/{activity.id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["sport_type"] == "running"
+        assert data["sport_type_detection_version"] == "v1"
+
+    @pytest.mark.asyncio
+    async def test_get_activity_returns_sport_type_cycling(self, client: AsyncClient, db_session: AsyncSession) -> None:
+        """Cycling activity shows sport_type='cycling' in GET response."""
+        athlete, goal, twin = await _create_athlete_with_onboarding(db_session)
+        token = _access_token(athlete.id)
+
+        activity = Activity(
+            athlete_id=athlete.id,
+            source=ActivitySource.MANUAL_UPLOAD,
+            activity_date=date(2026, 6, 15),
+            start_time=datetime(2026, 6, 15, 8, 0, tzinfo=timezone.utc),
+            duration_seconds=3600,
+            aerobic_load=85.0,
+            has_hr=True,
+            has_power=True,
+            has_rr_intervals=False,
+            has_gps=True,
+            calibration_eligible=False,  # Cycling never calibration-eligible
+            quality_flags={},
+            fit_file_key="fit-files/test.fit",
+            sport_type="cycling",
+            sport_type_detection_version="v1",
+        )
+        db_session.add(activity)
+        await db_session.flush()
+
+        response = await client.get(
+            f"/api/v1/athletes/{athlete.id}/activities/{activity.id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["sport_type"] == "cycling"
+        assert data["calibration_eligible"] is False
+
+    @pytest.mark.asyncio
+    async def test_get_activity_returns_sport_type_unknown(self, client: AsyncClient, db_session: AsyncSession) -> None:
+        """Activity with undetectable sport shows sport_type='unknown'."""
+        athlete, goal, twin = await _create_athlete_with_onboarding(db_session)
+        token = _access_token(athlete.id)
+
+        activity = Activity(
+            athlete_id=athlete.id,
+            source=ActivitySource.MANUAL_UPLOAD,
+            activity_date=date(2026, 6, 15),
+            start_time=datetime(2026, 6, 15, 8, 0, tzinfo=timezone.utc),
+            duration_seconds=3600,
+            aerobic_load=85.0,
+            has_hr=True,
+            has_power=False,
+            has_rr_intervals=False,
+            has_gps=False,
+            calibration_eligible=False,
+            quality_flags={},
+            fit_file_key="fit-files/test.fit",
+            sport_type="unknown",
+            sport_type_detection_version="v1",
+        )
+        db_session.add(activity)
+        await db_session.flush()
+
+        response = await client.get(
+            f"/api/v1/athletes/{athlete.id}/activities/{activity.id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["sport_type"] == "unknown"
+        assert data["sport_type_detection_version"] == "v1"
+        assert data["calibration_eligible"] is False
+
+    @pytest.mark.asyncio
+    async def test_list_activities_returns_sport_type(self, client: AsyncClient, db_session: AsyncSession) -> None:
+        """GET /activities list returns sport_type for each activity."""
+        athlete, goal, twin = await _create_athlete_with_onboarding(db_session)
+        token = _access_token(athlete.id)
+
+        activity1 = Activity(
+            athlete_id=athlete.id,
+            source=ActivitySource.MANUAL_UPLOAD,
+            activity_date=date(2026, 6, 15),
+            start_time=datetime(2026, 6, 15, 8, 0, tzinfo=timezone.utc),
+            duration_seconds=3600,
+            aerobic_load=85.0,
+            has_hr=True,
+            quality_flags={},
+            fit_file_key="fit-files/test.fit",
+            sport_type="running",
+            sport_type_detection_version="v1",
+        )
+        activity2 = Activity(
+            athlete_id=athlete.id,
+            source=ActivitySource.MANUAL_UPLOAD,
+            activity_date=date(2026, 6, 16),
+            start_time=datetime(2026, 6, 16, 8, 0, tzinfo=timezone.utc),
+            duration_seconds=3600,
+            aerobic_load=90.0,
+            has_hr=True,
+            quality_flags={},
+            fit_file_key="fit-files/test2.fit",
+            sport_type="cycling",
+            sport_type_detection_version="v1",
+        )
+        db_session.add_all([activity1, activity2])
+        await db_session.flush()
+
+        response = await client.get(
+            f"/api/v1/athletes/{athlete.id}/activities",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["activities"]) == 2
+        sport_types = {a["sport_type"] for a in data["activities"]}
+        assert sport_types == {"running", "cycling"}
+
+    @pytest.mark.asyncio
+    async def test_manual_entry_has_unknown_sport_type(self, client: AsyncClient, db_session: AsyncSession) -> None:
+        """Manual-entry activities default to sport_type='unknown'."""
+        athlete, goal, twin = await _create_athlete_with_onboarding(db_session)
+        token = _access_token(athlete.id)
+
+        activity = Activity(
+            athlete_id=athlete.id,
+            source=ActivitySource.MANUAL_ENTRY,
+            activity_date=date(2026, 6, 15),
+            start_time=datetime(2026, 6, 15, 8, 0, tzinfo=timezone.utc),
+            duration_seconds=1800,
+            has_hr=False,
+            calibration_eligible=False,
+            quality_flags={},
+            fit_file_key=None,
+            sport_type="unknown",  # Manual entry has no FIT detection
+            sport_type_detection_version=None,
+        )
+        db_session.add(activity)
+        await db_session.flush()
+
+        response = await client.get(
+            f"/api/v1/athletes/{athlete.id}/activities/{activity.id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["sport_type"] == "unknown"
+        # Manual entry should not have sport_type_detection_version
+        assert data.get("sport_type_detection_version") is None or data.get("sport_type_detection_version") == "unknown"

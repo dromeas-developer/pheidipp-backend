@@ -1,5 +1,14 @@
 """Pydantic schemas for the public API."""
 
+from app.schemas.activity import (
+    ActivityListResponse,
+    ActivityNotFoundResponse,
+    ActivityResponse,
+    ActivityUploadResponse,
+    CoachingMessageSummary,
+    FitParseErrorResponse,
+    PostWorkoutAnalysisResponse,
+)
 from app.schemas.auth import (
     AthleteResponse,
     AuthResponse,
@@ -51,6 +60,10 @@ from app.schemas.workout import (
 )
 
 __all__ = [
+    "ActivityListResponse",
+    "ActivityNotFoundResponse",
+    "ActivityResponse",
+    "ActivityUploadResponse",
     "AthletePreferencesPatchIn",
     "AthletePreferencesResponse",
     "AthleteProfilePatchIn",
@@ -59,7 +72,9 @@ __all__ = [
     "AuthResponse",
     "CheckpointResponse",
     "CoachingMessageResponse",
+    "CoachingMessageSummary",
     "FirstMessageConflictResponse",
+    "FitParseErrorResponse",
     "GenerateWorkoutResponse",
     "GeneratedWorkoutResponse",
     "LoginRequest",
@@ -72,6 +87,7 @@ __all__ = [
     "OnboardingTrainingGoalIn",
     "PhaseDescriptorResponse",
     "PlannedSessionResponse",
+    "PostWorkoutAnalysisResponse",
     "RefreshRequest",
     "RefreshResponse",
     "RegisterProfileIn",

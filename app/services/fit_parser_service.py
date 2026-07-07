@@ -1,7 +1,7 @@
 """FitParserService — extract raw HR data from a FIT file.
 
 Implements the Phase-1.6 contract from
-``docs/architecture/01-entities/activity.md` →
+``docs/architecture/01-entities/activity.md`` →
 ``LoadComputationService`` invariant ``must receive raw records from
 ``FitParserService``, not summary stats``.
 
@@ -32,6 +32,13 @@ Output:
   signal-availability flags. Power samples are exposed but
   ``has_power`` / ``has_rr_intervals`` flag tracks whether the
   Phase-1.6 load formula can consume them.
+
+Phase-2 expansion:
+
+* GPS records (distance, elevation, speed/pace) and RR interval
+  time-series for full signal processing.
+* Lap data and session-level totals.
+* Artifact detection (GPS spikes > 25 m/s speed).
 """
 
 from __future__ import annotations
@@ -44,6 +51,7 @@ from typing import List, Optional
 from fitparse import FitFile, FitParseError as UpstreamFitParseError
 
 from app.core.logging_utils import log_event
+from app.models.enums import SportType
 
 
 # ---------------------------------------------------------------------------
@@ -70,6 +78,26 @@ class FitParseEmptyError(FitParseError):
 
 
 # ---------------------------------------------------------------------------
+# Helper dataclass for GPS records.
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class GpsRecord:
+    """Single GPS point from a FIT file's record message.
+
+    All fields are in SI units (meters, meters/second) or radians.
+    """
+
+    timestamp: datetime
+    position_lat: Optional[float] = None
+    position_long: Optional[float] = None
+    distance: Optional[float] = None
+    altitude: Optional[float] = None
+    speed: Optional[float] = None
+
+
+# ---------------------------------------------------------------------------
 # Output dataclass.
 # ---------------------------------------------------------------------------
 
@@ -83,6 +111,15 @@ class ParsedFitData:
     can apply the HR-reserve integration formula against the
     original signal — the architecture invariant on raw-records-only
     consumption.
+
+    Phase-2 expansion:
+
+    * GPS records (distance, elevation, speed/pace) for structural
+      load computation and GPS artifact detection.
+    * RR interval time-series for HRV analysis.
+    * Session-level totals (total distance, total ascent).
+    * Flags for data availability and quality issues.
+    * Sport type detection result from FIT sport message.
     """
 
     start_time: datetime
@@ -92,6 +129,17 @@ class ParsedFitData:
     has_hr: bool = False
     has_power: bool = False
     has_rr_intervals: bool = False
+    # Phase-2 additions:
+    gps_records: List[GpsRecord] = field(default_factory=list)
+    rr_records: List[float] = field(default_factory=list)
+    total_distance_m: Optional[float] = None
+    total_ascent_m: Optional[float] = None
+    has_gps: bool = False
+    moving_duration_seconds: int = 0
+    # Sport type detection (Phase-2.1-P3):
+    sport_type: SportType = SportType.UNKNOWN
+    detection_confidence: str = "unknown"
+    detection_version: str = "v1"
 
 
 # ---------------------------------------------------------------------------
@@ -112,6 +160,12 @@ class FitParserService:
     SESSION_START_FIELD = "start_time"
     SESSION_TOTAL_TIMER_FIELD = "total_timer_time"
     SESSION_TOTAL_ELAPSED_FIELD = "total_elapsed_time"
+    SESSION_TOTAL_DISTANCE_FIELD = "total_distance"
+    SESSION_TOTAL_ELEV_GAIN_FIELD = "total_ascent"
+
+    # GPS artifact detection threshold: speed > 25 m/s (~90 km/h) is
+    # physically impossible for running and indicates a GPS glitch.
+    GPS_SPEED_SPIKE_THRESHOLD_M_S = 25.0
 
     async def parse(self, file_bytes: bytes) -> ParsedFitData:
         """Parse FIT bytes into raw-record :class:`ParsedFitData`.
@@ -161,11 +215,22 @@ class FitParserService:
 
         hr_records: list[int] = []
         power_records: list[int] = []
-        rr_seen = False
+        rr_records: list[float] = []
+        gps_records: list[GpsRecord] = []
         start_time: Optional[datetime] = None
         duration_seconds: int = 0
+        total_distance_m: Optional[float] = None
+        total_ascent_m: Optional[float] = None
+        has_gps: bool = False
 
         session_seen = False
+
+        # Sport type detection variables (Phase-2.1-P3)
+        sport_int: Optional[int] = None
+        sub_sport_int: Optional[int] = None
+        sport_type = SportType.UNKNOWN
+        detection_confidence = "unknown"
+
         for message in fit.messages:
             if message.name == "session":  # type: ignore[attr-defined]
                 session_seen = True
@@ -178,11 +243,21 @@ class FitParserService:
                     or message.get_value(self.SESSION_TOTAL_ELAPSED_FIELD)  # type: ignore[attr-defined]
                 )
                 if isinstance(raw_total, (int, float)):
-                    # FIT total_timer_time is in seconds with a 1000x
-                    # scaling factor (i.e. milliseconds). The library
-                    # sometimes already divides by 1000 depending on
-                    # the producer; coerce defensively.
                     duration_seconds = _coerce_duration_seconds(raw_total)
+                # Session-level totals
+                raw_dist = message.get_value(self.SESSION_TOTAL_DISTANCE_FIELD)  # type: ignore[attr-defined]
+                if isinstance(raw_dist, (int, float)):
+                    # FIT distance is typically in mm (1000x scale)
+                    total_distance_m = float(raw_dist) / 1000.0
+                raw_elev = message.get_value(self.SESSION_TOTAL_ELEV_GAIN_FIELD)  # type: ignore[attr-defined]
+                if isinstance(raw_elev, (int, float)):
+                    # FIT elevation is typically in m (sometimes 10x for older files)
+                    total_ascent_m = float(raw_elev)
+
+                # Extract sport type from FIT sport message (Phase-2.1-P3)
+                sport_int = message.get_value("sport")  # type: ignore[attr-defined]
+                sub_sport_int = message.get_value("sub_sport")  # type: ignore[attr-defined]
+                sport_type, detection_confidence = _map_fit_sport_to_enum(sport_int, sub_sport_int)
                 continue
 
             if message.name != "record":  # type: ignore[attr-defined]
@@ -196,12 +271,45 @@ class FitParserService:
             if isinstance(raw_power, int) and 0 <= raw_power <= 2500:
                 power_records.append(raw_power)
 
-            # RR-interval availability is signalled by the presence
-            # of the field on a record message. We do not extract
-            # individual samples at this phase; Phase 2 refines the
-            # RR handling.
-            if message.get_value("rr_interval") is not None:  # type: ignore[attr-defined]
-                rr_seen = True
+            # RR-interval values (milliseconds)
+            raw_rr = message.get_value("rr_interval")  # type: ignore[attr-defined]
+            if isinstance(raw_rr, (int, float)):
+                # rr_interval can be a single float (gap to next beat)
+                # or a list of intervals (in milliseconds)
+                if isinstance(raw_rr, list):
+                    rr_records.extend(raw_rr)
+                else:
+                    rr_records.append(float(raw_rr))
+
+            # GPS records: position_lat, position_long, distance, altitude, speed
+            raw_lat = message.get_value("position_lat")  # type: ignore[attr-defined]
+            raw_long = message.get_value("position_long")  # type: ignore[attr-defined]
+            raw_dist = message.get_value("distance")  # type: ignore[attr-defined]
+            raw_alt = message.get_value("altitude")  # type: ignore[attr-defined]
+            raw_speed = message.get_value("speed")  # type: ignore[attr-defined]
+
+            if raw_lat is not None or raw_long is not None:
+                # We have GPS data on this record
+                has_gps = True
+                if isinstance(raw_lat, int):
+                    raw_lat = raw_lat / 11930465.0  # Convert to degrees
+                if isinstance(raw_long, int):
+                    raw_long = raw_long / 11930465.0
+                if isinstance(raw_dist, (int, float)):
+                    raw_dist = float(raw_dist) / 1000.0  # mm to m
+                if isinstance(raw_alt, (int, float)):
+                    raw_alt = float(raw_alt) / 10.0  # dm to m
+                if isinstance(raw_speed, (int, float)):
+                    raw_speed = float(raw_speed)  # m/s
+
+                gps_records.append(GpsRecord(
+                    timestamp=message.timestamp if hasattr(message, 'timestamp') else start_time or datetime.now(timezone.utc),  # type: ignore[attr-defined]
+                    position_lat=raw_lat,
+                    position_long=raw_long,
+                    distance=raw_dist,
+                    altitude=raw_alt,
+                    speed=raw_speed,
+                ))
 
             if start_time is None:
                 raw_ts = message.get_value(self.TIMESTAMP_FIELD)  # type: ignore[attr-defined]
@@ -229,7 +337,16 @@ class FitParserService:
             power_records=power_records,
             has_hr=bool(hr_records),
             has_power=bool(power_records),
-            has_rr_intervals=rr_seen,
+            has_rr_intervals=bool(rr_records),
+            gps_records=gps_records,
+            rr_records=rr_records,
+            total_distance_m=total_distance_m,
+            total_ascent_m=total_ascent_m,
+            has_gps=has_gps,
+            moving_duration_seconds=duration_seconds,
+            sport_type=sport_type,
+            detection_confidence=detection_confidence,
+            detection_version="v1",
         )
 
 
@@ -297,3 +414,53 @@ def _coerce_duration_seconds(value: float | int) -> int:
     if numeric > 10_000:
         return int(round(numeric / 1000))
     return int(round(numeric))
+
+
+def _map_fit_sport_to_enum(sport: Optional[int], sub_sport: Optional[int]) -> tuple[SportType, str]:
+    """Map FIT sport and sub_sport integers to SportType and confidence.
+
+    Uses the Garmin/Ant+ sport mapping table from
+    docs/architecture/02-computations/sport-type-detection.md.
+
+    Args:
+        sport: Raw FIT sport field integer (None if absent)
+        sub_sport: Raw FIT sub_sport field integer (None if absent)
+
+    Returns:
+        Tuple of (SportType, detection_confidence) where confidence is:
+        - "high": FIT sport field was present and mappable
+        - "low": FIT sport field was present but unrecognized (defaulted to 'other')
+        - "unknown": FIT sport field is absent, generic (0), or "all" (254)
+
+    Mapping table:
+        sport=1 (running) → SportType.RUNNING (sub_sport irrelevant)
+        sport=2 (cycling) → SportType.CYCLING
+        sport=3 (transition) → SportType.OTHER
+        sport=4 (fitness_equipment) → SportType.STRENGTH
+        sport=5 (swimming) → SportType.SWIMMING
+        sport=14 (walking) → SportType.OTHER
+        sport=0 (generic), 254 (all), or None → SportType.UNKNOWN
+        unrecognized sport int → SportType.OTHER with "low" confidence
+    """
+    if sport is None or sport == 0 or sport == 254:
+        return SportType.UNKNOWN, "unknown"
+
+    if sport == 1:
+        # Running — sub_sport is irrelevant for calibration eligibility
+        return SportType.RUNNING, "high"
+    if sport == 2:
+        return SportType.CYCLING, "high"
+    if sport == 3:
+        # Transition
+        return SportType.OTHER, "high"
+    if sport == 4:
+        # Fitness equipment
+        return SportType.STRENGTH, "high"
+    if sport == 5:
+        return SportType.SWIMMING, "high"
+    if sport == 14:
+        # Walking
+        return SportType.OTHER, "high"
+
+    # Unrecognized sport integer — default to 'other' with low confidence
+    return SportType.OTHER, "low"

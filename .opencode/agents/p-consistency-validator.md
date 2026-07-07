@@ -1,5 +1,5 @@
 ---
-model: litellm-proxy/alibaba/qwen
+model: litellm-proxy/nvidia/glm-5.2
 temperature: 0.1
 
 permission:
@@ -112,7 +112,7 @@ scope:
 Capability-scoped audits require tracing inward from the capability
 via the implemented-state dependency map rather than filtering by
 phase tag. This is a meaningful change to Step 1 (Establish Scope)
-and Step 2 (Load Files). Re-evaluate when Phase 4 implementations
+and Step 2 (Structural Survey). Re-evaluate when Phase 4 implementations
 produce cross-phase capability slices worth auditing as a unit.
 
 ---
@@ -239,19 +239,45 @@ implementation artifacts in scope:
 
 Build this list before any retrieval. Do not retrieve speculatively.
 
-### Step 2 — Load Implementation Files
+### Step 2 — Structural Survey (cheap pass, no full file bodies)
 
-Call `get_files` with the complete scope list from Step 1. Load all files
-in a single call where possible. Group by category (models, services,
-repositories, routes) to make cross-category comparison tractable.
+Do not call `get_files` on the full scope list. Almost none of the checks
+in this protocol need full file content to run — they need names,
+signatures, and the few lines around specific patterns. Build a
+structural index of the scope first, using targeted, low-cost calls, and
+hold the number of calls fixed regardless of scope size:
 
-If a file in scope does not exist, note it and continue.
+* One `search_symbols` call covering every file in scope — class and
+  method/function names for every repository, service, and route. This
+  is what naming-drift and pattern-consistency comparisons actually need.
+  Never call it per-file; it takes a batch.
+* A small, fixed set of `grep_files` calls, each covering the full path
+  list (or the relevant subset) in one call — not one call per file:
+  - `session\.commit\(|publish_event\(` across services and repositories,
+    to check commit/event ordering
+  - `\.query\(|select\(|session\.execute\(`, scoped to route files, to
+    check for query logic outside the repository layer
+  - `^def |^class |^    def `, across the full scope, to get every file's
+    top-level shape in one pass — this also gives line counts and
+    responsibility signals for the Oversized Files and Accumulated
+    Responsibilities checks without reading bodies
+  - distinctive fragments for duplicate-logic candidates, one call per
+    fragment, each scoped to the full path list
+
+Target for this step: roughly 4-6 calls total, independent of how many
+files are in scope. If scope size is pushing that number up, combine
+patterns with regex alternation before adding another call.
+
+This survey is what the rest of the protocol runs against. If a file in
+scope does not exist, note it and continue.
 
 ### Step 3 — Category 1: Cross-Implementation Inconsistency
 
-Work through each inconsistency type systematically. Use `grep_files` and
-`search_symbols` to supplement `get_files` when you need to trace a
-pattern across files not already loaded.
+Work through each inconsistency type against the Step 2 structural index.
+When a finding needs full-body confirmation to be certain — not just
+plausible from names and grep hits — do not call `get_files` here. Add
+the file(s) to a running **Verification Queue** and continue working
+through checks. The queue is drained once, in Step 5.
 
 **For naming drift:**
 Scan for the same concept (entity, field, event, method) referenced under
@@ -262,7 +288,7 @@ different names. Focus on:
 - Variable names for the same injected dependency
 
 **For ownership blur:**
-For each file loaded, verify that the logic it contains belongs to the
+For each file in scope, verify that the logic it contains belongs to the
 layer the file represents. Flag any logic that has crossed a boundary:
 - Query logic in routes
 - Business rules in repositories
@@ -278,10 +304,10 @@ how similar operations are implemented. Look for:
 - Error response patterns — same exception types for same failure classes?
 
 **For duplicate logic:**
-Search for the same computation appearing independently. Use `grep_files`
-with distinctive fragments (a specific formula component, a specific
-transformation) to find copies. Flag when the same logic appears in two
-or more places without going through a shared utility.
+Search for the same computation appearing independently, using Step 2's
+fragment-search results. Flag when the same logic appears in two or more
+places without going through a shared utility; queue the candidate pair
+for verification rather than confirming from grep hits alone.
 
 **For inconsistent error handling:**
 Compare how each service handles the same class of error (missing entity,
@@ -293,19 +319,23 @@ different error types or HTTP responses for equivalent conditions.
 For each potential technical debt finding, make an explicit judgement call
 before flagging it. Ask: does this actually need to change? If the answer
 is "it depends" or "probably not," do not flag it. Only flag what you can
-make a clear case for.
+make a clear case for. As in Step 3, anything needing full-body
+confirmation goes into the Verification Queue rather than triggering an
+immediate load.
 
 **For oversized files:**
-For each large file, identify its distinct responsibilities. If they are
-genuinely separable — each with its own reason to change, its own natural
-test boundary — flag it. If the file is large but cohesive, note its size
-in the confidence section and move on. Do not flag cohesive files.
+Judge from Step 2's `def`/`class` list and line count first. If the
+top-level shape shows one clearly cohesive job, note its size in the
+confidence section and move on — do not queue it. Only queue a file when
+the shape itself is genuinely ambiguous about whether responsibilities
+are separable.
 
 **For accumulated service responsibilities:**
-For each service file, identify every distinct capability it owns. Only
-flag when a capability belongs to a clearly different ownership domain —
-not when it is a borderline case. Borderline cases are noted as
-observations, not findings.
+For each service, identify every distinct capability it owns from Step 2's
+structural index plus `implemented-state.md`'s ownership notes. Only flag
+when a capability belongs to a clearly different ownership domain — not
+when it is a borderline case. Borderline cases are noted as observations,
+not findings.
 
 **For extractable shared logic:**
 Only flag when: (a) the pattern appears three or more times, (b) the
@@ -316,7 +346,27 @@ shared utility could be extracted without ambiguating ownership.
 Only flag when the tangle represents an active risk — i.e. it is not
 already safely handled and would constrain a plausible future change.
 
-### Step 5 — Classify All Findings
+### Step 5 — Batch Verification
+
+Drain the Verification Queue accumulated across Steps 3 and 4 in a single
+`get_files` call covering every queued path. Do not call `get_files`
+per-finding as findings were identified in Steps 3-4 — that reintroduces
+the round-trip cost this restructuring exists to remove. One call here
+should be the norm; a second is acceptable only if the queue is large
+enough that the tool itself would truncate a single call.
+
+For each queued item, use the loaded content to either confirm the
+finding (promote it to the report with the disposition it warrants) or
+downgrade/drop it (the grep-level signal turned out to be a false
+positive — e.g. names matched but the logic genuinely differs). Record
+which happened; do not silently drop a queued item without a reason a
+future run could learn from.
+
+A finding that Steps 3-4 could already fully support from the Step 2
+structural evidence alone never entered the queue and needs no action
+here — cite the grep/symbol evidence directly in the report.
+
+### Step 6 — Classify All Findings
 
 Each finding gets one of four dispositions:
 
@@ -488,7 +538,8 @@ so the next consistency validation knows they were reviewed.
 | Dimension | Status |
 |-----------|--------|
 | Implemented-state loaded | yes / no |
-| All scope files retrieved | X of Y |
+| All scope files structurally surveyed (Step 2) | X of Y |
+| Verification Queue drained (Step 5) | X of Y items resolved |
 | Naming drift scan complete | yes / partial |
 | Ownership scan complete | yes / partial |
 | Pattern consistency scan complete | yes / partial |
@@ -496,9 +547,12 @@ so the next consistency validation knows they were reviewed.
 | Technical debt scan complete | yes / partial |
 
 Confidence is LOW if implemented-state was unavailable and fewer than half
-the scope files were retrievable. Confidence is MEDIUM if implemented-state
-was unavailable but all scope files loaded. Confidence is HIGH when all
-dimensions are yes.
+the scope files were surveyable. Confidence is MEDIUM if implemented-state
+was unavailable but all scope files were surveyed. Confidence is HIGH when
+all dimensions are yes/complete — note that "all scope files surveyed"
+does not mean all were loaded in full; it means every file was covered by
+the Step 2 structural pass, and every item that entered the Verification
+Queue in Steps 3-4 was resolved in Step 5.
 
 ---
 

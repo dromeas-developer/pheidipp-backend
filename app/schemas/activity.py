@@ -22,7 +22,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.enums import ActivitySource
+from app.models.enums import ActivitySource, SportType
 
 
 # ---------------------------------------------------------------------------
@@ -57,11 +57,14 @@ class ActivityResponse(BaseModel):
     has_hr: bool
     has_rr_intervals: bool
     has_power: bool
+    has_gps: bool
     calibration_eligible: bool
     quality_flags: Dict[str, Any]
     fit_file_key: Optional[str]
     ingestion_pipeline_version: Optional[str]
     cleaning_pipeline_version: Optional[str]
+    sport_type: SportType
+    sport_type_detection_version: Optional[str]
     notes: Optional[str]
     created_at: datetime
 

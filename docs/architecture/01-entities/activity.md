@@ -9,6 +9,15 @@
 ```typescript
 type ActivitySource = 'intervals_icu' | 'manual_upload' | 'garmin_direct' | 'manual_entry'
 
+type SportType = 
+  | 'running'
+  | 'cycling'
+  | 'swimming'
+  | 'strength'
+  | 'yoga_mobility'
+  | 'other'          // catch-all for unmapped sports
+  | 'unknown'        // parser could not determine sport
+
 type QualityFlags = {
   hr_dropout_pct?: number           // if > 20%, disqualifies calibration eligibility
   gps_loss?: boolean
@@ -25,6 +34,9 @@ type Activity = {
   activity_date: string             // YYYY-MM-DD
   start_time: string                // ISO 8601 datetime
   duration_seconds: number
+
+  // Sport type (for calibration filtering)
+  sport_type: SportType             // derived from FIT file or manual entry input
 
   // Load scores — persisted for query performance (twin reads across weeks of history)
   aerobic_load: number | null       // null for Tier 6; low-confidence for Tier 5
@@ -62,6 +74,8 @@ type Activity = {
 - Source `manual_entry` activities always have `calibration_eligible = false`, null load scores, and null `fit_file_key`. These are not error conditions.
 - Deduplication: `(athlete_id, external_id, source)` is unique where `external_id` is non-null. Duplicate ingestion attempts for the same external session create one Activity.
 - `power_profile_id` is null for Tier 6 activities and for all activities where `has_power = false`. It references `ActivityPowerProfile` when power data is available and calibration-eligible.
+- For non-manual entry sources, `sport_type` is populated during `FitParserService` execution and is never null at the time of Activity creation. If the parser cannot determine the sport, it must default to `'unknown'`.
+- Activities with `sport_type != 'running'` are treated as `calibration_eligible = false` and `data_tier = 6` by the `CalibrationEligibilityService`, regardless of hardware signal quality. This enforces the running-only twin model (Principle #8).
 
 ## State Transitions
 

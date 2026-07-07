@@ -19,6 +19,7 @@ type SystemEvent<T = unknown> = {
 type EventType =
   // Ingestion events
   | 'fit_file_received'
+  | 'sport_type_detected'
   | 'activity_ingested'
   | 'activity_calibration_eligible'
   // Auth events
@@ -120,6 +121,21 @@ type FitFileReceivedPayload = {
 
 ---
 
+### `sport_type_detected`
+```typescript
+type SportTypeDetectedPayload = {
+  activity_id: string
+  sport_type: SportType
+  detection_confidence: 'high' | 'low' | 'unknown'
+  detection_version: string
+}
+```
+**Producer:** `FitParserService` (during FIT parsing)
+**Consumers:** `CalibrationEligibilityService` (sport-type filtering)
+**Purpose:** Signals the sport type determined from FIT metadata, enabling non-running exclusion from twin calibration pipeline.
+
+---
+
 ### `athlete_registered`
 ```typescript
 type AthleteRegisteredPayload = {
@@ -182,6 +198,7 @@ type ActivityIngestedPayload = {
   has_hr: boolean
   has_rr_intervals: boolean
   has_power: boolean
+  sport_type: SportType
   fit_file_key: string
   ingestion_pipeline_version: string
 }

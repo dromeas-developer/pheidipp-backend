@@ -56,6 +56,16 @@ and event requirements must already be present in the implementation plan.
 If a contract is missing from the plan, that is a plan gap — report it and
 route back to the architect. Do not fetch architecture documents to fill it.
 
+You validate against the **master implementation plan**, not against any
+individual Execution Manifest the Batch Packager produced during
+implementation. A manifest is a filtered, single-batch extract of the plan
+containing no information the plan doesn't already have — it exists solely
+to keep the coder's working context small during implementation, and has
+nothing to offer here that the plan doesn't already give you directly,
+plus it cannot show you the cross-batch picture (an event produced in one
+batch and consumed in another, for instance) that whole-plan validation
+depends on.
+
 ## Boundaries
 
 - Do NOT modify any source file

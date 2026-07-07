@@ -16,6 +16,7 @@ When this architecture conflicts with the release plan on technical design, this
 |---|---|---|
 | Activity model | Lean index only — no averages, no lap dumps | `principles.md` |
 | `fit_file_key` | Required before Activity commits; never null for non-manual | `principles.md`, `01-entities/activity.md` |
+| `sport_type` | Populated at ingestion; non-running activities excluded from calibration | `02-computations/sport-type-detection.md`, `01-entities/activity.md` |
 | TwinState | Append-only; insert only; no UPDATE or DELETE | `01-entities/twin-state.md` |
 | LLM role | Reasons about strategy from pre-computed metrics; never processes raw data | `principles.md` |
 | LLM context | 2k–6k tokens per agent; `ContextBudgetService` enforces before call | `03-agents/context-budget-service.md` |
@@ -23,9 +24,9 @@ When this architecture conflicts with the release plan on technical design, this
 | `PhysiologicalSegment` | Stable interface across all segmentation generations | `01-entities/physiological-segment.md` |
 | Old analytical records | Never deleted; `superseded_at` on superseded records | `04-platform/versioning-and-reprocessing.md` |
 | GAP | Always grade-adjusted pace; never raw pace | `02-computations/effort-normalisation.md` |
-| Non-running activities | Logged in training record; excluded from twin calibration | `principles.md` |
+| Non-running activities | Logged in training record; excluded from twin calibration via sport_type gate | `02-computations/sport-type-detection.md` |
 | Processing | Async worker queue; API responses never wait for analysis | `04-platform/async-pipeline.md` |
-| Calibration eligibility | Five-rule gate; always Python; never overridden manually | `02-computations/load-computation.md` |
+| Calibration eligibility | Sport-type gate + five-rule gate; always Python; never overridden manually | `02-computations/load-computation.md` |
 | Confidence level | Evidence confidence ratchets up only; recommendation strength can decrease | `00-foundations/confidence-model.md` |
 | Active TrainingGoal | One per athlete; partial unique index enforces | `01-entities/training-goal.md` |
 | `block_id` = adaptation window | `block_id` groups on PlannedSession are the planning-level implementation of adaptation windows; `AdaptationBlockDetectionTask` detects the same pattern for observation | `01-entities/planned-session.md`, `01-entities/adaptation-observation.md` |
@@ -196,8 +197,12 @@ Two-step Propose→Confirm flow for target_performance date changes. Enforces co
 One document per computation algorithm. Inputs → outputs → formulas → version history.
 
 ### `02-computations/load-computation.md`
-Aerobic, neuromuscular, and structural load formulas. Calibration eligibility five-rule gate. Version history from heuristic to threshold-referenced to personalised.
-**Read for:** exact load formulas; calibration eligibility rules.
+Aerobic, neuromuscular, and structural load formulas. Calibration eligibility five-rule gate including sport-type filtering. Version history from heuristic to threshold-referenced to personalised.
+**Read for:** exact load formulas; calibration eligibility rules; sport-type exclusion gate.
+
+### `02-computations/sport-type-detection.md`
+Determines sport category of ingested activity from FIT file metadata or Intervals.icu source data. Implements non-running activity exclusion as required by Principle #8.
+**Read for:** FIT sport field mappings; Intervals.icu type mappings; detection failure modes.
 
 ### `02-computations/banister-update.md`
 Banister impulse-response update formula. Population default time constants (fitness τ = 42 days, fatigue τ = 7 days). Individual time constant fitting. Form-to-descriptor mapping for LLM agents. How load scores from Activity feed into fitness/fatigue scores.

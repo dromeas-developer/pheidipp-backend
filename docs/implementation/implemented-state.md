@@ -1,38 +1,62 @@
 # implemented-state
 
 Commit:
-b22c6da
+0f75c9e
 
 ## Change Set
 
 Base Commit:
-b22c6da
+0f75c9e
 
 Current Commit:
-b22c6da
+0f75c9e
 
 Files Added:
-- app/utils/email_utils.py
+- alembic/versions/2340974caeca_phase_2_1_p3_sport_type_filtering.py
+- reports/phase-2-1-p1-p2-p3_combined_validation.md
+- reports/phase-2-1-p1-p2-p3_devops.md
+- reports/phase-2-1-p1_validation.md
+- reports/phase-2-1-p1_validation_revalidation.md
+- tests/test-manifest/phase-2-1.yaml
 
 Files Modified:
-- app/repositories/athlete_auth_repository.py
-- app/repositories/athlete_repository.py
+- app/models/__init__.py
+- app/models/activity.py
+- app/models/enums.py
+- app/repositories/activity_repository.py
+- app/schemas/__init__.py
+- app/schemas/activity.py
+- app/services/__init__.py
 - app/services/activity_ingestion_service.py
-- app/services/auth_service.py
+- app/services/calibration_eligibility_service.py
+- app/services/fit_parser_service.py
+- app/services/load_computation_service.py
+- reports/test_history/latest.md
+- tests/MOCKING_CONTRACT.md
+- tests/README.md
+- tests/integration/test_activity_endpoints.py
+- tests/test-manifest/index.yaml
+- tests/unit/test_activity_ingestion_service.py
+- tests/unit/test_calibration_eligibility_service.py
+- tests/unit/test_fit_parser_service.py
+- tests/unit/test_load_computation_service.py
 
 Files Deleted:
 - none
 
 Touched Areas:
+- models
 - repositories
 - services
 - app
+- migrations
+- other
 
 Generated:
-2026-07-02T01:55:37.766208+00:00 UTC
+2026-07-07T22:43:44.291810+00:00 UTC
 
 Current DB Revision:
-d1579f4430e7 (head)
+2340974caeca (head)
 
 Python Files Scanned:
 108
@@ -97,6 +121,7 @@ Enums:
 - Sex — app/models/enums.py
 - SignalType — app/models/enums.py
 - SportBackground — app/models/enums.py
+- SportType — app/models/enums.py
 - StepType — app/models/enums.py
 - TrainingGoalStatus — app/models/enums.py
 - TrainingPlanStatus — app/models/enums.py
@@ -133,6 +158,7 @@ Repositories:
 
 Migrations:
 - 1b9e9026db1e (down: e7ffc8764335) — alembic/versions/1b9e9026db1e_phase_1_2b_plans_sessions_checkpoints.py
+- 2340974caeca (down: d1579f4430e7) — alembic/versions/2340974caeca_phase_2_1_p3_sport_type_filtering.py
 - 79dc97d4e433 (down: 1b9e9026db1e) — alembic/versions/79dc97d4e433_phase_1_2c_twin_fitness_coaching_.py
 - 8265efd46112 (down: fd373abd4b9e) — alembic/versions/8265efd46112_phase_1_1_p3_single_primary_auth_.py
 - d1579f4430e7 (down: 79dc97d4e433) — alembic/versions/d1579f4430e7_add_training_plans_twin_state_fk.py
@@ -243,16 +269,16 @@ Public API:
 ### Registrations
 
 - app/models/__init__.py
-- Imports: Activity, ActivitySource, Athlete, AthleteAuth, AthleteFitness, AthletePhysiology, AthletePreferences, AthleteProfile, AuthProvider, Checkpoint, CheckpointStatus, CheckpointType, CoachingMessage, DataTier, EventPublicationStatus, GeneratedWorkout, GenerationEvent, GoalEventType, GoalType, GpsSource, HrSource, InjurySeverity, MeasurementSource, MessageType, ObjectiveCategory, PhaseLabel, PhysiologicalIntent, PlannedSession, PlannedSessionStatus, PowerSource, PrimaryTrainingPlatform, RecoveryModifierLevel, RefreshToken, RegenerationTask, SecondaryEvent, SecondaryEventPriority, SessionPriority, SessionPurpose, SessionSlot, SessionType, Sex, SignalType, SportBackground, StepType, SystemEvent, SystemEventOutbox, TrainingGoal, TrainingGoalStatus, TrainingPlan, TrainingPlanStatus, TrainingTimeOfDay, TwinConfidenceLevel, TwinState, TwinTrigger, WeeklyPlan, WeeklyPlanStatus, WeeklySession, WellnessTrend, WorkoutStep, infer_data_tier
+- Imports: Activity, ActivitySource, Athlete, AthleteAuth, AthleteFitness, AthletePhysiology, AthletePreferences, AthleteProfile, AuthProvider, Checkpoint, CheckpointStatus, CheckpointType, CoachingMessage, DataTier, EventPublicationStatus, GeneratedWorkout, GenerationEvent, GoalEventType, GoalType, GpsSource, HrSource, InjurySeverity, MeasurementSource, MessageType, ObjectiveCategory, PhaseLabel, PhysiologicalIntent, PlannedSession, PlannedSessionStatus, PowerSource, PrimaryTrainingPlatform, RecoveryModifierLevel, RefreshToken, RegenerationTask, SecondaryEvent, SecondaryEventPriority, SessionPriority, SessionPurpose, SessionSlot, SessionType, Sex, SignalType, SportBackground, SportType, StepType, SystemEvent, SystemEventOutbox, TrainingGoal, TrainingGoalStatus, TrainingPlan, TrainingPlanStatus, TrainingTimeOfDay, TwinConfidenceLevel, TwinState, TwinTrigger, WeeklyPlan, WeeklyPlanStatus, WeeklySession, WellnessTrend, WorkoutStep, infer_data_tier
 
 - app/schemas/__init__.py
-- Imports: AthletePreferencesPatchIn, AthletePreferencesResponse, AthleteProfilePatchIn, AthleteProfileResponse, AthleteResponse, AuthResponse, CheckpointResponse, CoachingMessageResponse, FirstMessageConflictResponse, GenerateWorkoutResponse, GeneratedWorkoutResponse, LoginRequest, MessagesListResponse, OnboardingPreferencesIn, OnboardingProfileIn, OnboardingRequest, OnboardingResponse, OnboardingStatusResponse, OnboardingTrainingGoalIn, PhaseDescriptorResponse, PlannedSessionResponse, RefreshRequest, RefreshResponse, RegisterProfileIn, RegisterRequest, TargetSetResponse, TodayResponse, TokenPairResponse, TrainingPlanResponse, TwinStateHistoryResponse, TwinStateResponse, UpcomingSessionsResponse, WeeklyScheduleDayIn, WeeklyScheduleDayOut, WeeklyScheduleDayPatchIn, WorkoutAlreadyGeneratedConflictResponse, WorkoutStepResponse, WorkoutTargetPrimaryResponse, WorkoutTargetResponse
+- Imports: ActivityListResponse, ActivityNotFoundResponse, ActivityResponse, ActivityUploadResponse, AthletePreferencesPatchIn, AthletePreferencesResponse, AthleteProfilePatchIn, AthleteProfileResponse, AthleteResponse, AuthResponse, CheckpointResponse, CoachingMessageResponse, CoachingMessageSummary, FirstMessageConflictResponse, FitParseErrorResponse, GenerateWorkoutResponse, GeneratedWorkoutResponse, LoginRequest, MessagesListResponse, OnboardingPreferencesIn, OnboardingProfileIn, OnboardingRequest, OnboardingResponse, OnboardingStatusResponse, OnboardingTrainingGoalIn, PhaseDescriptorResponse, PlannedSessionResponse, PostWorkoutAnalysisResponse, RefreshRequest, RefreshResponse, RegisterProfileIn, RegisterRequest, TargetSetResponse, TodayResponse, TokenPairResponse, TrainingPlanResponse, TwinStateHistoryResponse, TwinStateResponse, UpcomingSessionsResponse, WeeklyScheduleDayIn, WeeklyScheduleDayOut, WeeklyScheduleDayPatchIn, WorkoutAlreadyGeneratedConflictResponse, WorkoutStepResponse, WorkoutTargetPrimaryResponse, WorkoutTargetResponse
 
 - app/repositories/__init__.py
 - Imports: AthleteAuthRepository, AthleteFitnessRepository, AthletePhysiologyRepository, AthletePreferencesRepository, AthleteProfileRepository, AthleteRepository, CheckpointRepository, CoachingMessageRepository, GeneratedWorkoutRepository, GenerationEventRepository, PlannedSessionRepository, RefreshTokenRepository, SystemEventOutboxRepository, SystemEventRepository, TrainingGoalRepository, TrainingPlanRepository, TwinStateRepository, WeeklyPlanRepository, WeeklySessionRepository, WorkoutStepRepository
 
 - app/services/__init__.py
-- Imports: ActivityIngestionError, ActivityIngestionResult, ActivityIngestionService, AthleteNotFoundError, AthleteNotFoundForIngestionError, AthleteTwinContext, AuthError, AuthResult, AuthService, BanisterUpdateResult, CalibrationEligibilityService, ComplianceError, ComplianceFindings, ComplianceService, ComputedObservations, ContextBudgetService, CrossAthleteAccessError, DATA_TIER_TARGET_TYPE, DuplicateEmailError, EventPublisher, FirstMessageAgent, FirstMessageAlreadyExistsError, FitParseEmptyError, FitParseError, FitParserService, InvalidCredentialsError, InvalidGoalTypeError, InvalidRefreshTokenError, IssuedTokens, LLMServiceUnavailableError, LoadComputationError, LoadComputationInputs, LoadComputationService, LoadScores, MissingAthleteFitnessError, MissingHeartRateError, MissingTrainingGoalError, ObjectStorageClient, ObjectStorageConflictError, ObjectStorageError, ObjectStorageFailureError, ObjectStorageNotConfiguredError, ObjectStorageUploadError, OnboardingAlreadyCompleteError, OnboardingError, OnboardingIncompleteError, OnboardingResult, OnboardingService, OnboardingStatus, OutboxEvent, ParsedFitData, PlanGenerationError, PlanGenerationResult, PlanGenerationService, PlannedSessionNotFoundError, PreferencesSnapshot, ProfileSnapshot, PromptNotFoundError, PromptRegistry, RecalibrationResult, SESSION_INTENT_MAP, SessionDayAssignment, StoredFitObject, TrainingGoalConflictError, TrainingLengthGateError, TwinContextAssembler, TwinContextSummary, TwinRecalibrationError, TwinRecalibrationFailureError, TwinRecalibrationService, UnauthenticatedError, WorkoutAlreadyGeneratedError, WorkoutGenerationAgent, WorkoutGenerationContractError, WorkoutGenerationError, WorkoutLLMServiceUnavailableError, _BytesReader, _GoalInput, _PreferencesInput, _ProfileInput, estimate_max_hr_from_age, get_object_storage_client, get_step_physiological_intent, reset_object_storage_client
+- Imports: ActivityIngestionError, ActivityIngestionResult, ActivityIngestionService, AthleteNotFoundError, AthleteNotFoundForIngestionError, AthleteTwinContext, AuthError, AuthResult, AuthService, BanisterUpdateResult, CalibrationEligibilityService, ComplianceError, ComplianceFindings, ComplianceService, ComputedObservations, ContextBudgetService, CrossAthleteAccessError, DATA_TIER_TARGET_TYPE, DuplicateEmailError, EventPublisher, FirstMessageAgent, FirstMessageAlreadyExistsError, FitParseEmptyError, FitParseError, FitParserService, GpsRecord, InvalidCredentialsError, InvalidGoalTypeError, InvalidRefreshTokenError, IssuedTokens, LLMServiceUnavailableError, LoadComputationError, LoadComputationInputs, LoadComputationService, LoadScores, MissingAthleteFitnessError, MissingCriticalPowerError, MissingHeartRateError, MissingTrainingGoalError, ObjectStorageClient, ObjectStorageConflictError, ObjectStorageError, ObjectStorageFailureError, ObjectStorageNotConfiguredError, ObjectStorageUploadError, OnboardingAlreadyCompleteError, OnboardingError, OnboardingIncompleteError, OnboardingResult, OnboardingService, OnboardingStatus, OutboxEvent, ParsedFitData, PlanGenerationError, PlanGenerationResult, PlanGenerationService, PlannedSessionNotFoundError, PreferencesSnapshot, ProfileSnapshot, PromptNotFoundError, PromptRegistry, RecalibrationResult, SESSION_INTENT_MAP, SessionDayAssignment, StoredFitObject, TrainingGoalConflictError, TrainingLengthGateError, TwinContextAssembler, TwinContextSummary, TwinRecalibrationError, TwinRecalibrationFailureError, TwinRecalibrationService, UnauthenticatedError, WorkoutAlreadyGeneratedError, WorkoutGenerationAgent, WorkoutGenerationContractError, WorkoutGenerationError, WorkoutLLMServiceUnavailableError, _BytesReader, _GoalInput, _PreferencesInput, _ProfileInput, estimate_max_hr_from_age, get_object_storage_client, get_step_physiological_intent, reset_object_storage_client
 
 - app/api/__init__.py
 - Imports: build_auth_service, build_onboarding_service, get_current_athlete_id, get_db, require_self
@@ -274,16 +300,16 @@ No changes detected
 
 ActivityIngestionService
  ├── ActivityRepository
+ ├── AthletePhysiologyRepository
+ ├── AthletePreferencesRepository
+ ├── AthleteProfileRepository
  ├── CalibrationEligibilityService
  ├── FitParserService
  ├── LoadComputationService
- ├── Optional[CalibrationEligibilityService]
- ├── Optional[EventPublisher]
- ├── Optional[FitParserService]
- ├── Optional[LoadComputationService]
- ├── Optional[ObjectStorageClient]
- ├── Optional[TwinRecalibrationService]
- ... +3 more
+ ├── Optional[AthletePhysiologyRepository]
+ ├── Optional[AthletePreferencesRepository]
+ ├── Optional[AthleteProfileRepository]
+ ... +9 more
 
 AuthService
  ├── AthleteAuthRepository
@@ -401,14 +427,15 @@ api dependencies: partial
 models: complete
 repositories: partial
 routers: complete
-schemas: partial
+schemas: complete
 services: complete
 
 ### Event Producers
 
 - app/agents/post_workout_agent.py:380 PostWorkoutAgent.generate publish -> coaching_message_generated [uncommitted]
-- app/services/activity_ingestion_service.py:363 ActivityIngestionService.ingest publish -> activity_ingested [uncommitted]
-- app/services/activity_ingestion_service.py:445 ActivityIngestionService.ingest_async publish -> activity_ingested [uncommitted]
+- app/services/activity_ingestion_service.py:592 ActivityIngestionService._run_ingestion_pipeline publish -> sport_type_detected [before_commit]
+- app/services/activity_ingestion_service.py:625 ActivityIngestionService._run_ingestion_pipeline publish -> activity_ingested [before_commit]
+- app/services/activity_ingestion_service.py:647 ActivityIngestionService._run_ingestion_pipeline publish -> activity_calibration_eligible [before_commit]
 - app/services/auth_service.py:171 AuthService.register publish -> athlete_registered [after_commit]
 - app/services/auth_service.py:275 AuthService.login publish -> athlete_logged_in [after_commit]
 - app/services/auth_service.py:368 AuthService.rotate_refresh_token publish -> athlete_logged_in [after_commit]
@@ -462,7 +489,7 @@ Flushes:
 - app/repositories/weekly_plan_repository.py:44 WeeklyPlanRepository.add_many self.session.flush
 - app/repositories/weekly_plan_repository.py:102 WeeklySessionRepository.add_many self.session.flush
 - app/repositories/workout_step_repository.py:64 WorkoutStepRepository.insert_many self.session.flush
-- app/services/activity_ingestion_service.py:549 ActivityIngestionService._run_ingestion_pipeline self.session.flush
+- app/services/activity_ingestion_service.py:584 ActivityIngestionService._run_ingestion_pipeline self.session.flush
 - app/services/auth_service.py:362 AuthService.rotate_refresh_token self.session.flush
 - app/services/onboarding_service.py:351 OnboardingService.complete_onboarding self.session.flush
 - app/services/onboarding_service.py:481 OnboardingService.complete_onboarding self.session.flush
@@ -535,6 +562,9 @@ Repository dependencies:
 - app/api/v1/workout.py: TwinStateRepository
 - app/api/v1/workout.py: WorkoutStepRepository
 - app/services/activity_ingestion_service.py: ActivityRepository
+- app/services/activity_ingestion_service.py: AthletePhysiologyRepository
+- app/services/activity_ingestion_service.py: AthletePreferencesRepository
+- app/services/activity_ingestion_service.py: AthleteProfileRepository
 - app/services/activity_ingestion_service.py: SystemEventOutboxRepository
 - app/services/activity_ingestion_service.py: SystemEventRepository
 - app/services/auth_service.py: AthleteAuthRepository
@@ -576,7 +606,7 @@ Repository dependencies:
 ### Execution Readiness
 
 Current Revision:
-d1579f4430e7 (head)
+2340974caeca (head)
 
 Migration Pending:
 yes
@@ -584,7 +614,6 @@ yes
 Missing Exports:
 - app/api/__init__.py: Missing [build_onboarding_service_with_plan, build_plan_service]
 - app/repositories/__init__.py: Missing [ActivityRepository]
-- app/schemas/__init__.py: Missing [ActivityListResponse, ActivityNotFoundResponse, ActivityResponse, ActivityUploadResponse, CoachingMessageSummary, FitParseErrorResponse, PostWorkoutAnalysisResponse]
 
 ### Snapshot Reliability
 

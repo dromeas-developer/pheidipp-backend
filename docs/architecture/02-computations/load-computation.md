@@ -161,20 +161,24 @@ Requires GPS (distance + elevation). Available from Tier 3 onward. Tier 6: null.
 
 ```typescript
 function isCalibrationEligible(activity: Activity, fit_data: FitData): boolean {
+  // Architecture Principle #8: non-running activities are excluded from twin calibration
+  if (activity.sport_type !== 'running') {
+    return false;
+  }
+
   return (
     activity.has_hr &&
     activity.source !== 'manual_entry' &&
     fit_data.moving_duration_seconds >= 1200 &&  // 20 minutes minimum
-    !activity.quality_flags.hr_dropout_pct ||
-    activity.quality_flags.hr_dropout_pct! <= 0.20 &&
+    (!activity.quality_flags.hr_dropout_pct ||
+    activity.quality_flags.hr_dropout_pct! <= 0.20) &&
     !activity.quality_flags.gps_loss &&
-    !activity.quality_flags.sensor_malfunction &&
-    isUsableSessionType(activity.session_type)   // excludes < 4 min interval sessions
+    !activity.quality_flags.sensor_malfunction
   )
 }
 ```
 
-**Note**: Easy runs are calibration-eligible (they meet the five-rule gate) and contribute to fitness/fatigue scores. However, they do NOT provide threshold detection evidence because they lack the intensity variation required for HR deflection/RR inflection algorithms (which need ≥3 distinct intensity steps and ≥8 minutes at each level). Easy runs build fitness, not threshold confidence.
+> **Sport Type Exclusion:** The first check in `isCalibrationEligible` enforces the architectural invariant that non-running activities are excluded from twin calibration (Principle #8). This includes cycling, swimming, strength, yoga, and any unclassified (`unknown`) sport. These activities appear in the training record but do not contribute to load computation, threshold detection, execution analysis, or adaptation modelling. See `02-computations/sport-type-detection.md` for the detection mechanism.
 
 ## Outputs → TwinState Layer 1
 

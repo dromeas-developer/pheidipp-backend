@@ -32,6 +32,7 @@ from app.services.fit_parser_service import (
     FitParseEmptyError,
     FitParseError,
     FitParserService,
+    GpsRecord,
     ParsedFitData,
     _BytesReader,
 )
@@ -45,8 +46,16 @@ from app.services.load_computation_service import (
     LoadComputationInputs,
     LoadComputationService,
     LoadScores,
+    MissingCriticalPowerError,
     MissingHeartRateError,
     estimate_max_hr_from_age,
+)
+from app.services.twin_recalibration_service import (
+    MissingAthleteFitnessError,
+    MissingTrainingGoalError,
+    RecalibrationResult,
+    TwinRecalibrationService,
+    TwinRecalibrationError,
 )
 from app.services.object_storage_client import (
     ObjectStorageClient,
@@ -141,6 +150,7 @@ __all__ = [
     "FitParserService",
     "FirstMessageAgent",
     "FirstMessageAlreadyExistsError",
+    "GpsRecord",
     "InvalidCredentialsError",
     "InvalidGoalTypeError",
     "InvalidRefreshTokenError",
@@ -151,6 +161,7 @@ __all__ = [
     "LoadComputationService",
     "LoadScores",
     "MissingAthleteFitnessError",
+    "MissingCriticalPowerError",
     "MissingHeartRateError",
     "MissingTrainingGoalError",
     "ObjectStorageClient",

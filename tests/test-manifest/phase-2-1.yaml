@@ -1,0 +1,388 @@
+version: '1.0'
+plan_id: phase-2-1-fit-ingestion-pipeline-expansion
+generated_at: '2026-07-02T00:00:00Z'
+last_reviewed_at: '2026-07-07T21:28:19Z'
+features:
+  calibration_eligibility_five_rule_gate:
+    status: generated
+    plan: docs/release-plan/phase-2/phase-2-1-fit-ingestion-pipeline-expansion.md
+    owned_by_plan:
+    - phase-2-1-fit-ingestion-pipeline-expansion
+    description: 'CalibrationEligibilityService evaluates the five-rule gate: has_hr
+      AND source != manual_entry AND duration >= 1200s AND hr_dropout_pct <= 0.20
+      AND NOT gps_loss AND NOT sensor_malfunction. Tier 5-6 activities are never calibration-eligible.
+
+      '
+    protects:
+    - calibration_eligible is set by CalibrationEligibilityService and never manually
+      overridden
+    - fit_file_key always set for source != manual_entry
+    impacts:
+    - threshold_detection
+    - signal_cleaning
+    execution_prerequisites:
+      migrations: true
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit:
+      - path: tests/unit/test_calibration_eligibility_service.py
+        owner: phase-2-1-fit-ingestion-pipeline-expansion
+  power_based_load_tier_1_2:
+    status: generated
+    plan: docs/release-plan/phase-2/phase-2-1-fit-ingestion-pipeline-expansion.md
+    owned_by_plan:
+    - phase-2-1-fit-ingestion-pipeline-expansion
+    description: 'LoadComputationService computes power-based aerobic load for Tier
+      1-2 athletes using (watts/CP)^4 intensity factor formula.
+
+      '
+    protects:
+    - No averaged fields on Activity
+    - Load scores null at initial creation, populated by LoadComputationService
+    impacts:
+    - power_profile_computation
+    execution_prerequisites:
+      migrations: true
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit:
+      - path: tests/unit/test_load_computation_service.py
+        owner: phase-2-1-fit-ingestion-pipeline-expansion
+  neuromuscular_load:
+    status: generated
+    plan: docs/release-plan/phase-2/phase-2-1-fit-ingestion-pipeline-expansion.md
+    owned_by_plan:
+    - phase-2-1-fit-ingestion-pipeline-expansion
+    description: 'LoadComputationService computes neuromuscular load for Tier 1-4:
+      variability_index * duration_hours + time_above_vo2_hours * 2.5
+
+      '
+    protects:
+    - neuromuscular_load null for Tier 5-6
+    impacts: []
+    execution_prerequisites:
+      migrations: true
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit:
+      - path: tests/unit/test_load_computation_service.py
+        owner: phase-2-1-fit-ingestion-pipeline-expansion
+  structural_load:
+    status: generated
+    plan: docs/release-plan/phase-2/phase-2-1-fit-ingestion-pipeline-expansion.md
+    owned_by_plan:
+    - phase-2-1-fit-ingestion-pipeline-expansion
+    description: 'LoadComputationService computes structural load from GPS data: base
+      + gradient_cost + density_penalty
+
+      '
+    protects:
+    - structural_load null when no GPS data
+    impacts: []
+    execution_prerequisites:
+      migrations: true
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit:
+      - path: tests/unit/test_load_computation_service.py
+        owner: phase-2-1-fit-ingestion-pipeline-expansion
+  signal_flags_populated:
+    status: generated
+    plan: docs/release-plan/phase-2/phase-2-1-fit-ingestion-pipeline-expansion.md
+    owned_by_plan:
+    - phase-2-1-fit-ingestion-pipeline-expansion
+    description: 'ActivityIngestionService sets has_power, has_rr_intervals, has_gps
+      flags on Activity from parsed FIT data.
+
+      '
+    protects:
+    - Signal availability flags set during ingestion pipeline
+    impacts:
+    - calibration_eligibility_five_rule_gate
+    execution_prerequisites:
+      migrations: true
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit:
+      - path: tests/unit/test_activity_ingestion_service.py
+        owner: phase-2-1-fit-ingestion-pipeline-expansion
+      integration:
+      - path: tests/integration/test_activity_endpoints.py
+        owner: phase-2-1-fit-ingestion-pipeline-expansion
+  fit_parser_expansion:
+    status: generated
+    plan: docs/release-plan/phase-2/phase-2-1-fit-ingestion-pipeline-expansion.md
+    owned_by_plan:
+    - phase-2-1-fit-ingestion-pipeline-expansion
+    description: 'FitParserService extracts power, GPS, RR interval data from FIT
+      files and exposes has_power, has_rr_intervals, has_gps flags.
+
+      '
+    protects:
+    - FitParserService preserves raw records for LoadComputationService
+    impacts:
+    - power_based_load_tier_1_2
+    - signal_flags_populated
+    execution_prerequisites:
+      migrations: true
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit:
+      - path: tests/unit/test_fit_parser_service.py
+        owner: phase-2-1-fit-ingestion-pipeline-expansion
+  gps_loss_continuous_gap_detection:
+    status: generated
+    plan: docs/implementation/phase-2/phase-2-1-p2-validation-remediation.md
+    owned_by_plan:
+    - phase-2-1-p2-validation-remediation
+    description: 'ActivityIngestionService._compute_quality_flags uses continuous-gap
+      detection for gps_loss: flag=True only when any single continuous gap between
+      consecutive GPS records exceeds 30 seconds.
+
+      '
+    protects:
+    - gps_loss computed by continuous-gap detection, not coverage ratio
+    - 'quality_flags JSONB shape stable (gps_loss: boolean)'
+    impacts:
+    - calibration_eligibility_five_rule_gate
+    execution_prerequisites:
+      migrations: true
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit:
+      - path: tests/unit/test_activity_ingestion_service.py
+        owner: phase-2-1-p2-validation-remediation
+  structural_risk_flag_repository:
+    status: generated
+    plan: docs/implementation/phase-2/phase-2-1-p2-validation-remediation.md
+    owned_by_plan:
+    - phase-2-1-p2-validation-remediation
+    description: 'ActivityIngestionService._read_structural_risk_flag uses AthleteProfileRepository
+      instead of raw SQL query.
+
+      '
+    protects:
+    - Repository pattern consistency in ingestion service
+    - structural_risk_flag defaults to False when profile missing
+    impacts:
+    - structural_load
+    execution_prerequisites:
+      migrations: true
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit:
+      - path: tests/unit/test_activity_ingestion_service.py
+        owner: phase-2-1-p2-validation-remediation
+  sport_type_filtering:
+    status: generated
+    plan: docs/implementation/phase-2/phase-2-1-p3-sport-type-filtering.md
+    owned_by_plan:
+    - phase-2-1-p3-sport-type-filtering
+    description: "CalibrationEligibilityService evaluates sport-type as the first\
+      \ gate check: sport_type != 'running' \u2192 calibration_eligible = false. Non-running\
+      \ activities are excluded from twin calibration per architecture principle #8.\n"
+    protects:
+    - Non-running activities are excluded from twin calibration
+    - sport_type check runs before all other calibration rules
+    impacts:
+    - twin_recalibration
+    - threshold_detection
+    execution_prerequisites:
+      migrations: true
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit:
+      - path: tests/unit/test_calibration_eligibility_service.py
+        owner: phase-2-1-p3-sport-type-filtering
+      integration:
+      - path: tests/integration/test_activity_endpoints.py
+        owner: phase-2-1-p3-sport-type-filtering
+  sport_type_detection_pipeline:
+    status: generated
+    plan: docs/implementation/phase-2/phase-2-1-p3-sport-type-filtering.md
+    owned_by_plan:
+    - phase-2-1-p3-sport-type-filtering
+    description: 'FitParserService extracts sport type from FIT session message (sport
+      field mapping: 1=running, 2=cycling, 3=other, 4=strength, 5=swimming, 14=other;
+      0/254/missing=unknown). Detection confidence is ''high'' for FIT-declared sports,
+      ''unknown'' for missing, ''low'' for unrecognized integers.
+
+      '
+    protects:
+    - sport_type populated from FIT file, not heuristic
+    - sport_type = 'unknown' when detection fails
+    impacts:
+    - sport_type_filtering
+    - sport_type_detection_event
+    execution_prerequisites:
+      migrations: true
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit:
+      - path: tests/unit/test_fit_parser_service.py
+        owner: phase-2-1-p3-sport-type-filtering
+  sport_type_detection_event:
+    status: generated
+    plan: docs/implementation/phase-2/phase-2-1-p3-sport-type-filtering.md
+    owned_by_plan:
+    - phase-2-1-p3-sport-type-filtering
+    description: 'ActivityIngestionService fires sport_type_detected event after Activity
+      update flush and before activity_calibration_eligible. Payload: {activity_id,
+      sport_type, detection_confidence, detection_version}. Does NOT fire for manual_entry
+      sources.
+
+      '
+    protects:
+    - sport_type_detected event fires for all non-manual-entry sources
+    - sport_type_detected fires before activity_calibration_eligible
+    impacts:
+    - twin_recalibration
+    execution_prerequisites:
+      migrations: true
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      unit:
+      - path: tests/unit/test_activity_ingestion_service.py
+        owner: phase-2-1-p3-sport-type-filtering
+  sport_type_api_response:
+    status: generated
+    plan: docs/implementation/phase-2/phase-2-1-p3-sport-type-filtering.md
+    owned_by_plan:
+    - phase-2-1-p3-sport-type-filtering
+    description: 'GET /athletes/{id}/activities/{aid} and GET /athletes/{id}/activities
+      return sport_type and sport_type_detection_version fields in the response body.
+
+      '
+    protects:
+    - sport_type visible in API responses
+    impacts: []
+    execution_prerequisites:
+      migrations: true
+      seed_data: false
+      external_services: []
+    validation:
+      implemented: true
+      executable: true
+      passed: true
+    tests:
+      integration:
+      - path: tests/integration/test_activity_endpoints.py
+        owner: phase-2-1-p3-sport-type-filtering
+execution_groups:
+  phase_2_1_smoke:
+    scope: smoke
+    phase: 2
+    tests:
+    - tests/unit/test_calibration_eligibility_service.py
+    - tests/unit/test_load_computation_service.py
+    depends_on: []
+  phase_2_1_feature:
+    scope: feature
+    phase: 2
+    tests:
+    - tests/unit/test_calibration_eligibility_service.py
+    - tests/unit/test_load_computation_service.py
+    - tests/unit/test_activity_ingestion_service.py
+    - tests/unit/test_fit_parser_service.py
+    - tests/integration/test_activity_endpoints.py
+    depends_on: []
+coverage:
+  routes:
+    covered:
+    - POST /athletes/{id}/activities/upload
+    - GET /athletes/{id}/activities
+    - GET /athletes/{id}/activities/{aid}
+    partial: []
+    missing: []
+  events:
+    covered:
+    - activity_ingested
+    - activity_calibration_eligible
+    - sport_type_detected
+    partial: []
+    missing: []
+  invariants:
+    covered:
+    - "calibration_eligible = false for all sessions (Phase 1.6) \u2014 REPLACED by\
+      \ five-rule gate"
+    - calibration_eligible set by CalibrationEligibilityService and never manually
+      overridden
+    - fit_file_key always set for source != manual_entry
+    - Load scores null at initial creation, populated by LoadComputationService
+    - Signal availability flags set during ingestion pipeline
+    - Object storage upload BEFORE Activity record creation
+    - activity_ingested event published AFTER commit
+    - Non-running activities are excluded from twin calibration
+    - sport_type check runs before all other calibration rules
+    - sport_type = 'unknown' when detection fails
+    - gps_loss computed by continuous-gap detection, not coverage ratio
+    - structural_risk_flag defaults to False when profile missing
+    partial: []
+    missing:
+    - Tier 5-6 activities are never calibration-eligible (requires Tier inference
+      in tests)
+history:
+- date: '2026-07-07'
+  plan: phase-2-1-p1-p2-p3-final-fix
+  tests_added: 0
+  tests_modified: 15
+  tests_removed: 0
+  result: PASS
+  coverage_delta: 'Fixed 25 test failures across 3 categories: (A) repository mocking
+    for scalar_one_or_none, (B) power-based load assertion values, (C) sport_type
+    field and enum value fixes in calibration eligibility and ingestion pipeline tests.'

@@ -43,7 +43,7 @@ from app.services.object_storage_client import ObjectStorageClient
 # SQLAlchemy ``+driver`` suffixes are stripped inside
 # ``get_procrastinate_dsn`` so the call site doesn't have to know
 # the converter exists. See app.config for the rationale.
-app = procrastinate.App(connector=Psycopg2Connector(conninfo=get_procrastinate_dsn()))
+app = procrastinate.App(connector=Psycopg2Connector(dsn=get_procrastinate_dsn()))
 
 
 # ---------------------------------------------------------------------------
@@ -55,7 +55,7 @@ app = procrastinate.App(connector=Psycopg2Connector(conninfo=get_procrastinate_d
 # thread/await dispatch internally.
 
 
-@app.task()
+@app.task(name="fit_ingest")
 async def fit_ingest(*, activity_id: str, athlete_id: str) -> dict[str, Any]:
     """Ingest a previously uploaded FIT file into the activity pipeline.
 
@@ -191,4 +191,101 @@ async def recalibrate_twin(*, athlete_id: str, activity_id: str) -> dict[str, An
         return {
             "twin_state_id": str(recalibration.twin_state.id),
             "updated_form": float(recalibration.updated_form),
+        }
+
+
+@app.task(name="signal_clean")
+async def signal_clean(*, activity_id: str) -> dict[str, Any]:
+    """Run the 7-step signal-cleaning pipeline for a previously
+    ingested activity and persist a ``RawSensorStream`` row.
+
+    Dispatched by :class:`ActivityIngestionService` after the
+    ingestion transaction commits, when the activity is
+    calibration-eligible, is a running activity, and is not a
+    manual entry. Decoupled from the ingestion transaction per
+    ADR-009 so a cleaning failure does not roll back the
+    already-committed ``Activity`` row.
+
+    Steps (one transaction owned by this task — single commit
+    boundary):
+
+        1. Open ``AsyncSessionLocal``.
+        2. Construct :class:`SignalCleaningService` with the
+           per-task session, the process-wide
+           :class:`ObjectStorageClient`, the
+           :class:`RawSensorStreamRepository`, the
+           :class:`ActivityRepository`, and a fresh
+           :class:`FitParserService`.
+        3. Call ``service.clean(uuid.UUID(activity_id))``.
+        4. Commit the session exactly once.
+
+    Retry semantics: procrastinate's default retry policy
+    applies — the architecture's load-compute retry semantics
+    ("up to 3×, then DLQ") are inherited via the same worker
+    app configuration. No retry / timeout decorators are added
+    on this task.
+
+    Importability: the task registers on the shared
+    ``app.worker.app.app`` procrastinate instance at module
+    import time. The body executes no module-level I/O, so
+    importing ``app.worker.app`` (e.g. from tests) is safe
+    without a DB connection — only the task's invocation
+    requires the DB.
+
+    Args:
+        activity_id: UUID string of the Activity to clean.
+
+    Returns:
+        ``{"activity_id": str, "raw_sensor_stream_id":
+        str | None, "created": bool}``. ``raw_sensor_stream_id``
+        is ``None`` on the no-op paths (manual entry, already
+        cleaned, ineligible); ``created`` mirrors the
+        ``CleaningResult.created`` flag.
+
+    Raises:
+        SignalCleaningNotFoundError: the activity row is
+            missing. Propagated to procrastinate.
+        SignalCleaningIneligibleError: a stale queue entry —
+            the activity is not calibration-eligible or not
+            running. Propagated to procrastinate.
+        FitParseError / SignalCleaningError: cleaning
+            failure. Propagated to procrastinate for retry /
+            DLQ handling per the architecture's load-compute
+            retry contract.
+    """
+    activity_uuid = uuid.UUID(activity_id)
+
+    async with AsyncSessionLocal() as session:
+        from app.services.fit_parser_service import FitParserService
+        from app.services.object_storage_client import ObjectStorageClient
+        from app.services.signal_cleaning_service import (
+            SignalCleaningService,
+        )
+        from app.repositories.activity_repository import (
+            ActivityRepository,
+        )
+        from app.repositories.raw_sensor_stream_repository import (
+            RawSensorStreamRepository,
+        )
+
+        service = SignalCleaningService(
+            session=session,
+            object_storage=ObjectStorageClient(),
+            raw_stream_repository=RawSensorStreamRepository(session),
+            activity_repository=ActivityRepository(session),
+            fit_parser=FitParserService(),
+        )
+
+        result = await service.clean(activity_uuid)
+
+        await session.commit()
+
+        return {
+            "activity_id": str(activity_uuid),
+            "raw_sensor_stream_id": (
+                str(result.raw_sensor_stream_id)
+                if result.raw_sensor_stream_id is not None
+                else None
+            ),
+            "created": bool(result.created),
         }

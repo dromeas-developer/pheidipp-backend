@@ -173,7 +173,7 @@ class Activity(Base):
         String(16), nullable=True
     )
     cleaning_pipeline_version: Mapped[str | None] = mapped_column(
-        String(16), nullable=True
+        String(32), nullable=True
     )
 
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)

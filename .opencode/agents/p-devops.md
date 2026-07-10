@@ -1,5 +1,5 @@
 ---
-model: litellm-proxy/poolside/laguna-xs-2.1
+model: opencode/deepseek-v4-flash
 temperature: 0.1
 
 permission:

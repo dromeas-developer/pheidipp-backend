@@ -110,6 +110,27 @@ class ActivityRepository:
         await self.session.refresh(activity)
         return activity
 
+    async def update_cleaning_version(
+        self,
+        *,
+        activity_id: uuid.UUID,
+        version: str,
+    ) -> Activity:
+        """Set the ``cleaning_pipeline_version`` on the activity.
+
+        The only permitted transition is ``null → non-null``: cleaning
+        the stream once is final for the version that did the work.
+        Re-cleaning with a new version is a future-phase concern
+        (flagged in ADR-009 tradeoffs) and is not exposed here.
+        """
+        activity = await self.get_by_id(activity_id)
+        if activity is None:
+            raise LookupError(f"activity {activity_id} not found")
+        activity.cleaning_pipeline_version = version
+        await self.session.flush()
+        await self.session.refresh(activity)
+        return activity
+
     # ------------------------------------------------------------------
     # Reads.
     # ------------------------------------------------------------------

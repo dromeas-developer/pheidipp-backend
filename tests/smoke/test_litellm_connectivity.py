@@ -23,7 +23,7 @@ os.environ.setdefault(
     "postgresql+asyncpg://postgres:postgres@db:5432/test_pheidipp",
 )
 
-from app.core.config import settings  # noqa: E402
+from app.config import settings
 
 
 @pytest.mark.asyncio

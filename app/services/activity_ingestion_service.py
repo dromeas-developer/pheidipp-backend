@@ -79,11 +79,12 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
-from typing import Optional
+from typing import Any, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.core.logging_utils import log_event
 from app.models.activity import Activity
 from app.models.enums import ActivitySource, DataTier, SportType
 from app.models.twin_state import TwinState
@@ -208,6 +209,7 @@ class ActivityIngestionService:
         athlete_preferences: Optional[AthletePreferencesRepository] = None,
         athlete_physiology: Optional[AthletePhysiologyRepository] = None,
         events: Optional[EventPublisher] = None,
+        task_dispatcher: Optional[Any] = None,
     ) -> None:
         self.session = session
         self.activities = ActivityRepository(session)
@@ -228,6 +230,21 @@ class ActivityIngestionService:
             calibration_eligibility or CalibrationEligibilityService()
         )
         self.events = events or self._build_default_publisher(session)
+        # ``task_dispatcher`` is the procrastinate ``App.tasks[…].defer``
+        # callable bound to ``signal_clean``; it MUST expose a
+        # ``defer(**kwargs)`` sync callable. When ``None`` (production)
+        # the service lazily resolves the live procrastinate app's
+        # ``tasks["signal_clean"].defer`` so this module stays
+        # importable even if the worker module is unavailable in a
+        # trimmed test runtime.
+        #
+        # ``defer`` (sync) is used because the shared procrastinate
+        # app is configured with ``Psycopg2Connector`` (sync-only);
+        # ``defer_async`` would unconditionally raise
+        # ``SyncConnectorConfigurationError``. The defer operation
+        # is a lightweight single-row INSERT into ``procrastinate_jobs``
+        # — negligible blocking time from an async ingestion path.
+        self._task_dispatcher = task_dispatcher
 
     # ------------------------------------------------------------------
     # Public entry points.
@@ -666,6 +683,39 @@ class ActivityIngestionService:
                 f"twin recalibration refused: {exc}"
             ) from exc
 
+        # Signal cleaning is a decoupled async task per ADR-009 — the
+        # cleaned-stream upload and the ``RawSensorStream`` insert run
+        # in their own transaction owned by the ``signal_clean``
+        # procrastinate worker. The defer is enqueued AFTER the twin
+        # recalibration returns so, per the
+        # ``04-platform/async-pipeline.md`` ordering note, the
+        # twin update and the cleaning persist against the same
+        # ingestion-time Activity snapshot (the defer is created with
+        # ``activity_id`` so the worker re-reads the row in its own
+        # transaction).
+        #
+        # Gate: per ADR-009, the task is only enqueued when the
+        # activity is calibration-eligible, is a running activity,
+        # and is not a manual entry. Manual entries have no FIT and
+        # so can never have a stream to clean; non-running activities
+        # are forced to ``data_tier = 6`` downstream and never carry
+        # a cleaned stream.
+        #
+        # Do NOT await the deferred task result — the cleaning runs
+        # asynchronously on the procrastinate worker. The ingestion
+        # transaction commits and returns immediately afterwards.
+        #
+        # If the defer itself raises (queue backend outage), swallow
+        # and log so the ingestion commit still succeeds. The
+        # activity remains in a cleanable state and Phase 2.4
+        # backfill (Principle #14 reprocessing) covers the missed enqueue.
+        if (
+            eligible
+            and activity.sport_type == SportType.RUNNING
+            and activity.source != ActivitySource.MANUAL_ENTRY
+        ):
+            await self._defer_signal_clean(activity_id=activity.id)
+
         return recalibration, scores
 
     # ------------------------------------------------------------------
@@ -855,3 +905,41 @@ class ActivityIngestionService:
             SystemEventRepository(session),
             SystemEventOutboxRepository(session),
         )
+
+    async def _defer_signal_clean(
+        self,
+        *,
+        activity_id: uuid.UUID,
+    ) -> None:
+        """Defer the ``signal_clean`` procrastinate task for *activity_id*.
+
+        The dispatcher is the live ``procrastinate_app.tasks[
+        "signal_clean"].defer`` callable when no test
+        fake was injected; the default is resolved lazily on
+        the first call so the module remains importable in
+        environments where the worker module is unavailable
+        (and the task is then never invoked anyway because
+        :meth:`__init__` accepts ``task_dispatcher=None`` —
+        tests inject their own).
+
+        The defer MUST NOT block on the task result; defer is
+        a free operation and the worker picks the queued job up
+        off its own schedule. Failures raised by ``defer``
+        itself (queue backend outage, etc.) are swallowed after
+        logging so the ingestion commit path can still succeed.
+        """
+        dispatcher = self._task_dispatcher
+        if dispatcher is None:
+            from app.worker.app import app as procrastinate_app
+
+            dispatcher = procrastinate_app.tasks["signal_clean"].defer
+
+        try:
+            dispatcher(activity_id=str(activity_id))
+        except Exception as exc:  # pragma: no cover — defensive swallow
+            log_event(
+                event="activity.signal_clean.enqueue.failure",
+                activity_id=str(activity_id),
+                outcome="failed",
+                error=str(exc),
+            )

@@ -1,5 +1,5 @@
 ---
-model: litellm-proxy/nvidia/minimax-m3
+model: nvidia/minimaxai/minimax-m3
 temperature: 0.1
 
 permission:

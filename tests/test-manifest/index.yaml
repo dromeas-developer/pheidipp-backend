@@ -1,5 +1,5 @@
 version: '1.0'
-last_reviewed_at: '2026-07-02T00:00:00Z'
+last_reviewed_at: '2026-07-10T14:00:00Z'
 selection:
   smoke:
   - tests/unit/test_first_message_agent.py
@@ -16,6 +16,15 @@ selection:
   - tests/unit/test_post_workout_agent.py
   - tests/unit/test_activity_ingestion_service.py
   - tests/integration/test_activity_endpoints.py
+  - tests/unit/test_signal_cleaning_service.py
+  - tests/unit/test_signal_cleaning_object_storage.py
+  - tests/unit/test_activity_ingestion_service_signal_clean.py
+  - tests/unit/test_activity_repository_update_cleaning_version.py
+  - tests/integration/test_signal_cleaning_service_integration.py
+  - tests/integration/test_signal_cleaning_task_integration.py
+  - tests/integration/test_activity_ingestion_signal_clean_enqueue_integration.py
+  - tests/integration/test_activity_repository_cleaning_version_integration.py
+  - tests/behaviour/test_signal_cleaning_user_journey.py
   regression:
   - tests/unit/test_first_message_agent.py
   - tests/unit/test_context_budget_service.py
@@ -37,6 +46,15 @@ selection:
   - tests/unit/test_object_storage_client.py
   - tests/unit/test_post_workout_agent.py
   - tests/unit/test_activity_ingestion_service.py
+  - tests/unit/test_signal_cleaning_service.py
+  - tests/unit/test_signal_cleaning_object_storage.py
+  - tests/unit/test_activity_ingestion_service_signal_clean.py
+  - tests/unit/test_activity_repository_update_cleaning_version.py
+  - tests/integration/test_signal_cleaning_service_integration.py
+  - tests/integration/test_signal_cleaning_task_integration.py
+  - tests/integration/test_activity_ingestion_signal_clean_enqueue_integration.py
+  - tests/integration/test_activity_repository_cleaning_version_integration.py
+  - tests/behaviour/test_signal_cleaning_user_journey.py
   release:
   - tests/unit/test_first_message_agent.py
   - tests/unit/test_context_budget_service.py
@@ -50,6 +68,15 @@ selection:
   - tests/unit/test_workout_target_types.py
   - tests/unit/test_workout_generation_agent.py
   - tests/integration/test_workout_endpoints.py
+  - tests/unit/test_signal_cleaning_service.py
+  - tests/unit/test_signal_cleaning_object_storage.py
+  - tests/unit/test_activity_ingestion_service_signal_clean.py
+  - tests/unit/test_activity_repository_update_cleaning_version.py
+  - tests/integration/test_signal_cleaning_service_integration.py
+  - tests/integration/test_signal_cleaning_task_integration.py
+  - tests/integration/test_activity_ingestion_signal_clean_enqueue_integration.py
+  - tests/integration/test_activity_repository_cleaning_version_integration.py
+  - tests/behaviour/test_signal_cleaning_user_journey.py
 coverage:
   routes:
     covered:
@@ -101,6 +128,15 @@ coverage:
     - Power-based aerobic load for Tier 1-2 athletes
     - Neuromuscular load computed for Tier 1-4 athletes
     - Structural load computed from GPS data
+    - Activity.cleaning_pipeline_version null → non-null exclusively by cleaning task
+    - One RawSensorStream per Activity
+    - Cleaned data stored in object storage is immutable
+    - fit_file_key on RawSensorStream is the cleaned stream key — different from Activity.fit_file_key
+    - Steps run in fixed order 1→7. No step may be skipped or reordered
+    - Signal cleaning failure does not block Activity creation
+    - Activities with source = manual_entry never get RawSensorStream
+    - If the pipeline produces a stream shorter than 5 minutes of non-null HR data, RawSensorStream is not created
+    - available_channels reflects what survived artifact removal (unit: >80% null → false tests; integration: persisted JSONB shape; behaviour Journeys E/F pending FIT fixture for end-to-end assertion)
     partial: []
     missing: []
 cross_phase_dependencies: {}

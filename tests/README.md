@@ -505,3 +505,106 @@ assert 0.9 < scores.aerobic_load < 1.1
 ```
 
 If the architecture contract specifies ~100 units at CP, the implementation should be updated to normalize consistently with HR-based load (divide by 148.0 instead of 3600.0), not the tests.
+
+---
+
+## Dated Lessons (2026-07-09)
+
+### Test fixtures must populate every field the production code reads unconditionally
+
+**Symptom:** All 5 tests in `TestSignalCleanEnqueueHook` (`tests/unit/test_activity_ingestion_service_signal_clean.py`) raise `AttributeError: 'NoneType' object has no attribute 'date'` before any assertion runs.
+
+**Root cause:** The helper `_minimal_parsed_fit()` was set up "as minimal as possible" with `start_time=None`. Production code at `app/services/activity_ingestion_service.py` calls `parsed.start_time.date()` unconditionally when stamping the activity row — a `None` start_time is not a state the production code handles. The fixture exercised a code path that does not exist in production.
+
+**Pattern that failed:**
+```python
+def _minimal_parsed_fit(...) -> ParsedFitData:
+    return ParsedFitData(
+        start_time=None,  # type: ignore[arg-type]
+        ...
+    )
+```
+
+**Pattern to use instead:**
+```python
+def _minimal_parsed_fit(...) -> ParsedFitData:
+    return ParsedFitData(
+        start_time=datetime(2026, 6, 15, 8, 0, tzinfo=timezone.utc),
+        ...
+    )
+```
+
+The meta-rule: when production code reads a field unconditionally, every test fixture for that object must populate it — even if the test is "minimal." A "field set even when unused" rule is a useful shareable fixture contract for any future test fixture targeting the same domain.
+
+### Test data must clear every gate in the chain before the one under test
+
+**Symptom:** Two `available_channels` tests in `tests/unit/test_signal_cleaning_service.py` fail with assertions on `result.stream` when `result.stream is None` (the service returned early with `reason="short_stream"`).
+
+**Root cause:** Both tests were designed to exercise a downstream null-fraction gate (channel unavailable when > 80% null) but the data was rejected by an *earlier* gate. The pipeline runs gates in order — short-stream first (≥ 300 non-null HR seconds), then null-fraction. Test data that fails the short-stream gate never reaches the null-fraction check. Related cases:
+
+* `test_clean_available_channels_power_false_when_all_artifacted` — fed `[5000.0] * 600`, expecting the 3×-rolling-median filter to null everything. A uniform series cannot be artifacted by that filter (candidate equals window median → 3×median is never crossed). The cleanest way to exercise the null-fraction gate is to feed raw nulls: `[None] * 600`.
+* `test_clean_available_channels_hr_false_when_gt_80pct_null` — fed `[None] * 510 + [150.0] * 90` = 90 non-null, but the short-stream gate requires ≥ 300 non-null HR. The fix is `[None] * 1700 + [150.0] * 300` with `duration=2000`: 300/2000 = 0.15 ≤ 0.80 → null-fraction gate fires, and 300 ≥ 300 → short-stream passes.
+
+**Pattern that failed:**
+```python
+# Test exercises the null-fraction gate, ignoring the short-stream gate.
+hr_values = [None] * 510 + [150.0] * 90
+```
+
+**Pattern to use instead:**
+```python
+# First, list every gate the request flows through (read the production code).
+# Then, choose data that clears every earlier gate and fires only the one under test.
+hr_values = [None] * 1700 + [150.0] * 300
+duration = 2000  # 300/2000 = 0.15 → null-fraction gate fires
+# 300 ≥ MIN_NON_NULL_HR_SECONDS (300) → short-stream gate passes
+```
+
+**Meta-rule:** When asserting a downstream gate, read the production code's gate chain first and design data that clears every earlier gate. Single-gate mental models fail when the pipeline has multiple gates — the test's data must satisfy the conjunction, not just the disjunction.
+
+### Use `pytest.approx` for numerically-filtered samples
+
+**Symptom:** `test_clean_rr_deviation_filter_does_not_apply_to_power` fails with `AssertionError: 200.0000000000001 != 200.0` on `assert record.power_w == 200.0`.
+
+**Root cause:** A uniform `[200.0] * 600` power series is fed through the Savitzky-Golay smoother (`scipy.signal.savgol_filter`, window=7, polyorder=3). The smoother computes weighted sums that don't reduce to the exact input value due to floating-point rounding; a uniform input produces values like `200.0000000000001`. Strict `==` is brittle against any numerical filter (Savitzky-Golay, EMA, rolling median, FFT, interpolation).
+
+**Pattern that failed:**
+```python
+for record in result.stream.time_series:
+    assert record.power_w == 200.0
+```
+
+**Pattern to use instead:**
+```python
+for record in result.stream.time_series:
+    assert record.power_w == pytest.approx(200.0, abs=1e-9)
+```
+
+**Meta-rule:** Any sample that has passed through a numerical filter should be asserted with `pytest.approx`. The tolerance depends on the filter: Savitzky-Golay noise is well under 1e-9 for a uniform input; rolling medians are exact (no FP noise); FFTs are 1e-6 or worse. Default to `abs=1e-9` unless the filter is known to be noisier. Strict equality is only safe for samples that have *not* been numerically transformed (e.g., direct passthrough fields).
+
+---
+
+## Dated Lessons (2026-07-09, Test Authoring Conventions)
+
+### Variable name `mock` must not be reused for `ParsedFitData`
+
+**Symptom:** Two tests in `tests/unit/test_signal_cleaning_service.py` (`test_clean_rr_outside_200_2500_ms_removed` and `test_clean_available_channels_rr_false_when_gt_80pct_null`) crash with `AttributeError` deep inside the helper `_run_clean_and_return_result`.
+
+**Root cause:** The variable name `mock` was reused for whichever object was constructed first. The two broken tests constructed a `ParsedFitData` first and assigned it to `mock`; the helper expected its third argument to be a `MagicMock(Activity)` and accessed `mock_activity.athlete_id` / `mock_activity.id`. The author's intent (a real `ParsedFitData` to feed into the helper) collided with the helper's documented contract.
+
+**Pattern that failed:**
+```python
+mock = _parsed_fit_data_full()       # ← ParsedFitData, not MagicMock
+parsed = _parsed_fit_data_full(rr_values=rr_values)
+result = await _run_clean_and_return_result(service, activity_id, mock, parsed)
+# _run_clean_and_return_result does mock_activity.athlete_id → AttributeError
+```
+
+**Pattern to use instead:**
+```python
+mock_activity = _mock_activity()     # MagicMock(Activity)
+parsed = _parsed_fit_data_full(rr_values=rr_values)
+result = await _run_clean_and_return_result(service, activity_id, mock_activity, parsed)
+```
+
+**Meta-rule:** When a helper takes both a `MagicMock` and a domain object, name the variables after their semantic role, not after a generic `mock`. The convention `mock_activity` / `parsed` is unambiguous at the call site and matches the helper's parameter names.

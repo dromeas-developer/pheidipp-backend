@@ -1,5 +1,5 @@
 ---
-model: litellm-proxy/poolside/laguna-xs-2.1
+model: cohere/command-a-plus-05-2026
 temperature: 0.0
 
 # NOTE: verify this exact provider-routing string against your litellm-proxy

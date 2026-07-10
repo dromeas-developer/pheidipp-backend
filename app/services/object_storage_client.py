@@ -94,6 +94,24 @@ class StoredFitObject:
     content_md5: str
 
 
+@dataclass(frozen=True)
+class StoredCleanedStream:
+    """Value object returned by :meth:`ObjectStorageClient.upload_cleaned_stream`.
+
+    Carries the cleaned-stream storage key plus byte count and content
+    hash. The key is derived deterministically from ``(athlete_id,
+    activity_id)`` (see :meth:`build_cleaned_stream_key`) so a retry
+    of the signal-cleaning task after a partial commit hits the
+    immutability conflict path on the second upload — the conflict is
+    converted to success by ``SignalCleaningService`` per ADR-009's
+    idempotency contract.
+    """
+
+    key: str
+    byte_count: int
+    content_md5: str
+
+
 # ---------------------------------------------------------------------------
 # Client.
 # ---------------------------------------------------------------------------
@@ -161,6 +179,23 @@ class ObjectStorageClient:
             f"fit-files/{athlete_id}/"
             f"{activity_date.isoformat()}/{suffix_uuid}.fit"
         )
+
+    @staticmethod
+    def build_cleaned_stream_key(
+        athlete_id: uuid.UUID, activity_id: uuid.UUID
+    ) -> str:
+        """Build the deterministic object key for a cleaned sensor stream.
+
+        Format: ``cleaned-streams/{athlete_id}/{activity_id}/stream.gz``
+
+        The key is derived deterministically from ``(athlete_id,
+        activity_id)`` — NOT a fresh UUID — so a retry of the
+        signal-cleaning task after a partial commit hits the
+        immutability conflict path on the second upload
+        (:class:`ObjectStorageConflictError`), which the cleaning
+        service treats as the idempotency outcome per ADR-009.
+        """
+        return f"cleaned-streams/{athlete_id}/{activity_id}/stream.gz"
 
     async def upload_fit(
         self,
@@ -281,6 +316,106 @@ class ObjectStorageClient:
         body = response["Body"]
         return await loop.run_in_executor(None, body.read)
 
+    async def upload_cleaned_stream(
+        self,
+        *,
+        athlete_id: uuid.UUID,
+        activity_id: uuid.UUID,
+        payload_bytes: bytes,
+        content_type: str = "application/gzip",
+    ) -> StoredCleanedStream:
+        """Upload a cleaned sensor stream to object storage.
+
+        The key is built from the deterministic
+        ``cleaned-streams/{athlete_id}/{activity_id}/stream.gz``
+        pattern via :meth:`build_cleaned_stream_key`. The PUT call
+        runs in a thread-pool executor so the async event loop is
+        never blocked.
+
+        The cleaned stream is append-only / immutable: if the key
+        already exists, :class:`ObjectStorageConflictError` is raised
+        so the cleaning task can treat the conflict as the
+        idempotency outcome on retry (ADR-009). The conflict is
+        caught by ``SignalCleaningService`` and converted to success
+        without re-uploading.
+
+        Raises:
+            ObjectStorageUploadError: the PUT call failed
+                (network / 5xx / credentials). The caller should
+                retry per procrastinate's backoff policy.
+            ObjectStorageConflictError: the key already exists.
+                The cleaned stream is immutable; the cleaning
+                service converts this to success on retry.
+            ObjectStorageNotConfiguredError: object storage is not
+                configured and the local fallback is also disabled.
+        """
+        key = self.build_cleaned_stream_key(athlete_id, activity_id)
+        loop = asyncio.get_running_loop()
+
+        if self._use_local_fallback:
+            return await loop.run_in_executor(
+                None, self._upload_local_cleaned_stream, key, payload_bytes
+            )
+
+        try:
+            await loop.run_in_executor(
+                None,
+                lambda: self._s3_client.put_object(  # type: ignore[union-attr]
+                    Bucket=self._bucket,
+                    Key=key,
+                    Body=payload_bytes,
+                    ContentType=content_type,
+                    Metadata={
+                        "athlete_id": str(athlete_id),
+                        "activity_id": str(activity_id),
+                    },
+                ),
+            )
+        except ClientError as exc:
+            code = exc.response.get("Error", {}).get("Code", "")
+            if code in {"PreconditionFailed", "x-amz-precondition-failed"}:
+                log_event(
+                    event="object_storage.cleaned_stream.upload.conflict",
+                    athlete_id=str(athlete_id),
+                    outcome="failed",
+                )
+                raise ObjectStorageConflictError(
+                    f"object already exists at {key}"
+                ) from exc
+            log_event(
+                event="object_storage.cleaned_stream.upload.failed",
+                athlete_id=str(athlete_id),
+                outcome="failed",
+            )
+            raise ObjectStorageUploadError(
+                f"s3 put_object failed for {key}: {exc}"
+            ) from exc
+
+        log_event(
+            event="object_storage.cleaned_stream.upload.success",
+            athlete_id=str(athlete_id),
+            outcome="success",
+        )
+        return StoredCleanedStream(
+            key=key,
+            byte_count=len(payload_bytes),
+            content_md5=_md5_base64(payload_bytes),
+        )
+
+    async def download_cleaned_stream(self, key: str) -> bytes:
+        """Download a previously-stored cleaned stream as raw bytes.
+
+        Parallel to :meth:`download_fit`; used by Phase-2.3
+        segmentation to load the stream identified by
+        ``RawSensorStream.fit_file_key``.
+
+        Raises:
+            ObjectStorageUploadError: the GET call failed. Surfaced
+                with the same exception type as upload for caller
+                simplicity.
+        """
+        return await self.download_fit(key)
+
     async def exists(self, key: str) -> bool:
         """Return ``True`` if *key* exists in the configured bucket."""
         loop = asyncio.get_running_loop()
@@ -319,6 +454,23 @@ class ObjectStorageClient:
         with path.open("wb") as fh:
             fh.write(file_bytes)
         return StoredFitObject(
+            key=key,
+            byte_count=len(file_bytes),
+            content_md5=_md5_base64(file_bytes),
+        )
+
+    def _upload_local_cleaned_stream(
+        self, key: str, file_bytes: bytes
+    ) -> StoredCleanedStream:
+        path = self.LOCAL_FALLBACK_ROOT / key
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if path.exists():
+            raise ObjectStorageConflictError(
+                f"object already exists at {key}"
+            )
+        with path.open("wb") as fh:
+            fh.write(file_bytes)
+        return StoredCleanedStream(
             key=key,
             byte_count=len(file_bytes),
             content_md5=_md5_base64(file_bytes),

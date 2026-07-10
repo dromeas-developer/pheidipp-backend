@@ -47,6 +47,23 @@ function removeArtifacts(records: FitRecord[]): FitRecord[] {
 }
 ```
 
+**RR deviation check (follow-on to the hard bound):** RR values that survive the
+200–2500 ms hard bound are then subjected to a rolling-median deviation filter.
+For each RR sample, compute the rolling median over a trailing window of
+non-null RR samples (window of 30 seconds / 30 samples at the 1 Hz rate after
+resampling) and null any sample that deviates more than ±20% from that rolling
+median. This two-stage RR artifact removal — hard bound then deviation filter —
+is what produces the cleaned RR series that the downstream
+`ThresholdDetectionService` HRV-inflection algorithm (`02-computations/threshold-detection.md`,
+Algorithm 2 step 1: "values outside ±20% of rolling median removed") consumes.
+The hard bound alone is sufficient to reject physiologically impossible RR
+values; the deviation filter rejects physiologically plausible-but-erroneous
+samples (sensor misreads, ectopic beats recorded as intervals) that would
+corrupt per-window RMSSD computation downstream. Nulls propagate through the
+rolling window: a window with fewer than 2 non-null RR samples contributes
+the median of the available non-null samples, and a window with zero non-null
+samples leaves the candidate sample unchanged.
+
 ### Step 2 — Smoothing / Filtering
 
 Reduce noise while preserving physiologically real transitions.

@@ -390,6 +390,60 @@ def _prepare_database():
 
 
 # ---------------------------------------------------------------------------
+# Procrastinate worker app — open for synchronous defer calls.
+#
+# The production ``app.worker.app`` module creates a procrastinate
+# ``App`` with ``Psycopg2Connector(dsn=…)``. We open the app here so
+# the connection pool is ready before any ``defer()`` call from the
+# upload endpoint, and install the procrastinate schema (tables,
+# functions like ``procrastinate_defer_job``) which is not part of
+# any Alembic migration — in production it is created by the worker
+# CLI (``procrastinate --app=app.worker.app schema --install``).
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(scope="session", autouse=True)
+def _open_procrastinate_app():
+    """Open the procrastinate app and install its schema for the test session.
+
+    The procrastinate app must be ``open()`` before any ``defer()`` call
+    succeeds — the pool is lazily created on open.
+    """
+    from app.worker.app import app as _procrastinate_app
+
+    # Install the procrastinate schema (tables, functions like
+    # ``procrastinate_defer_job``) if not already present. The schema
+    # is not part of any Alembic migration — it comes from procrastinate
+    # itself, and in production is created by the worker CLI
+    # (``procrastinate --app=app.worker.app schema --install``). Since
+    # the test database is created fresh, we install it here so the
+    # ``defer()`` call in the upload endpoint can reach the
+    # ``procrastinate_defer_job`` function.
+    # Note: ``apply_schema()`` needs a database pool, so it must be
+    # called inside the ``open()`` context (not before it).
+    #
+    # ``apply_schema()`` uses plain ``CREATE TYPE`` / ``CREATE TABLE``
+    # (without ``IF NOT EXISTS``), so it will raise
+    # ``DuplicateObject`` / ``DuplicateTable`` if the schema has already
+    # been applied (e.g. when a developer re-runs tests without
+    # rebuilding the test database). We catch and suppress these errors
+    # so the fixture is idempotent across test-session boundaries.
+    import procrastinate.exceptions
+    import psycopg2
+
+    with _procrastinate_app.open():
+        try:
+            _procrastinate_app.schema_manager.apply_schema()
+        except procrastinate.exceptions.ConnectorException as exc:
+            # ``apply_schema()`` wraps psycopg2 errors in
+            # ``ConnectorException``. ``DuplicateObject`` means the
+            # schema was already installed (idempotent re-run).
+            cause = exc.__cause__
+            if not isinstance(cause, psycopg2.errors.DuplicateObject):
+                raise
+        yield
+
+
+# ---------------------------------------------------------------------------
 # Per-test transactional session.
 # ---------------------------------------------------------------------------
 

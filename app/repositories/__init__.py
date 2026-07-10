@@ -23,6 +23,9 @@ from app.repositories.generated_workout_repository import (
 from app.repositories.planned_session_repository import (
     PlannedSessionRepository,
 )
+from app.repositories.raw_sensor_stream_repository import (
+    RawSensorStreamRepository,
+)
 from app.repositories.refresh_token_repository import RefreshTokenRepository
 from app.repositories.workout_step_repository import WorkoutStepRepository
 from app.repositories.system_event_outbox_repository import (
@@ -49,6 +52,7 @@ __all__ = [
     "GenerationEventRepository",
     "GeneratedWorkoutRepository",
     "PlannedSessionRepository",
+    "RawSensorStreamRepository",
     "RefreshTokenRepository",
     "SystemEventOutboxRepository",
     "SystemEventRepository",

@@ -1,5 +1,5 @@
 ---
-model: litellm-proxy/mistral/mistral-medium-engineer
+model: nvidia/mistralai/mistral-medium-3.5-128b
 temperature: 0.2
 tools:
   read:     false   # → get_files

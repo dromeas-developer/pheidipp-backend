@@ -42,6 +42,10 @@ Quick reference for common mocking failures. Full details in `tests/README.md` d
 | Tests asserting JWT access token uniqueness | README.md: "JWT Token Uniqueness in Tests" section |
 | Mocking `session.execute()` when implementation uses repository methods | README.md: "Repository mocking requires scalar_one_or_none() not first()" (2026-07-07) |
 | Omitting `sport_type` in Activity factory after sport-type gate implementation | README.md: "sport_type field must be set in Activity factory" (2026-07-07) |
+| `start_time=None` in `ParsedFitData` test fixtures (production reads `parsed.start_time.date()` unconditionally) | README.md: "Test fixtures must populate every field the production code reads unconditionally" (2026-07-09) |
+| Strict `==` equality on values produced by Savitzky-Golay / EMA / FFT / rolling-median filters | README.md: "Use `pytest.approx` for numerically-filtered samples" (2026-07-09) |
+| Test data designed for a downstream gate but rejected by an earlier gate (e.g. short-stream vs null-fraction) | README.md: "Test data must clear every gate in the chain before the one under test" (2026-07-09) |
+| Reusing the variable name `mock` for a `ParsedFitData` when the helper takes both a `MagicMock` and a domain object | README.md: "Variable name `mock` must not be reused for ParsedFitData" (2026-07-09) |
 
 ---
 
@@ -51,3 +55,4 @@ Quick reference for common mocking failures. Full details in `tests/README.md` d
 |------|--------|--------|
 | 2026-07-01 | Initial seeding from README lessons and DevOps incident #phase-1-6-7-8-p1 | p-test-architect |
 | 2026-07-07 | Added scalar_one_or_none anti-pattern; documented repository mocking strategy; added sport_type factory requirement | p-test-architect |
+| 2026-07-09 | Added fixture field-set rule, pytest.approx for filtered samples, gate-ordering data design, and mock-variable shadowing — seeded from DevOps incident #phase-2-2-p2-rr-deviation-filter-remediation (Categories A and B) | p-test-architect |

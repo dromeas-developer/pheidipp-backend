@@ -1,9 +1,9 @@
-date: 2026-07-07T17:20:00Z
-plan: phase-2-1-p1-p2-p3
+date: 2026-07-10
+plan: phase-2-2-p2-rr-deviation-filter-remediation
 execution_group: feature
-total: 235
-passed: 235
+total: 320
+passed: 318
 failed: 0
-skipped: 0
-duration_seconds: 8.26
+skipped: 2
+duration_seconds: 1367
 failures: []

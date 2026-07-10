@@ -57,6 +57,7 @@ from app.models.enums import (
 from app.models.generated_workout import GeneratedWorkout
 from app.models.generation_event import GenerationEvent
 from app.models.planned_session import PlannedSession
+from app.models.raw_sensor_stream import RawSensorStream
 from app.models.regeneration_task import RegenerationTask
 from app.models.refresh_token import RefreshToken
 from app.models.secondary_event import SecondaryEvent
@@ -103,6 +104,7 @@ __all__ = [
     "PlannedSessionStatus",
     "PowerSource",
     "PrimaryTrainingPlatform",
+    "RawSensorStream",
     "RecoveryModifierLevel",
     "RefreshToken",
     "RegenerationTask",

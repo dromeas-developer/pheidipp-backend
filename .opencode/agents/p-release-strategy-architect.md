@@ -1,5 +1,5 @@
 ---
-model: litellm-proxy/poolside/laguna-m.1
+model: poolside/poolside/laguna-m.1
 temperature: 0.2
 
 permission:

@@ -140,7 +140,7 @@ class TestPostUploadActivity:
         # Mock the procrastinate task deferral
         with patch("app.api.v1.activity.procrastinate_app") as mock_procrastinate:
             mock_task = MagicMock()
-            mock_task.defer_async = AsyncMock(return_value=12345)  # job id
+            mock_task.defer = MagicMock(return_value=12345)  # job id
             mock_procrastinate_app = MagicMock()
             mock_procrastinate_app.tasks = {"fit_ingest": mock_task}
             mock_procrastinate.tasks = mock_procrastinate_app.tasks

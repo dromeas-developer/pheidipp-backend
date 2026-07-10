@@ -46,7 +46,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List, Optional, Sequence
 
 from fitparse import FitFile, FitParseError as UpstreamFitParseError
 
@@ -124,14 +124,14 @@ class ParsedFitData:
 
     start_time: datetime
     duration_seconds: int
-    hr_records: List[int] = field(default_factory=list)
-    power_records: List[int] = field(default_factory=list)
+    hr_records: Sequence[Optional[float]] = field(default_factory=list)
+    power_records: Sequence[Optional[float]] = field(default_factory=list)
     has_hr: bool = False
     has_power: bool = False
     has_rr_intervals: bool = False
     # Phase-2 additions:
     gps_records: List[GpsRecord] = field(default_factory=list)
-    rr_records: List[float] = field(default_factory=list)
+    rr_records: Sequence[Optional[float]] = field(default_factory=list)
     total_distance_m: Optional[float] = None
     total_ascent_m: Optional[float] = None
     has_gps: bool = False
@@ -213,9 +213,9 @@ class FitParserService:
         # side-effect); list() was an erroneous wrapper — remove it.
         fit.parse()  # type: ignore[arg-type]
 
-        hr_records: list[int] = []
-        power_records: list[int] = []
-        rr_records: list[float] = []
+        hr_records: list[Optional[float]] = []
+        power_records: list[Optional[float]] = []
+        rr_records: list[Optional[float]] = []
         gps_records: list[GpsRecord] = []
         start_time: Optional[datetime] = None
         duration_seconds: int = 0

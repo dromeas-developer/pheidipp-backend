@@ -5,17 +5,15 @@
   // Order matters — stack-truth first (stable rules), dynamic last (live state).
   "instructions": [
     "AGENTS.md",
-    ".opencode/instructions/stack-truth.md",
-    ".opencode/instructions/dynamic.md"
+    ".opencode/instructions/001-stack-truth.md"
   ],
 
   // Only show the providers and models you actually use.
   // Prevents OpenRouter/Mistral full catalog from flooding /models.
-  "enabled_providers": [
-    "opencode",
-    "litellm-proxy",
-    "cloudflare"
-  ],
+  //"enabled_providers": [
+  //  "opencode",
+  //  "litellm-proxy",
+  //],
 
   // MCP server — semantic codebase search, symbol lookup, and architectural context.
   // PROJECT_PATH tells the server which directory to index.

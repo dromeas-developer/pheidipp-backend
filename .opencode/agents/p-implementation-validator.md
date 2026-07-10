@@ -1,5 +1,5 @@
 ---
-model: litellm-proxy/nvidia/qwen3.5-397b
+model: nvidia/z-ai/glm-5.2
 temperature: 0.1
 
 permission:

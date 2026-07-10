@@ -233,12 +233,19 @@ async def post_upload_activity(
     await session.commit()
 
     # Enqueue the heavy ingestion pipeline. Procrastinate's
-    # ``defer_async`` returns the job id as an ``int`` (not a
+    # ``defer`` returns the job id as an ``int`` (not a
     # ``Job`` object). We promote it to a ``UUID`` here so the
     # response schema's ``task_id: UUID`` field is satisfied.
     # The conversion is lossless and reversible:
     # ``UUID(int=job_id << 96).int >> 96 == job_id``.
-    job = await procrastinate_app.tasks["fit_ingest"].defer_async(
+    #
+    # ``defer`` (sync) is used because the shared procrastinate
+    # app is configured with ``Psycopg2Connector`` (sync-only);
+    # ``defer_async`` would unconditionally raise
+    # ``SyncConnectorConfigurationError``. The defer operation
+    # is a lightweight single-row INSERT into ``procrastinate_jobs``
+    # — negligible blocking time from an async endpoint.
+    job = procrastinate_app.tasks["fit_ingest"].defer(
         athlete_id=str(athlete_id),
         activity_id=str(activity.id),
     )

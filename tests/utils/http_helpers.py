@@ -7,6 +7,7 @@ token issuance as part of test setup.
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+import uuid
 
 if TYPE_CHECKING:
     from httpx import AsyncClient
@@ -17,7 +18,7 @@ def bearer_header(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-async def http_register(client: "AsyncClient", email: str) -> tuple[str, str]:
+async def http_register(client: "AsyncClient", email: str) -> tuple[uuid.UUID, str]:
     """Register a fresh athlete through the HTTP surface.
 
     Returns ``(athlete_id, access_token)``.
@@ -30,4 +31,4 @@ async def http_register(client: "AsyncClient", email: str) -> tuple[str, str]:
     )
     assert response.status_code == 201, response.text
     body = response.json()
-    return body["athlete"]["id"], body["access_token"]
+    return uuid.UUID(body["athlete"]["id"]), body["access_token"]

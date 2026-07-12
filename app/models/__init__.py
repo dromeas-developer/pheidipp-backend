@@ -32,6 +32,7 @@ from app.models.enums import (
     ObjectiveCategory,
     PhaseLabel,
     PhysiologicalIntent,
+    PhysiologyParameter,
     PlannedSessionStatus,
     PowerSource,
     PrimaryTrainingPlatform,
@@ -56,6 +57,7 @@ from app.models.enums import (
 )
 from app.models.generated_workout import GeneratedWorkout
 from app.models.generation_event import GenerationEvent
+from app.models.physiology_measurement import PhysiologyMeasurement
 from app.models.planned_session import PlannedSession
 from app.models.raw_sensor_stream import RawSensorStream
 from app.models.regeneration_task import RegenerationTask
@@ -100,6 +102,8 @@ __all__ = [
     "ObjectiveCategory",
     "PhaseLabel",
     "PhysiologicalIntent",
+    "PhysiologyMeasurement",
+    "PhysiologyParameter",
     "PlannedSession",
     "PlannedSessionStatus",
     "PowerSource",

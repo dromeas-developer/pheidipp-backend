@@ -1,55 +1,48 @@
 # implemented-state
 
 Commit:
-e22795b
+4a8a46f
 
 ## Change Set
 
 Base Commit:
-e22795b
+4a8a46f
 
 Current Commit:
-e22795b
+4a8a46f
 
 Files Added:
-- alembic/versions/297ea8ac7f69_phase_2_2_p1_batch_1_raw_sensor_streams.py
-- alembic/versions/84d65f756e09_widen_cleaning_pipeline_version_columns_.py
-- app/models/raw_sensor_stream.py
-- app/repositories/raw_sensor_stream_repository.py
-- app/services/signal_cleaning_service.py
-- reports/phase-2-2-p1-signal-cleaning_validation.md
-- reports/phase-2-2-p2-rr-deviation-filter-remediation_devops.md
-- reports/phase-2-2-p2-rr-deviation-filter-remediation_validation.md
-- tests/behaviour/test_signal_cleaning_user_journey.py
-- tests/integration/test_activity_ingestion_signal_clean_enqueue_integration.py
-- tests/integration/test_activity_repository_cleaning_version_integration.py
-- tests/integration/test_signal_cleaning_service_integration.py
-- tests/integration/test_signal_cleaning_task_integration.py
-- tests/test-manifest/phase-2-2.yaml
-- tests/unit/test_activity_ingestion_service_signal_clean.py
-- tests/unit/test_activity_repository_update_cleaning_version.py
-- tests/unit/test_signal_cleaning_object_storage.py
-- tests/unit/test_signal_cleaning_service.py
+- alembic/versions/8413e6547a40_phase_2_3_p1_physiology_measurement.py
+- app/models/physiology_measurement.py
+- app/repositories/physiology_measurement_repository.py
+- app/services/threshold_detection_service.py
+- reports/phase-2-3-p1-threshold-detection_devops.md
+- reports/phase-2-3-p1-threshold-detection_validation.md
+- tests/behaviour/test_threshold_detection_user_journey.py
+- tests/integration/test_physiology_measurement_repository_integration.py
+- tests/integration/test_threshold_detection_service_integration.py
+- tests/test-manifest/phase-2-3x.yaml
+- tests/unit/test_physiology_measurement_model.py
+- tests/unit/test_physiology_measurement_repository.py
+- tests/unit/test_physiology_parameter_enum.py
+- tests/unit/test_threshold_detection_service.py
 
 Files Modified:
-- app/api/v1/activity.py
+- alembic/env.py
 - app/models/__init__.py
-- app/models/activity.py
+- app/models/enums.py
 - app/repositories/__init__.py
 - app/repositories/activity_repository.py
-- app/services/activity_ingestion_service.py
-- app/services/fit_parser_service.py
-- app/services/object_storage_client.py
-- app/worker/app.py
+- app/services/__init__.py
+- app/services/plan_generation_service.py
 - reports/test_history/latest.md
-- requirements.txt
 - tests/MOCKING_CONTRACT.md
 - tests/README.md
+- tests/api/test_onboarding_endpoints.py
 - tests/conftest.py
-- tests/integration/test_activity_endpoints.py
-- tests/smoke/test_litellm_connectivity.py
+- tests/integration/test_migration_phase_1_2c.py
 - tests/test-manifest/index.yaml
-- tests/utils/http_helpers.py
+- tests/test-manifest/phase-1-2c.yaml
 
 Files Deleted:
 - none
@@ -58,20 +51,17 @@ Touched Areas:
 - models
 - repositories
 - services
-- api
-- app
 - migrations
-- requirements
 - other
 
 Generated:
-2026-07-10T03:14:40.293216+00:00 UTC
+2026-07-12T00:49:28.810906+00:00 UTC
 
 Current DB Revision:
-84d65f756e09 (head)
+8413e6547a40 (head)
 
 Python Files Scanned:
-111
+114
 
 ---
 
@@ -91,6 +81,7 @@ Entities:
 - CoachingMessage (coaching_messages) — app/models/coaching_message.py
 - GeneratedWorkout (generated_workouts) — app/models/generated_workout.py
 - GenerationEvent (generation_events) — app/models/generation_event.py
+- PhysiologyMeasurement (physiology_measurements) — app/models/physiology_measurement.py
 - PlannedSession (planned_sessions) — app/models/planned_session.py
 - RawSensorStream (raw_sensor_streams) — app/models/raw_sensor_stream.py
 - RefreshToken (athlete_refresh_tokens) — app/models/refresh_token.py
@@ -122,6 +113,7 @@ Enums:
 - ObjectiveCategory — app/models/enums.py
 - PhaseLabel — app/models/enums.py
 - PhysiologicalIntent — app/models/enums.py
+- PhysiologyParameter — app/models/enums.py
 - PlannedSessionStatus — app/models/enums.py
 - PowerSource — app/models/enums.py
 - PrimaryTrainingPlatform — app/models/enums.py
@@ -158,6 +150,7 @@ Repositories:
 - CoachingMessageRepository -> CoachingMessage (app/repositories/coaching_message_repository.py)
 - GeneratedWorkoutRepository -> GeneratedWorkout (app/repositories/generated_workout_repository.py)
 - GenerationEventRepository -> GenerationEvent (app/repositories/generation_event_repository.py)
+- PhysiologyMeasurementRepository -> PhysiologyMeasurement (app/repositories/physiology_measurement_repository.py)
 - PlannedSessionRepository -> PlannedSession (app/repositories/planned_session_repository.py)
 - RawSensorStreamRepository -> RawSensorStream (app/repositories/raw_sensor_stream_repository.py)
 - RefreshTokenRepository -> RefreshToken (app/repositories/refresh_token_repository.py)
@@ -176,6 +169,7 @@ Migrations:
 - 297ea8ac7f69 (down: 2340974caeca) — alembic/versions/297ea8ac7f69_phase_2_2_p1_batch_1_raw_sensor_streams.py
 - 79dc97d4e433 (down: 1b9e9026db1e) — alembic/versions/79dc97d4e433_phase_1_2c_twin_fitness_coaching_.py
 - 8265efd46112 (down: fd373abd4b9e) — alembic/versions/8265efd46112_phase_1_1_p3_single_primary_auth_.py
+- 8413e6547a40 (down: 84d65f756e09) — alembic/versions/8413e6547a40_phase_2_3_p1_physiology_measurement.py
 - 84d65f756e09 (down: 297ea8ac7f69) — alembic/versions/84d65f756e09_widen_cleaning_pipeline_version_columns_.py
 - d1579f4430e7 (down: 79dc97d4e433) — alembic/versions/d1579f4430e7_add_training_plans_twin_state_fk.py
 - e7ffc8764335 (down: 8265efd46112) — alembic/versions/e7ffc8764335_phase_1_2a_profile_preferences_activity.py
@@ -199,6 +193,7 @@ Services:
 - TrainingLengthGateError — app/services/plan_generation_errors.py
 - PlanGenerationService — app/services/plan_generation_service.py
 - SignalCleaningService — app/services/signal_cleaning_service.py
+- ThresholdDetectionService — app/services/threshold_detection_service.py
 - TwinRecalibrationService — app/services/twin_recalibration_service.py
 - WorkoutGenerationAgent — app/services/workout_generation_agent.py
 - PlannedSessionNotFoundError — app/services/workout_generation_errors.py
@@ -286,16 +281,16 @@ Public API:
 ### Registrations
 
 - app/models/__init__.py
-- Imports: Activity, ActivitySource, Athlete, AthleteAuth, AthleteFitness, AthletePhysiology, AthletePreferences, AthleteProfile, AuthProvider, Checkpoint, CheckpointStatus, CheckpointType, CoachingMessage, DataTier, EventPublicationStatus, GeneratedWorkout, GenerationEvent, GoalEventType, GoalType, GpsSource, HrSource, InjurySeverity, MeasurementSource, MessageType, ObjectiveCategory, PhaseLabel, PhysiologicalIntent, PlannedSession, PlannedSessionStatus, PowerSource, PrimaryTrainingPlatform, RawSensorStream, RecoveryModifierLevel, RefreshToken, RegenerationTask, SecondaryEvent, SecondaryEventPriority, SessionPriority, SessionPurpose, SessionSlot, SessionType, Sex, SignalType, SportBackground, SportType, StepType, SystemEvent, SystemEventOutbox, TrainingGoal, TrainingGoalStatus, TrainingPlan, TrainingPlanStatus, TrainingTimeOfDay, TwinConfidenceLevel, TwinState, TwinTrigger, WeeklyPlan, WeeklyPlanStatus, WeeklySession, WellnessTrend, WorkoutStep, infer_data_tier
+- Imports: Activity, ActivitySource, Athlete, AthleteAuth, AthleteFitness, AthletePhysiology, AthletePreferences, AthleteProfile, AuthProvider, Checkpoint, CheckpointStatus, CheckpointType, CoachingMessage, DataTier, EventPublicationStatus, GeneratedWorkout, GenerationEvent, GoalEventType, GoalType, GpsSource, HrSource, InjurySeverity, MeasurementSource, MessageType, ObjectiveCategory, PhaseLabel, PhysiologicalIntent, PhysiologyMeasurement, PhysiologyParameter, PlannedSession, PlannedSessionStatus, PowerSource, PrimaryTrainingPlatform, RawSensorStream, RecoveryModifierLevel, RefreshToken, RegenerationTask, SecondaryEvent, SecondaryEventPriority, SessionPriority, SessionPurpose, SessionSlot, SessionType, Sex, SignalType, SportBackground, SportType, StepType, SystemEvent, SystemEventOutbox, TrainingGoal, TrainingGoalStatus, TrainingPlan, TrainingPlanStatus, TrainingTimeOfDay, TwinConfidenceLevel, TwinState, TwinTrigger, WeeklyPlan, WeeklyPlanStatus, WeeklySession, WellnessTrend, WorkoutStep, infer_data_tier
 
 - app/schemas/__init__.py
 - Imports: ActivityListResponse, ActivityNotFoundResponse, ActivityResponse, ActivityUploadResponse, AthletePreferencesPatchIn, AthletePreferencesResponse, AthleteProfilePatchIn, AthleteProfileResponse, AthleteResponse, AuthResponse, CheckpointResponse, CoachingMessageResponse, CoachingMessageSummary, FirstMessageConflictResponse, FitParseErrorResponse, GenerateWorkoutResponse, GeneratedWorkoutResponse, LoginRequest, MessagesListResponse, OnboardingPreferencesIn, OnboardingProfileIn, OnboardingRequest, OnboardingResponse, OnboardingStatusResponse, OnboardingTrainingGoalIn, PhaseDescriptorResponse, PlannedSessionResponse, PostWorkoutAnalysisResponse, RefreshRequest, RefreshResponse, RegisterProfileIn, RegisterRequest, TargetSetResponse, TodayResponse, TokenPairResponse, TrainingPlanResponse, TwinStateHistoryResponse, TwinStateResponse, UpcomingSessionsResponse, WeeklyScheduleDayIn, WeeklyScheduleDayOut, WeeklyScheduleDayPatchIn, WorkoutAlreadyGeneratedConflictResponse, WorkoutStepResponse, WorkoutTargetPrimaryResponse, WorkoutTargetResponse
 
 - app/repositories/__init__.py
-- Imports: AthleteAuthRepository, AthleteFitnessRepository, AthletePhysiologyRepository, AthletePreferencesRepository, AthleteProfileRepository, AthleteRepository, CheckpointRepository, CoachingMessageRepository, GeneratedWorkoutRepository, GenerationEventRepository, PlannedSessionRepository, RawSensorStreamRepository, RefreshTokenRepository, SystemEventOutboxRepository, SystemEventRepository, TrainingGoalRepository, TrainingPlanRepository, TwinStateRepository, WeeklyPlanRepository, WeeklySessionRepository, WorkoutStepRepository
+- Imports: AthleteAuthRepository, AthleteFitnessRepository, AthletePhysiologyRepository, AthletePreferencesRepository, AthleteProfileRepository, AthleteRepository, CheckpointRepository, CoachingMessageRepository, GeneratedWorkoutRepository, GenerationEventRepository, PhysiologyMeasurementRepository, PlannedSessionRepository, RawSensorStreamRepository, RefreshTokenRepository, SystemEventOutboxRepository, SystemEventRepository, TrainingGoalRepository, TrainingPlanRepository, TwinStateRepository, WeeklyPlanRepository, WeeklySessionRepository, WorkoutStepRepository
 
 - app/services/__init__.py
-- Imports: ActivityIngestionError, ActivityIngestionResult, ActivityIngestionService, AthleteNotFoundError, AthleteNotFoundForIngestionError, AthleteTwinContext, AuthError, AuthResult, AuthService, BanisterUpdateResult, CalibrationEligibilityService, ComplianceError, ComplianceFindings, ComplianceService, ComputedObservations, ContextBudgetService, CrossAthleteAccessError, DATA_TIER_TARGET_TYPE, DuplicateEmailError, EventPublisher, FirstMessageAgent, FirstMessageAlreadyExistsError, FitParseEmptyError, FitParseError, FitParserService, GpsRecord, InvalidCredentialsError, InvalidGoalTypeError, InvalidRefreshTokenError, IssuedTokens, LLMServiceUnavailableError, LoadComputationError, LoadComputationInputs, LoadComputationService, LoadScores, MissingAthleteFitnessError, MissingCriticalPowerError, MissingHeartRateError, MissingTrainingGoalError, ObjectStorageClient, ObjectStorageConflictError, ObjectStorageError, ObjectStorageFailureError, ObjectStorageNotConfiguredError, ObjectStorageUploadError, OnboardingAlreadyCompleteError, OnboardingError, OnboardingIncompleteError, OnboardingResult, OnboardingService, OnboardingStatus, OutboxEvent, ParsedFitData, PlanGenerationError, PlanGenerationResult, PlanGenerationService, PlannedSessionNotFoundError, PreferencesSnapshot, ProfileSnapshot, PromptNotFoundError, PromptRegistry, RecalibrationResult, SESSION_INTENT_MAP, SessionDayAssignment, StoredFitObject, TrainingGoalConflictError, TrainingLengthGateError, TwinContextAssembler, TwinContextSummary, TwinRecalibrationError, TwinRecalibrationFailureError, TwinRecalibrationService, UnauthenticatedError, WorkoutAlreadyGeneratedError, WorkoutGenerationAgent, WorkoutGenerationContractError, WorkoutGenerationError, WorkoutLLMServiceUnavailableError, _BytesReader, _GoalInput, _PreferencesInput, _ProfileInput, estimate_max_hr_from_age, get_object_storage_client, get_step_physiological_intent, reset_object_storage_client
+- Imports: ActivityIngestionError, ActivityIngestionResult, ActivityIngestionService, AthleteNotFoundError, AthleteNotFoundForIngestionError, AthleteTwinContext, AuthError, AuthResult, AuthService, BanisterUpdateResult, CalibrationEligibilityService, ComplianceError, ComplianceFindings, ComplianceService, ComputedObservations, ContextBudgetService, CrossAthleteAccessError, DATA_TIER_TARGET_TYPE, DuplicateEmailError, EventPublisher, FirstMessageAgent, FirstMessageAlreadyExistsError, FitParseEmptyError, FitParseError, FitParserService, GpsRecord, InvalidCredentialsError, InvalidGoalTypeError, InvalidRefreshTokenError, IssuedTokens, LLMServiceUnavailableError, LoadComputationError, LoadComputationInputs, LoadComputationService, LoadScores, MissingAthleteFitnessError, MissingCriticalPowerError, MissingHeartRateError, MissingTrainingGoalError, ObjectStorageClient, ObjectStorageConflictError, ObjectStorageError, ObjectStorageFailureError, ObjectStorageNotConfiguredError, ObjectStorageUploadError, OnboardingAlreadyCompleteError, OnboardingError, OnboardingIncompleteError, OnboardingResult, OnboardingService, OnboardingStatus, OutboxEvent, ParsedFitData, PlanGenerationError, PlanGenerationResult, PlanGenerationService, PlannedSessionNotFoundError, PreferencesSnapshot, ProfileSnapshot, PromptNotFoundError, PromptRegistry, RecalibrationResult, SESSION_INTENT_MAP, SessionDayAssignment, StoredFitObject, ThresholdDetectionService, ThresholdObservation, TrainingGoalConflictError, TrainingLengthGateError, TwinContextAssembler, TwinContextSummary, TwinRecalibrationError, TwinRecalibrationFailureError, TwinRecalibrationService, UnauthenticatedError, WorkoutAlreadyGeneratedError, WorkoutGenerationAgent, WorkoutGenerationContractError, WorkoutGenerationError, WorkoutLLMServiceUnavailableError, _BytesReader, _GoalInput, _PreferencesInput, _ProfileInput, estimate_max_hr_from_age, get_object_storage_client, get_step_physiological_intent, reset_object_storage_client
 
 - app/api/__init__.py
 - Imports: build_auth_service, build_onboarding_service, get_current_athlete_id, get_db, require_self
@@ -311,14 +306,7 @@ Public API:
 ### Dependency Changes
 
 requirements.txt
-Added:
-- scipy>=1.10.0
-
-Updated:
-- none
-
-Removed:
-- none
+No changes detected
 
 ### Service Wiring
 
@@ -409,6 +397,14 @@ SignalCleaningService
  ├── ObjectStorageClient
  └── RawSensorStreamRepository
 
+ThresholdDetectionService
+ ├── ActivityRepository
+ ├── AthletePhysiologyRepository
+ ├── ObjectStorageClient
+ ├── Optional[PlannedSessionRepository]
+ ├── PhysiologyMeasurementRepository
+ └── RawSensorStreamRepository
+
 TrainingLengthGateError
  └── none
 
@@ -495,10 +491,10 @@ Commits:
 - app/worker/app.py:281 signal_clean session.commit
 
 Flushes:
-- app/repositories/activity_repository.py:62 ActivityRepository.add self.session.flush
-- app/repositories/activity_repository.py:88 ActivityRepository.update_load_scores self.session.flush
-- app/repositories/activity_repository.py:109 ActivityRepository.update_calibration_eligibility self.session.flush
-- app/repositories/activity_repository.py:130 ActivityRepository.update_cleaning_version self.session.flush
+- app/repositories/activity_repository.py:63 ActivityRepository.add self.session.flush
+- app/repositories/activity_repository.py:89 ActivityRepository.update_load_scores self.session.flush
+- app/repositories/activity_repository.py:110 ActivityRepository.update_calibration_eligibility self.session.flush
+- app/repositories/activity_repository.py:131 ActivityRepository.update_cleaning_version self.session.flush
 - app/repositories/athlete_auth_repository.py:57 AthleteAuthRepository.add self.session.flush
 - app/repositories/athlete_auth_repository.py:64 AthleteAuthRepository.touch_last_login self.session.flush
 - app/repositories/athlete_fitness_repository.py:42 AthleteFitnessRepository.add self.session.flush
@@ -510,6 +506,7 @@ Flushes:
 - app/repositories/coaching_message_repository.py:43 CoachingMessageRepository.insert self.session.flush
 - app/repositories/generated_workout_repository.py:62 GeneratedWorkoutRepository.insert self.session.flush
 - app/repositories/generation_event_repository.py:38 GenerationEventRepository.insert self.session.flush
+- app/repositories/physiology_measurement_repository.py:47 PhysiologyMeasurementRepository.insert self.session.flush
 - app/repositories/raw_sensor_stream_repository.py:45 RawSensorStreamRepository.insert self.session.flush
 - app/repositories/refresh_token_repository.py:42 RefreshTokenRepository.add self.session.flush
 - app/repositories/system_event_outbox_repository.py:44 SystemEventOutboxRepository.add self.session.flush
@@ -553,6 +550,7 @@ AsyncSession imports:
 - app/repositories/coaching_message_repository.py
 - app/repositories/generated_workout_repository.py
 - app/repositories/generation_event_repository.py
+- app/repositories/physiology_measurement_repository.py
 - app/repositories/planned_session_repository.py
 - app/repositories/raw_sensor_stream_repository.py
 - app/repositories/refresh_token_repository.py
@@ -569,6 +567,7 @@ AsyncSession imports:
 - app/services/onboarding_service.py
 - app/services/plan_generation_service.py
 - app/services/signal_cleaning_service.py
+- app/services/threshold_detection_service.py
 - app/services/twin_recalibration_service.py
 
 Repository dependencies:
@@ -642,7 +641,7 @@ Repository dependencies:
 ### Execution Readiness
 
 Current Revision:
-84d65f756e09 (head)
+8413e6547a40 (head)
 
 Migration Pending:
 yes

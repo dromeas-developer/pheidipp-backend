@@ -457,7 +457,7 @@ class PlanGenerationService:
         )
         gap_pct = _compute_gap_percentage(
             current_estimate_min=current_estimate,
-            target_time_min=target_time_min,
+            target_time_min=target_time_minutes,
         )
         gap_class = _classify_gap(gap_pct)
         estimated_weeks = _estimate_weeks_to_target(

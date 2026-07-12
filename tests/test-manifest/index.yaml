@@ -1,5 +1,5 @@
 version: '1.0'
-last_reviewed_at: '2026-07-10T14:00:00Z'
+last_reviewed_at: '2026-07-11T22:30:00Z'
 selection:
   smoke:
   - tests/unit/test_first_message_agent.py
@@ -25,6 +25,13 @@ selection:
   - tests/integration/test_activity_ingestion_signal_clean_enqueue_integration.py
   - tests/integration/test_activity_repository_cleaning_version_integration.py
   - tests/behaviour/test_signal_cleaning_user_journey.py
+  - tests/unit/test_physiology_parameter_enum.py
+  - tests/unit/test_physiology_measurement_model.py
+  - tests/unit/test_physiology_measurement_repository.py
+  - tests/unit/test_threshold_detection_service.py
+  - tests/integration/test_physiology_measurement_repository_integration.py
+  - tests/integration/test_threshold_detection_service_integration.py
+  - tests/behaviour/test_threshold_detection_user_journey.py
   regression:
   - tests/unit/test_first_message_agent.py
   - tests/unit/test_context_budget_service.py
@@ -55,7 +62,10 @@ selection:
   - tests/integration/test_activity_ingestion_signal_clean_enqueue_integration.py
   - tests/integration/test_activity_repository_cleaning_version_integration.py
   - tests/behaviour/test_signal_cleaning_user_journey.py
-  release:
+  - tests/integration/test_physiology_measurement_repository_integration.py
+  - tests/integration/test_threshold_detection_service_integration.py
+  - tests/behaviour/test_threshold_detection_user_journey.py
+release:
   - tests/unit/test_first_message_agent.py
   - tests/unit/test_context_budget_service.py
   - tests/unit/test_twin_context_assembler.py
@@ -77,6 +87,9 @@ selection:
   - tests/integration/test_activity_ingestion_signal_clean_enqueue_integration.py
   - tests/integration/test_activity_repository_cleaning_version_integration.py
   - tests/behaviour/test_signal_cleaning_user_journey.py
+  - tests/integration/test_physiology_measurement_repository_integration.py
+  - tests/integration/test_threshold_detection_service_integration.py
+  - tests/behaviour/test_threshold_detection_user_journey.py
 coverage:
   routes:
     covered:
@@ -137,6 +150,17 @@ coverage:
     - Activities with source = manual_entry never get RawSensorStream
     - If the pipeline produces a stream shorter than 5 minutes of non-null HR data, RawSensorStream is not created
     - available_channels reflects what survived artifact removal (unit: >80% null → false tests; integration: persisted JSONB shape; behaviour Journeys E/F pending FIT fixture for end-to-end assertion)
+    - PhysiologyMeasurement is append-only at the repository layer — no update/delete methods
+    - activity_id ON DELETE SET NULL preserves the historical row when an Activity is deleted
+    - athlete_id ON DELETE CASCADE removes measurements when the Athlete is deleted
+    - Threshold detection only runs for calibration_eligible = true activities (end-to-end)
+    - Threshold detection only runs for sport_type = RUNNING (end-to-end)
+    - Missing RawSensorStream returns empty list (end-to-end)
+    - detect() does NOT write to PhysiologyMeasurement — that is Plan P2's responsibility
+    - Natural training analysis: ≥3 consistent easy runs (±5 bpm) produce LT1_HR observation with weight 0.5
+    - Natural training analysis: inconsistent easy runs (spread > 5 bpm) produce no observation
+    - Natural training analysis: fewer than 3 easy runs produce no observation
+    - Natural training analysis: measurement_date is the current activity's activity_date, not the historical run dates
     partial: []
     missing: []
 cross_phase_dependencies: {}

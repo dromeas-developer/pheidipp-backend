@@ -19,7 +19,7 @@ tools:
   read:       false   # → get_files
   grep:       false
   glob:       false
-  edit:       false   # this agent never modifies the master plan
+  edit:       true   # this agent never modifies the master plan
   bash:       false
   webfetch:   false
   skill:      false

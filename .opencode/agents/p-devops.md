@@ -1,5 +1,5 @@
 ---
-model: opencode/deepseek-v4-flash
+model: opencode/deepseek-v4-flash-free
 temperature: 0.1
 
 permission:
@@ -98,10 +98,24 @@ manually. The separation matters for Step 3 (test DB migration) vs Step 6
 is handled transparently by `get_postgres_url(sync=True)` in `app/core/config.py`
 and is already wired in `alembic/env.py`. Never touch this wiring.
 
-**`db-revision.sh` targets the production DB.** It uses whatever `DATABASE_URL`
-is active in the environment. The pending-changes check in Step 4 therefore
-verifies that the production schema matches the ORM models — this is correct
-and intentional.
+**Two `db-revision` scripts exist, targeting different databases.**
+`db-revision.sh` targets the production DB (`DATABASE_URL` / `pheidipp`).
+`db-revision-test.sh` targets the test DB (`TEST_DATABASE_URL` /
+`test_pheidipp`) — it loads `.env.test` and overrides `DATABASE_URL` the
+same way `db-upgrade-test.sh` does. Both accept `"check"` as the revision
+message to run in verification-only mode.
+
+**The pending-changes check in Step 4 uses `db-revision-test.sh`, not
+`db-revision.sh`.** At that point in the flow, only `test_pheidipp` has
+been migrated (Step 3) — `pheidipp` is not touched until Step 6. Running
+the check against prod at Step 4 would therefore always show a non-empty
+diff (prod is still on the old revision), which is a false positive, not
+a real drift finding. Checking against `test_pheidipp` — which was just
+upgraded to head in Step 3 — is the correct target: it verifies the
+coder's migration file actually captures every ORM model change, not just
+that `alembic upgrade head` ran without error. `db-revision.sh` (prod)
+remains available as a command but is not part of the standard execution
+steps below.
 
 **If the test DB is in a broken state** (failed mid-migration, schema
 corrupted, migration history diverged from prod) there is no
@@ -126,7 +140,8 @@ bash scripts/docker-down.sh               # stop all services
 bash scripts/docker-logs.sh               # inspect container logs on failure
 bash scripts/db-upgrade-test.sh           # migrate test_pheidipp (reads .env.test)
 bash scripts/db-upgrade.sh               # migrate pheidipp (reads .env / DATABASE_URL)
-bash scripts/db-revision.sh "<message>"  # autogenerate revision against prod DB
+bash scripts/db-revision.sh "<message>"       # autogenerate revision / check against prod DB
+bash scripts/db-revision-test.sh "<message>"  # autogenerate revision / check against test_pheidipp
 bash scripts/run-tests.sh [paths...]     # run pytest inside api container against test_pheidipp
 ```
 
@@ -149,9 +164,10 @@ Do not attempt to run `alembic`, `pytest`, or `python` directly.
 
 ## Check File Rule (NON-NEGOTIABLE)
 
-`db-revision.sh "check"` generates a file named `<hash>_check.py` in
-`alembic/versions/`. This is a schema-verification artefact — NOT an
-official revision. It must NEVER be applied to any database.
+`db-revision.sh "check"` and `db-revision-test.sh "check"` each generate a
+file named `<hash>_check.py` in `alembic/versions/`. This is a
+schema-verification artefact — NOT an official revision. It must NEVER be
+applied to any database, regardless of which script produced it.
 
 Before EVERY `db-upgrade.sh` or `db-upgrade-test.sh` call:
 1. Use `find_files` to search `alembic/versions/` for files matching `*_check.py`
@@ -317,19 +333,30 @@ full output, record in report, and STOP. Do not proceed to Step 4.
 
 ### 4. Pending Changes Check
 
-This step verifies the production DB's current schema matches the ORM models.
-`db-revision.sh` always targets the production `DATABASE_URL`.
+This step verifies the newly-migrated `test_pheidipp` schema matches the
+ORM models. It runs immediately after Step 3, against the same database
+Step 3 just upgraded to head — this catches migration files that ran
+cleanly but don't fully capture every model change (e.g. a column added
+to the model but missed in the migration's `upgrade()` body).
 
-Run `bash scripts/db-revision.sh "check"`.
+This step does NOT touch or check the production `pheidipp` database —
+that check does not exist at this point in the flow because prod has not
+been migrated yet (it is not touched until Step 6). Running this check
+against prod here would always report a non-empty diff regardless of
+whether this plan's migration is correct, since prod is still on the
+prior revision — that would be a false positive, not a real finding.
+
+Run `bash scripts/db-revision-test.sh "check"`.
 
 This generates a `*_check.py` file in `alembic/versions/`. Read it:
 
-- **Empty `upgrade()` body** → ORM models and applied migrations are in sync.
-  The check passed. Delete the file and proceed.
-- **Non-empty `upgrade()` body** → CRITICAL. The production schema is out of
-  sync with the ORM models. This means either the migration was not applied,
-  or a model was changed without a corresponding migration. Record the
-  unexpected operations in the report and STOP.
+- **Empty `upgrade()` body** → the test DB schema (post-Step-3 migration)
+  matches the ORM models. The check passed. Delete the file and proceed.
+- **Non-empty `upgrade()` body** → CRITICAL. The migration applied in
+  Step 3 does not fully capture the ORM model state — something the
+  coder's migration should have included is missing (or an unrelated
+  model change is not yet migrated). Record the unexpected operations in
+  the report and STOP.
 
 Delete the `*_check.py` file after inspecting it regardless of outcome.
 
@@ -522,7 +549,7 @@ implemented_state_available: <yes/no>
 | Migration drift reviewed | ✅ / ❌ | removed tables, if any |
 | TimescaleDB augmentation | ✅ / ❌ / N/A | not required for this plan |
 | Test DB upgrade clean | ✅ / ❌ | |
-| No pending model changes | ✅ / ❌ | |
+| No pending model changes (test DB) | ✅ / ❌ | via db-revision-test.sh |
 | Test suite | ✅ / ❌ | X passed, Y failed, Z skipped |
 | Manifest updated (executable + passed) | ✅ / ❌ | written by DevOps in Step 5 |
 | Prod DB upgrade clean | ✅ / ❌ | |

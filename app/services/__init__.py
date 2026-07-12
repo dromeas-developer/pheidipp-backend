@@ -124,6 +124,10 @@ from app.services.twin_context_assembler import (
     TwinContextAssembler,
     TwinContextSummary,
 )
+from app.services.threshold_detection_service import (
+    ThresholdDetectionService,
+    ThresholdObservation,
+)
 
 __all__ = [
     "ActivityIngestionError",
@@ -190,6 +194,8 @@ __all__ = [
     "SESSION_INTENT_MAP",
     "SessionDayAssignment",
     "StoredFitObject",
+    "ThresholdDetectionService",
+    "ThresholdObservation",
     "TrainingGoalConflictError",
     "TrainingLengthGateError",
     "TwinContextAssembler",

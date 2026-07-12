@@ -515,6 +515,31 @@ class MeasurementSource(str, Enum):
     LAB_TEST = "lab_test"
 
 
+class PhysiologyParameter(str, Enum):
+    """Closed ontology of physiological parameters tracked per athlete.
+
+    Each value identifies a single (parameter, signal) pair that
+    ``PhysiologyMeasurement`` rows can record. The signal dimension
+    (HR / power / pace) is encoded in the value name so the same
+    physiological threshold (e.g. LT1) can be observed in any of
+    three signals without ambiguity.
+
+    See docs/architecture/01-entities/athlete-physiology.md →
+    PhysiologyParameter.
+    """
+
+    LT1_HR = "lt1_hr"
+    LT1_POWER = "lt1_power"
+    LT1_PACE = "lt1_pace"
+    LT2_HR = "lt2_hr"
+    LT2_POWER = "lt2_power"
+    LT2_PACE = "lt2_pace"
+    CP = "cp"
+    VO2MAX_ML_KG_MIN = "vo2max_ml_kg_min"
+    VO2MAX_POWER = "vo2max_power"
+    MAX_HR = "max_hr"
+
+
 class SignalType(str, Enum):
     """Signal channel that a ``WorkoutTarget`` carries targets in.
 

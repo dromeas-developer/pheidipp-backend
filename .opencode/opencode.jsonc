@@ -10,10 +10,46 @@
 
   // Only show the providers and models you actually use.
   // Prevents OpenRouter/Mistral full catalog from flooding /models.
-  //"enabled_providers": [
-  //  "opencode",
-  //  "litellm-proxy",
-  //],
+  "enabled_providers": [
+    "cloudflare-workers-ai",
+    "cohere",
+    "nvidia",
+    "ollama-cloud",
+    "opencode",
+    "opencode-go",
+    "poolside",
+    "litellm-proxy"
+  ],
+
+  "provider": {
+    "nvidia": {
+      "name": "Nvidia Cloud",
+      "whitelist": [
+        "deepseek-ai/deepseek-v4-pro",
+        "deepseek-ai/deepseek-v4-flash",
+        "z-ai/glm-5.2",
+        "minimaxai/minimax-m3",
+        "qwen/qwen3.5-397b",
+        "stepfun-ai/step-3.7-flash"
+      ]
+    },
+    "litellm-proxy": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "LiteLLM Proxy",
+      "options": {
+        "baseURL": "http://localhost:4000/v1"
+      },
+      "models": {
+        "nvidia/deepseek-v4-pro":             { "name": "Deepseek v4-pro (nvidia cloud)" },
+        "nvidia/deepseek-v4-flash":           { "name": "Deepseek v4-flash (nvidia cloud)" },
+        "nvidia/glm-5.2":                     { "name": "GLM 5.2 (nvidia cloud)" },
+        "nvidia/kimi-k2.6":                   { "name": "kimi k2.6 (nvidia cloud)" },
+        "nvidia/minimax-m3":                  { "name": "Minimax m3 (nvidia cloud)" },
+        "nvidia/qwen3.5-397b":                { "name": "Qwen3.5-397b (nvidia cloud)"},
+        "routeway/step-3.7-flash":            { "name": "Step 3.7-flash (routeway cloud)" }
+      }
+    }
+  },
 
   // MCP server — semantic codebase search, symbol lookup, and architectural context.
   // PROJECT_PATH tells the server which directory to index.

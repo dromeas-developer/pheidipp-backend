@@ -87,7 +87,7 @@ class TestCompleteOnboardingEndpoint:
         assert response.status_code == 201, response.text
         body = response.json()
         # Identifiers returned.
-        assert body["athlete_id"] == aid
+        assert body["athlete_id"] == str(aid)
         assert body["onboarding_complete"] is True
         assert "twin_state_id" in body
         assert "training_goal_id" in body
@@ -344,7 +344,7 @@ class TestGetProfileEndpoint:
         )
         assert response.status_code == 200
         body = response.json()
-        assert body["athlete_id"] == aid
+        assert body["athlete_id"] == str(aid)
         assert body["date_of_birth"]
         # Per the architecture, personalisation model JSONBs are
         # excluded from the public view.
@@ -511,7 +511,7 @@ class TestGetPreferencesEndpoint:
         )
         assert response.status_code == 200
         body = response.json()
-        assert body["athlete_id"] == aid
+        assert body["athlete_id"] == str(aid)
         # Weekly schedule structured JSON round-tripped.
         assert "monday" in body["weekly_schedule"]
         assert body["weekly_schedule"]["monday"]["available"] is True
@@ -744,7 +744,7 @@ class TestGetTwinStateEndpoint:
         )
         assert response.status_code == 200
         body = response.json()
-        assert body["athlete_id"] == aid
+        assert body["athlete_id"] == str(aid)
         assert body["confidence_level"] == "low"
         assert body["trigger"] == "questionnaire"
         assert body["readiness_level"] == "green"
@@ -797,7 +797,7 @@ class TestGetTwinHistoryEndpoint:
         body = response.json()
         assert body["count"] == 1
         assert len(body["items"]) == 1
-        assert body["items"][0]["athlete_id"] == aid
+        assert body["items"][0]["athlete_id"] == str(aid)
 
     async def test_history_limit_query_parameter_respected(
         self, client: AsyncClient, onboarded_athlete: tuple[str, str]

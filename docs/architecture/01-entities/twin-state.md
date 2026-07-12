@@ -86,8 +86,8 @@ This separation ensures the **historical layer** (TwinState) and **operational l
 ### 1. Append-Only
 No `UPDATE` or `DELETE` at any layer. `TwinStateRepository` exposes only `insert`, `get_latest`, `get_by_activity`, and `get_history`.
 
-### 2. One TwinState Per Calibration Event
-Multiple TwinStates per day are possible (e.g., `activity_sync` followed by `wellness_update`), but only **one** TwinState per `activity_id`. See "Concurrency & Coordination" for deduplication logic.
+### 2. TwinState Per Activity — Deduplication Via Application Logic
+Multiple TwinStates per day are possible (e.g., `activity_sync` followed by `wellness_update`). For activity-linked triggers, the application-level `insert_if_not_exists` logic (see "Concurrency & Coordination") is the authoritative deduplication mechanism: a calibration TwinState may coexist with a prior activity_sync TwinState for the same `activity_id` (the calibration record supersedes the fitness-only record as history). Duplicate triggers of the same type are skipped. A DB-level unique index on `(athlete_id, activity_id)` is NOT used — it would prevent the calibration supersession scenario.
 
 ### 3. Frozen Context
 - `training_goal_id` is frozen at creation time — it records which goal was active when this snapshot was taken, even if the goal is later superseded.
@@ -108,9 +108,9 @@ function deriveConfidenceLevel(physiology: AthletePhysiology): TwinConfidenceLev
   return 'low';
 }
 
-// Example thresholds (finalize with data science):
-const CONFIDENCE_THRESHOLD_MEDIUM = 15.0;  // ~3 calibration sessions
-const CONFIDENCE_THRESHOLD_HIGH = 40.0;    // ~8-10 calibration sessions + consistency
+// Authoritative thresholds from 00-foundations/confidence-model.md:
+const CONFIDENCE_THRESHOLD_MEDIUM = 4.0;   // ~4 HR deflection sessions at weight 1.0
+const CONFIDENCE_THRESHOLD_HIGH = 8.0;     // ~8 HR deflection sessions, or fewer RR sessions
 ```
 
 ### 5. Confidence Field Usage

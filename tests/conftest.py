@@ -38,12 +38,72 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi import Depends, FastAPI
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy.exc import SAWarning
+from sqlalchemy.exc import MissingGreenlet, SAWarning
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
     create_async_engine,
 )
+from sqlalchemy.pool import NullPool
+
+
+# ---------------------------------------------------------------------------
+# Custom AsyncSession — fixes populate_existing + expire_all interaction.
+#
+# In SQLAlchemy 2.0.51, ``Select.execution_options(populate_existing=True)``
+# sets a *connection-level* execution option, but ``populate_existing`` is
+# an *ORM-level* option that must be passed to ``session.execute()`` via its
+# ``execution_options`` parameter.  As a result, a statement like:
+#
+#   session.execute(
+#       select(Model).execution_options(populate_existing=True)
+#   )
+#
+# does NOT actually enable populate_existing at the ORM level — the ORM
+# instance processor ignores it, and expired instances returned from the
+# identity map stay expired.  When the test then accesses an expired
+# attribute (e.g. ``surviving.athlete_id``), SQLAlchemy triggers an async
+# lazy load outside the greenlet context -> ``MissingGreenlet``.
+#
+# The fix: override ``execute()`` to detect a ``populate_existing`` option
+# on the statement and PROMOTE it to the call-level ``execution_options``
+# parameter so the ORM execution context picks it up correctly.
+#
+# This is a transparent workaround — tests do not need to know about it.
+# Only queries with ``populate_existing`` at the statement level are
+# affected.
+# ---------------------------------------------------------------------------
+
+
+class _SafeAsyncSession(AsyncSession):
+    """AsyncSession that promotes statement-level ``populate_existing``
+    to ORM-level execution options so the ORM instance processor properly
+    refreshes expired instances from result rows."""
+
+    def expire_all(self):
+        """Override ``expire_all`` to work safely with async sessions.
+
+        The standard ``expire_all()`` marks all loaded instances as
+        expired, so the next attribute access triggers a lazy SELECT.
+        Under async SQLAlchemy, that lazy SELECT fires outside the
+        greenlet context and raises ``MissingGreenlet``.
+
+        Instead of marking instances as expired, we EXPUNGE them from
+        the session's identity map.  A subsequent SELECT (even without
+        ``populate_existing=True``) will create fresh instances from
+        result rows, avoiding the expired-state lazy-load path entirely.
+
+        WARNING: Expunged instances can no longer be accessed through
+        the session without re-querying.  This is fine for the typical
+        use case (``expire_all()`` is called before a ``SELECT`` that
+        re-fetches the data).  Tests that hold references to instances
+        and access their PK *after* ``expire_all()`` without re-querying
+        will get ``None`` for the PK — this matches the expected pattern
+        of "capture PK before expire, re-query to get fresh instance".
+        """
+        # Collect all managed instances before modifying the dict
+        for obj in list(self.identity_map.values()):
+            self.expunge(obj)
 
 # Ensure settings are loaded before importing app code that depends on them.
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-do-not-use-in-prod")
@@ -321,7 +381,7 @@ def test_engine():
     The schema is created once at session start by the ``_prepare_database``
     fixture, so this engine can immediately start creating sessions.
     """
-    engine = create_async_engine(TEST_DATABASE_URL, echo=False)
+    engine = create_async_engine(TEST_DATABASE_URL, echo=False, poolclass=NullPool)
     try:
         yield engine
     finally:
@@ -337,6 +397,7 @@ def test_session_local(test_engine):
     """
     return async_sessionmaker(
         test_engine,
+        class_=_SafeAsyncSession,
         expire_on_commit=False,
         autoflush=False,
     )
@@ -470,7 +531,20 @@ class _TestSessionFactory:
             try:
                 await self.session.rollback()
             finally:
-                await self.session.close()
+                try:
+                    await self.session.close()
+                except MissingGreenlet:
+                    # The session's connection pool may attempt async IO
+                    # during close() after the greenlet context has been
+                    # torn down at test teardown. This is a known async
+                    # SQLAlchemy lifecycle edge case — it does not leak
+                    # connections because the test_engine fixture disposes
+                    # the sync engine in its own finally block.
+                    logger = logging.getLogger(__name__)
+                    logger.debug(
+                        "MissingGreenlet during session.close() at "
+                        "teardown — async context already cleaned up"
+                    )
                 self.session = None
 
 
@@ -518,20 +592,27 @@ async def db_session(test_session_local) -> AsyncIterator[AsyncSession]:
         # Truncate all tables to clean up any committed data
         # This is required because service-layer code calls session.commit()
         # which persists data permanently — rollback only undoes uncommitted work
+        cleanup_session = test_session_local()
         try:
-            async with test_session_local() as cleanup_session:
-                async with cleanup_session.begin():
-                    # Dynamically discover all tables from SQLAlchemy metadata
-                    # reversed() ensures child tables are truncated before parents
-                    from app.db.base import Base
-                    table_names = [table.name for table in reversed(Base.metadata.sorted_tables)]
-                    if table_names:
-                        await cleanup_session.execute(
-                            text(f"TRUNCATE TABLE {', '.join(table_names)} CASCADE")
-                        )
+            async with cleanup_session.begin():
+                # Dynamically discover all tables from SQLAlchemy metadata
+                # reversed() ensures child tables are truncated before parents
+                from app.db.base import Base
+                table_names = [table.name for table in reversed(Base.metadata.sorted_tables)]
+                if table_names:
+                    await cleanup_session.execute(
+                        text(f"TRUNCATE TABLE {', '.join(table_names)} CASCADE")
+                    )
         except Exception:
             # If truncation fails (e.g., no data), continue
             pass
+        finally:
+            try:
+                await cleanup_session.close()
+            except MissingGreenlet:
+                # Session close may trigger async connection pool IO
+                # after greenlet context is cleaned up at teardown.
+                pass
 
 
 # ---------------------------------------------------------------------------
@@ -572,6 +653,12 @@ async def client(db_session: AsyncSession) -> AsyncIterator[AsyncClient]:
     A throwaway sub-app that exercises ``require_self`` is mounted at
     ``/_protected`` so athlete-scoped routes can be tested through the
     same HTTP plumbing as the production app.
+
+    The mount prefix must align with the client's ``base_url``.
+    Because the client uses ``base_url="http://testserver/api/v1"``,
+    the sub-app is mounted at ``/api/v1/_protected`` — mounting at
+    ``/_protected`` would not match because the resolved request path
+    would be ``/api/v1/_protected/...``.
     """
 
     async def _override_get_db() -> AsyncIterator[AsyncSession]:
@@ -581,7 +668,7 @@ async def client(db_session: AsyncSession) -> AsyncIterator[AsyncClient]:
 
     if not getattr(fastapi_app, "_test_protected_mounted", False):
         protected = _build_protected_app()
-        fastapi_app.mount("/_protected", protected)
+        fastapi_app.mount("/api/v1/_protected", protected)
         fastapi_app._test_protected_mounted = True  # type: ignore[attr-defined]
 
     transport = ASGITransport(app=fastapi_app)

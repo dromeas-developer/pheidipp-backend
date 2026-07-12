@@ -35,6 +35,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.activity import Activity
+from app.models.enums import SportType
 
 
 class ActivityRepository:
@@ -210,6 +211,45 @@ class ActivityRepository:
             )
         )
         return result.scalar_one_or_none()
+
+    async def get_recent_activities_for_athlete(
+        self,
+        athlete_id: uuid.UUID,
+        sport_type: SportType,
+        limit: int = 20,
+    ) -> List[Activity]:
+        """Return recent calibration-eligible activities for one sport.
+
+        Filters on ``sport_type`` and ``calibration_eligible = true``,
+        ordered newest first. Used by the natural training analysis
+        algorithm (LT1 passive inference method 3) to query the
+        recent history of easy / recovery runs.
+
+        The natural training analysis then filters further by the
+        session's ``PlannedSession.session_type`` (easy_run /
+        recovery_run) once the cleaned stream is downloaded and the
+        mean HR is computed. This method returns the candidate
+        activities only — the session layer applies the
+        session_type and HR-pattern filters.
+
+        Backed by the
+        ``ix_activities_athlete_calibration_eligible`` index, which
+        covers ``(athlete_id, activity_date) WHERE calibration_eligible
+        = true``. The ``sport_type`` predicate is applied as a
+        post-index filter.
+        """
+        stmt = (
+            select(Activity)
+            .where(
+                Activity.athlete_id == athlete_id,
+                Activity.sport_type == sport_type,
+                Activity.calibration_eligible.is_(True),
+            )
+            .order_by(Activity.start_time.desc())
+            .limit(limit)
+        )
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
 
     async def get_recent_structural_load(
         self,

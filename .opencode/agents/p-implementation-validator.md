@@ -51,6 +51,20 @@ The three layers are:
    and events explicitly stated in the plan?
 3. **Deviation detection** — did the coder introduce anything outside the plan?
 
+You also classify every CRITICAL and MAJOR finding along a second,
+independent dimension: **Resolution Path** — whether correcting it is a
+plain implementation fix `p-coder` can make directly, or whether it
+requires an architecture decision only `p-architect` can make. Severity
+tells you how significant a finding is; Resolution Path tells you who
+acts on it. A CRITICAL finding is not automatically an architect
+problem — a completely missing function, or a requirement implemented
+incorrectly against an already-clear plan statement, is exactly the kind
+of thing `p-coder` should fix directly regardless of how severe it looks.
+See Step 7 for the full test. This classification is not a fix
+suggestion — you are still not designing the fix, only saying who is
+positioned to make it without inventing anything the plan doesn't
+already state.
+
 Architecture is not re-derived during validation. All contracts, invariants,
 and event requirements must already be present in the implementation plan.
 If a contract is missing from the plan, that is a plan gap — report it and
@@ -231,9 +245,21 @@ For each deviation found, classify it:
 - **CRITICAL** — architectural violation (changed invariant semantics,
   wrong ownership boundary, entity logic in wrong service)
 
+A Layer 3 finding's own CRITICAL/DEVIATION/Acceptable label is a
+different axis from the Resolution Path test in Step 7 — it is about
+whether the coder was authorized to add what they added, not about
+whether an already-specified requirement was implemented correctly. Do
+not run the Resolution Path test on Layer 3 findings. CRITICAL and
+DEVIATION here always route to `p-architect`; only Acceptable needs no
+routing at all.
+
 ### Step 6 — Stack-Truth Conformance
 
-Check three categories independently.
+Check three categories independently. All three feed the same Step 7
+classification — a MAJOR (Runtime Rules) or CRITICAL (Architecture
+Rules) finding here still goes through the Resolution Path test before
+routing; do not assume Architecture Rules violations are automatically
+`p-architect` just because the category name says "Architecture."
 
 **Runtime Rules — violations are MAJOR:**
 - All DB access uses `AsyncSession` — no sync `Session`
@@ -261,7 +287,15 @@ Check three categories independently.
 
 ### Step 7 — Classify All Findings
 
-**CRITICAL** — architecture broken; requires architect review before any fix:
+Findings are classified along two independent dimensions: **Severity**
+(how significant the deviation is) and **Resolution Path** (who can act
+on it without an architecture decision). Severity alone no longer
+determines routing — apply the Resolution Path test below to every
+CRITICAL and MAJOR finding before deciding where it goes.
+
+**Severity:**
+
+CRITICAL — architecture broken:
 - Architecture invariant violated
 - Wrong ownership boundary
 - Layer skipping or reversal
@@ -269,7 +303,7 @@ Check three categories independently.
 - Event produced with wrong payload or wrong ordering
 - Silent deviation that constitutes an architectural decision
 
-**MAJOR** — behaviour deviates; requires architect acknowledgement or coder fix:
+MAJOR — behaviour deviates:
 - Transaction not atomic where plan requires it
 - Event ordering assumption violated
 - Endpoint contract mismatch (wrong status code, wrong response shape)
@@ -277,7 +311,8 @@ Check three categories independently.
 - Plan gap (contract missing from the plan that should be there)
 - Async rule violated
 
-**MINOR** — implementation hygiene; coder can fix directly:
+MINOR — implementation hygiene; always routes to `p-coder` directly, no
+Resolution Path assessment needed:
 - Missing `__init__.py` export
 - Missing type hint
 - Wrong Pydantic method
@@ -285,9 +320,67 @@ Check three categories independently.
 - `exclude_unset` missing on PATCH
 - Naming inconsistency with plan
 
-**DEVIATION** — requires architect acknowledgement; may or may not need ADR:
-- Coder introduced something not in plan that requires a decision
-- Acceptable deviations are noted but do not block routing
+DEVIATION — requires architect acknowledgement; may or may not need ADR.
+Always routes to `p-architect` — see Step 5 above. This is a judgement
+about whether unauthorized scope should be accepted, not a code-defect
+question, so the Resolution Path test below does not apply to Layer 3
+findings.
+
+**Resolution Path — required for every CRITICAL and MAJOR finding:**
+
+Ask the same question `p-coder` asks itself under its own "No Silent
+Deviations" rule — the two prompts share this exact test on purpose, so
+nothing you route to `p-coder` should ever ask it to do what it is
+separately instructed to refuse. Would correcting this finding require
+any of the following?
+
+- a new event or modified event payload contract
+- a new ownership boundary or responsibility not already specified in the plan
+- a schema redesign not specified in the plan
+- an invariant change
+- a reinterpretation of an architecture contract
+- any change to cross-subsystem dependencies
+
+**No to all six → `Resolution Path: Implementation Fix`, routes to
+`p-coder`.** This covers a completely missing function, an incomplete or
+incorrect implementation of an already-specified behaviour, logic
+sitting in the wrong layer when the plan already states the correct
+layer (the fix is relocating code, not redesigning ownership), a wrong
+status code, an unenforced invariant the plan already states clearly, or
+an event payload missing fields the plan already lists.
+
+**Yes to any → `Resolution Path: Architecture Change Required`, routes
+to `p-architect`.** Every MAJOR Plan Gap finding is `Architecture Change
+Required` by definition — if a contract is missing from the plan, the
+plan must be updated before anyone can correctly implement or fix
+against it; asking `p-coder` to resolve a Plan Gap means asking it to
+invent a contract, which is exactly the "reinterpretation of an
+architecture contract" case. The same applies to a "wrong ownership
+boundary" finding where the plan itself does not clearly specify which
+component should own the logic — that is a Plan Gap in a different
+guise, not a relocation job.
+
+If you are not confident which side of this test a finding falls on,
+route it to `p-architect`. An unnecessary architect review costs less
+than asking `p-coder` to make an architecture decision it is separately
+instructed to refuse — `p-coder` will correctly stop and bounce the
+finding back if you get this wrong (see its own "No Silent Deviations"
+rule), but that round-trip is exactly the friction this test exists to
+avoid.
+
+**Illustrative examples:**
+
+| Finding | Severity | Resolution Path | Route |
+|---|---|---|---|
+| A required file from the plan's CREATE scope was never created | CRITICAL | Implementation Fix — coder has not finished this step; only reclassify if you have specific evidence the omission was deliberate (see Layer 3) | p-coder |
+| A stated invariant ("hashed_password never returned") is violated because the field is present in a response | CRITICAL | Implementation Fix | p-coder |
+| An endpoint returns 404 where the plan explicitly states 403 | CRITICAL | Implementation Fix | p-coder |
+| Business logic sits in the API layer; the plan already names the service that should own it | CRITICAL | Implementation Fix — relocate the code | p-coder |
+| Business logic sits in a service, and the plan does not clearly say which service should own it | CRITICAL | Architecture Change Required | p-architect |
+| An event contract in the plan lists 5 required payload fields; the code sets 3 | MAJOR | Implementation Fix | p-coder |
+| The plan requires atomicity for an operation the code splits across two transactions | MAJOR | Implementation Fix | p-coder |
+| The plan has no invariant at all for a behaviour the code needs to satisfy | MAJOR (Plan Gap) | Architecture Change Required | p-architect |
+| A deviation adds a new persistence entity outside the plan's scope | DEVIATION | not applicable — Layer 3 always routes to p-architect | p-architect |
 
 ---
 
@@ -306,45 +399,45 @@ Plan: docs/implementation/<path-to-plan>.md
 
 ## Layer 1: Plan Conformance
 
-| Step | Description | Severity | Finding |
-|------|-------------|----------|---------|
-| 1 | Persistence models created | ✅ | |
-| 5 | Registration atomicity | MAJOR | Event emitted before transaction commit in register() |
-| 8 | require_self 403 vs 404 | CRITICAL | Returns 404 on athlete mismatch |
+| Step | Description | Severity | Route | Finding |
+|------|-------------|----------|-------|---------|
+| 1 | Persistence models created | ✅ | | |
+| 5 | Registration atomicity | MAJOR | p-coder | Event emitted before transaction commit in register() |
+| 8 | require_self 403 vs 404 | CRITICAL | p-coder | Returns 404 on athlete mismatch |
 
 ---
 
 ## Layer 2: Contract Conformance
 
-| Contract | Check | Severity | Finding |
-|----------|-------|----------|---------|
-| Invariant: hashed_password never returned | ✅ | |
-| Invariant: refresh rotation atomic | MAJOR | auth_service.py: insert and revoke in separate transactions |
-| Event: athlete_registered after commit | ✅ | |
-| Event: athlete_logged_in token_type field | MINOR | Field present but typed as str not Literal |
-| PLAN GAP: no invariant for ip_address anonymisation | MAJOR | Plan omits this invariant from athlete-auth.md |
+| Contract | Check | Severity | Route | Finding |
+|----------|-------|----------|-------|---------|
+| Invariant: hashed_password never returned | ✅ | | | |
+| Invariant: refresh rotation atomic | MAJOR | p-coder | auth_service.py: insert and revoke in separate transactions |
+| Event: athlete_registered after commit | ✅ | | | |
+| Event: athlete_logged_in token_type field | MINOR | p-coder | Field present but typed as str not Literal |
+| PLAN GAP: no invariant for ip_address anonymisation | MAJOR | p-architect | Plan omits this invariant from athlete-auth.md |
 
 ---
 
 ## Layer 3: Deviations
 
-| Item | What Was Added | Classification | Action |
-|------|---------------|----------------|--------|
-| app/models/event_log.py | New EventLog persistence model | DEVIATION | Architect review — new entity outside plan scope |
-| requirements.txt: bcrypt | Dependency added | Acceptable | Routine, no action needed |
+| Item | What Was Added | Classification | Route | Action |
+|------|---------------|----------------|-------|--------|
+| app/models/event_log.py | New EventLog persistence model | DEVIATION | p-architect | Architect review — new entity outside plan scope |
+| requirements.txt: bcrypt | Dependency added | Acceptable | — | Routine, no action needed |
 
 ---
 
 ## Stack-Truth
 
 ### CRITICAL
-- <finding>: <file> — <description>
+- <finding>: <file> — <description> — Route: p-coder | p-architect
 
 ### MAJOR
-- <finding>: <file> — <description>
+- <finding>: <file> — <description> — Route: p-coder | p-architect
 
 ### MINOR
-- <finding>: <file> — <description>
+- <finding>: <file> — <description> — Route: p-coder
 
 ---
 
@@ -367,14 +460,27 @@ dimensions are yes.
 
 ---
 
-## Routing
+## Routing Summary
+
+*Every finding with an action attached to it appears exactly once below,
+grouped by owner. A report can — and often will — route some findings to
+`p-coder` and others to `p-architect` in the same run; that is expected,
+not a sign of an inconsistent report.*
+
+| Owner | Findings |
+|---|---|
+| p-coder | Layer 1 Step 5, Layer 1 Step 8, Layer 2 (refresh rotation atomic), Layer 2 (token_type field), Stack-Truth MINOR (…) |
+| p-architect | Layer 2 (PLAN GAP: ip_address anonymisation), Layer 3 (event_log.py) |
+| p-devops | — |
+
+## Routing — How To Read The Summary Above
 
 | Finding | Route To |
 |---------|----------|
-| CRITICAL (any) | p-architect + this report |
-| MAJOR (behaviour) | p-architect + this report |
-| MAJOR (plan gap) | p-architect + this report — plan needs updating |
-| DEVIATION | p-architect + this report — architect acknowledges or requests ADR |
+| CRITICAL / MAJOR — Resolution Path: Implementation Fix | p-coder + this report |
+| CRITICAL / MAJOR — Resolution Path: Architecture Change Required | p-architect + this report |
+| MAJOR (plan gap) | p-architect + this report — plan needs updating; always Architecture Change Required, see Step 7 |
+| DEVIATION / Layer 3 CRITICAL | p-architect + this report — architect acknowledges or requests ADR |
 | MINOR (hygiene) | p-coder + this report |
 | Migration incomplete | p-devops + this report |
 | No findings | p-devops |

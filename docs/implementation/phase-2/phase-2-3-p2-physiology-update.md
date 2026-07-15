@@ -68,6 +68,12 @@ can create `TwinState` records with correct `metric_confidence`.
 - `00-foundations/event-catalogue.md` → `physiology_updated` — PRODUCES
 - `02-computations/threshold-detection.md` — DEPENDS ON (Plan P1
   `ThresholdObservation` data contract)
+- `docs/adr/011-confidence-monotonicity-ratchet-location.md` — DECISION
+  (the per-metric confidence monotonicity ratchet is NOT enforced in this
+  plan — it is enforced in P3's `TwinRecalibrationService`. This plan outputs
+  the raw computed `metric_confidence` from current `prior_weight`; P3
+  applies `max(stored_level, computed_level)` per metric. Read before
+  implementing Step 8.)
 
 ## Invariants
 - "One `AthletePhysiology` record per athlete. **Mutable current-state
@@ -206,10 +212,15 @@ can create `TwinState` records with correct `metric_confidence`.
    Return the per-metric confidence dict in the `PhysiologyUpdateResult`.
    Also detect whether any metric transitioned (was LOW and is now MEDIUM,
    or was MEDIUM and is now HIGH) — this is used by Plan P3's
-   `TwinRecalibrationService` to fire `twin_confidence_upgraded`. Confidence
-   is monotonic — it never decreases. If prior_weight drops below a
-   threshold due to decay, the confidence level stays at its current level
-   (the decay affects recommendation strength, not the confidence enum).
+   `TwinRecalibrationService` to fire `twin_confidence_upgraded`. This
+   service computes the raw confidence level from current `prior_weight` —
+   it does NOT enforce the monotonicity ratchet. The ratchet
+   (`max(stored_level, computed_level)` per metric) is enforced in P3's
+   `TwinRecalibrationService`, which reads the previous TwinState and keeps
+   the higher level. See ADR-011. P2's `metric_confidence` output CAN be
+   lower than the previous TwinState's stored level after a long gap — this
+   is expected and correct; P3 applies the ratchet before writing the new
+   TwinState.
 
 9. [OWNER: Coder] Implement idempotency for duplicate observations. Before
    applying the Bayesian update, check if a `PhysiologyMeasurement` already
@@ -412,14 +423,22 @@ _compute_metric_confidence(physiology):
   `evidence-mapping.md`, `threshold-detection.md`, and the sub-phase
   document. Use 4.0/8.0 — the 15.0/40.0 values are a stale example that was
   never updated.
-- **Confidence is monotonic**: the `prior_weight` decays over time (42-day
-  half-life), which means it can drop below a threshold. However, the
-  confidence LEVEL (LOW/MEDIUM/HIGH) never decreases — it ratchets upward
-  only. If `prior_weight` drops below 4.0 due to decay, a MEDIUM-confidence
-  metric stays MEDIUM. The decay affects recommendation strength (wider
-  ranges, more conservative coaching), not the confidence enum. Store the
-  highest confidence level ever achieved per metric and use `max(stored_level,
-  computed_level)` when deriving the current level.
+- **Confidence is monotonic — but the ratchet is enforced in P3, not P2**:
+  the `prior_weight` decays over time (42-day half-life), which means it can
+  drop below a threshold. The confidence LEVEL (LOW/MEDIUM/HIGH) never
+  decreases — it ratchets upward only. If `prior_weight` drops below 4.0 due
+  to decay, a MEDIUM-confidence metric stays MEDIUM. The decay affects
+  recommendation strength (wider ranges, more conservative coaching), not the
+  confidence enum. **However, this service (P2) does NOT enforce the ratchet.**
+  P2 computes `metric_confidence` purely from current `prior_weight` — this
+  is the "computed level" and it CAN be lower than the previous TwinState's
+  stored level after a long gap. The monotonicity ratchet
+  (`max(stored_level, computed_level)` per metric) is enforced in P3's
+  `TwinRecalibrationService.recalibrate_for_calibration`, which reads the
+  previous TwinState and applies the ratchet before writing the new TwinState.
+  See ADR-011 (`docs/adr/011-confidence-monotonicity-ratchet-location.md`).
+  P2 must NOT add a `TwinStateRepository` dependency to try to enforce the
+  ratchet — that crosses an ownership boundary.
 - **`physiology_updated` event fires only when posterior shifts > 1 unit**:
   the threshold is > 1 bpm for HR parameters and > 1 watt for CP. The
   `PhysiologyMeasurement` record is always written regardless — it is the
@@ -506,9 +525,13 @@ Batch 3 assumes Batch 2 is complete. Batch 3 complete when:
   `dominant_sources`, `prior_weights`)
 - `physiology_updated` does NOT fire when no parameters shifted
 - Confidence transition detection correctly identifies LOW→MEDIUM (at 4.0)
-  and MEDIUM→HIGH (at 8.0) transitions
-- Confidence is monotonic — a metric that reached MEDIUM stays MEDIUM even
-  if prior_weight decays below 4.0
+  and MEDIUM→HIGH (at 8.0) transitions within a single `apply_observations`
+  call
+- P2 computes `metric_confidence` from current `prior_weight` only — it does
+  NOT enforce the monotonicity ratchet (that is P3's responsibility per
+  ADR-011). P2's output CAN be lower than the previous TwinState's level
+  after a long gap; P3 applies `max(stored, computed)` before writing the
+  new TwinState
 - Duplicate observations (same parameter, value, date, source, activity_id)
   write the measurement but do NOT shift the posterior or fire the event
 - `PhysiologyUpdateService` and `PhysiologyUpdateResult` are registered in

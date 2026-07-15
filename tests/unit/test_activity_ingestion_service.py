@@ -964,6 +964,32 @@ class TestSignalFlagsPopulation:
 # ===========================================================================
 
 
+class TestComputeQualityFlagsSensorMalfunction:
+    """Regression coverage for optional HR/power records in quality flags."""
+
+    def _make_flags(self, parsed: ParsedFitData) -> dict:
+        """Helper: call _compute_quality_flags directly on a ParsedFitData."""
+        service = ActivityIngestionService(session=AsyncMock())
+        return service._compute_quality_flags(parsed)
+
+    def test_ignores_none_hr_and_power_samples_when_flagging_sensor_malfunction(
+        self,
+    ) -> None:
+        """Optional samples should not raise or poison the anomaly check."""
+        parsed = ParsedFitData(
+            start_time=datetime(2026, 6, 15, 8, 0, tzinfo=timezone.utc),
+            duration_seconds=3600,
+            hr_records=[None, 240.0],
+            power_records=[None, 2500.0],
+            has_hr=True,
+            has_power=True,
+        )
+
+        flags = self._make_flags(parsed)
+
+        assert flags["sensor_malfunction"] is True
+
+
 class TestComputeQualityFlagsGpsLoss:
     """Phase-2.1-P2: gps_loss uses continuous-gap detection (>30s threshold).
 

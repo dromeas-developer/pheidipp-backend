@@ -8,9 +8,10 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING
 
+from app.models.activity import Activity
 from app.models.athlete import Athlete
 from app.models.athlete_auth import AthleteAuth
-from app.models.enums import AuthProvider
+from app.models.enums import ActivitySource, AuthProvider, SportType
 
 if TYPE_CHECKING:
     from app.models.refresh_token import RefreshToken
@@ -42,6 +43,61 @@ async def make_auth(
     db_session.add(auth)
     await db_session.flush()
     return auth
+
+
+async def make_activity(
+    db_session,
+    *,
+    athlete_id: uuid.UUID,
+    activity_date=None,
+    sport_type: SportType = SportType.RUNNING,
+    calibration_eligible: bool = True,
+    has_hr: bool = True,
+    has_rr_intervals: bool = False,
+    has_power: bool = False,
+) -> Activity:
+    """Create and flush an Activity row with sensible defaults.
+
+    Used by integration tests that need a real Activity row to
+    satisfy the ``physiology_measurements.activity_id`` foreign key
+    (the column is nullable, but a non-null value must reference
+    an existing ``activities.id``). The minimum field set the
+    calibration-eligible / sport-type gates need is set; tests
+    that exercise other fields can pass them through.
+    """
+    from datetime import date as _date
+
+    if activity_date is None:
+        activity_date = _date.today()
+    activity = Activity(
+        athlete_id=athlete_id,
+        source=ActivitySource.MANUAL_UPLOAD,
+        external_id=None,
+        activity_date=activity_date,
+        start_time=datetime(
+            activity_date.year,
+            activity_date.month,
+            activity_date.day,
+            8,
+            0,
+            tzinfo=timezone.utc,
+        ),
+        duration_seconds=600,
+        aerobic_load=85.0,
+        has_hr=has_hr,
+        has_rr_intervals=has_rr_intervals,
+        has_power=has_power,
+        has_gps=True,
+        sport_type=sport_type,
+        calibration_eligible=calibration_eligible,
+        quality_flags={},
+        fit_file_key="fit-files/test/uploaded.fit",
+        ingestion_pipeline_version="v1-simple-fit",
+        cleaning_pipeline_version="v1-signal-cleaning",
+    )
+    db_session.add(activity)
+    await db_session.flush()
+    return activity
 
 
 async def make_refresh_token(

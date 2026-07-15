@@ -87,6 +87,11 @@ from app.services.onboarding_service import (
     _PreferencesInput,
     _ProfileInput,
 )
+from app.services.physiology_update_service import (
+    MissingAthletePhysiologyError,
+    PhysiologyUpdateResult,
+    PhysiologyUpdateService,
+)
 from app.services.plan_generation_errors import (
     PlanGenerationError,
     TrainingLengthGateError,
@@ -165,6 +170,7 @@ __all__ = [
     "LoadComputationService",
     "LoadScores",
     "MissingAthleteFitnessError",
+    "MissingAthletePhysiologyError",
     "MissingCriticalPowerError",
     "MissingHeartRateError",
     "MissingTrainingGoalError",
@@ -182,6 +188,8 @@ __all__ = [
     "OnboardingStatus",
     "OutboxEvent",
     "ParsedFitData",
+    "PhysiologyUpdateResult",
+    "PhysiologyUpdateService",
     "PlanGenerationError",
     "PlanGenerationResult",
     "PlanGenerationService",

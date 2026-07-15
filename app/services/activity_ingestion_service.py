@@ -880,12 +880,14 @@ class ActivityIngestionService:
         # Already filtered in parsing, so flag if values are extreme
         sensor_malfunction = False
         if parsed.hr_records:
-            # Check for sustained HR > 220 (likely malfunction)
-            if any(hr > 220 or hr < 30 for hr in parsed.hr_records):
+            # Check for sustained HR > 220 or < 30 (likely malfunction).
+            # `ParsedFitData` preserves raw optional samples, so ignore None.
+            if any(hr is not None and (hr > 220 or hr < 30) for hr in parsed.hr_records):
                 sensor_malfunction = True
         if parsed.power_records:
-            # Check for power > 2000W (impossible for running)
-            if any(p > 2000 for p in parsed.power_records):
+            # Check for power > 2000W (impossible for running).
+            # `ParsedFitData` preserves raw optional samples, so ignore None.
+            if any(p is not None and p > 2000 for p in parsed.power_records):
                 sensor_malfunction = True
         quality_flags["sensor_malfunction"] = sensor_malfunction
         

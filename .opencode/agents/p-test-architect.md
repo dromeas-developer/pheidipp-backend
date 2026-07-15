@@ -18,7 +18,7 @@ permission:
   grep:       deny
   glob:       deny
   edit:       allow
-  writee:     allow
+  write:      allow
   bash:       allow
   webfetch:   deny
   todowrite:  allow
@@ -127,19 +127,19 @@ The call shape, every time, one call per group:
 Tool: task
 Input:
 {
-  "subagent": "p-code-explorer",
+  "subagent_type": "p-code-explorer",
   "prompt": "Mode: Test Architect\n\nGroup: <test_type> — <file_scope>\n\nCapabilities:\n- <capability name>: <one line>\n\nCanonical Fixtures (from tests/MOCKING_CONTRACT.md):\n<paste the table>"
 }
 ```
 
-> The exact field names above (`subagent`, `prompt`) are a placeholder for
-> your real Task tool schema — confirm and correct them if your
-> orchestrator uses different parameter names. What must not change is
-> the pattern itself: one explicit, visible tool call per group, with
-> that group's `test_type`, `file_scope`, capability names, and the
-> fixtures table in the prompt — shown the same concrete way as every
-> other tool call in this document, not described in prose and left for
-> you to infer the mechanics of.
+> `subagent_type` and `prompt` are the confirmed field names — verified
+> from an actual successful invocation, not a guess. Do not paste the
+> full Canonical Fixtures table into every group's prompt within the
+> same stage — include it in full on the first call of a stage, then
+> for subsequent groups in that same stage write "Canonical Fixtures:
+> same as previous call this stage" and reference it by name. The table
+> doesn't change within a stage; repeating it verbatim across three or
+> four group calls is pure duplication.
 
 **The only files you fetch directly, ever, at any step, are:** the plan,
 the manifest (index + sub-phase file), `tests/README.md`,
@@ -178,32 +178,6 @@ stay yours, fetched and edited directly, same as always.
   every generated test must conform to it (see Fixture & Mocking Contract
   below)
 * `docs/testing/<plan-id>_test_pack.md` — human-readable test pack per plan
-
----
-
-## ⚠️ TEMPORARY — One-Time Contract Backfill
-
-**Delete this entire section, unedited, the first time you confirm
-`tests/MOCKING_CONTRACT.md` exists in the repository.** Nothing else in
-this prompt depends on this section being present — it is a self-contained
-bridge for a project that already has a manifest and a `tests/README.md`
-but was created before `tests/MOCKING_CONTRACT.md` existed. The normal
-Bootstrap path above only creates the contract when `index.yaml` itself is
-missing, which will not happen again for this project — this section
-covers that gap once, then becomes dead weight.
-
-Run this check first, before Step 1, on every execution, regardless of
-Operating Mode:
-
-Use `find_files` to check whether `tests/MOCKING_CONTRACT.md` exists.
-
-* **If it exists:** skip the rest of this section and proceed to Step 1.
-* **If it does not exist:** create it now with the skeleton described in
-  Fixture & Mocking Contract below (Layer Boundaries, Canonical Fixtures,
-  Known Anti-Patterns). Populate Known Anti-Patterns from the existing
-  dated entries in `tests/README.md` — this is a backfill, not a fresh
-  start, so it should not launch empty when there is already lesson
-  history to seed it from. Then proceed to Step 1 as normal.
 
 ---
 
@@ -355,6 +329,20 @@ yet — extracting everything that needs testing:
 * Invariants (from the plan's Invariants section)
 * Acceptance criteria (from the plan's Testing Requirements section)
 
+**If the plan doesn't state a detail, the inventory doesn't contain it.**
+Do not open the implementation to fill the gap — not "just to check," not
+to make a capability's description more precise, not to pre-derive an
+exact formula or error condition for use later at Step 6. A capability
+entry at this step is a name, a one-line description of what it verifies,
+a `test_type`, and a `file_scope` — nothing that required reading code to
+write. If you find yourself wanting to open an `app/` file to answer a
+question at this step, that question belongs to `p-code-explorer` at
+Step 6, not to you here. This is the same rule as Implementation
+Resolution above; Step 3 is where it's most tempting to break, because
+"just one look to be accurate" feels harmless — it is not: it is the
+exact behaviour that produced four separate re-reads of the same file
+with advancing line offsets in a session that prompted this rule.
+
 Use `search_invariants` to find invariants for the primary entities in the
 plan. Use `get_event_context` to confirm event payload requirements.
 These two tools exist specifically to ensure invariant tests and event
@@ -488,7 +476,7 @@ anything — for example:
 Tool: task
 Input:
 {
-  "subagent": "p-code-explorer",
+  "subagent_type": "p-code-explorer",
   "prompt": "Mode: Test Architect\n\nGroup: unit — app/services/threshold_detection_service.py\n\nCapabilities:\n- hr_deflection_detects_lt1_lt2: HR deflection algorithm, ≥3 intensity steps, R² ≥ 0.80\n- rr_inflection_requires_min_duration: RR inflection needs ≥8 min per intensity level\n\nCanonical Fixtures (from tests/MOCKING_CONTRACT.md):\n<paste the table>"
 }
 ```
@@ -504,6 +492,20 @@ earlier, before you start writing instead of mid-write. Correct
 `test_type` in the manifest at Step 5b when this happens, not just in
 your own reasoning for this session — a later `integration`-mode session
 needs the corrected tag to know this capability is its responsibility.
+
+**Keep the Capabilities list in the prompt at the detail level shown
+above — a one-line plan-level description per capability, nothing more.**
+Do not write out exact formulas, exact JSONB shapes, or exact error
+conditions in this list. If you find yourself typing something like
+`posterior mean = (current.value * decayed_weight + obs.value *
+obs.weight) / new_total_weight` into a Capabilities entry, stop — that
+level of precision is what you're asking `p-code-explorer` to derive
+and return in its Signatures and behaviour section, not something you
+supply going in. Writing it yourself means you already read the source
+to get it, which is the violation this whole section exists to prevent.
+A thin capability list produces a better brief, not a worse one — it's
+what tells the Explorer what to look for without pre-answering the
+question.
 
 **Stage 2 — Integration.** Group `integration`-tagged capabilities by
 interaction — the specific service+repository pair, or the specific pair

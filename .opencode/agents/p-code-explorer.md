@@ -22,7 +22,8 @@ permission:
   glob:       deny
   webfetch:   deny
   skill:      deny
-  edit:       deny   # read-only agent — never writes or edits
+  edit:       deny
+  write:      deny
   bash:       deny
   todowrite:  deny
 

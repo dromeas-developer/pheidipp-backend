@@ -932,3 +932,752 @@ assert rc == 0
 **Decision policy:** When a downgrade test is failing because the system has moved past the migration, prefer **deletion** of the end-to-end test (keeping the static-body checks) over fixing the test to work around the later sub-phases. The end-to-end test asserts a property that was only ever true at one point in time, and the static-body checks provide the actual coverage of the migration's downgrade logic. A work-around test either (a) pins the upgrade, which couples the test to specific downstream revisions and breaks the next time a sub-phase is added, or (b) skips the failing assertions, which leaves the test as a false-positive landmine. The first lesson of this project is "tests must assert behaviour, not implementation"; a downgrade test that asserts a property the migration was never responsible for is asserting a *different system's* behaviour and belongs to that system's tests, not this migration's.
 
 **Meta-rule:** Migration tests split into two categories with different staleness profiles. **Static-body checks** (parse the migration source, assert expected `op.*` calls) are stable forever. **End-to-end alembic subprocess checks** are stable only as long as the migration is the head revision. For the latter, pin the upgrade to the migration's own revision (or accept the test will be deleted when the system moves past it). This is now first-class in `tests/MOCKING_CONTRACT.md` "Known Anti-Patterns".
+
+## Dated Lessons (2026-07-13)
+
+### Post-commit JSONB reads must use `.scalars().all()[0]`, not `.scalar_one()`
+
+**Symptom:** All 48 integration tests in `tests/integration/test_physiology_update_service_*.py` and `tests/integration/test_athlete_physiology_repository_update_in_place_integration.py` would have asserted `fresh.cp is None` (or `fresh.lt1 is None`, etc.) immediately after `await db_session.commit()` and a re-`SELECT` of the row, even though the prior `repo.update_in_place(athlete.id, cp=new_cp)` had just persisted a non-null JSONB value. The test would have looked like the DB silently dropped the mutation. Additionally, the IDE type-checker (mypy / Pylance) reports `Object of type "None" is not subscriptable` on any `fresh.cp["value"]` access, because `cp: Mapped[dict | None]` is nullable and the type system has no way to know the post-commit read will return a non-null value.
+
+**Root cause:** After `await db_session.commit()`, the test calls `await db_session.execute(select(AthletePhysiology).where(...))` and chains `.scalar_one()`. The session's identity map returns the same ORM instance that was loaded *before* the commit. SQLAlchemy's identity map does not refresh JSONB attribute values on a cached instance from a same-table `SELECT` unless `populate_existing=True` is set, and the test was not setting it. The instance's in-memory `cp` attribute can be stale relative to the actual DB row.
+
+**Pattern that failed:**
+
+```python
+await repo.update_in_place(athlete.id, cp=new_cp)
+await db_session.commit()
+
+# WRONG — identity map may return the pre-update instance with stale cp
+fresh = (
+    await db_session.execute(
+        select(AthletePhysiology).where(AthletePhysiology.athlete_id == athlete.id)
+    )
+).scalar_one()
+assert fresh.cp == new_cp  # can fail with fresh.cp is None or stale value
+```
+
+**Pattern to use instead:** Use `.scalars().all()[0]` (or `.scalars().first()`) instead of `.scalar_one()`. The `.scalars().all()` path constructs fresh ORM instances from result rows, bypassing the identity map entirely. The first test that already used this pattern correctly was `tests/integration/test_physiology_measurement_repository_integration.py` — copy from it.
+
+```python
+# CORRECT — fresh instance from result rows
+fresh = (
+    await db_session.execute(
+        select(AthletePhysiology).where(AthletePhysiology.athlete_id == athlete.id)
+    )
+).scalars().all()[0]
+assert fresh.cp == new_cp
+```
+
+**For nullable JSONB columns (`cp`, `max_hr`, `vo2max`), also add a `is not None` narrowing assert before any subscript access.** This is required to satisfy the IDE type-checker (`Mapped[dict | None]` is the static type, and `cp["value"]` is statically invalid without narrowing) and to give a clear runtime error if the post-commit read returns a null value. `lt1` and `lt2` are non-nullable (`Mapped[dict]`) and need no narrowing.
+
+```python
+fresh = (
+    await db_session.execute(
+        select(AthletePhysiology).where(AthletePhysiology.athlete_id == athlete.id)
+    )
+).scalars().all()[0]
+assert fresh.cp is not None  # narrows type AND catches runtime null
+assert fresh.cp["value"] == pytest.approx(260.0)
+```
+
+**For `result` variables assigned inside a `for` loop and used after the loop, initialize with a type annotation before the loop and add `assert result is not None` after.** The IDE type-checker treats `for i in range(N):` as "may execute zero times" → `result` is "possibly unbound" even when `N > 0` is obvious. The fix is:
+
+```python
+result: PhysiologyUpdateResult | None = None
+for i in range(8):
+    result = await service.apply_observations(athlete_id=athlete.id, observations=[obs])
+
+assert result is not None  # narrows type AND catches runtime null
+assert result.metric_confidence["lt2_hr"] == "high"
+```
+
+This pattern appeared in `tests/integration/test_physiology_update_service_confidence_transitions_integration.py` (4 tests) where `result` was assigned inside a loop and used after.
+
+**Why this is a reusable failure class:** The conftest's `_SafeAsyncSession.expire_all()` override expunges instances (it does not just expire them) so that post-`expire_all()` lazy loads do not raise `MissingGreenlet`. But expunging does not help here — the issue is the inverse: the identity map returns a still-loaded instance, but the instance's JSONB attributes are stale because the row was mutated in place via `flag_modified` and the identity map does not know to refresh on a same-table `SELECT` without `populate_existing=True`. Any future integration test that does a post-commit read of a JSONB-mutated row (e.g. `AthletePhysiology`, `TwinState`, `WorkoutTarget`) is at risk.
+
+**Alternative fix:** Add `populate_existing=True` to the `select()` execution options. This is equivalent to `.scalars().all()[0]` from a correctness standpoint but changes the call shape more invasively. The `.scalars().all()[0]` pattern is preferred because it matches the existing tests in `test_physiology_measurement_repository_integration.py` and is more readable.
+
+---
+
+## Dated Lessons (2026-07-13, Phase-2.3-P2 triage)
+
+### `str(enum_member)` is NOT the `.value` for `class Foo(str, Enum)` — use `source.value`
+
+**Symptom:** Every test that asserts a `MeasurementSource` enum-derived string is now stored in the JSONB `dominant_source` field or the `physiology_updated` event payload fails with `AssertionError: 'MeasurementSource.TRAINING_RR_INFLECTION' != 'training_rr_inflection'`. Affected: 7 unit tests, 6+ integration tests, 4+ behaviour tests — every test that checks the `dominant_source` JSONB column or event payload after a `bayesian_update`/`apply_observations` call with a `MeasurementSource` enum source.
+
+**Root cause:** `app/models/enums.py` declares `MeasurementSource` as `class MeasurementSource(str, Enum)` — the `str` mixin makes enum members compare-equal to their value string (`MeasurementSource.TRAINING_RR_DEFLECTION == "training_hr_deflection"` is `True`), but `str(enum_member)` returns the *qualified name* (`"ClassName.MEMBER_NAME"`) because `Enum.__str__` is the `__str__` method, not the str mixin's. The function `_source_value(source: Any) -> str` in `app/services/physiology_update_service.py` is `return str(source)`, which yields `"MeasurementSource.TRAINING_RR_DEFLECTION"` instead of the intended `"training_hr_deflection"`. Verified in `.venv/bin/python` — the behaviour is the same on Python 3.11 (the project's runtime), and is unchanged for `StrEnum` in 3.12+ when the enum is declared as `(str, Enum)` rather than `(StrEnum,)`.
+
+**Pattern that failed** (in `app/services/physiology_update_service.py`):
+
+```python
+def _source_value(source: Any) -> str:
+    """Return the MeasurementSource.value string for source."""
+    return str(source)  # ← "MeasurementSource.TRAINING_RR_DEFLECTION", not "training_hr_deflection"
+```
+
+**Pattern to use instead** (one-line fix in production code):
+
+```python
+def _source_value(source: Any) -> str:
+    """Return the MeasurementSource.value string for source."""
+    if isinstance(source, MeasurementSource):
+        return source.value
+    # Defensive: JSONB round-trips can hand back a plain string.
+    return str(source)
+```
+
+**Meta-rule:** For any `class Foo(str, Enum)` in this codebase, do NOT use `str(enum_member)` to get the value — use `enum_member.value`. The `str` mixin only enables string comparison and JSON serialisation, not `str()` semantics. The correct pattern is `source.value` when the input is known to be the enum, with a defensive `str(source)` fallback for pre-stringified values. A test-asserting string like `"training_hr_deflection"` (the `.value`) is correct; a test asserting `"MeasurementSource.TRAINING_RR_DEFLECTION"` would be wrong. This is now first-class in `tests/MOCKING_CONTRACT.md` "Known Anti-Patterns" (if a contract layer ever emerges for enum serialisation).
+
+### `_observation()` helper default `activity_id=uuid.uuid4()` violates the FK chain
+
+**Symptom:** All integration and behaviour tests that build `ThresholdObservation` via the per-file `_observation()` helper fail at the first `apply_observations` call with `sqlalchemy.exc.IntegrityError: insert or update on table "physiology_measurements" violates foreign key constraint "physiology_measurements_activity_id_fkey"`. Affected: 20+ integration tests, 4 behaviour tests — every test that uses the default `activity_id` value.
+
+**Root cause:** The `_observation()` helper defaulted `activity_id` to `activity_id or uuid.uuid4()` — a fresh random UUID with no corresponding `Activity` row. The helper's docstring noted "the column is nullable" but stopped short of the corollary: *a non-null value must reference a real `activities.id`*. The PostgreSQL FK is always enforced when a value is present, regardless of whether the column is itself nullable. The test author's mental model was "nullable means optional" without distinguishing between "the value is null" (FK skipped) and "the value is present but invalid" (FK enforced). The same author of the test author on the unit-test side correctly passed `activity_id=None` (the model has no Activity row in the unit-test branch, so `None` is the only safe choice); the integration test author had a real DB and reasonably wanted a real activity reference, but did not create the row.
+
+**Pattern that failed** (in `tests/integration/test_physiology_update_service_*.py`):
+
+```python
+def _observation(
+    *,
+    parameter: PhysiologyParameter = ...,
+    activity_id: Optional[uuid.UUID] = None,
+    ...
+) -> ThresholdObservation:
+    return ThresholdObservation(
+        ...
+        activity_id=activity_id or uuid.uuid4(),  # ← FK violation
+        ...
+    )
+```
+
+**Pattern to use instead:**
+
+```python
+def _observation(
+    *,
+    parameter: PhysiologyParameter = ...,
+    activity_id: Optional[uuid.UUID] = None,
+    ...
+) -> ThresholdObservation:
+    """``activity_id`` defaults to ``None`` so the
+    ``physiology_measurements.activity_id`` FK is bypassed — the
+    column is nullable, so a NULL value skips the constraint
+    entirely. Tests that specifically want to attach a
+    measurement to a real activity (e.g. for the idempotency
+    dedup test) pass an explicit ``activity_id`` AFTER creating
+    the matching ``Activity`` row with the ``make_activity``
+    factory — see ``tests/utils/factories.py``.
+    """
+    return ThresholdObservation(
+        ...
+        activity_id=activity_id,  # ← None or a real Activity id
+        ...
+    )
+```
+
+The new `make_activity` factory lives in `tests/utils/factories.py` and mirrors the shape of `make_athlete` / `make_auth` / `make_refresh_token`. It uses `ActivitySource.MANUAL_UPLOAD`, `SportType.RUNNING`, and the minimum field set the calibration-eligible / sport-type / signal gates need. The four tests in the idempotency class that explicitly test the dedup key (which includes `activity_id`) call `make_activity(db_session, athlete_id=athlete.id, activity_date=...)` and pass `activity.id` to `_observation`.
+
+**Meta-rule:** When a test helper builds a model that has a non-nullable column with a FK to another table, the helper's default for that column must either be `None` (if the column is nullable) or a real `id` from a pre-created row. Generating a fresh `uuid.uuid4()` for an FK column is a code smell that should fail review — the UUID has no referent. The two-step pattern (1. factory creates the parent row, 2. test calls the helper with the parent's id) is the canonical way to wire a real reference. This is now first-class in `tests/MOCKING_CONTRACT.md` "Known Anti-Patterns".
+
+### `http_register` does not create `AthletePhysiology` — behaviour tests must insert it explicitly
+
+**Symptom:** All 7 behaviour tests in `tests/behaviour/test_physiology_update_user_journey.py` fail at the first `apply_observations(athlete_id, ...)` call with `MissingAthletePhysiologyError: no AthletePhysiology row for athlete <uuid>`. The HTTP register endpoint (`app/services/auth_service.py::AuthService.register`) only creates `Athlete + AthleteAuth + AthleteProfile + RefreshToken`; the `AthletePhysiology` row is bootstrapped by the onboarding service in a separate sub-phase (out of Phase-2.3-P2 scope).
+
+**Root cause:** The behaviour test author assumed the HTTP register path would create the physiology row — the same assumption that a unit-test author would correctly NOT make (the unit tests build the `AthletePhysiology` row directly in the test). The behaviour layer exercises the full HTTP path, but the production HTTP `register` does not include the physiology bootstrap. The architecture's invariant "one `AthletePhysiology` row per athlete" is satisfied by the onboarding service, not by registration. The behaviour tests need to insert the row explicitly after `http_register` — this is the production data topology: register is auth-only, physiology is bootstrapped by onboarding.
+
+**Pattern that failed:**
+
+```python
+athlete_id, _ = await http_register(
+    client, f"behaviour-phys-a-{uuid.uuid4()}@example.com"
+)
+# No AthletePhysiology row exists — apply_observations will raise.
+activity = await _create_running_activity(db_session, athlete_id=athlete_id, ...)
+result = await physiology_service.apply_observations(athlete_id, observations)
+# ← MissingAthletePhysiologyError
+```
+
+**Pattern to use instead:**
+
+```python
+athlete_id, _ = await http_register(
+    client, f"behaviour-phys-a-{uuid.uuid4()}@example.com"
+)
+# ``http_register`` only creates Athlete + AthleteAuth + AthleteProfile.
+# The AthletePhysiology row is bootstrapped by the onboarding service
+# (separate sub-phase, out of P2 scope). Insert it explicitly so
+# ``apply_observations`` finds a row to mutate.
+await _ensure_physiology_row(db_session, athlete_id=athlete_id)
+activity = await _create_running_activity(db_session, athlete_id=athlete_id, ...)
+result = await physiology_service.apply_observations(athlete_id, observations)
+```
+
+The `_ensure_physiology_row` helper in the behaviour test file is idempotent — it checks for an existing row first and only inserts if missing. Tests that need a pre-populated `lt1` / `lt2` / `cp` / `max_hr` pass them in via the helper's kwargs; the default is the empty three-dimension container for `lt1`/`lt2` and `None` for `cp`/`max_hr` (matching what `OnboardingService.complete_onboarding` produces at the end of the onboarding transaction).
+
+**Meta-rule:** When the behaviour layer exercises an HTTP path that does NOT include the full data-creation chain, the test must explicitly create the dependencies the subsequent service calls need. The production code's responsibility is the contract that `register` is auth-only — the test's responsibility is to know that and insert the missing row. Reading the implementation of the HTTP endpoint (here, `app/services/auth_service.py::AuthService.register`) and the onboarding service (here, `app/services/onboarding_service.py::OnboardingService.complete_onboarding`) before writing the test would have caught this. A test that exercises "register → first service call" needs to know what `register` actually creates, not what the test author wishes it created. This is now first-class in `tests/MOCKING_CONTRACT.md` "Known Anti-Patterns".
+
+### `apply_observations` loop does not accumulate state across same-parameter observations in a single call
+
+**Symptom:** All confidence-transition tests (4 observations should reach `prior_weight=4.0`, 8 should reach 8.0, 2 RR observations should reach 5.0) fail because the post-loop `prior_weight` is 1.0 (the last iteration's contribution only) instead of the accumulated value. Affected: 3 unit tests in `TestApplyObservationsConfidenceTransitions`, 4 integration tests in `TestLowToMediumTransition` / `TestMediumToHighTransition`, 2 behaviour tests in `TestPhysiologyUpdateConfidenceTransitionsJourney`. The test failure is `result.confidence_transitions["lt2_hr"] == ("low", "medium")` failing because `result.metric_confidence["lt2_hr"] == "low"` (the post-update prior_weight is below 4.0).
+
+**Root cause:** The implementation in `app/services/physiology_update_service.py::PhysiologyUpdateService.apply_observations` reads `current_state` from `physiology` on every iteration of the observation loop via `self._get_parameter_state(physiology, obs.parameter)`. But `physiology` is only mutated AFTER the loop completes, in `self._apply_updated_states(physiology, working_state)` and `self.athlete_physiology.update_in_place(...)`. The `working_state` dict IS mutated inside the loop, but `current_state` is always read from the in-memory `physiology` (the pre-loop state), not from `working_state[obs.parameter]`. So for 4 observations of the same parameter in a single call, all 4 iterations see the same original `prior_weight=0.0` (or `0.5` depending on the test fixture), and each iteration's `working_state[obs.parameter] = new_state` overwrites the previous one. The final `working_state[obs.parameter]["prior_weight"]` reflects exactly one observation's contribution (1.0), not the accumulated value (4.0).
+
+**Pattern that failed** (in `app/services/physiology_update_service.py`):
+
+```python
+for obs in observations:
+    if await self._is_duplicate(...):
+        ...
+        continue
+
+    current_state = self._get_parameter_state(physiology, obs.parameter)
+    # ← BUG: always reads from `physiology`, which is not updated
+    # until AFTER the loop. The 2nd, 3rd, 4th observations see
+    # the SAME current_state as the 1st, so their bayesian_update
+    # computations are all based on the original prior_weight.
+
+    if current_state is None:
+        new_state = init_null_parameter_state(observation_payload)
+    else:
+        new_state = bayesian_update(current_state, observation_payload)
+
+    working_state[obs.parameter] = new_state
+    # ← The dict overwrite means only the last iteration's
+    # result survives. The accumulated state across iterations
+    # is lost.
+    ...
+```
+
+**Pattern to use instead** (in production code, NOT a test fix):
+
+```python
+for obs in observations:
+    if await self._is_duplicate(...):
+        ...
+        continue
+
+    # CRITICAL: if this parameter was already updated in a prior
+    # iteration of THIS batch, use the in-loop `working_state`
+    # entry as the next iteration's prior. Otherwise, read from
+    # the in-memory `physiology` row (which reflects the
+    # persisted state at call entry).
+    current_state = working_state.get(obs.parameter)
+    if current_state is None:
+        current_state = self._get_parameter_state(physiology, obs.parameter)
+
+    if current_state is None:
+        new_state = init_null_parameter_state(observation_payload)
+    else:
+        new_state = bayesian_update(current_state, observation_payload)
+
+    working_state[obs.parameter] = new_state
+    ...
+```
+
+**Verification:** A trace through 4 observations of weight 1.0 against initial `prior_weight=0.0`:
+- Iteration 1: `working_state` is empty → read from physiology (0.0) → new prior_weight = 0.0 + 1.0 = 1.0 → `working_state[param]` = 1.0
+- Iteration 2: `working_state.get(param)` returns 1.0 → use as prior → new prior_weight = 1.0 * 1.0 (no decay) + 1.0 = 2.0 → `working_state[param]` = 2.0
+- Iteration 3: `working_state.get(param)` returns 2.0 → new prior_weight = 3.0
+- Iteration 4: `working_state.get(param)` returns 3.0 → new prior_weight = 4.0 → LOW→MEDIUM transition fires correctly.
+
+**Meta-rule:** When a service method processes a batch of observations that may contain multiple observations for the same parameter, the in-loop state must be the source of truth for the next iteration's `current_state`, not the in-memory entity loaded at the start of the call. This is the standard Bayesian sequential-update pattern: posterior_n = bayesian_update(posterior_{n-1}, observation_n), not posterior_n = bayesian_update(prior, observation_n) for n > 1. A test that submits N observations of the same parameter in one call (e.g. the confidence-transition tests here) will catch this; a test that submits one observation per call (e.g. the behaviour journey that does one `apply_observations` per activity) will NOT catch it because each call's single observation does not need accumulation. The lesson: design tests to exercise the same call's batch dynamics, not just multi-call dynamics. This is now first-class in `tests/MOCKING_CONTRACT.md` "Known Anti-Patterns".
+
+### `onupdate=` hook fires only when a column is mutated — not on a no-op flush
+
+**Symptom:** `test_updated_at_changes_even_with_no_column_mutations` (in `tests/integration/test_athlete_physiology_repository_update_in_place_integration.py`) fails with `AssertionError` because `row.updated_at` is unchanged after calling `update_in_place(athlete.id)` (no parameters) and committing. The test was asserting that the `onupdate=` hook fires on any `flush()`, regardless of whether a column was mutated.
+
+**Root cause:** SQLAlchemy's `onupdate=` hook fires on a column when an `UPDATE` statement is issued for the row. An `UPDATE` statement is issued only when SQLAlchemy detects at least one column change in the dirty instance. Calling `update_in_place` with all default parameters leaves the in-memory `physiology` row's columns unchanged, so SQLAlchemy does not include the row in the dirty set, no `UPDATE` is issued, and the `onupdate=` hook does not fire. The test was asserting the wrong behaviour — the architecture's contract is "`updated_at` advances when `update_in_place` actually mutates a column" (see Plan Step 6: "Only update columns that have changed"), not "advances on every call to `update_in_place`".
+
+**Pattern that failed:**
+
+```python
+original_updated_at = row.updated_at
+await asyncio.sleep(1.1)
+repo = AthletePhysiologyRepository(db_session)
+# No parameters passed → no column touched.
+await repo.update_in_place(athlete.id)
+await db_session.commit()
+await db_session.refresh(row)
+assert row.updated_at > original_updated_at  # ← FAILS — no UPDATE, no onupdate
+```
+
+**Pattern to use instead:** The correct semantics are pinned by `test_updated_at_changes_after_update` (a mutated-column call DOES fire the hook). The no-op test was removed entirely (replaced with a NOTE comment in the test file) because the test was asserting a property the SQLAlchemy ORM does not implement. The intended invariant — "`update_in_place` always does some DB work" — is meaningless at the SQLAlchemy level (a no-op call is a no-op), and the real invariant — "`update_in_place` mutates columns and persists them" — is already covered by the per-column persistence tests in `TestUpdateInPlaceLt1Persistence` / `TestUpdateInPlaceCpPersistence` etc.
+
+**Meta-rule:** Do not test that an ORM hook fires on a no-op operation. SQLAlchemy's `onupdate=` is per-row, not per-flush — it requires actual column mutations to issue an `UPDATE` statement. When writing a test that asserts a `flush()`-side-effect (trigger, hook, computed column), design data that produces the side-effect, or remove the test. A test asserting "the hook fires even when no work was done" is asserting a contract the ORM does not have. This is now first-class in `tests/MOCKING_CONTRACT.md` "Known Anti-Patterns".
+
+### Test fixtures with default `last_observation_date` cause 45-day decay when assertions assume same-day
+
+**Symptom:** Four unit tests in `tests/unit/test_physiology_update_service_bayesian.py` (`test_posterior_mean_exact_when_weights_equal`, `test_new_total_weight_is_decayed_plus_observation`, `test_uncertainty_above_floor_when_evidence_moderate`, `test_prior_dominates_when_weights_equal`) fail with numeric values that are off by the `exp(-45/42) ≈ 0.343` decay factor. The tests expected simple arithmetic combinations (170.0, 5.0, sqrt(2.0), prior-source-preservation) but got values that reflected a decayed prior.
+
+**Root cause:** The shared `_state()` helper defaults `last_observation_date="2026-05-01"` and the shared `_observation()` helper defaults `obs_date=date(2026, 6, 15)` — a 45-day gap. The default fixture was inherited from a different test class that exercised decay (where the 45-day gap was the actual scenario under test), but these four tests were written assuming same-day semantics. The decayed_weight becomes `prior_weight * 0.343`, and the resulting posterior values differ from the same-day case by the same factor. The 45-day gap is not a bug in the test data — it is a bug in the test's understanding of the shared fixture.
+
+**Pattern that failed:**
+
+```python
+def test_posterior_mean_exact_when_weights_equal(self) -> None:
+    # Comment in the test: "decayed_weight = 1.0, obs.weight = 1.0 → simple mean"
+    # ← WRONG — the default _state() has last_observation_date='2026-05-01',
+    # and the default _observation() has obs_date=date(2026, 6, 15).
+    # The actual decayed_weight is 1.0 * exp(-45/42) ≈ 0.343.
+    current = _state(value=160.0, prior_weight=1.0)
+    observation = _observation(value=180.0, weight=1.0)
+    result = bayesian_update(current, observation)
+    assert result["value"] == pytest.approx(170.0)  # ← FAILS, actual is ~175
+```
+
+**Pattern to use instead:** Pin the date explicitly to match the observation date so the test exercises the same-day semantics it intends:
+
+```python
+def test_posterior_mean_exact_when_weights_equal(self) -> None:
+    # Same-day observation → no decay → simple arithmetic mean.
+    # Pin last_observation_date to match the default obs_date so
+    # the test exercises the same-day path, not the 45-day gap.
+    current = _state(
+        value=160.0,
+        prior_weight=1.0,
+        last_observation_date="2026-06-15",
+    )
+    observation = _observation(value=180.0, weight=1.0)
+    result = bayesian_update(current, observation)
+    assert result["value"] == pytest.approx(170.0)  # ← PASSES
+```
+
+**Meta-rule:** When a test file has multiple helpers with default date values (e.g. `_state`, `_observation`), the author of any new test that intends a specific date semantics (same-day, exactly 42 days, etc.) MUST pin both dates explicitly. The default fixture may have been designed for a different scenario (e.g. the `_state` default was used in a decay-exercising test). Reading the helper's default values and confirming the test's expected math matches those defaults is part of test-authoring hygiene. A test that says "same-day" in a comment but uses 45-day-apart defaults will silently compute the wrong expected value. This is now first-class in `tests/MOCKING_CONTRACT.md` "Known Anti-Patterns".
+
+---
+
+## Dated Lessons (2026-07-14, Phase-2.3-P2 test pack re-run)
+
+### Integration `_state()` helper default date causes 23 failures when assertions assume same-day math
+
+**Symptom:** After p-coder fixed the two Phase-2.3-P2 production bugs (`_source_value` enum `.value` and `apply_observations` intra-call state accumulation), 23 of 193 tests still failed with numeric mismatches like `assert 168.53781815096877 == 166.66666666666666 ± 0.01`, `assert 4.020484699851728 == 4.5 ± 4.5e-06`, `assert ('low', 'high') == ('medium', 'high')`, `IndexError: list index out of range`, and `assert 0 >= 1`. Affected every integration and behaviour test file under `tests/integration/test_physiology_update_service_*.py` and `tests/behaviour/test_physiology_update_user_journey.py`, plus one unit test in `test_physiology_update_service_orchestration.py`.
+
+**Root cause:** The 2026-07-13 dated lesson above documents the unit-test case (4 unit tests in `test_physiology_update_service_bayesian.py` pinned `last_observation_date='2026-06-15'` on the per-test `_state()` calls). The 2026-07-14 re-run surfaced the same problem at the **integration and behaviour layers** — the integration test files' `_state()` helper still defaulted `last_observation_date: str = "2026-05-01"`, but the sibling `_observation()` helper defaulted `measurement_date=date(2026, 6, 15)`, producing a 45-day gap that decayed the prior weight via the 42-day time constant (e.g. `0.5 * exp(-45/42) ≈ 0.171`). The integration tests' expected values were computed for same-day math (e.g. `(160 * 0.5 + 170 * 1.0) / 1.5 = 166.67`), not the decayed math (e.g. `(160 * 0.171 + 170 * 1.0) / 1.171 = 168.54`).
+
+The unit-test fix was correct but only fixed the 4 unit tests that explicitly passed `last_observation_date`. The integration tests rely on the helper's default, so the 45-day gap silently applied to every integration test that did not override the date. No integration test explicitly pinned `last_observation_date` — they all relied on the default, so the default's drift from the observation's date was the single point of failure for 16 of the 23 failures.
+
+The remaining 7 failures (1 unit + 6 behaviour) are independent of the date-default issue and are documented as separate dated lessons below.
+
+**Pattern that failed (in 4 integration test files, 1 default site each):**
+
+```python
+def _state(
+    *,
+    value: float = 165.0,
+    uncertainty: float = 1.0,
+    prior_weight: float = 0.5,
+    dominant_source: str = "training_hr_deflection",
+    last_observation_date: str = "2026-05-01",  # ← 45-day gap from default obs_date
+) -> Dict[str, Any]:
+    return {
+        "value": value,
+        "uncertainty": uncertainty,
+        "prior_weight": prior_weight,
+        "dominant_source": dominant_source,
+        "last_observation_date": last_observation_date,
+    }
+```
+
+**Pattern to use instead:** Change the default to match the sibling `_observation()` helper's `measurement_date`. Every test that does not override the date now gets same-day semantics — the same semantics the test's expected value was computed for.
+
+```python
+def _state(
+    *,
+    value: float = 165.0,
+    uncertainty: float = 1.0,
+    prior_weight: float = 0.5,
+    dominant_source: str = "training_hr_deflection",
+    last_observation_date: str = "2026-06-15",  # ← same as default _observation() date
+) -> Dict[str, Any]:
+    return {
+        "value": value,
+        "uncertainty": uncertainty,
+        "prior_weight": prior_weight,
+        "dominant_source": dominant_source,
+        "last_observation_date": last_observation_date,
+    }
+```
+
+**Meta-rule:** When two helper functions in the same test file have default date values that interact (`_state` has `last_observation_date`, `_observation` has `measurement_date`), the two defaults must agree. A drift between the two defaults silently introduces a date gap in every test that uses both defaults — the test passes the assertion phase but produces wrong numeric values that diverge from the test author's mental model. Reading both defaults and confirming they agree is part of test-authoring hygiene. A test that relies on same-day semantics must use helpers whose defaults agree on the same date, or pin both dates explicitly per test. This is now first-class in `tests/MOCKING_CONTRACT.md` "Known Anti-Patterns" (see the 2026-07-13 entry, which this lesson extends to the integration/behaviour layers).
+
+### `apply_observations` batch transition is `(pre_call_level, post_call_level)`, not per-observation transitions
+
+**Symptom:** `test_eight_observations_reach_high` (in `tests/unit/test_physiology_update_service_orchestration.py::TestApplyObservationsConfidenceTransitions`) failed with `AssertionError: assert ('low', 'high') == ('medium', 'high')`. The test expected a `MEDIUM→HIGH` transition, but the service reported `LOW→HIGH`.
+
+**Root cause:** The test author assumed the service reports per-observation transitions — that observation 4 (which crosses prior_weight=4.0 → MEDIUM) would be reported as a transition, then observation 8 (which crosses prior_weight=8.0 → HIGH) would be reported as a second transition. The actual architecture reports a single `confidence_transitions` dict per `apply_observations` call, with the entry being `(pre_call_level, post_call_level)` — a batch transition between the call's input and output. A single batch that starts at LOW (prior_weight=0.0) and ends at HIGH (prior_weight=8.0) reports a direct `LOW→HIGH` transition. The MEDIUM level is reached internally at observation 4 but is not a snapshot the service reports — the `_compute_metric_confidence` function is called exactly twice per `apply_observations` call (once before, once after), and only the pre/post diff is reported.
+
+**Pattern that failed:**
+
+```python
+@pytest.mark.asyncio
+async def test_eight_observations_reach_high(self) -> None:
+    """Eight observations of weight 1.0 for LT2_HR push the
+    prior_weight to 8.0 and trigger a MEDIUM→HIGH transition."""
+    # ...
+    result = await service.apply_observations(
+        athlete_id=uuid.uuid4(),
+        observations=observations,
+    )
+
+    assert "lt2_hr" in result.confidence_transitions
+    # ← WRONG — batch transition is LOW→HIGH, not MEDIUM→HIGH
+    assert result.confidence_transitions["lt2_hr"] == ("medium", "high")
+```
+
+**Pattern to use instead:** Accept the batch transition as the correct architecture contract. The MEDIUM level is a transient state inside the batch; the service contract is pre/post, not per-observation.
+
+```python
+@pytest.mark.asyncio
+async def test_eight_observations_reach_high(self) -> None:
+    """Eight observations of weight 1.0 for LT2_HR push the
+    prior_weight to 8.0 and trigger a LOW→HIGH batch transition.
+
+    Note: the transition is reported as ``("low", "high")``,
+    NOT ``("medium", "high")`` — ``apply_observations`` computes
+    the pre- and post-call confidence levels and reports the
+    batch transition between them, not the per-observation
+    transitions.
+    """
+    # ...
+    result = await service.apply_observations(
+        athlete_id=uuid.uuid4(),
+        observations=observations,
+    )
+
+    assert "lt2_hr" in result.confidence_transitions
+    # Batch transition: pre-call confidence = LOW (prior_weight
+    # 0.0), post-call confidence = HIGH (prior_weight 8.0).
+    # MEDIUM is reached mid-batch but is not a snapshot the
+    # service reports.
+    assert result.confidence_transitions["lt2_hr"] == ("low", "high")
+```
+
+**Meta-rule:** A test that asserts on a sequence of intermediate state transitions (LOW→MEDIUM, then MEDIUM→HIGH) is asserting a property the service does not implement — the service is designed around a single pre/post diff per call. The integration and behaviour tests that need intermediate transitions should use multi-call designs (one `apply_observations` per observation) and assert on each call's `confidence_transitions` dict separately. The single-call design can only assert on the pre/post pair. The plan's Step 8 explicitly states: "the service computes the raw confidence level from current `prior_weight`" — a single computation per call, not per-observation.
+
+### Rollback tests must commit fixture rows in their own transaction — `flush()` does not survive `rollback()`
+
+**Symptom:** `test_event_atomicity_rolls_back_when_later_step_fails` (in `tests/integration/test_physiology_update_service_integration.py::TestPhysiologyUpdatedEvent`) failed with `IndexError: list index out of range` at the post-rollback `fresh = (...).scalars().all()[0]` accessor. The `all()` returned `[]` because the fixture row had been rolled back along with the observation batch.
+
+**Root cause:** The `_create_physiology_row` helper only calls `session.flush()` (not `commit()`) — the test author intended the fixture row to be visible inside the transaction but uncommitted, mirroring how `apply_observations` would see it via the same session. The accumulation fix (the production fix for RC2) made `apply_observations` actually mutate the row in place via `update_in_place` + `flag_modified`, which now flushes real SQL updates through the same session. When the test then called `db_session.rollback()`, the rollback unwound BOTH the fixture row's INSERT (which was only flushed, not committed) AND the observation batch's UPDATE — leaving no `AthletePhysiology` row at all. The post-rollback SELECT returned `[]`, and `.all()[0]` raised `IndexError`.
+
+The test was previously passing because the broken accumulation did not flush any modifications — the rollback only undid the row creation, but `apply_observations` did not change anything that triggered the rollback to matter. The accumulation fix exposed this latent fixture design issue: the test needs the fixture row to SURVIVE the rollback so the post-rollback SELECT finds it and asserts it was NOT modified by the (rolled-back) observation batch.
+
+**Pattern that failed:**
+
+```python
+async def test_event_atomicity_rolls_back_when_later_step_fails(...):
+    athlete = await make_athlete(db_session)
+    # ← flush-only, not committed
+    await _create_physiology_row(
+        db_session, athlete_id=athlete.id, lt2={...},
+    )
+    service = PhysiologyUpdateService(db_session)
+    await service.apply_observations(athlete_id=athlete.id, observations=[obs()])
+    await db_session.rollback()  # ← undoes the fixture row too
+    fresh = (await db_session.execute(select(...))).scalars().all()[0]
+    # ← IndexError: all() returned [] because the fixture was rolled back
+```
+
+**Pattern to use instead:** Commit the fixture row in its own transaction so it survives the subsequent rollback. The `apply_observations` call opens a new transaction; its rollback must unwind the observation batch but NOT the fixture row.
+
+```python
+async def test_event_atomicity_rolls_back_when_later_step_fails(...):
+    athlete = await make_athlete(db_session)
+    await _create_physiology_row(
+        db_session, athlete_id=athlete.id, lt2={...},
+    )
+    # ← Commit the fixture row so it survives the subsequent rollback.
+    # The apply_observations call below opens a new transaction; its
+    # rollback must unwind the observation batch but NOT the fixture row.
+    await db_session.commit()
+    service = PhysiologyUpdateService(db_session)
+    await service.apply_observations(athlete_id=athlete.id, observations=[obs()])
+    await db_session.rollback()
+    fresh = (await db_session.execute(select(...))).scalars().all()[0]
+    # ← fresh row is found; the post-rollback assertion verifies the
+    # JSONB columns are unchanged (the rollback undid the mutation).
+```
+
+**Meta-rule:** A test that exercises transaction rollback semantics (ADR-004, "Event Persistence Atomicity", or any test that calls `db_session.rollback()` after a service call) must commit any fixture rows that the post-rollback assertions depend on. The `_create_*` helper convention of `flush()` (not `commit()`) is correct for tests that assert on in-transaction state, but it is WRONG for tests that follow up with a rollback — the rollback undoes the flush. The split-commit pattern (commit the fixture, then open a new transaction for the service call) is the canonical rollback-test fixture contract. A test that mixes `flush()`-only fixtures with a `rollback()` is asserting a property the fixture cannot satisfy. The same pattern applies to any test that uses `_SafeAsyncSession` or any fixture helper that defers the commit to the test's teardown — those fixtures will also be rolled back, and the post-rollback SELECT will return stale state. This is now first-class in `tests/MOCKING_CONTRACT.md` "Known Anti-Patterns".
+
+### Behaviour tests must pre-populate `AthletePhysiology` when asserting on a posterior shift — bootstrap suppresses shift detection
+
+**Symptom:** Six behaviour tests in `tests/behaviour/test_physiology_update_user_journey.py` failed with `AssertionError: assert 0 >= 1` (empty `shifted_parameters`). Affected: `test_journey_threshold_detection_to_physiology_updated_event`, `test_journey_event_payload_matches_shifted_parameters`, `test_journey_duplicate_observation_writes_measurement_not_event`, `test_journey_four_observations_reach_medium_confidence`, `test_journey_eight_observations_reach_high_confidence`, `test_journey_small_shift_writes_measurement_not_event`.
+
+**Root cause:** The 2026-07-13 dated lesson "`http_register` does not create `AthletePhysiology` — behaviour tests must insert it explicitly" documents the fix for `MissingAthletePhysiologyError`. The 2026-07-14 re-run surfaced a related but distinct issue: behaviour tests that insert an empty `AthletePhysiology` row (via `_ensure_physiology_row(db_session, athlete_id=athlete_id)` with no `lt1`/`lt2` kwargs) and then call `apply_observations` with a single activity's observations get an empty `shifted_parameters` list. The reason: the first observation for each parameter in the `apply_observations` call bootstraps the state from null (via `init_null_parameter_state`), and the shift detection's `current_state is None` guard suppresses shift detection on the bootstrap. The architecture is correct — the "> 1 unit shift gate only applies when an existing estimate exists" (plan Step 5) — but the behaviour tests were designed assuming the first observation would produce a shift.
+
+For the multi-activity tests (`test_journey_four_observations_reach_medium_confidence`, `test_journey_eight_observations_reach_high_confidence`), the failure mode was different: the activities were spread over multiple weeks (7-day gaps), so the 42-day decay reduced `prior_weight` to ~3.17 after 4 observations and ~4.79 after 8 observations — both below the 4.0 and 8.0 MEDIUM/HIGH thresholds. The tests asserted `prior_weight >= 4.0` and `prior_weight >= 8.0` respectively, and both failed.
+
+**Pattern that failed (single-activity shift assertion):**
+
+```python
+async def test_journey_threshold_detection_to_physiology_updated_event(...):
+    athlete_id, _ = await http_register(client, ...)
+    # ← Empty physiology row — lt1/lt2 sub-states are all None
+    await _ensure_physiology_row(db_session, athlete_id=athlete_id)
+    activity = await _create_running_activity(...)
+    # ... upload + detect ...
+    result = await physiology_service.apply_observations(athlete_id, observations)
+    # ← FAILS — first observation bootstraps, no shift detected
+    assert len(result.shifted_parameters) >= 1
+```
+
+**Pattern that use instead (single-activity shift assertion):**
+
+```python
+async def test_journey_threshold_detection_to_physiology_updated_event(...):
+    athlete_id, _ = await http_register(client, ...)
+    # Pre-populate lt1.hr and lt2.hr with state that differs from
+    # the cleaned-stream observations by more than 1 bpm so the
+    # first observation produces a posterior shift (the
+    # current_state is None guard suppresses shift detection for
+    # bootstrap observations against a null column).
+    await _ensure_physiology_row(
+        db_session, athlete_id=athlete_id,
+        lt1={"hr": _state(value=130.0, prior_weight=1.0), "power": None, "pace": None},
+        lt2={"hr": _state(value=150.0, prior_weight=1.0), "power": None, "pace": None},
+    )
+    # ... rest of the test
+```
+
+**Pattern that failed (multi-activity threshold assertion):**
+
+```python
+async def test_journey_four_observations_reach_medium_confidence(...):
+    athlete_id, _ = await http_register(client, ...)
+    await _ensure_physiology_row(db_session, athlete_id=athlete_id)
+    # ← 7-day gaps between activities — 42-day decay reduces prior_weight
+    activity_dates = [date(2026, 6, 1), date(2026, 6, 8), date(2026, 6, 15), date(2026, 6, 22)]
+    # ... 4 activities, 4 apply_observations calls ...
+    # ← FAILS — prior_weight ~3.17, not >= 4.0
+    assert lt2_hr_state["prior_weight"] >= 4.0
+```
+
+**Pattern to use instead (multi-activity threshold assertion):**
+
+```python
+async def test_journey_four_observations_reach_medium_confidence(...):
+    athlete_id, _ = await http_register(client, ...)
+    # Pre-populate with prior_weight=0.5 and same-date activities
+    await _ensure_physiology_row(
+        db_session, athlete_id=athlete_id,
+        lt2={"hr": _state(value=150.0, prior_weight=0.5), "power": None, "pace": None},
+    )
+    # ← SAME date for all 4 activities — distinct activity_ids, no decay
+    activity_dates = [date(2026, 6, 15)] * 4
+    # ... 4 activities, 4 apply_observations calls ...
+    # ← PASSES — prior_weight = 0.5 + 4×1.0 = 4.5
+    assert lt2_hr_state["prior_weight"] >= 4.0
+```
+
+**Meta-rule:** A behaviour test that asserts on a posterior shift (`len(result.shifted_parameters) >= 1` or a specific shift detection) MUST pre-populate the `AthletePhysiology` row with state that differs from the cleaned-stream observations by more than 1 bpm (HR parameters) or 1 watt (CP). An empty `lt1`/`lt2` row leaves the first observation as a bootstrap, and the `current_state is None` guard correctly suppresses shift detection — the test would be asserting a property the architecture does not have. A behaviour test that asserts on `prior_weight >= threshold` after N observations across multiple activities MUST use same-date activities (or pre-populate the state with a high enough `prior_weight` to absorb the decay) — the 42-day decay across 7-day gaps reduces `prior_weight` to a value below the threshold. Same-date activities are distinguished by their `activity_id` UUID, not by date, so the dedup key (which includes `activity_id`) is unique per activity. The behaviour tests are designed to exercise the end-to-end user journey, not the decay math — the integration layer pins the decay math, and the behaviour layer can use same-date activities to keep the journey test deterministic. This is now first-class in `tests/MOCKING_CONTRACT.md` "Known Anti-Patterns".
+
+---
+
+## Dated Lessons (2026-07-14, Phase-2.3-P2 test pack re-run, pass 2)
+
+### Integration tests asserting linear `prior_weight` accumulation with multi-day `measurement_date` fail due to 42-day decay
+
+**Symptom:** Seven integration tests in `tests/integration/test_physiology_update_service_confidence_transitions_integration.py` and `tests/integration/test_physiology_update_service_first_observation_integration.py` fail with `assert 4.3265 == 4.5 ± 4.5e-06` (or similar non-integer values). The pass-1 fix (aligning the integration `_state()` helper default to `"2026-06-15"`) resolved 16 of 23 tests that relied on the helper's default, but 7 tests explicitly construct observations at `measurement_date=date(2026, 6, 15 + i)` for `i in range(N)`, introducing 1-day gaps that the 42-day time constant decays by `exp(-1/42) ≈ 0.9765` per gap.
+
+**Root cause:** The architecture's `bayesian_update()` applies `decay_factor = exp(-days_since_last / 42)` to the prior weight on every observation. When tests loop `for i in range(N)` and pin `measurement_date=date(2026, 6, 15 + i)`, each iteration's prior weight is decayed by `0.9765` before the new observation's weight is added. After N iterations starting from `prior_weight=0.5`, the accumulated weight is `0.5 × 0.9765^(N-1) + 1.0 × Σ(k=0..N-1) 0.9765^k`, which is strictly less than the linear-accumulation `0.5 + N × 1.0` for N > 1. For N=4, the actual value is `0.5 × 0.9084 + 1.0 × 3.8181 = 4.2725` (close to the report's 4.3265 — small differences come from the bootstrap path on the 1st observation). The decay is architecturally correct and is already covered by `TestBayesianUpdatePriorDecay` in the unit tests; the integration tests are designed to exercise the accumulation pattern, not the decay pattern.
+
+**Pattern that failed (asserting linear accumulation with multi-day dates):**
+
+```python
+# 4 observations at 1-day intervals starting from prior_weight=0.5
+# Test asserts: 0.5 + 4 × 1.0 = 4.5
+for i in range(4):
+    obs = _observation(
+        parameter=PhysiologyParameter.LT2_HR,
+        observed_value=170.0 + i * 0.1,  # distinct values — no dedup
+        weight=1.0,
+        measurement_date=date(2026, 6, 15 + i),  # ← 1-day gap → 0.9765 decay
+    )
+    await service.apply_observations(
+        athlete_id=athlete.id, observations=[obs],
+    )
+await db_session.commit()
+assert await _read_lt2_hr_prior_weight(db_session, athlete.id) == pytest.approx(4.5)
+# ← FAILS: actual is ~4.327 (decayed)
+```
+
+**Pattern to use instead (same-day dates preserve linear accumulation):**
+
+```python
+# 4 observations all on 2026-06-15 — distinct observed_value avoids dedup
+# decay_factor = exp(-0/42) = 1.0 between observations → linear accumulation
+for i in range(4):
+    obs = _observation(
+        parameter=PhysiologyParameter.LT2_HR,
+        observed_value=170.0 + i * 0.1,  # distinct values — no dedup
+        weight=1.0,
+        measurement_date=date(2026, 6, 15),  # ← same day → no decay
+    )
+    await service.apply_observations(
+        athlete_id=athlete.id, observations=[obs],
+    )
+await db_session.commit()
+assert await _read_lt2_hr_prior_weight(db_session, athlete.id) == pytest.approx(4.5)
+# ← PASSES
+```
+
+**Meta-rule:** Integration tests that assert linear accumulation of `prior_weight` (e.g. `expected = 0.5 + N × weight`) across multiple `apply_observations` calls MUST pin all observations to the same `measurement_date` with distinct `observed_value` to avoid dedup. This restores the expected linear accumulation by setting the decay factor to `1.0` between observations. The decay-between-observations behaviour is already pinned by `TestBayesianUpdatePriorDecay` in the unit tests — the integration layer's job is to verify accumulation and confidence transitions, not decay. When the test's intent is to verify a specific cross-call accumulation pattern, same-day dates are the correct choice. When the test's intent is to verify cross-call state persistence (e.g. `test_three_calls_each_with_one_observation`), same-day dates are still correct — the test is verifying that each call sees the previous call's mutation, not the decay between dates. This is now first-class in `tests/MOCKING_CONTRACT.md` "Known Anti-Patterns".
+
+### Loop pattern cannot observe `from_level == "low"` on the Nth call when the (N-1)th call already crossed MEDIUM/HIGH
+
+**Symptom:** `test_four_rr_observations_reach_high_confidence` in `tests/integration/test_physiology_update_service_confidence_transitions_integration.py` fails with `AssertionError: assert 'medium' == 'low'` on the `from_level` assertion. The test loops 4 times, each iteration calling `apply_observations` with one RR observation (weight=2.5), and asserts the 4th call's result has `confidence_transitions["lt2_hr"] == ("low", "high")`.
+
+**Root cause:** The test's loop pattern accumulates `prior_weight` across calls: after call 1, `prior_weight=3.0` (LOW); after call 2, `prior_weight=5.43` (MEDIUM, with 1-day decay); after call 3, `prior_weight=7.80` (MEDIUM); after call 4, `prior_weight=10.11` (HIGH). The 4th call's pre-call level is MEDIUM, not LOW, so the `from_level == "low"` assertion is wrong. The test was designed under the assumption that the 4th call is the first to cross HIGH, but the 3rd call already crosses MEDIUM (and with same-day dates, the 3rd call crosses HIGH at `5.5 + 2.5 = 8.0`). With any date pattern, the 4th call's pre-call level is never LOW.
+
+**Pattern that failed (4-call loop with `from_level == "low"` on call 4):**
+
+```python
+result: PhysiologyUpdateResult | None = None
+for i in range(4):
+    obs = _observation(
+        parameter=PhysiologyParameter.LT2_HR,
+        observed_value=170.0 + i * 0.1,
+        source=MeasurementSource.TRAINING_RR_INFLECTION,
+        weight=2.5,
+        measurement_date=date(2026, 6, 15 + i),
+    )
+    result = await service.apply_observations(
+        athlete_id=athlete.id, observations=[obs],
+    )
+assert result.metric_confidence["lt2_hr"] == "high"
+assert "lt2_hr" in result.confidence_transitions
+from_level, to_level = result.confidence_transitions["lt2_hr"]
+assert from_level == "low"  # ← FAILS: actual is "medium"
+assert to_level == "high"
+```
+
+**Pattern to use instead (single batch call):**
+
+```python
+# All 4 observations in a single apply_observations call.
+# The batch transition is (pre_call_level, post_call_level) — pre-call
+# state was LOW (prior_weight=0.5), post-call state is HIGH (10.5).
+observations = [
+    _observation(
+        parameter=PhysiologyParameter.LT2_HR,
+        observed_value=170.0 + i * 0.1,
+        source=MeasurementSource.TRAINING_RR_INFLECTION,
+        weight=2.5,
+        measurement_date=date(2026, 6, 15),
+    )
+    for i in range(4)
+]
+result = await service.apply_observations(
+    athlete_id=athlete.id, observations=observations,
+)
+assert result.metric_confidence["lt2_hr"] == "high"
+assert "lt2_hr" in result.confidence_transitions
+from_level, to_level = result.confidence_transitions["lt2_hr"]
+assert from_level == "low"  # ← PASSES
+assert to_level == "high"
+```
+
+**Meta-rule:** A test that asserts `from_level == "low"` on the Nth `apply_observations` call for a high-weight source (e.g. RR inflection, weight=2.5) is structurally impossible to satisfy via a loop: the (N-1)th call already crosses MEDIUM (or HIGH) because each call adds the full observation weight on top of an already-accumulated prior_weight, so the Nth call's pre-call level is never LOW. Two fixes: (a) use a single `apply_observations` call with all N observations in one batch — the service reports a single `(pre_call_level, post_call_level)` transition reflecting the full batch, making the `("low", "high")` transition observable; (b) rewrite the assertion to match the actual pre-call level (e.g. `from_level == "medium"` if the 2nd call already crossed MEDIUM). The batch approach is cleaner because the test name typically refers to the N observations as a group (e.g. "four_rr_observations"), and the batch call is the natural API for processing a group. The loop pattern is still correct for tests that assert cross-call state persistence (e.g. `test_three_calls_each_with_one_observation`) or per-call confidence levels (e.g. `test_four_observations_trigger_low_to_medium_transition`) — the issue is specific to tests that assert a `from_level` that requires the pre-call state to be at the lowest level. This is now first-class in `tests/MOCKING_CONTRACT.md` "Known Anti-Patterns".
+
+### Post-rollback ORM attribute access triggers `MissingGreenlet` — use column-level SELECT for JSONB reads
+
+**Symptom:** `test_event_atomicity_rolls_back_when_later_step_fails` in `tests/integration/test_physiology_update_service_integration.py` fails with `sqlalchemy.exc.MissingGreenlet: greenlet_spawn has not been called; can't call await_only() here.` on the post-rollback assertion `assert fresh.lt2["hr"]["value"] == pytest.approx(160.0)`. The pass-1 fix (committing the fixture row in its own transaction before `apply_observations` + `rollback`) correctly resolved the IndexError that preceded the MissingGreenlet, but the post-rollback SELECT returned a fresh `AthletePhysiology` instance whose `lt2` attribute triggered async lazy loading outside the greenlet context.
+
+**Root cause:** After `db_session.rollback()`, the session's connection lifecycle enters a state where lazy attribute access on a freshly-loaded instance attempts async IO outside the greenlet context. The pass-1 fix's column-level SELECT (option 1 in the DevOps report) was recommended but not applied — the test was left with the ORM-attribute-access pattern that triggers the lazy load. The `lt2` column is a standard non-deferred JSONB column, so the lazy load is triggered by SQLAlchemy's internal attribute-expiration mechanism after `rollback()`, not by any deferred-column configuration. The traceback shows `_load_expired` → `load_on_pk_identity` → `session.execute` → `pool._create_connection` → `asyncpg.connect` → `await_only()` failing because no greenlet_spawn context exists.
+
+**Pattern that failed (ORM attribute access after rollback):**
+
+```python
+await service.apply_observations(
+    athlete_id=athlete.id, observations=[_observation()],
+)
+await db_session.rollback()
+
+# ... assertions on events, measurements, outbox ...
+
+# ← ORM attribute access on freshly-loaded instance after rollback
+fresh = (
+    await db_session.execute(
+        select(AthletePhysiology).where(
+            AthletePhysiology.athlete_id == athlete.id
+        )
+    )
+).scalars().all()[0]
+assert fresh.lt2["hr"]["value"] == pytest.approx(160.0)
+# ← FAILS: MissingGreenlet on fresh.lt2 access
+```
+
+**Pattern to use instead (column-level SELECT for JSONB):**
+
+```python
+await service.apply_observations(
+    athlete_id=athlete.id, observations=[_observation()],
+)
+await db_session.rollback()
+
+# ... assertions on events, measurements, outbox ...
+
+# ← Column-level SELECT reads the JSONB value directly without
+# loading an ORM instance, bypassing the lazy-load hazard.
+fresh_lt2 = (
+    await db_session.execute(
+        select(AthletePhysiology.lt2).where(
+            AthletePhysiology.athlete_id == athlete.id
+        )
+    )
+).scalar_one()
+assert fresh_lt2["hr"]["value"] == pytest.approx(160.0)
+# ← PASSES
+```
+
+**Meta-rule:** A test that reads an ORM attribute (especially a JSONB column) on a freshly-loaded instance AFTER `db_session.rollback()` MUST use a column-level SELECT (e.g. `select(Model.jsonb_column).where(...)` and `.scalar_one()`) to read the value directly. The rollback puts the session's connection lifecycle in a state where lazy attribute access on freshly-loaded instances triggers async IO outside the greenlet context, raising `MissingGreenlet`. The column-level SELECT bypasses the ORM attribute layer entirely — the SELECT returns the raw column value without instantiating the model. This is DIFFERENT from the 2026-07-11 `expire_all()` + lazy load anti-pattern — `rollback()` puts the session in a similar but distinct state where the connection lifecycle cannot service subsequent lazy loads. The two fixes have different root causes (expire_all evicts attribute state; rollback evicts transaction state) and different patterns (expire_all → use `.execution_options(populate_existing=True)`; rollback → use column-level SELECT). When a test needs to read JSONB values after a rollback, the column-level SELECT is the only safe pattern. This is now first-class in `tests/MOCKING_CONTRACT.md` "Known Anti-Patterns".
+
+### Post-rollback PK access in WHERE clauses triggers `MissingGreenlet` — capture the PK before `rollback()`
+
+**Symptom:** `test_event_atomicity_rolls_back_when_later_step_fails` (in `tests/integration/test_physiology_update_service_integration.py`) failed with `sqlalchemy.exc.MissingGreenlet: greenlet_spawn has not been called; can't call await_only() here.` at line 878, even after the pass-2 column-level SELECT fix for the post-rollback `fresh.lt2` JSONB read was applied. The pass-2 fix is necessary but not sufficient: the post-rollback `select(SystemEvent).where(SystemEvent.athlete_id == athlete.id)` access triggers the same hazard, because `athlete.id` is itself an ORM-mapped attribute on an instance that was loaded BEFORE the rollback.
+
+**Root cause:** `db_session.rollback()` expires ALL ORM instances tracked by the session, including the `athlete` object loaded at the start of the test. Accessing `athlete.id` (or any other mapped attribute — even a PK) on an expired instance triggers an async lazy load to re-fetch the row. Under async SQLAlchemy + NullPool, the lazy load fires outside the greenlet context, raising `MissingGreenlet`. The `expire_on_rollback=False` parameter on `async_sessionmaker` would have prevented the expiration, but SQLAlchemy 2.x does not support that parameter — it was removed/never existed in this version.
+
+**Pattern that failed (post-rollback `athlete.id` access in WHERE clause):**
+```python
+athlete = await make_athlete(db_session)
+await db_session.commit()
+await service.apply_observations(athlete_id=athlete.id, observations=[_observation()])
+await db_session.rollback()
+# ← `athlete` is now expired — accessing `athlete.id` will
+# trigger an async lazy load outside the greenlet.
+
+events = (
+    await db_session.execute(
+        select(SystemEvent).where(
+            SystemEvent.event_type == "physiology_updated",
+            SystemEvent.athlete_id == athlete.id,  # ← MissingGreenlet!
+        )
+    )
+).scalars().all()
+```
+
+**Pattern to use instead (capture the PK as a plain Python scalar BEFORE the rollback):**
+```python
+athlete = await make_athlete(db_session)
+await db_session.commit()
+await service.apply_observations(athlete_id=athlete.id, observations=[_observation()])
+# Capture the PK before the rollback expires the instance.
+athlete_id = athlete.id
+await db_session.rollback()
+# ← `athlete_id` is a plain Python UUID, immune to the
+# session-expiration hazard.
+
+events = (
+    await db_session.execute(
+        select(SystemEvent).where(
+            SystemEvent.event_type == "physiology_updated",
+            SystemEvent.athlete_id == athlete_id,  # ← captured scalar
+        )
+    )
+).scalars().all()
+```
+
+**Meta-rule:** Any test that calls `db_session.rollback()` and then references a mapped attribute of an in-memory instance (e.g. `athlete.id`, `token.token_hash`, `measurement.athlete_id`) in a subsequent `select(...).where(...)` clause or as an argument to a service call MUST capture that attribute as a plain Python scalar (UUID, int, str, etc.) BEFORE the rollback call. The captured scalar survives the rollback and is safe to use in subsequent code paths. This is a strict superset of the 2026-07-11 `expire_all()` + lazy-load-on-captured-scalar rule: `rollback()` is a different state-setter than `expire_all()` (rollback evicts transaction state; expire_all evicts attribute state), but both leave the instance in a state where lazy loads are unservicable. The capture-first pattern works for both. This is now first-class in `tests/MOCKING_CONTRACT.md` "Known Anti-Patterns".
+

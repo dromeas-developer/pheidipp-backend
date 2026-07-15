@@ -665,6 +665,17 @@ class WorkoutGenerationAgent:
             target_gap_sec_per_km = step_raw.get("target_gap_sec_per_km")
             description = step_raw.get("description")
 
+            if step_order is None:
+                raise WorkoutGenerationContractError(
+                    f"step at index {index} has null step_order"
+                )
+
+            if not isinstance(description, str) or not description.strip():
+                raise WorkoutGenerationContractError(
+                    f"step {step_order} description must be a non-empty string"
+                )
+            description = description.strip()
+
             # target_type-driven numeric discipline: only the
             # target_type's field may be populated.
             actual_numeric_fields = {
@@ -705,13 +716,6 @@ class WorkoutGenerationAgent:
                 description=description,
             )
 
-            # Description is required (architecture invariant:
-            # ``description`` is always present; never null; never empty).
-            if not isinstance(description, str) or not description.strip():
-                raise WorkoutGenerationContractError(
-                    f"step {step_order} description must be a non-empty string"
-                )
-
             parsed.append(
                 {
                     "step_order": step_order,
@@ -726,7 +730,7 @@ class WorkoutGenerationAgent:
                     ),
                     "target": target_payload,
                     "target_duration_seconds": duration_seconds,
-                    "description": description.strip(),
+                    "description": description,
                 }
             )
             expected_order += 1

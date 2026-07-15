@@ -459,12 +459,12 @@ class ContextBudgetService:
             )
 
         profile_summary: ProfileSummary | None = None
-        if profile and preferences:
+        if preferences:
             profile_summary = ProfileSummary(
                 sport_background=preferences.sport_background,
                 years_structured_training=preferences.years_structured_training,
-                fitness_level=profile.fitness_level or 3,  # fallback default
-                recent_injury=profile.recent_injury,
+                fitness_level=active_goal.fitness_level if active_goal else 3,
+                recent_injury=active_goal.recent_injury if active_goal else None,
             )
 
         plan_overview: PlanOverview | None = None

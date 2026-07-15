@@ -71,6 +71,12 @@ pipeline that satisfies the sub-phase exit gate.
   `ThresholdDetectionService` entry point)
 - `02-computations/physiology-update.md` — DEPENDS ON (Plan P2
   `PhysiologyUpdateService` entry point)
+- `docs/adr/011-confidence-monotonicity-ratchet-location.md` — DECISION
+  (the per-metric confidence ratchet `max(stored_level, computed_level)` is
+  enforced in this plan's `TwinRecalibrationService`, NOT in P2's
+  `PhysiologyUpdateService`. P2 outputs the raw computed level; P3 reads the
+  previous TwinState and applies the ratchet per metric before inserting the
+  new TwinState. Read before implementing Step 2.)
 
 ## Invariants
 - "No `UPDATE` or `DELETE` at any layer. `TwinStateRepository` exposes only
@@ -130,10 +136,21 @@ pipeline that satisfies the sub-phase exit gate.
    - Derives `confidence_level` from `min(lt1.hr.prior_weight,
      lt2.hr.prior_weight)` using thresholds 4.0 (MEDIUM) and 8.0 (HIGH).
      Confidence is monotonic — compare against the previous TwinState's
-     confidence_level and keep the higher value.
+     confidence_level and keep the higher value (`max(previous, computed)`).
    - Derives `metric_confidence` from per-parameter prior weights using the
      same 4.0/8.0 thresholds. For parameters with null prior_weight (e.g.,
      `lt1_power` when no power data), the metric confidence is null.
+     **Per-metric monotonicity ratchet (ADR-011)**: for each metric key in
+     `metric_confidence`, the final stored value is
+     `max(previous_twin_state.metric_confidence[metric], computed_level)`.
+     Read the previous TwinState via `TwinStateRepository.get_latest` and
+     apply the ratchet per metric — a metric that previously reached MEDIUM
+     stays MEDIUM even if `prior_weight` has since decayed below 4.0. If
+     there is no previous TwinState (first snapshot), the computed level is
+     the final level. For metrics where the previous value is null (no power
+     data before) and the computed value is non-null (power data now
+     available), use the computed value — null means "no data", not "low
+     confidence".
    - Builds the inline threshold snapshot from the updated
      `AthletePhysiology`: `lt1_hr_bpm`, `lt2_hr_bpm`, `cp_watts` (from the
      JSONB posterior values).
@@ -375,7 +392,20 @@ async def recalibrate_for_calibration(self, athlete_id, activity_id,
     # Monotonic: keep the higher level
     confidence_level = max(new_confidence, old_confidence)
 
-    metric_confidence = _derive_metric_confidence(physiology_result.physiology)
+    # Per-metric monotonicity ratchet (ADR-011)
+    computed_metric_confidence = _derive_metric_confidence(
+        physiology_result.physiology
+    )
+    if previous and previous.metric_confidence:
+        metric_confidence = {
+            k: _max_level(
+                previous.metric_confidence.get(k),
+                computed_metric_confidence.get(k)
+            )
+            for k in computed_metric_confidence
+        }
+    else:
+        metric_confidence = computed_metric_confidence
 
     # Build inline snapshot from updated physiology
     lt1_hr = _extract_param_value(physiology_result.physiology.lt1, "hr")
@@ -565,6 +595,10 @@ Batch 2 assumes Batch 1 is complete. Batch 2 complete when:
 - `confidence_level` is derived as `min(lt1.hr.prior_weight,
   lt2.hr.prior_weight)` using thresholds 4.0/8.0, with monotonic ratchet
   (never lower than previous TwinState)
+- Per-metric `metric_confidence` also ratchets: each metric key uses
+  `max(previous_twin_state.metric_confidence[metric], computed_level)` —
+  a metric that previously reached MEDIUM stays MEDIUM even if `prior_weight`
+  has decayed below 4.0 (ADR-011)
 - `twin_recalibrated` event fires for every new calibration TwinState with
   correct payload
 - `twin_confidence_upgraded` event fires only when confidence_level
@@ -601,7 +635,9 @@ Step 2:
               `app/models/twin_state.py` (TwinState fields to populate),
               output of Plan P2 (`PhysiologyUpdateResult` dataclass —
               carries updated physiology, shifted parameters,
-              metric_confidence, transitions)
+              metric_confidence, transitions),
+              `docs/adr/011-confidence-monotonicity-ratchet-location.md`
+              (DECISION — the per-metric ratchet lives here, not in P2)
   Secondary:  `app/services/onboarding_service.py` (how `_bootstrap_signal`
               and `_bootstrap_metric_confidence` shape the JSONB — the
               calibration TwinState must use the same shapes)
@@ -667,3 +703,21 @@ Step 8:
 (This is everything relevant to the steps above. Primary items are fetched
 together in Pre-Flight Step 3; Secondary and Fallback are requested only on
 demand.)
+
+### ADR Constraint
+
+**ADR-011** (`docs/adr/011-confidence-monotonicity-ratchet-location.md`)
+imposes a constraint the coder must not violate: the per-metric confidence
+monotonicity ratchet (`max(stored_level, computed_level)` per metric) is
+enforced in `TwinRecalibrationService.recalibrate_for_calibration` (this
+plan, Step 2), NOT in `PhysiologyUpdateService` (Plan P2). P2's
+`PhysiologyUpdateResult.metric_confidence` is the raw computed level from
+current `prior_weight` — it can be lower than the previous TwinState's
+stored level if `prior_weight` has decayed. This is expected and correct:
+P3 reads the previous TwinState via `TwinStateRepository.get_latest` and
+applies `max(previous.metric_confidence[metric], computed[metric])` per
+metric before writing the new TwinState. Do NOT add `TwinStateRepository`
+as a dependency of `PhysiologyUpdateService` to try to enforce the ratchet
+in P2 — that crosses an ownership boundary. The ratchet is a TwinState-level
+concern (historical audit trail), not a physiology-level concern (operational
+current state).

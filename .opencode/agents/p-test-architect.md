@@ -14,6 +14,7 @@ permission:
     "*": deny
     p-code-explorer: allow
     p-diagnostics-fixer: allow
+    p-documentation: allow
 
   read:       deny
   grep:       deny
@@ -274,12 +275,21 @@ Load in this order, in a single batched `get_files` call where possible:
    may already carry a capability inventory (test type and file scope per
    capability) from a prior session's Step 3 — see Step 3 for what to do
    with it.
-6. `tests/README.md` and `tests/MOCKING_CONTRACT.md` — accumulated
-   do/don't lessons from real test failures (async session pitfalls,
-   schema-inspection anti-patterns, determinism issues, etc.) and the
-   current fixture/mock boundary rules. These are load-bearing inputs, not
-   background reading: Step 2 depends on the former, Step 6 depends on
-   the latter.
+ 6. `tests/README.md` and `tests/MOCKING_CONTRACT.md` — accumulated
+    do/don't lessons from real test failures (async session pitfalls,
+    schema-inspection anti-patterns, determinism issues, etc.) and the
+    current fixture/mock boundary rules. These are load-bearing inputs, not
+    background reading: Step 2 depends on the former, Step 6 depends on
+    the latter.
+ 7. **Per-folder test READMEs** — `tests/unit/README.md`,
+    `tests/integration/README.md`, `tests/api/README.md`,
+    `tests/behaviour/README.md`, and `tests/smoke/README.md`, if they
+    exist. Load all of them in the same batched call as items 5 and 6.
+    Each README's `## Contents` table lists what test files exist and what
+    they cover — this is the map of the test suite, and it makes Step 4
+    (Load Existing Suite) much cheaper by telling you what's in each
+    directory before you open any test file. If a README doesn't exist for
+    a directory, skip it — the doc-writer hasn't baselined it yet.
 
 Do not load implemented files here. The capability inventory (Step 3) is
 built entirely from the plan — routes, service methods, repository
@@ -385,14 +395,21 @@ from the plan a second time.
 
 ### Step 4 — Load Existing Suite (Incremental / Expansion only)
 
-Inspect existing tests to avoid duplication and identify gaps:
+Inspect existing tests to avoid duplication and identify gaps.
 
-* What is already tested and how?
-* Which existing tests are affected by the new implementation?
-* Which tests need updating (behaviour changed) vs extending (new paths added)?
-* Which tests should be removed (capability superseded)?
+**Use per-folder READMEs as the map.** Before opening any test file, check
+the `## Contents` table in the relevant directory's README (loaded in
+Step 1). It lists every test file in that directory and what it covers.
+Use this to triage:
 
-Classify each existing test as: KEEP, MODIFY, EXTEND, or REMOVE.
+* Test files whose `Covers` description doesn't overlap with the current
+  plan's capabilities → skip them. Don't open them. They're not relevant.
+* Test files whose `Covers` overlaps → flag them for inspection.
+* Capabilities in the BRD that have no matching entry in any README's
+  `## Contents` → they need new tests. That's a gap, not a duplicate.
+
+After triage, open only the flagged files via `get_files` in one batched
+call. Classify each as: KEEP, MODIFY, EXTEND, or REMOVE.
 
 Do not inspect tests for features unrelated to the current plan's scope.
 
@@ -681,6 +698,26 @@ specifically because the workload is too large for concurrent processing.
 After all tasks are complete, count successful reports vs failures.
 Report both in your completion confirmation.
 
+* invoke `p-documentation` via the `task` tool to update or create
+  per-folder READMEs in the test directories this invocation touched.
+  Provide the test pack path, the list of test files created or modified,
+  and the sub-phase manifest path:
+
+  ```
+  Tool: task
+  Input:
+  {
+    "subagent_type": "p-documentation",
+    "prompt": "Test pack: docs/testing/<plan-id>_test_pack.md\n\nManifest: tests/test-manifest/phase-N-Mx.yaml\n\nFiles:\n<path/to/test_file1.py>\n<path/to/test_file2.py>\n..."
+  }
+  ```
+
+  The doc-writer reads the test pack for capability descriptions, reads
+  the manifest for type-to-file mappings, and updates or creates
+  `README.md` files in `tests/unit/`, `tests/integration/`, etc. One
+  invocation covers all test directories — the doc-writer batches its own
+  checks internally.
+
 Then STOP.
 
 ---
@@ -796,3 +833,32 @@ These apply to all generated tests regardless of type.
   service boundary — do not mock internal services. `tests/MOCKING_CONTRACT.md`
   is the authoritative per-layer boundary table; if this rule and the
   contract ever disagree, fix the contract, not the rule
+
+---
+
+## Comment Discipline
+
+Test files document behavior through their names and assertions. Comments
+in tests almost never add value — a test named
+`test_register_duplicate_email_returns_409` already says what the comment
+would.
+
+**Never write:**
+* Comments describing what a test does — the test name is the description
+* Arrange/Act/Assert section labels (`# Arrange`, `# Act`, `# Assert`)
+* Docstrings on test functions — the function name is the docstring
+* "Test that..." comments above test methods
+* Fixture setup explanation comments — fixture name + scope is enough
+* `# Cleanup` or `# Teardown` above fixture yield/teardown
+* Commented-out assertions or test cases
+* Section headers grouping tests by scenario — use a test class or
+  a separate file instead
+
+**Allowed — and only these:**
+* `# noqa` and `# type: ignore` as required by tooling
+* A one-line comment when a test's expected behavior is genuinely
+  surprising — contradicts what the function name suggests, or exercises
+  a documented edge case from `tests/README.md` that wouldn't be obvious
+  from the assertion alone. This should be vanishingly rare; if you find
+  yourself writing more than one per file, the test names aren't clear
+  enough

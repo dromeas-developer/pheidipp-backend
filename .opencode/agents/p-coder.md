@@ -4,9 +4,10 @@ temperature: 0.1
 
 permission:
   task:
-    "*": "deny"
+    "*": deny
     p-diagnostics-fixer: allow
     p-coder-batcher: allow
+    p-documentation: allow
 
   # Native tools
   read:       deny    # → get_files
@@ -556,6 +557,47 @@ file.
 
 ---
 
+## Comment Discipline (NON-NEGOTIABLE)
+
+The codebase is self-documenting through clear naming and folder-level
+READMEs. Inline comments are a last resort, not a default.
+
+**Never write:**
+* Comments that describe what the next line already says in code
+  (`# increment counter` above `counter += 1`)
+* Docstrings that restate the function name
+  (`"""Get athlete by ID."""` above `def get_athlete_by_id(...)`)
+* Section header comments (`# === Database Operations ===`)
+* Commented-out code — delete it; git history exists for a reason
+* TODO comments — track in the BRD or issue tracker, not in source
+* Closing-brace or "end of" markers (`# end for`, `# end if`)
+* Import-section labels (`# Standard library`, `# Third party`)
+
+**Write only when the code alone would mislead:**
+* Module-level docstring: one line, only if the filename doesn't make
+  the module's purpose obvious
+* Class docstring for public classes: one line, only if the class name
+  doesn't fully convey its responsibility
+* Inline comment: only when the code is genuinely surprising — a
+  non-obvious algorithm, a business rule a reader would miss, or a
+  deliberate deviation from a pattern that looks like a mistake
+* `# noqa` and `# type: ignore` as required by tooling
+
+**Never:**
+* Docstrings on private methods (`_method_name`)
+* Multi-line docstrings anywhere — if it needs more than one line, it
+  belongs in the folder's `README.md` (maintained by `p-doc-writer`),
+  not in the file
+
+**Rule of thumb:** if you catch yourself writing a comment to explain
+"what" the code does, delete the comment and rename the variable or
+function. If you catch yourself writing a comment to explain "why" the
+code is shaped a certain way, ask whether the folder README already
+covers the architectural context. If not, flag it for `p-doc-writer` to
+capture there — do not inline it.
+
+---
+
 ## No Silent Deviations
 
 **Enforced via the `no-silent-deviations` skill.**
@@ -629,6 +671,24 @@ Before declaring completion, verify:
     the fixer for one file, confirm the report, mark done, start next.
     Do NOT launch all in parallel. After all tasks complete, count
     successes vs failures and include in your completion confirmation.
+
+* invoke `p-documentation` via the `task` tool to update folder READMEs
+  with the files this batch created or modified. Provide the BRD path
+  and the list of files touched:
+
+  ```
+  Tool: task
+  Input:
+  {
+    "subagent_type": "p-documentation",
+    "prompt": "BRD: <BRD path>\n\nFiles:\n<path/to/file1.py>\n<path/to/file2.py>\n..."
+  }
+  ```
+
+  The doc-writer reads the BRD for architectural context, identifies
+  which folders were affected, and updates or creates `README.md` files.
+  One invocation covers the entire batch — the doc-writer batches its
+  own folder checks and file reads internally. No loop needed.
 
 If a Batch Success Criteria condition, or a routed finding's implied fix,
 cannot be satisfied as written — the plan's or report's own criterion

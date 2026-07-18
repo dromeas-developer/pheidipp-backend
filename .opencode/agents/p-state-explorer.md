@@ -90,12 +90,30 @@ for alternative names unless the task explicitly asks for that.
 
 ## What You Do
 
-1. **Resolve the domain to concrete artifacts.** If the caller provided a
-   domain description, use `search_codebase` to find the relevant files
-   and symbols. If the caller provided an explicit entity list, use
-   `search_symbols` to confirm each entity exists.
+1. **Check for folder READMEs first.** Before broad searching, read
+   `README.md` files in folders relevant to the caller's domain.
+   For an entity domain like "athlete profile," the relevant folders are
+   `app/models/README.md`, `app/services/README.md`,
+   `app/repositories/README.md`, and `app/api/routes/README.md`.
+   For an explicit entity list, read the README in each layer folder
+   that typically hosts that entity type. Batch these reads alongside
+   your initial searches — do not make a separate round trip for them.
 
-2. **For each domain or entity**, build a registry block containing:
+   A README's `## Contents` table lists every file in the folder with a
+   one-line responsibility. This often answers "what exists?" without
+   needing to grep or search broadly — you get the file list directly.
+   Use the README for file discovery, then use targeted `search_symbols`
+   or `get_files` for details the README doesn't contain (method names,
+   column types, event producers, transaction boundaries).
+
+2. **Resolve the domain to concrete artifacts.** If the caller provided a
+   domain description, use `search_codebase` to find the relevant files
+   and symbols — but only after exhausting what READMEs already tell you.
+   If the caller provided an explicit entity list, use `search_symbols`
+   to confirm each entity exists — but first check whether READMEs already
+   list the files where those entities live.
+
+3. **For each domain or entity**, build a registry block containing:
    - **Entities**: ORM models found in `app/models/`, their table names,
      and key columns (names and types — not full definitions)
    - **Services**: service classes found in `app/services/`, their public
@@ -107,23 +125,23 @@ for alternative names unless the task explicitly asks for that.
      `app/models/__init__.py`, `app/services/__init__.py`, etc.
    - **Event producers**: files that call `publish_event` or emit system
      events, and which events they produce
-   - **Transaction boundaries**: where `session.commit()` appears in
-     services, and whether events are fired before or after commit
+    - **Transaction boundaries**: where `session.commit()` appears in
+      services, and whether events are fired before or after commit
 
-3. **Batch your queries.** Use `search_symbols` with all entity names in
+4. **Batch your queries.** Use `search_symbols` with all entity names in
    one call. Use `grep_files` with all relevant patterns in one call per
-   pattern type. Never call sequentially for independent items.
+    pattern type. Never call sequentially for independent items.
 
-4. **Flag missing registrations.** If an entity exists in `app/models/`
+5. **Flag missing registrations.** If an entity exists in `app/models/`
    but is not exported in `app/models/__init__.py`, flag it. This is a
-   common cause of empty Alembic migrations.
+    common cause of empty Alembic migrations.
 
-5. **Flag contradictions.** If a service claims to handle an entity but
+6. **Flag contradictions.** If a service claims to handle an entity but
    has no import of that entity's model, flag it. If an event producer
-   references an event name that does not appear in the event catalogue,
-   flag it.
+    references an event name that does not appear in the event catalogue,
+    flag it.
 
-6. **Do not resolve file content beyond what is needed for registry
+7. **Do not resolve file content beyond what is needed for registry
    confirmation.** You need to know that `DomainService` exists and
    what methods it exposes — you do not need to know how `process()`
    is implemented. If the caller needs implementation details, they

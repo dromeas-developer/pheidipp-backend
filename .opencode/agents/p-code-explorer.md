@@ -151,31 +151,41 @@ and fetches those itself; you resolve only the implementation under test.
 
 **Test Architect Mode:**
 
-1. **Fetch each capability group's `file_scope` in one batched `get_files`
-   call per group** — never one call per capability within a group, and
-   never one call spanning multiple groups (each group becomes its own
-   brief block, generated and consumed independently, which is what keeps
-   the Test Architect's context from carrying all four stages at once).
-2. **For each fetched file, extract everything a correct test needs to
+1. **Check for folder READMEs first.** For each unique parent folder in
+   the capability group's `file_scope`, check whether a `README.md` exists
+   at `<folder>/README.md`. Include these in the same batched `get_files`
+   call as the `file_scope` files — do not make a separate call for them.
+   A README provides folder purpose, the full file listing, architectural
+   patterns, and cross-references — it often answers questions that would
+   otherwise require reading additional files to infer.
+
+2. **Fetch each capability group's `file_scope` in one batched `get_files`
+   call per group** — together with any READMEs found in step 1. Never one
+   call per capability within a group, and never one call spanning multiple
+   groups (each group becomes its own brief block, generated and consumed
+   independently, which is what keeps the Test Architect's context from
+   carrying all four stages at once).
+
+3. **For each fetched file, extract everything a correct test needs to
    assert against it:**
    - exact method/route signatures — names, parameter types, return types
    - validation rules and the exact conditions under which they fire
    - every distinct error branch and what triggers it (this maps directly
      to negative-path tests — a missed branch here is a missed test)
    - response/payload shapes for API-layer capabilities
-   - any invariant enforced in code that isn't obvious from the method name
-3. **Check `tests/MOCKING_CONTRACT.md`'s Canonical Fixtures table** (it will
+    - any invariant enforced in code that isn't obvious from the method name
+4. **Check `tests/MOCKING_CONTRACT.md`'s Canonical Fixtures table** (it will
    be provided alongside the capability group) **against what you fetched.**
    If an existing fixture already covers a dependency this code has (e.g.
    it depends on a repository that a canonical fixture already mocks),
    name that fixture in the brief so the Test Architect reuses it instead
-   of reinventing one.
-4. **Flag anything that suggests a capability was mis-tagged in Step 3** —
+    of reinventing one.
+5. **Flag anything that suggests a capability was mis-tagged in Step 3** —
    e.g. a capability tagged `unit` whose file directly calls a repository
    or another service. This is the same self-correction the Test Architect
    already does mid-generation; you are surfacing the signal earlier, from
-   the actual code, before generation starts.
-5. **Do not search for or open test files.** Existing-test inspection is
+    the actual code, before generation starts.
+6. **Do not search for or open test files.** Existing-test inspection is
    the Test Architect's own Step 4, performed directly — it is not part of
    what you resolve.
 

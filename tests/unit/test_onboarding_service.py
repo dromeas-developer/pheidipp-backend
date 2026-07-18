@@ -4,16 +4,16 @@ These are pure-function tests — no database, no session, no HTTP.
 They exercise the small helpers the service relies on for its bootstrap
 math and error mapping.
 
-* ``_age_in_years`` — birthday-aware age computation (drives the
+* ``age_in_years`` — birthday-aware age computation (drives the
   ``max_hr = 220 - age`` formula).
-* ``_bootstrap_signal`` — JSON shape for a populated physiology posterior.
+* ``bootstrap_signal`` — JSON shape for a populated physiology posterior.
 * ``TrainingGoalRepository_unique_violation`` — PostgreSQL ``23505``
   detection for partial unique index failures.
 * ``_validate_goal_type`` — the onboarding whitelist for ``GoalType``.
 * The ``BOOTSTRAP_MODEL_VERSION`` constant matches the documented value.
 * ``POPULATION_TAU`` time constants carry the documented values from
   the architecture's Banister contract.
-* ``_bootstrap_metric_confidence`` produces the expected ``lt1_hr`` /
+* ``bootstrap_metric_confidence`` produces the expected ``lt1_hr`` /
   ``lt2_hr`` low-confidence JSON with all other metric slots null.
 
 Reference plan: docs/implementation/phase-1/phase-1-3-p1-onboarding-twin-bootstrap.md
@@ -37,14 +37,14 @@ from app.services.onboarding_service import (
     POPULATION_TAU,
     OnboardingService,
     TrainingGoalRepository_unique_violation,
-    _age_in_years,
-    _bootstrap_metric_confidence,
-    _bootstrap_signal,
+    age_in_years,
+    bootstrap_metric_confidence,
+    bootstrap_signal,
 )
 
 
 # ---------------------------------------------------------------------------
-# _age_in_years — birthday-aware computation.
+# age_in_years — birthday-aware computation.
 # ---------------------------------------------------------------------------
 
 
@@ -53,31 +53,31 @@ class TestAgeInYears:
 
     def test_age_is_zero_when_birthday_is_today(self) -> None:
         today = datetime(2026, 6, 25, tzinfo=timezone.utc)
-        assert _age_in_years(date(2026, 6, 25), today) == 0
+        assert age_in_years(date(2026, 6, 25), today) == 0
 
     def test_age_is_zero_when_birthday_is_in_the_future_this_year(self) -> None:
         today = datetime(2026, 6, 25, tzinfo=timezone.utc)
-        assert _age_in_years(date(2026, 6, 26), today) == 0
+        assert age_in_years(date(2026, 6, 26), today) == 0
 
     def test_age_increments_after_birthday_this_year(self) -> None:
         today = datetime(2026, 6, 25, tzinfo=timezone.utc)
-        assert _age_in_years(date(1990, 6, 25), today) == 36
+        assert age_in_years(date(1990, 6, 25), today) == 36
 
     def test_age_holds_before_birthday_this_year(self) -> None:
         """One day before birthday — age must NOT increment yet."""
         today = datetime(2026, 6, 25, tzinfo=timezone.utc)
-        assert _age_in_years(date(1990, 6, 26), today) == 35
+        assert age_in_years(date(1990, 6, 26), today) == 35
 
     def test_age_works_across_year_boundary_before_birthday(self) -> None:
         today = datetime(2026, 1, 1, tzinfo=timezone.utc)
         # Birthday in March — should report age as year-1 (turning N on
         # March 15), not the new age.
-        assert _age_in_years(date(1990, 3, 15), today) == 35
+        assert age_in_years(date(1990, 3, 15), today) == 35
 
     def test_age_works_across_year_boundary_after_birthday(self) -> None:
         today = datetime(2026, 6, 25, tzinfo=timezone.utc)
         # Birthday in January — already past, so age is N.
-        assert _age_in_years(date(1990, 1, 15), today) == 36
+        assert age_in_years(date(1990, 1, 15), today) == 36
 
     def test_age_drives_max_hr_estimate(self) -> None:
         """The bootstrap uses ``max_hr = 220 - age``. Asserting the
@@ -85,12 +85,12 @@ class TestAgeInYears:
         mapping at 36y -> 184 bpm which the rest of the suite
         relies on."""
         today = datetime(2026, 6, 25, tzinfo=timezone.utc)
-        age = _age_in_years(date(1990, 6, 25), today)
+        age = age_in_years(date(1990, 6, 25), today)
         assert 220 - age == 184
 
 
 # ---------------------------------------------------------------------------
-# _bootstrap_signal — posterior JSON shape.
+# bootstrap_signal — posterior JSON shape.
 # ---------------------------------------------------------------------------
 
 
@@ -100,7 +100,7 @@ class TestBootstrapSignal:
 
     def test_emits_expected_key_set(self) -> None:
         observation = datetime(2026, 6, 25, tzinfo=timezone.utc)
-        sig = _bootstrap_signal(value=138.0, observation_date=observation)
+        sig = bootstrap_signal(value=138.0, observation_date=observation)
         expected_keys = {
             "value",
             "uncertainty",
@@ -112,7 +112,7 @@ class TestBootstrapSignal:
 
     def test_value_passes_through_unchanged(self) -> None:
         observation = datetime(2026, 6, 25, tzinfo=timezone.utc)
-        sig = _bootstrap_signal(value=160.5, observation_date=observation)
+        sig = bootstrap_signal(value=160.5, observation_date=observation)
         assert sig["value"] == 160.5
 
     def test_uncertainty_is_high_for_bootstrap(self) -> None:
@@ -120,24 +120,24 @@ class TestBootstrapSignal:
         observations arrive — the architecture sets this to 1.0 at
         bootstrap."""
         observation = datetime(2026, 6, 25, tzinfo=timezone.utc)
-        sig = _bootstrap_signal(value=160.0, observation_date=observation)
+        sig = bootstrap_signal(value=160.0, observation_date=observation)
         assert sig["uncertainty"] == 1.0
 
     def test_prior_weight_is_uniform_half(self) -> None:
         """Per the architecture's Bayesian contract, bootstrap priors
         carry a uniform weight of 0.5."""
         observation = datetime(2026, 6, 25, tzinfo=timezone.utc)
-        sig = _bootstrap_signal(value=160.0, observation_date=observation)
+        sig = bootstrap_signal(value=160.0, observation_date=observation)
         assert sig["prior_weight"] == 0.5
 
     def test_dominant_source_is_questionnaire_estimate(self) -> None:
         observation = datetime(2026, 6, 25, tzinfo=timezone.utc)
-        sig = _bootstrap_signal(value=160.0, observation_date=observation)
+        sig = bootstrap_signal(value=160.0, observation_date=observation)
         assert sig["dominant_source"] == "questionnaire_estimate"
 
     def test_last_observation_date_is_the_supplied_datetime(self) -> None:
         observation = datetime(2026, 6, 25, tzinfo=timezone.utc)
-        sig = _bootstrap_signal(value=160.0, observation_date=observation)
+        sig = bootstrap_signal(value=160.0, observation_date=observation)
         # The implementation returns ISO format string for JSONB storage.
         # The contract is "the supplied observation date is preserved".
         assert sig["last_observation_date"] == observation.isoformat()
@@ -212,7 +212,7 @@ class TestGoalTypeWhitelist:
     @pytest.mark.parametrize("goal_type", [GoalType.RACE_EVENT, GoalType.TARGET_PERFORMANCE])
     def test_allowed_goal_types_pass_validation(self, goal_type: GoalType) -> None:
         # Should NOT raise.
-        OnboardingService._validate_goal_type(goal_type)
+        OnboardingService.validate_goal_type(goal_type)
 
     @pytest.mark.parametrize(
         "goal_type",
@@ -226,7 +226,7 @@ class TestGoalTypeWhitelist:
         self, goal_type: GoalType
     ) -> None:
         with pytest.raises(InvalidGoalTypeError) as exc_info:
-            OnboardingService._validate_goal_type(goal_type)
+            OnboardingService.validate_goal_type(goal_type)
         assert goal_type.value in str(exc_info.value)
 
     def test_validate_goal_type_rejects_unknown_value_textually(self) -> None:
@@ -234,23 +234,23 @@ class TestGoalTypeWhitelist:
         # Passing a non-enum raises at the membership check, not
         # silently — confirm the surface is strict.
         with pytest.raises((InvalidGoalTypeError, TypeError)):
-            OnboardingService._validate_goal_type(
+            OnboardingService.validate_goal_type(
                 "race_event",  # type: ignore[arg-type]
             )
 
     def test_module_level_helper_matches_class_validator(self) -> None:
         """The onboarding whitelist is enforced through
-        :meth:`OnboardingService._validate_goal_type`. The helper
+        :meth:`OnboardingService.validate_goal_type`. The helper
         rejects every value outside ``ALLOWED_ONBOARDING_GOAL_TYPES``,
         so disallowed values must produce :class:`InvalidGoalTypeError`
         and allowed values must pass silently."""
         with pytest.raises(InvalidGoalTypeError):
-            OnboardingService._validate_goal_type(
+            OnboardingService.validate_goal_type(
                 GoalType.FITNESS_IMPROVEMENT
             )
         # No raise for allowed types.
-        OnboardingService._validate_goal_type(GoalType.RACE_EVENT)
-        OnboardingService._validate_goal_type(GoalType.TARGET_PERFORMANCE)
+        OnboardingService.validate_goal_type(GoalType.RACE_EVENT)
+        OnboardingService.validate_goal_type(GoalType.TARGET_PERFORMANCE)
 
 
 # ---------------------------------------------------------------------------
@@ -338,12 +338,12 @@ class TestBootstrapMetricConfidence:
     ``low``; all other metric slots are explicitly ``null``."""
 
     def test_lt1_hr_and_lt2_hr_are_low(self) -> None:
-        confidence = _bootstrap_metric_confidence()
+        confidence = bootstrap_metric_confidence()
         assert confidence["lt1_hr"] == "low"
         assert confidence["lt2_hr"] == "low"
 
     def test_other_metric_slots_are_null(self) -> None:
-        confidence = _bootstrap_metric_confidence()
+        confidence = bootstrap_metric_confidence()
         for key in ("lt1_power", "lt1_pace", "lt2_power", "lt2_pace", "cp"):
             assert key in confidence, f"missing metric confidence key: {key}"
             assert confidence[key] is None, (
@@ -354,13 +354,13 @@ class TestBootstrapMetricConfidence:
         """Global ``TwinState.confidence_level`` is
         ``min(per-metric)``. With only low-populated entries the
         result must be ``low``."""
-        confidence = _bootstrap_metric_confidence()
+        confidence = bootstrap_metric_confidence()
         populated = [v for v in confidence.values() if v is not None]
         assert populated  # at least one populated
         assert all(v == "low" for v in populated)
 
     def test_carries_all_expected_keys(self) -> None:
-        confidence = _bootstrap_metric_confidence()
+        confidence = bootstrap_metric_confidence()
         expected = {
             "lt1_hr",
             "lt1_power",

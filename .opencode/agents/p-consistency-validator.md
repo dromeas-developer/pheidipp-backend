@@ -80,8 +80,8 @@ outside a repository) can be found without architecture context. But
 the harder class of ownership blur — a service that has accumulated
 a responsibility that architecturally belongs to a different service
 — requires knowing the intended boundary, which is architecture
-knowledge. The `implemented-state.md` partially bridges this because
-it captures ownership context as written by the coder. This works
+knowledge. The State Explorer's registry partially bridges this because
+it captures ownership context from the live codebase. This works
 in early phases. In later phases, when services are large and boundaries
 are subtle, some MAJOR findings in the "Accumulated Service
 Responsibilities" check may quietly require architecture knowledge
@@ -110,7 +110,7 @@ scope:
 ```
 
 Capability-scoped audits require tracing inward from the capability
-via the implemented-state dependency map rather than filtering by
+via the registry dependency map rather than filtering by
 phase tag. This is a meaningful change to Step 1 (Establish Scope)
 and Step 2 (Structural Survey). Re-evaluate when Phase 4 implementations
 produce cross-phase capability slices worth auditing as a unit.
@@ -123,9 +123,19 @@ The task must specify the scope: either a phase number (`phase: 1`) or an
 explicit list of sub-phase IDs (`subphases: [1-1, 1-2a, 1-2b]`). If neither
 is provided, STOP and report the missing input.
 
-Load `docs/implementation/implemented-state.md` first if it exists. Use it
-as the primary reference for what has been implemented. If unavailable,
-proceed with reduced confidence and note it.
+Invoke `p-state-explorer` via the `task` tool with the task's scope:
+
+```
+Tool: task
+Input:
+{
+  "subagent_type": "p-state-explorer",
+  "prompt": "Domain: <domain or phase scope>\n\nAspects: all"
+}
+```
+
+Use its brief as the primary reference for what has been implemented.
+The State Explorer queries the live codebase and is always current.
 
 ---
 
@@ -158,7 +168,7 @@ behaviour. A third class — a service that owns a capability belonging
 to a different service's domain — requires architecture knowledge to
 detect reliably. Findings in this third class should be flagged as
 OBSERVATION unless the misplacement is unambiguous from the code and
-the implemented-state ownership notes. See Known Limitations.
+the registry's ownership notes. See Known Limitations.
 
 **Pattern inconsistency within the same category** — similar operations
 implemented differently across the same category of component. Examples:
@@ -217,16 +227,26 @@ managed safely (e.g. via `TYPE_CHECKING` guards that are correctly placed).
 
 ### Step 0 — Load State
 
-Load `docs/implementation/implemented-state.md` if it exists. This gives
-you the list of implemented entities, services, repositories, routes, and
-event producers to guide retrieval.
+Invoke `p-state-explorer` via the `task` tool with the task's scope
+(phase number or sub-phase ID list):
 
-If unavailable: proceed using only the scope specified in the task. Note
-reduced confidence in the report.
+```
+Tool: task
+Input:
+{
+  "subagent_type": "p-state-explorer",
+  "prompt": "Domain: <phase scope>\n\nAspects: all"
+}
+```
+
+This gives you the live registry of implemented entities, services,
+repositories, routes, and event producers to guide retrieval.
+The State Explorer queries the codebase at fetch time, so its results are
+always current — no static snapshot to maintain or fall back from.
 
 ### Step 1 — Establish Scope
 
-From the task input and implemented-state, identify the complete set of
+From the task input and the State Explorer's brief, identify the complete set of
 implementation artifacts in scope:
 
 - Model files
@@ -241,32 +261,21 @@ Build this list before any retrieval. Do not retrieve speculatively.
 
 ### Step 2 — Structural Survey (cheap pass, no full file bodies)
 
-Do not call `get_files` on the full scope list. Almost none of the checks
-in this protocol need full file content to run — they need names,
-signatures, and the few lines around specific patterns. Build a
-structural index of the scope first, using targeted, low-cost calls, and
-hold the number of calls fixed regardless of scope size:
+Use the State Explorer's Brief from Step 0 as your structural index.
+It already covers every file's entity/service/repo/route registrations,
+event producer locations, and transaction boundaries — the full registry
+for the scope. Run only the two grep calls not covered by State Explorer:
 
-* One `search_symbols` call covering every file in scope — class and
-  method/function names for every repository, service, and route. This
-  is what naming-drift and pattern-consistency comparisons actually need.
-  Never call it per-file; it takes a batch.
-* A small, fixed set of `grep_files` calls, each covering the full path
-  list (or the relevant subset) in one call — not one call per file:
-  - `session\.commit\(|publish_event\(` across services and repositories,
-    to check commit/event ordering
-  - `\.query\(|select\(|session\.execute\(`, scoped to route files, to
-    check for query logic outside the repository layer
-  - `^def |^class |^    def `, across the full scope, to get every file's
-    top-level shape in one pass — this also gives line counts and
-    responsibility signals for the Oversized Files and Accumulated
-    Responsibilities checks without reading bodies
-  - distinctive fragments for duplicate-logic candidates, one call per
-    fragment, each scoped to the full path list
+* One `grep_files` across all scope files for `\.query\(|select\(|session\.execute\(`,
+  scoped to route files, to check for query logic outside the repository layer
+* One `grep_files` for distinctive duplicate-logic fragments across the full
+  scope, one call per fragment
 
-Target for this step: roughly 4-6 calls total, independent of how many
-files are in scope. If scope size is pushing that number up, combine
-patterns with regex alternation before adding another call.
+Skip the `search_symbols` batch — State Explorer already has class/method
+names. Skip the commit/event grep — State Explorer already has event
+producer locations and transaction boundaries.
+
+Target: 2-3 calls total, independent of scope size.
 
 This survey is what the rest of the protocol runs against. If a file in
 scope does not exist, note it and continue.
@@ -332,7 +341,7 @@ are separable.
 
 **For accumulated service responsibilities:**
 For each service, identify every distinct capability it owns from Step 2's
-structural index plus `implemented-state.md`'s ownership notes. Only flag
+structural index plus the State Explorer's ownership notes. Only flag
 when a capability belongs to a clearly different ownership domain — not
 when it is a borderline case. Borderline cases are noted as observations,
 not findings.
@@ -416,7 +425,6 @@ Save the report as `docs/implementation/consistency-<scope>.md` where
 ```markdown
 # Consistency Validation Report — <scope>
 Date: <date>
-Implemented-state available: yes / no
 
 ## Result: PASS | PASS WITH CODER FIXES | FINDINGS REQUIRING ARCHITECT REVIEW
 
@@ -537,7 +545,6 @@ so the next consistency validation knows they were reviewed.
 
 | Dimension | Status |
 |-----------|--------|
-| Implemented-state loaded | yes / no |
 | All scope files structurally surveyed (Step 2) | X of Y |
 | Verification Queue drained (Step 5) | X of Y items resolved |
 | Naming drift scan complete | yes / partial |
@@ -546,13 +553,13 @@ so the next consistency validation knows they were reviewed.
 | Duplicate logic scan complete | yes / partial |
 | Technical debt scan complete | yes / partial |
 
-Confidence is LOW if implemented-state was unavailable and fewer than half
-the scope files were surveyable. Confidence is MEDIUM if implemented-state
-was unavailable but all scope files were surveyed. Confidence is HIGH when
-all dimensions are yes/complete — note that "all scope files surveyed"
-does not mean all were loaded in full; it means every file was covered by
-the Step 2 structural pass, and every item that entered the Verification
-Queue in Steps 3-4 was resolved in Step 5.
+Confidence is LOW if fewer than half the scope files were surveyable.
+Confidence is MEDIUM if all scope files were surveyed but some patterns
+had sparse matches. Confidence is HIGH when all dimensions are
+yes/complete — note that "all scope files surveyed" does not mean all
+were loaded in full; it means every file was covered by the Step 2
+structural pass, and every item that entered the Verification Queue in
+Steps 3-4 was resolved in Step 5.
 
 ---
 
@@ -560,8 +567,8 @@ Queue in Steps 3-4 was resolved in Step 5.
 
 | Disposition | Count | Route |
 |-------------|-------|-------|
-| CRITICAL | N | → p-architect immediately; block next sub-phase until resolved |
-| MAJOR | N | → p-architect to decide: remediation plan, absorb into upcoming sub-phase, or accept with ADR |
+| CRITICAL | N | → p-implementation-architect immediately; block next sub-phase until resolved |
+| MAJOR | N | → p-implementation-architect to decide: remediation plan, absorb into upcoming sub-phase, or accept with ADR |
 | CODER | N | → p-coder directly with this report; no architect review needed |
 | OBSERVATION | N | No action; documented above |
 ```

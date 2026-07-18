@@ -13,6 +13,7 @@ permission:
   task:
     "*": deny
     p-code-explorer: allow
+    p-diagnostics-fixer: allow
 
   read:       deny
   grep:       deny
@@ -113,13 +114,22 @@ input to resolve execution scope.
 
 ## Implementation Resolution (NON-NEGOTIABLE)
 
-From Step 3 onward, you never call `get_files`, `find_files`, or
-`grep_files` on `app/` paths — that is `p-code-explorer`'s job, not yours.
-All implementation-file resolution routes through the `task` tool,
-invoking `p-code-explorer` in Test Architect Mode. This is not a
-preference or a style note: a direct `get_files` against an `app/` path
-in Step 3 or later is a protocol violation, the same class of violation
-as running bare `pytest` instead of `scripts/pytest.sh` above.
+You never call `get_files`, `find_files`, `grep_files`, `search_codebase`,
+or `search_symbols` on `app/` paths — that is `p-code-explorer`'s job, not
+yours. This applies at every step, not just Step 3 onward. All
+implementation-file resolution routes through the `task` tool, invoking
+`p-code-explorer` in Test Architect Mode. This is not a preference or a
+style note: a direct tool call against an `app/` path at any step is a
+protocol violation, the same class of violation as running bare `pytest`
+instead of `scripts/pytest.sh` above.
+
+**For diagnostics-fixer follow-up analysis:** When the fixer returns a
+report or batching plan that requires you to understand production code
+(e.g., determining whether a private method should be made public,
+analyzing a type error's root cause in `app/`), delegate to
+`p-code-explorer`. Ask the explorer to produce a report on the relevant
+`app/` files — method visibility, signature contracts, usage patterns.
+Do not open `app/` files yourself to answer these questions.
 
 The call shape, every time, one call per group:
 
@@ -141,13 +151,14 @@ Input:
 > doesn't change within a stage; repeating it verbatim across three or
 > four group calls is pure duplication.
 
-**The only files you fetch directly, ever, at any step, are:** the plan,
-the manifest (index + sub-phase file), `tests/README.md`,
-`tests/MOCKING_CONTRACT.md`, DevOps reports, and your own existing test
-files under `tests/`. Everything under `app/` goes through
-`p-code-explorer`. If you catch yourself about to fetch an `app/` path
-directly, stop — that is the signal delegation was skipped, not a sign
-the Explorer is unnecessary for this particular case.
+**The only files you fetch or search directly, ever, at any step, are:**
+the plan, the manifest (index + sub-phase file), `tests/README.md`,
+`tests/MOCKING_CONTRACT.md`, DevOps reports, your own diagnostic reports,
+and your own existing test files under `tests/`. Everything under `app/`
+goes through `p-code-explorer` — including `search_codebase` and
+`search_symbols` queries. If you catch yourself about to access an `app/`
+path directly, stop — that is the signal delegation was skipped, not a
+sign the Explorer is unnecessary for this particular case.
 
 **Fallback, stated precisely so it cannot be used as a shortcut:** you
 may fetch an `app/` path directly only after an actual `task` call to
@@ -245,18 +256,25 @@ later session to pick up, it just doesn't generate their tests itself.
 
 Load in this order, in a single batched `get_files` call where possible:
 
-1. Implementation plan (`docs/implementation/phase-N/phase-N-M-pY-<title>.md`)
-2. Validator report for this plan (if available — do not block if missing)
-3. DevOps report from the most recent execution cycle for this plan or
+1. Implementation plan — the batch BRD
+   (`docs/implementation/phase-N/phase-N-M/batch-N-<theme>.md`)
+2. **Test scenarios companion file** — if the batch BRD has a companion
+   `-tests.md` file at `docs/implementation/phase-N/phase-N-M/batch-N-<theme>-tests.md`,
+   load it in the same batched call. Each scenario in this file is a
+   concrete input/output pair that must become at least one test case.
+   If the file does not exist (purely structural batch, no behavioural
+   changes), skip — the test architect derives tests from contracts alone.
+3. Validator report for this plan (if available — do not block if missing)
+4. DevOps report from the most recent execution cycle for this plan or
    sub-phase (if available — do not block if missing; this feeds Step 2)
-4. `tests/test-manifest/index.yaml` and the current sub-phase file
+5. `tests/test-manifest/index.yaml` and the current sub-phase file
    (`tests/test-manifest/phase-N-Mx.yaml`), if they exist. Load other
    sub-phase files only if cross-phase impact analysis requires it (see
    Step 4). If this plan already has an entry in the sub-phase file, it
    may already carry a capability inventory (test type and file scope per
    capability) from a prior session's Step 3 — see Step 3 for what to do
    with it.
-5. `tests/README.md` and `tests/MOCKING_CONTRACT.md` — accumulated
+6. `tests/README.md` and `tests/MOCKING_CONTRACT.md` — accumulated
    do/don't lessons from real test failures (async session pitfalls,
    schema-inspection anti-patterns, determinism issues, etc.) and the
    current fixture/mock boundary rules. These are load-bearing inputs, not
@@ -277,32 +295,26 @@ If the implementation plan is missing → STOP and report it.
 
 ### Step 2 — Ingest DevOps Infrastructure Fixes (MANDATORY when a DevOps report exists)
 
-Skip this step only if no DevOps report exists yet for this plan (i.e. this
-is the first-ever generation cycle). Otherwise it is mandatory and
-blocking — do not proceed to Step 3 until it is complete.
+Skip only if no DevOps report exists yet. Read the report's
+`## Infrastructure Fixes` section. For each entry, classify as one-off
+(single file, unlikely to recur) or reusable failure class (async
+session scope, mock boundary, schema-inspection anti-pattern, ordering
+assumption, JWT/datetime determinism, etc.).
 
-For each entry under the DevOps report's `## Infrastructure Fixes` heading:
+For every reusable class: append a dated entry to `tests/README.md` in
+the existing do/don't format — symptom, root cause, failed pattern,
+correct pattern.
 
-1. Classify it as either a **one-off** (specific to a single file, unlikely
-   to recur) or a **reusable failure class** (async session/fixture scope,
-   mock boundary violation, schema-inspection anti-pattern, ordering/timing
-   assumption, JWT or datetime determinism, etc.).
-2. For every reusable failure class, append a dated entry to
-   `tests/README.md` in the existing do/don't format: symptom observed,
-   root cause, the pattern that failed, the pattern to use instead.
-3. If the fix reveals that a test crossed a mocking boundary it should not
-   have (mocked too deep, mocked too shallow, or reinvented a fixture that
-   already existed), update `tests/MOCKING_CONTRACT.md` directly — the
-   README records the lesson, the contract enforces it going forward.
-4. If a fix belongs to a failure class that already has two or more prior
-   entries in `tests/README.md`, do not just add a third entry. Flag it in
-   this cycle's test pack under `## Recurring Infrastructure Risk` and
-   state whether it should move into a shared `conftest.py` fixture
-   instead of relying on every test author to remember the rule.
+If the fix crossed a mocking boundary: update `tests/MOCKING_CONTRACT.md`
+directly — README records the lesson, the contract enforces it.
 
-The goal of this step is that the same class of DevOps-reported failure
-should not recur more than twice before it is either fixed structurally
-(a fixture) or made impossible to miss (the contract).
+If a class already has ≥2 prior README entries: flag it in this cycle's
+test pack under `## Recurring Infrastructure Risk` and state whether it
+should move into a shared `conftest.py` fixture.
+
+The goal: the same failure class should not recur more than twice before
+it is either fixed structurally (a fixture) or made impossible to miss
+(the contract).
 
 ### Step 3 — Build Capability Inventory
 
@@ -637,21 +649,50 @@ lets a later session know it still owes work on this plan.
 Include a `## Recurring Infrastructure Risk` section if Step 2 flagged one.
 
 Then confirm `index.yaml`, the sub-phase file(s), `tests/README.md`, and
-`tests/MOCKING_CONTRACT.md` were saved (as applicable) and STOP.
+`tests/MOCKING_CONTRACT.md` were saved (as applicable).
+
+**Post-generation diagnostics:** Invoke `p-diagnostics-fixer` via the
+`task` tool — **one invocation per test file**, not one invocation with
+all files. Each invocation starts fresh, fixes a single file's type
+errors, and returns. Invoke once per test file you created or modified,
+in order:
+
+```
+Tool: task
+Input:
+{
+  "subagent_type": "p-diagnostics-fixer",
+  "prompt": "plan_id: <plan-id>\n\nfile: <path/to/test_file.py>"
+}
+```
+
+No `max_iterations` — with a single file per invocation, the fixer should
+complete in 1-2 turns. After all invocations complete, verify each returned
+a result: a report at `reports/<plan_id>_diagnostics_<file>.md`, or a
+batching plan in the response text.
+
+**Handling a batching plan response:** If the fixer returns a batching plan
+(text, no file), create a `todowrite` tasklist from it. Each file in the
+plan becomes one task item. Process sequentially — invoke the fixer for one
+file, confirm the report was saved, mark the task complete, then start the
+next. Do NOT launch all invocations in parallel — the batching plan exists
+specifically because the workload is too large for concurrent processing.
+
+After all tasks are complete, count successful reports vs failures.
+Report both in your completion confirmation.
+
+Then STOP.
 
 ---
 
-## Manifest Structure
+## Manifest Schema
 
-The manifest is split across multiple files under `tests/test-manifest/`:
+The full manifest schema (index.yaml structure, sub-phase file schema,
+ownership rules, and selection group rules) is in
+`tests/test-manifest/SCHEMA.md`. Reference that file for the authoritative
+schema definition.
 
-```
-tests/test-manifest/
-  index.yaml          # selection groups, cross-phase coverage, history summary
-  phase-1-1.yaml      # all features and tests for Phase 1.1
-  phase-1-2a.yaml     # all features and tests for Phase 1.2a
-  phase-1-2b.yaml     # etc — one file per sub-phase
-```
+**Agent-specific notes:**
 
 **Agents load only what they need:**
 - DevOps: reads `index.yaml` (for selection scope) + the current sub-phase file
@@ -663,171 +704,6 @@ tests/test-manifest/
 creates a new `phase-N-Mx.yaml` file. It never modifies a prior sub-phase
 file except to update `validation` fields when DevOps reports results for
 previously deferred tests.
-
----
-
-## Index Schema
-
-```yaml
-# tests/test-manifest/index.yaml
-# Lean cross-phase registry. Only two things live here:
-#   1. Resolved selection groups (paths only)
-#   2. Cross-phase coverage summary
-#   3. Cross-phase execution group dependencies
-# History, features, execution groups, and per-sub-phase coverage
-# live in the individual sub-phase files.
-version: "1.0"
-last_reviewed_at: "<ISO 8601>"
-
-# Resolved selection groups — paths only, no feature metadata.
-# Rebuilt by Test Architect when any sub-phase file changes promotion state.
-selection:
-  smoke:
-    - "<test file path>"
-  feature:
-    - "<test file path>"     # current sub-phase only
-  regression:
-    - "<test file path>"     # all promoted tests across all sub-phases
-  release:
-    - "<test file path>"     # all status=promoted tests
-
-# Cross-phase coverage summary — updated when features are promoted.
-coverage:
-  routes:
-    covered: ["<route>"]
-    partial: ["<route>"]
-    missing: ["<route>"]
-  events:
-    covered: ["<event>"]
-    partial: ["<event>"]
-    missing: ["<event>"]
-  invariants:
-    covered: ["<invariant>"]
-    partial: ["<invariant>"]
-    missing: ["<invariant>"]
-
-# Cross-phase execution group dependencies.
-# Intra-phase ordering lives in the sub-phase files.
-cross_phase_dependencies:
-  <group-id>:
-    depends_on_cross_phase:
-      - "<group-id>"
-```
-
----
-
-## Sub-Phase File Schema
-
-```yaml
-# tests/test-manifest/phase-N-Mx.yaml
-version: "1.0"
-plan_id: "<plan-id>"
-generated_at: "<ISO 8601>"
-last_reviewed_at: "<ISO 8601>"
-
-features:
-  <feature-id>:
-    status: pending           # pending | generated | executable | passing | promoted | deprecated
-    # "pending" means Step 3 has identified and tagged this capability but
-    # no Test Mode session has generated its test yet. This is the state
-    # every capability starts in — it lets a later single-mode session
-    # (e.g. "integration" run in a separate session from "unit") find
-    # exactly what it still owes without re-deriving the inventory.
-    test_type: unit           # unit | integration | api | behaviour — set by Step 3
-    file_scope:               # exact paths from the plan's Scope section — set by Step 3
-      - "<file path>"
-    plan: "<plan file path>"
-    owned_by_plan:
-      - "<plan-id>"
-    description: "<one line>"
-    protects:
-      - "<invariant description>"
-    impacts:
-      - "<feature-id>"       # may reference features in other sub-phase files
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: false     # set by Test Architect when this feature's test is generated
-      executable: false      # set by DevOps after execution
-      passed: false          # set by DevOps after execution
-    tests:
-      unit:
-        - path: "tests/unit/test_x.py"
-          owner: "<plan-id>"
-      integration:
-        - path: "tests/integration/test_x.py"
-          owner: "<plan-id>"
-      api:
-        - path: "tests/api/test_x.py"
-          owner: "<plan-id>"
-      behaviour:
-        - path: "tests/behaviour/test_x.py"
-          owner: "<plan-id>"
-      release:
-        - path: "tests/release/test_x.py"
-          owner: "<plan-id>"
-
-# Execution groups for this sub-phase only.
-# Cross-phase depends_on edges live in index.yaml cross_phase_dependencies.
-execution_groups:
-  <group-name>:
-    scope: smoke | feature | regression | release
-    phase: <n>
-    tests:
-      - "<test file path>"
-    depends_on:
-      - "<group-name>"       # intra-phase only
-
-# Coverage for this sub-phase only — index.yaml holds the cross-phase view.
-coverage:
-  routes:
-    covered: ["<route>"]
-    partial: ["<route>"]
-    missing: ["<route>"]
-  events:
-    covered: ["<event>"]
-    partial: ["<event>"]
-    missing: ["<event>"]
-  invariants:
-    covered: ["<invariant>"]
-    partial: ["<invariant>"]
-    missing: ["<invariant>"]
-
-# Full audit history for this sub-phase.
-# Every Test Architect or DevOps change gets an entry here.
-# The index.yaml has no history block — this is the only history record.
-history:
-  - date: "<YYYY-MM-DD>"
-    plan: "<plan-id>"
-    tests_added: <n>
-    tests_modified: <n>
-    tests_removed: <n>
-    result: "PASS | FAIL | PARTIAL"
-    coverage_delta: >
-      <prose description of what changed and why>
-```
-
----
-
-## Manifest Ownership Rules
-
-The manifest is split-owned between the Test Architect and DevOps.
-The division follows who has direct evidence for each field.
-
-| Field | File | Owner | Rationale |
-|---|---|---|---|
-| `validation.implemented` | sub-phase | Test Architect | Only the Test Architect knows whether a test file was generated and exists on disk |
-| `validation.executable` | sub-phase | DevOps | Only DevOps has run the suite and knows whether tests ran without errors |
-| `validation.passed` | sub-phase | DevOps | Only DevOps has the actual pass/fail result |
-| `status` progression | sub-phase | Test Architect | Promotion decisions are judgment calls, not transcription |
-| `test_type` / `file_scope` | sub-phase | Test Architect | Set once by Step 3, read by every later Test Mode session on this plan instead of being re-derived |
-| `history` | sub-phase | Test Architect | Full audit trail for this sub-phase — lives where the detail lives |
-| `selection` groups | index | Test Architect | Which tests belong in smoke/regression/release is a design decision |
-| `coverage` (cross-phase) | index | Test Architect | Updated when features are promoted |
-| `cross_phase_dependencies` | index | Test Architect | Cross-phase execution group ordering |
-| All other sub-phase fields | sub-phase | Test Architect | Features, protects, impacts, prerequisites |
 
 **What this means in practice:**
 

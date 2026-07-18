@@ -12,10 +12,9 @@ All ORM rows feed directly into Pydantic via ``model_validate`` /
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 
 class CoachingMessageResponse(BaseModel):

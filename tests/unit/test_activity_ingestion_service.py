@@ -11,16 +11,15 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime, timedelta, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from typing import Any
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from app.models.enums import ActivitySource, HrSource, PowerSource, SportType
 from app.services.activity_ingestion_service import (
     ActivityIngestionError,
-    ActivityIngestionResult,
     ActivityIngestionService,
-    AthleteNotFoundForIngestionError,
     ObjectStorageFailureError,
 )
 from app.services.fit_parser_service import GpsRecord, ParsedFitData
@@ -62,7 +61,7 @@ class TestStageUpload:
         service.activities = mock_repo
 
         # Call stage_upload
-        result = await service.stage_upload(
+        await service.stage_upload(
             athlete_id=athlete_id,
             file_bytes=file_bytes,
         )
@@ -299,7 +298,7 @@ class TestIngestPipeline:
         mock_repo.update_load_scores = AsyncMock()
         service.activities = mock_repo
 
-        recal, scores = await service._run_ingestion_pipeline(
+        recal, scores = await service.run_ingestion_pipeline(
             athlete_id=athlete_id,
             activity_id=activity_id,
             file_bytes=file_bytes,
@@ -310,20 +309,6 @@ class TestIngestPipeline:
         assert recal.twin_state == mock_twin_state
         # Verify update was called with load scores
         mock_repo.update_load_scores.assert_called_once()
-
-
-class _MockRow:
-    """Mock SQLAlchemy Row for _read_profile_date_of_birth queries.
-
-    SQLAlchemy Row objects are subscriptable (row[0]) and have named
-    attribute access. This class provides minimal subscriptable behaviour.
-    """
-
-    def __init__(self, date_of_birth):
-        self._data = (date_of_birth,)
-
-    def __getitem__(self, key):
-        return self._data[key]
 
 
 class TestIngestAsync:
@@ -641,7 +626,7 @@ class TestSignalFlagsPopulation:
         mock_repo.update_calibration_eligibility = AsyncMock()
         service.activities = mock_repo
 
-        await service._run_ingestion_pipeline(
+        await service.run_ingestion_pipeline(
             athlete_id=athlete_id,
             activity_id=activity_id,
             file_bytes=file_bytes,
@@ -725,7 +710,7 @@ class TestSignalFlagsPopulation:
         mock_repo.get_recent_structural_load = AsyncMock(return_value=0.0)
         service.activities = mock_repo
 
-        await service._run_ingestion_pipeline(
+        await service.run_ingestion_pipeline(
             athlete_id=athlete_id,
             activity_id=activity_id,
             file_bytes=b"fit",
@@ -798,7 +783,7 @@ class TestSignalFlagsPopulation:
         mock_repo.get_recent_structural_load = AsyncMock(return_value=0.0)
         service.activities = mock_repo
 
-        await service._run_ingestion_pipeline(
+        await service.run_ingestion_pipeline(
             athlete_id=athlete_id,
             activity_id=activity_id,
             file_bytes=b"fit",
@@ -874,7 +859,7 @@ class TestSignalFlagsPopulation:
         mock_repo.get_recent_structural_load = AsyncMock(return_value=0.0)
         service.activities = mock_repo
 
-        await service._run_ingestion_pipeline(
+        await service.run_ingestion_pipeline(
             athlete_id=athlete_id,
             activity_id=activity_id,
             file_bytes=b"fit",
@@ -947,7 +932,7 @@ class TestSignalFlagsPopulation:
         mock_repo.update_calibration_eligibility = AsyncMock()
         service.activities = mock_repo
 
-        await service._run_ingestion_pipeline(
+        await service.run_ingestion_pipeline(
             athlete_id=athlete_id,
             activity_id=activity_id,
             file_bytes=b"fit",
@@ -967,10 +952,10 @@ class TestSignalFlagsPopulation:
 class TestComputeQualityFlagsSensorMalfunction:
     """Regression coverage for optional HR/power records in quality flags."""
 
-    def _make_flags(self, parsed: ParsedFitData) -> dict:
+    def _make_flags(self, parsed: ParsedFitData) -> dict[str, Any]:
         """Helper: call _compute_quality_flags directly on a ParsedFitData."""
         service = ActivityIngestionService(session=AsyncMock())
-        return service._compute_quality_flags(parsed)
+        return service.compute_quality_flags(parsed)
 
     def test_ignores_none_hr_and_power_samples_when_flagging_sensor_malfunction(
         self,
@@ -1005,10 +990,10 @@ class TestComputeQualityFlagsGpsLoss:
     - has_gps=false → gps_loss = False (regardless of records)
     """
 
-    def _make_flags(self, parsed: ParsedFitData) -> dict:
+    def _make_flags(self, parsed: ParsedFitData) -> dict[str, Any]:
         """Helper: call _compute_quality_flags directly on a ParsedFitData."""
         service = ActivityIngestionService(session=AsyncMock())
-        return service._compute_quality_flags(parsed)
+        return service.compute_quality_flags(parsed)
 
     def test_gps_loss_false_when_has_gps_is_false(self) -> None:
         """has_gps=False → gps_loss=False regardless of any records."""
@@ -1198,7 +1183,7 @@ class TestReadStructuralRiskFlag:
             athlete_profiles=mock_repo,
         )
 
-        result = await service._read_structural_risk_flag(athlete_id)
+        result = await service.read_structural_risk_flag(athlete_id)
         assert result is True
         mock_repo.get_by_athlete_id.assert_awaited_once_with(athlete_id)
 
@@ -1218,7 +1203,7 @@ class TestReadStructuralRiskFlag:
             athlete_profiles=mock_repo,
         )
 
-        result = await service._read_structural_risk_flag(athlete_id)
+        result = await service.read_structural_risk_flag(athlete_id)
         assert result is False
 
     @pytest.mark.asyncio
@@ -1237,7 +1222,7 @@ class TestReadStructuralRiskFlag:
             athlete_profiles=mock_repo,
         )
 
-        result = await service._read_structural_risk_flag(athlete_id)
+        result = await service.read_structural_risk_flag(athlete_id)
         assert result is False
 
     @pytest.mark.asyncio
@@ -1253,7 +1238,7 @@ class TestReadStructuralRiskFlag:
             athlete_profiles=mock_repo,
         )
 
-        result = await service._read_structural_risk_flag(athlete_id)
+        result = await service.read_structural_risk_flag(athlete_id)
         assert result is False
 
 
@@ -1353,7 +1338,7 @@ class TestSportTypePipeline:
         mock_repo.update_load_scores = AsyncMock()
         service.activities = mock_repo
 
-        await service._run_ingestion_pipeline(
+        await service.run_ingestion_pipeline(
             athlete_id=athlete_id,
             activity_id=activity_id,
             file_bytes=b"running.fit",
@@ -1437,7 +1422,7 @@ class TestSportTypePipeline:
         mock_repo.update_load_scores = AsyncMock()
         service.activities = mock_repo
 
-        await service._run_ingestion_pipeline(
+        await service.run_ingestion_pipeline(
             athlete_id=athlete_id,
             activity_id=activity_id,
             file_bytes=b"cycling.fit",
@@ -1517,7 +1502,7 @@ class TestSportTypePipeline:
         mock_repo.get_recent_structural_load = AsyncMock(return_value=0.0)
         service.activities = mock_repo
 
-        await service._run_ingestion_pipeline(
+        await service.run_ingestion_pipeline(
             athlete_id=athlete_id,
             activity_id=activity_id,
             file_bytes=b"test.fit",
@@ -1525,7 +1510,7 @@ class TestSportTypePipeline:
 
         # Verify sport_type_detected event was published
         calls = service.events.publish.call_args_list
-        event_types = [call[1].get("event_type") or call[0][0] for call in calls]
+        [call[1].get("event_type") or call[0][0] for call in calls]
         # sport_type_detected should fire for non-manual-entry sources
         # (actual event name depends on implementation; check publish calls)
         assert service.events.publish.call_count >= 1
@@ -1595,7 +1580,7 @@ class TestSportTypePipeline:
         mock_repo.update_load_scores = AsyncMock()
         service.activities = mock_repo
 
-        await service._run_ingestion_pipeline(
+        await service.run_ingestion_pipeline(
             athlete_id=athlete_id,
             activity_id=activity_id,
             file_bytes=b"unknown.fit",

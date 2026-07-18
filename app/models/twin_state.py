@@ -16,16 +16,19 @@ Invariants codified at the DB layer:
 * ``training_goal_id``, ``model_version``, and ``activity_id`` are
   frozen at creation time via being non-nullable (or null at insert
   only for ``activity_id``).
-* One ``TwinState`` per ``(athlete_id, activity_id)`` where
-  ``activity_id IS NOT NULL`` — enforced via partial unique index so
-  non-activity triggers (questionnaire / physiology_input /
-  wellness_update) are not blocked.
+* Multiple ``TwinState`` rows per ``(athlete_id, activity_id)`` are
+  allowed — a calibration TwinState may coexist with a prior
+  activity_sync TwinState for the same activity. Deduplication is
+  application-level (``insert_if_not_exists``); the DB-level unique
+  index was dropped in Phase 2.3 P3.
 * ``(athlete_id, created_at DESC)`` is the primary read pattern — the
   ``idx_twin_states_latest`` index supports the most frequent query
   in the system (``get_latest`` for the home view).
 """
 
 from __future__ import annotations
+
+from typing import Any
 
 import uuid
 from datetime import datetime, timezone
@@ -45,6 +48,7 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
+from app.models._enum_helpers import enum_str_values
 from app.models.enums import (
     DataTier,
     RecoveryModifierLevel,
@@ -108,7 +112,7 @@ class TwinState(Base):
             name="twin_confidence_level",
             native_enum=False,
             length=16,
-            values_callable=lambda x: [e.value for e in x],
+            values_callable=enum_str_values,
         ),
         nullable=False,
     )
@@ -118,7 +122,7 @@ class TwinState(Base):
             name="twin_trigger",
             native_enum=False,
             length=32,
-            values_callable=lambda x: [e.value for e in x],
+            values_callable=enum_str_values,
         ),
         nullable=False,
     )
@@ -166,7 +170,7 @@ class TwinState(Base):
             name="recovery_modifier_level",
             native_enum=False,
             length=8,
-            values_callable=lambda x: [e.value for e in x],
+            values_callable=enum_str_values,
             create_type=False,
         ),
         nullable=False,
@@ -177,7 +181,7 @@ class TwinState(Base):
             name="wellness_trend",
             native_enum=False,
             length=16,
-            values_callable=lambda x: [e.value for e in x],
+            values_callable=enum_str_values,
         ),
         nullable=True,
     )
@@ -188,20 +192,21 @@ class TwinState(Base):
     # ``lt1_power`` / ``lt1_pace``, ``lt2_hr``, ``lt2_power`` /
     # ``lt2_pace``, ``cp``). Null fields use JSON ``null``.
     # ------------------------------------------------------------------
-    metric_confidence: Mapped[dict] = mapped_column(
+    metric_confidence: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb")
     )
 
     __table_args__ = (
-        # Arch invariant — one TwinState per (athlete_id, activity_id)
-        # for activity-linked triggers. The partial uniques index
-        # keeps non-activity triggers (questionnaire, physiology_input,
-        # wellness_update) outside the deduplication scope.
+        # Reverse-lookup from training goal / activity — supports the
+        # get_by_activity repository contract. Non-unique: a
+        # calibration TwinState may coexist with a prior
+        # activity_sync TwinState for the same activity (Phase 2.3
+        # P3). Application-level ``insert_if_not_exists`` is the
+        # authoritative deduplication mechanism.
         Index(
-            "uq_twin_states_athlete_activity",
+            "ix_twin_states_athlete_activity",
             "athlete_id",
             "activity_id",
-            unique=True,
             postgresql_where=text("activity_id IS NOT NULL"),
         ),
         # Primary read path — ``get_latest`` lookup for the home view.

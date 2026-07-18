@@ -24,10 +24,10 @@ async def http_register(client: "AsyncClient", email: str) -> tuple[uuid.UUID, s
     Returns ``(athlete_id, access_token)``.
     Raises ``AssertionError`` if the registration does not return 201.
     """
-    from tests.payloads import _register_payload
+    from tests.payloads import register_payload
 
     response = await client.post(
-        "/api/v1/auth/register", json=_register_payload(email)
+        "/api/v1/auth/register", json=register_payload(email)
     )
     assert response.status_code == 201, response.text
     body = response.json()

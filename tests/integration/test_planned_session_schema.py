@@ -44,7 +44,6 @@ from tests.utils.schema_helpers import (
     db_check_constraints,
     db_columns,
     db_foreign_keys,
-    db_indexes,
     db_unique_constraints,
 )
 

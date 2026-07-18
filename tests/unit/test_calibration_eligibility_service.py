@@ -18,8 +18,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime, timezone
-
-import pytest
+from typing import Any
 
 from app.models.activity import Activity
 from app.models.enums import ActivitySource, SportType
@@ -33,7 +32,7 @@ def _activity_factory(
     source: ActivitySource = ActivitySource.MANUAL_UPLOAD,
     has_hr: bool = True,
     duration_seconds: int = 3600,
-    quality_flags: dict | None = None,
+    quality_flags: dict[str, Any] | None = None,
     sport_type: str = "running",
 ) -> Activity:
     """Create an Activity instance for testing the five-rule gate."""
@@ -229,7 +228,7 @@ class TestCalibrationEligibilitySportTypeGate:
         source: ActivitySource = ActivitySource.MANUAL_UPLOAD,
         has_hr: bool = True,
         duration_seconds: int = 3600,
-        quality_flags: dict | None = None,
+        quality_flags: dict[str, Any] | None = None,
     ) -> Activity:
         """Factory for activities with a sport_type attribute."""
         activity = _activity_factory(
@@ -239,7 +238,7 @@ class TestCalibrationEligibilitySportTypeGate:
             quality_flags=quality_flags,
         )
         # Set sport_type via the attribute (model must support it)
-        activity.sport_type = sport_type
+        activity.sport_type = sport_type  # type: ignore[assignment]
         return activity
 
     def test_running_passes_when_all_other_rules_met(self) -> None:

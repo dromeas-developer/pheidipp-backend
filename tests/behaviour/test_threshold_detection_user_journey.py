@@ -72,6 +72,9 @@ from app.models.enums import (
 from app.models.physiology_measurement import PhysiologyMeasurement
 from app.models.planned_session import PlannedSession
 from app.models.raw_sensor_stream import RawSensorStream
+from app.models.training_goal import TrainingGoal
+from app.models.training_plan import TrainingPlan
+from app.models.weekly_plan import WeeklyPlan
 from app.repositories.activity_repository import ActivityRepository
 from app.repositories.athlete_physiology_repository import (
     AthletePhysiologyRepository,
@@ -100,7 +103,6 @@ from app.services.threshold_detection_service import (
     WEIGHT_LT1_NATURAL_TRAINING,
     WEIGHT_RR_INFLECTION,
 )
-from tests.utils.factories import make_athlete
 from tests.utils.http_helpers import bearer_header, http_register
 
 
@@ -418,8 +420,8 @@ async def _create_planned_session(
     athlete_id: uuid.UUID,
     session_type: SessionType = SessionType.EASY_RUN,
     target_date: Optional[date] = None,
-    parent_chain: Optional[tuple] = None,
-) -> tuple:
+    parent_chain: Optional[tuple[TrainingGoal, TrainingPlan | None, WeeklyPlan | None]] = None,
+) -> tuple[TrainingGoal, TrainingPlan | None, WeeklyPlan | None, PlannedSession]:
     """Insert a ``PlannedSession`` row with the full parent chain
     (TrainingGoal → TrainingPlan → WeeklyPlan → PlannedSession).
 
@@ -480,6 +482,8 @@ async def _create_planned_session(
         # same (one active goal, one plan, one weekly plan, many
         # planned sessions).
         goal, plan, weekly_plan = parent_chain
+        assert plan is not None
+        assert weekly_plan is not None
     else:
         # Build the chain: TrainingGoal → TrainingPlan →
         # WeeklyPlan. Each row's NOT NULL columns are populated.
@@ -1136,9 +1140,9 @@ class TestThresholdDetectionNaturalTrainingJourney:
         # WeeklyPlan (the partial unique index
         # ``ix_training_goals_athlete_active`` allows only ONE
         # active goal per athlete).
-        goal: Optional[object] = None
-        plan: Optional[object] = None
-        weekly_plan: Optional[object] = None
+        goal: Optional[TrainingGoal] = None
+        plan: Optional[TrainingPlan] = None
+        weekly_plan: Optional[WeeklyPlan] = None
 
         for run_date, mean_hr in zip(easy_run_dates, easy_run_mean_hrs):
             parent_chain = (
@@ -1251,9 +1255,9 @@ class TestThresholdDetectionNaturalTrainingJourney:
         # WeeklyPlan (the partial unique index
         # ``ix_training_goals_athlete_active`` allows only ONE
         # active goal per athlete).
-        goal: Optional[object] = None
-        plan: Optional[object] = None
-        weekly_plan: Optional[object] = None
+        goal: Optional[TrainingGoal] = None
+        plan: Optional[TrainingPlan] = None
+        weekly_plan: Optional[WeeklyPlan] = None
 
         for run_date, mean_hr in zip(easy_run_dates, easy_run_mean_hrs):
             parent_chain = (

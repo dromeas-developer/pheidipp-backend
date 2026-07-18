@@ -19,7 +19,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.enums import (
     PhysiologicalIntent,
-    RecoveryModifierLevel,
     SessionPurpose,
     SessionType,
     StepType,

@@ -785,8 +785,6 @@ class TestRepositoryAppendOnlySurface:
     method exists on the production repository class as it stands."""
 
     def test_repository_has_no_update_method(self) -> None:
-        mock_session = type("S", (), {})()  # noqa: F841 — placeholder
-        repo = PhysiologyMeasurementRepository.__init__  # noqa: F841
         # The class does not define a method called ``update``.
         assert not hasattr(PhysiologyMeasurementRepository, "update")
         # Sanity: the documented methods ARE present.

@@ -22,7 +22,9 @@ docs/implementation/phase-1/phase-1-2a-p1-profile-preferences-activity.md
 
 from __future__ import annotations
 
+import uuid
 from datetime import date, datetime, timezone
+from typing import Any
 
 import pytest
 from sqlalchemy import create_engine, select, text
@@ -41,7 +43,7 @@ TABLE = "activities"
 
 def _activity_factory(
     *,
-    athlete_id,
+    athlete_id: uuid.UUID,
     source: ActivitySource = ActivitySource.MANUAL_ENTRY,
     external_id: str | None = None,
     fit_file_key: str | None = None,
@@ -144,9 +146,9 @@ class TestActivityDedupPartialUniqueIndex:
     unique WHERE ``external_id IS NOT NULL``. ``manual_entry`` rows
     have ``external_id IS NULL`` and must NOT collide."""
 
-    def _dedup_index(self, db_session) -> dict | None:
+    def _dedup_index(self, db_session: AsyncSession) -> dict[str, Any] | None:
         for idx in db_indexes(TABLE):
-            cols = idx.get("column_names") or []
+            cols: list[str] = idx.get("column_names") or []
             if set(cols) >= {"athlete_id", "external_id", "source"} and idx.get(
                 "unique"
             ):

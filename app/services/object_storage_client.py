@@ -41,7 +41,8 @@ import uuid
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
-from typing import Optional
+from typing import Any, cast
+
 
 import boto3
 from botocore.exceptions import ClientError
@@ -152,16 +153,16 @@ class ObjectStorageClient:
             and not self._access_key
             and not self._secret_key
         )
-        self._s3_client = None
+        self._s3_client: Any = None
         if not self._use_local_fallback:
-            self._s3_client = boto3.client(
+            self._s3_client = cast(Any, boto3.client(  # type: ignore[reportUnknownMemberType]
                 "s3",
                 endpoint_url=self._endpoint_url or None,
                 region_name=self._region,
                 aws_access_key_id=self._access_key or None,
                 aws_secret_access_key=self._secret_key or None,
                 use_ssl=self._use_ssl,
-            )
+            ))
 
     # ------------------------------------------------------------------
     # Public API.
@@ -254,7 +255,7 @@ class ObjectStorageClient:
                 ),
             )
         except ClientError as exc:
-            code = exc.response.get("Error", {}).get("Code", "")
+            code: str = cast(dict[str, Any], exc.response).get("Error", {}).get("Code", "")
             if code in {"PreconditionFailed", "x-amz-precondition-failed"}:
                 # Head-object preconditions returned a conflict — the
                 # key already exists. Raw FIT files are immutable.
@@ -283,7 +284,7 @@ class ObjectStorageClient:
         return StoredFitObject(
             key=key,
             byte_count=len(file_bytes),
-            content_md5=_md5_base64(file_bytes),
+            content_md5=md5_base64(file_bytes),
         )
 
     async def download_fit(self, key: str) -> bytes:
@@ -372,7 +373,7 @@ class ObjectStorageClient:
                 ),
             )
         except ClientError as exc:
-            code = exc.response.get("Error", {}).get("Code", "")
+            code: str = cast(dict[str, Any], exc.response).get("Error", {}).get("Code", "")
             if code in {"PreconditionFailed", "x-amz-precondition-failed"}:
                 log_event(
                     event="object_storage.cleaned_stream.upload.conflict",
@@ -399,7 +400,7 @@ class ObjectStorageClient:
         return StoredCleanedStream(
             key=key,
             byte_count=len(payload_bytes),
-            content_md5=_md5_base64(payload_bytes),
+            content_md5=md5_base64(payload_bytes),
         )
 
     async def download_cleaned_stream(self, key: str) -> bytes:
@@ -431,7 +432,7 @@ class ObjectStorageClient:
             )
             return True
         except ClientError as exc:
-            code = exc.response.get("Error", {}).get("Code", "")
+            code: str = cast(dict[str, Any], exc.response).get("Error", {}).get("Code", "")
             if code in {"404", "NoSuchKey", "NotFound"}:
                 return False
             raise ObjectStorageUploadError(
@@ -456,7 +457,7 @@ class ObjectStorageClient:
         return StoredFitObject(
             key=key,
             byte_count=len(file_bytes),
-            content_md5=_md5_base64(file_bytes),
+            content_md5=md5_base64(file_bytes),
         )
 
     def _upload_local_cleaned_stream(
@@ -473,7 +474,7 @@ class ObjectStorageClient:
         return StoredCleanedStream(
             key=key,
             byte_count=len(file_bytes),
-            content_md5=_md5_base64(file_bytes),
+            content_md5=md5_base64(file_bytes),
         )
 
     def _download_local(self, key: str) -> bytes:
@@ -524,7 +525,7 @@ def reset_object_storage_client() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _md5_base64(data: bytes) -> str:
+def md5_base64(data: bytes) -> str:
     """Return the base64-encoded MD5 digest of *data*.
 
     Mirrors the S3 ``ETag`` format for single-part uploads so the

@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timedelta, timezone
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -59,8 +60,8 @@ class TestDiscardRefreshTokenIpsTask:
     async def test_task_discards_ips_older_than_seven_days(
         self,
         db_session: AsyncSession,
-        test_session_local,
-        monkeypatch,
+        test_session_local: Any,
+        monkeypatch: Any,
     ) -> None:
         athlete = await _make_athlete(db_session)
         token = await _make_old_token(db_session, athlete, days_old=8)
@@ -88,8 +89,8 @@ class TestDiscardRefreshTokenIpsTask:
     async def test_task_preserves_ip_freshly(
         self,
         db_session: AsyncSession,
-        test_session_local,
-        monkeypatch,
+        test_session_local: Any,
+        monkeypatch: Any,
     ) -> None:
         """Rows whose age is well within the retention window are untouched."""
         athlete = await _make_athlete(db_session)
@@ -118,8 +119,8 @@ class TestDiscardRefreshTokenIpsTask:
     async def test_task_is_idempotent(
         self,
         db_session: AsyncSession,
-        test_session_local,
-        monkeypatch,
+        test_session_local: Any,
+        monkeypatch: Any,
     ) -> None:
         athlete = await _make_athlete(db_session)
         token = await _make_old_token(db_session, athlete, days_old=8)
@@ -152,8 +153,8 @@ class TestDiscardRefreshTokenIpsTask:
     async def test_task_honours_custom_retention_days(
         self,
         db_session: AsyncSession,
-        test_session_local,
-        monkeypatch,
+        test_session_local: Any,
+        monkeypatch: Any,
     ) -> None:
         athlete = await _make_athlete(db_session)
         # Two-day-old token under a 1-day retention window should be

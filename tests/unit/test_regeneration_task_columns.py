@@ -12,6 +12,8 @@ Architecture: docs/architecture/01-entities/training-goal.md (RegenerationTask s
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 from sqlalchemy import (
     Date,
@@ -144,7 +146,8 @@ class TestRegenerationTaskPendingPartialIndex:
 
     def test_pending_partial_predicate_is_status_pending_confirmation(self) -> None:
         idx = get_indexes(RegenerationTask)["ix_regeneration_tasks_pending"]
-        predicate = idx.dialect_options.get("postgresql", {}).get("where")
+        dialect_opts: Any = idx.dialect_options
+        predicate: Any = dialect_opts.get("postgresql", {}).get("where")
         assert predicate is not None, (
             "ix_regeneration_tasks_pending must declare a "
             "postgresql_where predicate."

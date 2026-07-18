@@ -21,8 +21,8 @@ docs/implementation/phase-1/phase-1-2a-p1-profile-preferences-activity.md
 
 from __future__ import annotations
 
-import uuid
 from datetime import datetime, timezone
+from typing import Any
 
 import pytest
 from sqlalchemy import select
@@ -44,7 +44,7 @@ def service(db_session: AsyncSession) -> AuthService:
 def _register_kwargs(
     email: str = "phase-1-2a-regression@example.com",
     password: str = "ValidPass123!",
-) -> dict:
+) -> dict[str, Any]:
     return {
         "email": email,
         "password": password,

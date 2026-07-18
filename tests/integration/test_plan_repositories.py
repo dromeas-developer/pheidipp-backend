@@ -32,7 +32,6 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime, timezone
 
-import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -406,7 +405,7 @@ class TestCheckpointRepository:
     async def test_add_many_persists_checkpoints(
         self, db_session: AsyncSession
     ) -> None:
-        plan_id, _weekly_id, session_id = await self._seed_plan_with_session(
+        _, _weekly_id, session_id = await self._seed_plan_with_session(
             db_session
         )
         repo = CheckpointRepository(db_session)

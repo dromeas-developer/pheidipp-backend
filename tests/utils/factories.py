@@ -5,8 +5,10 @@ These are async helpers that use the per-test db_session fixture.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import TYPE_CHECKING
+
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.activity import Activity
 from app.models.athlete import Athlete
@@ -17,7 +19,10 @@ if TYPE_CHECKING:
     from app.models.refresh_token import RefreshToken
 
 
-async def make_athlete(db_session, email: str | None = None) -> Athlete:
+async def make_athlete(
+    db_session: AsyncSession,
+    email: str | None = None,
+) -> Athlete:
     """Create and flush an Athlete with a unique email."""
     if email is None:
         email = f"athlete-{uuid.uuid4()}@example.com"
@@ -28,7 +33,7 @@ async def make_athlete(db_session, email: str | None = None) -> Athlete:
 
 
 async def make_auth(
-    db_session,
+    db_session: AsyncSession,
     *,
     athlete_id: uuid.UUID,
     provider: AuthProvider = AuthProvider.EMAIL,
@@ -46,10 +51,10 @@ async def make_auth(
 
 
 async def make_activity(
-    db_session,
+    db_session: AsyncSession,
     *,
     athlete_id: uuid.UUID,
-    activity_date=None,
+    activity_date: date | None = None,
     sport_type: SportType = SportType.RUNNING,
     calibration_eligible: bool = True,
     has_hr: bool = True,
@@ -101,7 +106,7 @@ async def make_activity(
 
 
 async def make_refresh_token(
-    db_session,
+    db_session: AsyncSession,
     athlete_id: uuid.UUID,
     *,
     token_hash: str | None = None,

@@ -34,8 +34,8 @@ Reference architecture: docs/architecture/02-computations/physiology-update.md
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timezone
-from typing import Any, Dict, List, Optional, cast
+from datetime import date
+from typing import Any, Dict, Optional, cast
 
 import pytest
 from sqlalchemy import select

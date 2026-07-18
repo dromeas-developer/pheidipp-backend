@@ -16,7 +16,7 @@ Module surface:
   bootstraps a brand-new ``PhysiologyParameterState`` from the
   first qualifying observation against a previously-null
   parameter column (e.g. the first ``CP`` observation).
-* :func:`_detect_confidence_transitions` — pure helper that
+* :func:`detect_confidence_transitions` — pure helper that
   diffs a pre-/post-update per-metric confidence map and
   returns the monotonic LOW→MEDIUM→HIGH transitions.
 * :class:`PhysiologyUpdateService` — the orchestrator that loads
@@ -64,7 +64,7 @@ Invariants codified here, copied from the architecture corpus:
 * Confidence is monotonic — the per-metric level never
   decreases. The stored ``prior_weight`` only ever grows
   across observations, so the comparison in
-  :func:`_detect_confidence_transitions` is one-way.
+  :func:`detect_confidence_transitions` is one-way.
 * The service does NOT commit — the worker task in Phase-2.3-P3
   owns the commit boundary.
 """
@@ -170,8 +170,8 @@ def bayesian_update(
     8. ``last_observation_date = observation.date`` — stored as
        ISO-8601 string to match the bootstrap shape.
     """
-    current_date = _parse_iso_date(current["last_observation_date"])
-    observation_date = _coerce_observation_date(observation["date"])
+    current_date = parse_iso_date(current["last_observation_date"])
+    observation_date = coerce_observation_date(observation["date"])
     days_since_last = max(
         0, (observation_date - current_date).days
     )
@@ -197,7 +197,7 @@ def bayesian_update(
     # weight than the decayed prior. Stored as ``.value`` so the JSONB
     # column matches the shape produced by ``_bootstrap_signal``.
     if float(observation["weight"]) > decayed_weight:
-        dominant_source = _source_value(observation["source"])
+        dominant_source = source_value(observation["source"])
     else:
         dominant_source = current["dominant_source"]
 
@@ -230,12 +230,12 @@ def init_null_parameter_state(
     ``dominant_source`` and ``prior_weight`` originate from the
     observation rather than the bootstrap constants.
     """
-    observation_date = _coerce_observation_date(observation["date"])
+    observation_date = coerce_observation_date(observation["date"])
     return {
         "value": float(observation["value"]),
         "uncertainty": INITIAL_UNCERTAINTY,
         "prior_weight": float(observation["weight"]),
-        "dominant_source": _source_value(observation["source"]),
+        "dominant_source": source_value(observation["source"]),
         "last_observation_date": observation_date.isoformat(),
     }
 
@@ -271,11 +271,13 @@ class PhysiologyUpdateResult:
 
     physiology: AthletePhysiology
     shifted_parameters: list[PhysiologyParameter] = field(
-        default_factory=list
+        default_factory=lambda: []  # type: ignore[reportUnknownVariableType]
     )
-    metric_confidence: Dict[str, Optional[str]] = field(default_factory=dict)
+    metric_confidence: Dict[str, Optional[str]] = field(
+        default_factory=lambda: {}  # type: ignore[reportUnknownVariableType]
+    )
     confidence_transitions: Dict[str, tuple[Optional[str], Optional[str]]] = (
-        field(default_factory=dict)
+        field(default_factory=lambda: {})  # type: ignore[reportUnknownVariableType]
     )
     measurements_written: int = 0
 
@@ -285,7 +287,7 @@ class PhysiologyUpdateResult:
 # ---------------------------------------------------------------------------
 
 
-def _parse_iso_date(value: Any) -> date:
+def parse_iso_date(value: Any) -> date:
     """Parse the ISO-8601 ``last_observation_date`` JSONB string.
 
     Accepts the full ``datetime.isoformat()`` form
@@ -308,7 +310,7 @@ def _parse_iso_date(value: Any) -> date:
     )
 
 
-def _coerce_observation_date(value: Any) -> date:
+def coerce_observation_date(value: Any) -> date:
     """Coerce an observation ``date`` value to a ``datetime.date``.
 
     The ``PhysiologyMeasurement.measurement_date`` column is
@@ -324,7 +326,7 @@ def _coerce_observation_date(value: Any) -> date:
     )
 
 
-def _source_value(source: Any) -> str:
+def source_value(source: Any) -> str:
     """Return the ``MeasurementSource.value`` string for ``source``.
 
     Accepts either a ``MeasurementSource`` enum member (preferred
@@ -534,9 +536,9 @@ class PhysiologyUpdateService:
         # stored ``prior_weight`` only ever grows across
         # observations, so in practice the level only goes up;
         # the explicit comparison in
-        # :func:`_detect_confidence_transitions` is one-way to
+        # :func:`detect_confidence_transitions` is one-way to
         # preserve the "Confidence Does Not Decrease" invariant.
-        old_confidence = _compute_metric_confidence(physiology)
+        old_confidence = compute_metric_confidence(physiology)
 
         # Work on a deep copy of each touched JSONB column so the
         # ``flag_modified`` write-back is a clean assignment of a
@@ -552,7 +554,7 @@ class PhysiologyUpdateService:
         # that does not shift it again — the parameter must still
         # appear in the event payload.
         shifted_parameters: List[PhysiologyParameter] = []
-        shifted_parameters_set: set = set()
+        shifted_parameters_set: set[PhysiologyParameter] = set()
         # Per-parameter metadata for the ``physiology_updated``
         # event payload — updated for every non-duplicate
         # observation so the final posterior state is captured
@@ -583,7 +585,7 @@ class PhysiologyUpdateService:
             # iteration re-reading the original column value.
             current_state = working_state.get(
                 obs.parameter,
-                self._get_parameter_state(physiology, obs.parameter),
+                self.get_parameter_state(physiology, obs.parameter),
             )
 
             # Apply Bayesian update — bootstrap a fresh state for
@@ -637,7 +639,7 @@ class PhysiologyUpdateService:
         # ``flag_modified`` is called on every column that was
         # touched so SQLAlchemy persists the JSONB mutation.
         if working_state:
-            self._apply_updated_states(physiology, working_state)
+            self.apply_updated_states(physiology, working_state)
             # Only pass the JSONB columns that were actually
             # touched in this call — the repository's
             # ``update_in_place`` already supports partial writes
@@ -672,8 +674,8 @@ class PhysiologyUpdateService:
         # the monotonic upward transitions Plan P3's
         # ``TwinRecalibrationService`` consumes to fire
         # ``twin_confidence_upgraded``.
-        new_confidence = _compute_metric_confidence(physiology)
-        confidence_transitions = _detect_confidence_transitions(
+        new_confidence = compute_metric_confidence(physiology)
+        confidence_transitions = detect_confidence_transitions(
             old_confidence, new_confidence
         )
 
@@ -721,7 +723,7 @@ class PhysiologyUpdateService:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _get_parameter_state(
+    def get_parameter_state(
         physiology: AthletePhysiology,
         parameter: PhysiologyParameter,
     ) -> Optional[Dict[str, Any]]:
@@ -753,7 +755,7 @@ class PhysiologyUpdateService:
         return dict(sub_value)
 
     @staticmethod
-    def _apply_updated_states(
+    def apply_updated_states(
         physiology: AthletePhysiology,
         updated_states: Mapping[PhysiologyParameter, Dict[str, Any]],
     ) -> None:
@@ -903,7 +905,7 @@ class PhysiologyUpdateService:
 # ---------------------------------------------------------------------------
 
 
-def _confidence_level(prior_weight: Optional[float]) -> str:
+def confidence_level(prior_weight: Optional[float]) -> str:
     """Map a ``prior_weight`` to a ``TwinConfidenceLevel`` value string.
 
     Thresholds are 4.0 (LOW→MEDIUM) and 8.0 (MEDIUM→HIGH) per
@@ -925,7 +927,7 @@ def _confidence_level(prior_weight: Optional[float]) -> str:
     return TwinConfidenceLevel.LOW.value
 
 
-def _state_prior_weight(state: Optional[Mapping[str, Any]]) -> Optional[float]:
+def state_prior_weight(state: Optional[Mapping[str, Any]]) -> Optional[float]:
     """Return the ``prior_weight`` of a ``PhysiologyParameterState``.
 
     Handles ``None`` state and dicts missing the key defensively
@@ -934,7 +936,7 @@ def _state_prior_weight(state: Optional[Mapping[str, Any]]) -> Optional[float]:
     """
     if state is None:
         return None
-    weight = state.get("prior_weight") if isinstance(state, Mapping) else None
+    weight = state.get("prior_weight")
     return float(weight) if weight is not None else None
 
 
@@ -948,7 +950,7 @@ _CONFIDENCE_LEVEL_ORDER: Dict[str, int] = {
 }
 
 
-def _detect_confidence_transitions(
+def detect_confidence_transitions(
     old: Mapping[str, Optional[str]],
     new: Mapping[str, Optional[str]],
 ) -> Dict[str, tuple[Optional[str], Optional[str]]]:
@@ -980,7 +982,7 @@ def _detect_confidence_transitions(
     for metric, new_level in new.items():
         old_level = old.get(metric)
         # Normalise ``None`` to LOW for the comparison; matches the
-        # ``_confidence_level`` default for missing prior weights.
+        # ``confidence_level`` default for missing prior weights.
         old_rank = _CONFIDENCE_LEVEL_ORDER.get(
             old_level if old_level is not None else TwinConfidenceLevel.LOW.value
         )
@@ -997,7 +999,7 @@ def _detect_confidence_transitions(
     return transitions
 
 
-def _compute_metric_confidence(
+def compute_metric_confidence(
     physiology: AthletePhysiology,
 ) -> Dict[str, Optional[str]]:
     """Return the per-metric confidence dict in ``TwinState`` shape.
@@ -1019,25 +1021,25 @@ def _compute_metric_confidence(
     lt1 = physiology.lt1 or {}
     lt2 = physiology.lt2 or {}
     return {
-        "lt1_hr": _confidence_level(
-            _state_prior_weight(lt1.get("hr") if lt1 else None)
+        "lt1_hr": confidence_level(
+            state_prior_weight(lt1.get("hr") if lt1 else None)
         ),
-        "lt1_power": _confidence_level(
-            _state_prior_weight(lt1.get("power") if lt1 else None)
+        "lt1_power": confidence_level(
+            state_prior_weight(lt1.get("power") if lt1 else None)
         ),
-        "lt1_pace": _confidence_level(
-            _state_prior_weight(lt1.get("pace") if lt1 else None)
+        "lt1_pace": confidence_level(
+            state_prior_weight(lt1.get("pace") if lt1 else None)
         ),
-        "lt2_hr": _confidence_level(
-            _state_prior_weight(lt2.get("hr") if lt2 else None)
+        "lt2_hr": confidence_level(
+            state_prior_weight(lt2.get("hr") if lt2 else None)
         ),
-        "lt2_power": _confidence_level(
-            _state_prior_weight(lt2.get("power") if lt2 else None)
+        "lt2_power": confidence_level(
+            state_prior_weight(lt2.get("power") if lt2 else None)
         ),
-        "lt2_pace": _confidence_level(
-            _state_prior_weight(lt2.get("pace") if lt2 else None)
+        "lt2_pace": confidence_level(
+            state_prior_weight(lt2.get("pace") if lt2 else None)
         ),
-        "cp": _confidence_level(_state_prior_weight(physiology.cp)),
+        "cp": confidence_level(state_prior_weight(physiology.cp)),
     }
 
 

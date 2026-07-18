@@ -19,7 +19,6 @@ from app.models.enums import ActivitySource, SessionType
 from app.models.planned_session import PlannedSession
 from app.services.compliance_service import (
     ComplianceService,
-    ComplianceFindings,
 )
 
 

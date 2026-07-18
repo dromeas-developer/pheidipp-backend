@@ -10,9 +10,8 @@ docs/architecture/02-computations/load-computation.md
 
 from __future__ import annotations
 
-import math
 from datetime import datetime, timezone
-from typing import List
+from typing import Any, List, cast
 
 import pytest
 
@@ -22,7 +21,6 @@ from app.services.load_computation_service import (
     LoadComputationService,
     LoadScores,
     MissingHeartRateError,
-    MissingCriticalPowerError,
     estimate_max_hr_from_age,
 )
 from app.models.enums import DataTier
@@ -45,8 +43,8 @@ def _parsed_fit(
     return ParsedFitData(
         start_time=start_time or datetime(2026, 6, 15, 8, 0, tzinfo=timezone.utc),
         duration_seconds=duration_seconds or len(hr_records),
-        hr_records=hr_records,
-        power_records=power_records if power_records is not None else ([100] if has_power else []),
+        hr_records=cast("list[float | None]", hr_records),
+        power_records=cast("list[float | None]", power_records) if power_records is not None else (cast("list[float | None]", [100.0]) if has_power else cast("list[float | None]", [])),
         has_hr=bool(hr_records),
         has_power=has_power,
         has_rr_intervals=has_rr,
@@ -70,7 +68,7 @@ def _inputs(
     total_ascent_m: float | None = None,
     recent_structural_load_72h: float = 0.0,
     structural_risk_flag: bool = False,
-    **kwargs,
+    **kwargs: Any,
 ) -> LoadComputationInputs:
     parsed = _parsed_fit(
         hr_records,
@@ -576,7 +574,7 @@ class TestAllThreeDimensions:
             hr_records=[100] * 600,
             data_tier=DataTier.TIER_5,
         )
-        scores = service.compute_aerobic_load(inputs)
+        service.compute_aerobic_load(inputs)
         # Phase 1.6: aerobic was computed even for short sessions
         # Phase 2.1: Tier 5-6 has null load scores per architecture
         # Note: aerobic_load is computed from hr_records if present

@@ -55,25 +55,15 @@ from app.agents.post_workout_agent import (
     PostWorkoutLLMUnavailableError,
 )
 from app.api.deps import get_db, require_self
-from app.models.coaching_message import CoachingMessage
 from app.models.enums import ActivitySource, MessageType
 from app.repositories.activity_repository import ActivityRepository
-from app.repositories.athlete_preferences_repository import (
-    AthletePreferencesRepository,
-)
-from app.repositories.athlete_profile_repository import AthleteProfileRepository
 from app.repositories.coaching_message_repository import (
     CoachingMessageRepository,
-)
-from app.repositories.generated_workout_repository import (
-    GeneratedWorkoutRepository,
 )
 from app.repositories.generation_event_repository import (
     GenerationEventRepository,
 )
 from app.repositories.planned_session_repository import PlannedSessionRepository
-from app.repositories.training_goal_repository import TrainingGoalRepository
-from app.repositories.training_plan_repository import TrainingPlanRepository
 from app.repositories.twin_state_repository import TwinStateRepository
 from app.schemas.activity import (
     ActivityListResponse,
@@ -245,7 +235,7 @@ async def post_upload_activity(
     # ``SyncConnectorConfigurationError``. The defer operation
     # is a lightweight single-row INSERT into ``procrastinate_jobs``
     # — negligible blocking time from an async endpoint.
-    job = procrastinate_app.tasks["fit_ingest"].defer(
+    job = procrastinate_app.tasks["fit_ingest"].defer(  # type: ignore
         athlete_id=str(athlete_id),
         activity_id=str(activity.id),
     )

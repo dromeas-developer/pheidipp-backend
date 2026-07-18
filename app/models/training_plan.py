@@ -8,6 +8,8 @@ exists.
 
 from __future__ import annotations
 
+from typing import Any
+
 import uuid
 from datetime import datetime, timezone
 
@@ -23,6 +25,7 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
+from app.models._enum_helpers import enum_str_values
 from app.models.enums import TrainingPlanStatus
 
 
@@ -74,17 +77,17 @@ class TrainingPlan(Base):
     # ------------------------------------------------------------------
     # ``phases_summary`` carries ``PhaseDescriptor[]``: label,
     # start/end date, weeks, primary_focus, weekly_session_count.
-    phases_summary: Mapped[list] = mapped_column(
+    phases_summary: Mapped[list[dict[str, Any]]] = mapped_column(
         JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb")
     )
     # ``phase_definitions`` carries ``PhaseDefinition[]``: the
     # adaptation-strategy per phase.
-    phase_definitions: Mapped[list] = mapped_column(
+    phase_definitions: Mapped[list[dict[str, Any]]] = mapped_column(
         JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb")
     )
     # ``weekly_distributions`` carries ``WeeklyDistribution[]``: the
     # deterministic-expansion output for the plan.
-    weekly_distributions: Mapped[list] = mapped_column(
+    weekly_distributions: Mapped[list[dict[str, Any]]] = mapped_column(
         JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb")
     )
 
@@ -97,7 +100,7 @@ class TrainingPlan(Base):
             name="training_plan_status",
             native_enum=False,
             length=16,
-            values_callable=lambda x: [e.value for e in x],
+            values_callable=enum_str_values,
         ),
         nullable=False,
     )
@@ -116,8 +119,8 @@ class TrainingPlan(Base):
     # Both are JSONB so the architecture shape can be enforced at the
     # application layer without database migration churn.
     # ------------------------------------------------------------------
-    strategic_rationale: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-    checkpoint_schedule: Mapped[list] = mapped_column(
+    strategic_rationale: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    checkpoint_schedule: Mapped[list[dict[str, Any]]] = mapped_column(
         JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb")
     )
 

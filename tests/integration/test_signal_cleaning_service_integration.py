@@ -29,11 +29,9 @@ from __future__ import annotations
 
 import gzip
 import json
-import math
 import uuid
 from datetime import date, datetime, timezone
-from typing import List, Optional
-from unittest.mock import AsyncMock
+from typing import Any, List, Optional, cast
 
 import pytest
 from sqlalchemy import select
@@ -47,13 +45,11 @@ from app.repositories.raw_sensor_stream_repository import (
     RawSensorStreamRepository,
 )
 from app.services.fit_parser_service import (
-    FitParserService,
     GpsRecord,
     ParsedFitData,
 )
 from app.services.object_storage_client import (
     ObjectStorageClient,
-    StoredFitObject,
 )
 from app.services.signal_cleaning_service import (
     GAP_COEFFICIENT_A,
@@ -135,7 +131,7 @@ async def _create_running_activity(
     source: ActivitySource = ActivitySource.MANUAL_UPLOAD,
     sport_type: SportType = SportType.RUNNING,
     cleaning_pipeline_version: Optional[str] = None,
-    quality_flags: Optional[dict] = None,
+    quality_flags: Optional[dict[str, Any]] = None,
 ) -> Activity:
     """Insert a real ``Activity`` row that is eligible for cleaning."""
     activity = Activity(
@@ -167,10 +163,11 @@ def _hr_only_parsed(
     hr_values: Optional[List[float]] = None,
 ) -> ParsedFitData:
     """ParsedFitData with HR only (no power, no GPS, no RR)."""
+    hr: list[float | None] = list(hr_values) if hr_values is not None else [150.0] * duration
     return ParsedFitData(
         start_time=datetime(2026, 6, 15, 8, 0, tzinfo=timezone.utc),
         duration_seconds=duration,
-        hr_records=hr_values or [150.0] * duration,
+        hr_records=hr,
         has_hr=True,
         has_power=False,
         has_rr_intervals=False,
@@ -275,7 +272,7 @@ class TestCleanHappyPath:
         )
         await db_session.commit()
 
-        service, parser, raw_repo, activity_repo = _build_service(
+        service, parser, raw_repo, _ = _build_service(
             db_session,
             _hr_only_parsed(_SUFFICIENT_DURATION),
             object_storage,
@@ -412,7 +409,7 @@ class TestCleanShortStreamGate:
         )
         await db_session.commit()
 
-        service, parser, raw_repo, activity_repo = _build_service(
+        service, _, raw_repo, activity_repo = _build_service(
             db_session,
             _hr_only_parsed(_SHORT_DURATION),
             object_storage,
@@ -460,7 +457,7 @@ class TestCleanIdempotencyAtDb:
         )
         await db_session.commit()
 
-        service1, _, raw_repo, _ = _build_service(
+        service1, _, _, _ = _build_service(
             db_session,
             _hr_only_parsed(_SUFFICIENT_DURATION),
             object_storage,
@@ -637,7 +634,7 @@ class TestCleanRrRollingMedianFilter:
         spike_index = 299
         spike_value = 1300.0
         conformant = 1000.0
-        rr_records = (
+        rr_records: list[float] = (
             [conformant] * spike_index
             + [spike_value]
             + [conformant] * (_SUFFICIENT_DURATION - spike_index - 1)
@@ -649,7 +646,7 @@ class TestCleanRrRollingMedianFilter:
             start_time=datetime(2026, 6, 15, 8, 0, tzinfo=timezone.utc),
             duration_seconds=_SUFFICIENT_DURATION,
             hr_records=[150.0] * _SUFFICIENT_DURATION,
-            rr_records=rr_records,
+            rr_records=cast(list[float | None], rr_records),
             has_hr=True,
             has_rr_intervals=True,
         )
@@ -724,10 +721,7 @@ class TestCleanRrRollingMedianFilter:
         assert RR_ROLLING_WINDOW_S == 30
         # Threshold: 0.20 × 1000 = 200 ms; the spike's 300 ms
         # deviation strictly exceeds it.
-        assert (
-            abs(spike_value - conformant)
-            > RR_DEVIATION_THRESHOLD * conformant
-        )
+        assert abs(spike_value - conformant) > RR_DEVIATION_THRESHOLD * conformant
 
     @pytest.mark.asyncio
     async def test_rr_deviation_filter_pushed_rr_intervals_to_unavailable(
@@ -801,7 +795,7 @@ class TestCleanRrRollingMedianFilter:
             start_time=datetime(2026, 6, 15, 8, 0, tzinfo=timezone.utc),
             duration_seconds=_SUFFICIENT_DURATION,
             hr_records=[150.0] * _SUFFICIENT_DURATION,
-            rr_records=rr_records,
+            rr_records=cast(list[float | None], rr_records),
             has_hr=True,
             has_rr_intervals=True,
         )
@@ -1047,8 +1041,8 @@ class TestCleanRrRollingMedianFilter:
         parsed = ParsedFitData(
             start_time=datetime(2026, 6, 15, 8, 0, tzinfo=timezone.utc),
             duration_seconds=_SUFFICIENT_DURATION,
-            hr_records=hr_records,
-            rr_records=rr_records,
+            hr_records=cast(list[float | None], hr_records),
+            rr_records=cast(list[float | None], rr_records),
             has_hr=True,
             has_rr_intervals=True,
         )

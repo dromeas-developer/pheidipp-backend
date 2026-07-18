@@ -12,7 +12,6 @@ Architecture: docs/architecture/01-entities/athlete-physiology.md
 
 from __future__ import annotations
 
-import pytest
 
 from app.models.enums import PhysiologyParameter
 

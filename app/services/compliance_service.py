@@ -32,7 +32,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any, Optional
 
 from app.models.activity import Activity
 from app.models.planned_session import PlannedSession
@@ -62,7 +62,7 @@ class ComplianceFindings:
     has_prescribed_session: bool = True
     prescribed_session_id: Optional[uuid.UUID] = None
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Serialise to a plain dict for prompt rendering."""
         return {
             "duration_delta_pct": self.duration_delta_pct,

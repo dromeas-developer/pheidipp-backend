@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date
+from typing import Any
 
 import pytest
 from sqlalchemy import select
@@ -141,7 +142,7 @@ async def _new_twin_state(
     return state
 
 
-def _default_targets() -> dict:
+def _default_targets() -> dict[str, Any]:
     """A typical TargetSet JSONB shape — targets list + description."""
     return {
         "targets": [
@@ -239,7 +240,6 @@ class TestGeneratedWorkoutIdempotencyUniqueDB:
         )
         goal = await db_session.get(TrainingGoal, None)  # ignored, just placeholder
         # re-fetch goal directly:
-        from sqlalchemy import select
 
         result = await db_session.execute(
             select(TrainingGoal).where(
@@ -275,7 +275,6 @@ class TestGeneratedWorkoutIdempotencyUniqueDB:
         _, _, _, session = await _new_goal_plan_week_session(
             db_session, athlete
         )
-        from sqlalchemy import select
 
         result = await db_session.execute(
             select(TrainingGoal).where(
@@ -332,7 +331,6 @@ class TestGeneratedWorkoutTargetsAreObjectsCheckDB:
         _, _, _, session = await _new_goal_plan_week_session(
             db_session, athlete
         )
-        from sqlalchemy import select
 
         result = await db_session.execute(
             select(TrainingGoal).where(
@@ -482,7 +480,6 @@ class TestGeneratedWorkoutServerDefaultsDB:
         _, _, _, session = await _new_goal_plan_week_session(
             db_session, athlete
         )
-        from sqlalchemy import select
 
         result = await db_session.execute(
             select(TrainingGoal).where(
@@ -521,7 +518,6 @@ class TestGeneratedWorkoutRoundTripDB:
         _, _, _, session = await _new_goal_plan_week_session(
             db_session, athlete
         )
-        from sqlalchemy import select
 
         result = await db_session.execute(
             select(TrainingGoal).where(
@@ -587,7 +583,6 @@ class TestGeneratedWorkoutRoundTripDB:
         _, _, _, session = await _new_goal_plan_week_session(
             db_session, athlete
         )
-        from sqlalchemy import select
 
         result = await db_session.execute(
             select(TrainingGoal).where(

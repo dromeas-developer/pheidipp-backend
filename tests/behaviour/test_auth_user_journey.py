@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import time
 from datetime import datetime, timezone
+from typing import Any
 
 import jwt as pyjwt
 from httpx import AsyncClient
@@ -20,7 +21,7 @@ from app.config import settings
 from app.models.enums import Sex
 from app.models.system_event import SystemEvent
 from app.services.auth_service import AuthService
-from tests.payloads import _login_payload, _register_payload
+from tests.payloads import login_payload, register_payload
 
 
 # ---------------------------------------------------------------------------
@@ -37,7 +38,7 @@ class TestFullUserJourney:
         # 1. Register.
         register = await client.post(
             "/api/v1/auth/register",
-            json=_register_payload("journey@example.com"),
+            json=register_payload("journey@example.com"),
         )
         assert register.status_code == 201
         registered = register.json()
@@ -54,7 +55,7 @@ class TestFullUserJourney:
         # 3. Login (independent session; keep both refresh tokens alive).
         login = await client.post(
             "/api/v1/auth/login",
-            json=_login_payload("journey@example.com"),
+            json=login_payload("journey@example.com"),
         )
         assert login.status_code == 200
         login_access = login.json()["access_token"]
@@ -109,7 +110,7 @@ class TestExpiredAccessTokenLifecycle:
     ) -> None:
         register = await client.post(
             "/api/v1/auth/register",
-            json=_register_payload("lifecycle@example.com"),
+            json=register_payload("lifecycle@example.com"),
         )
         athlete_id = register.json()["athlete"]["id"]
 
@@ -148,7 +149,7 @@ class TestSecretLeakageAudit:
     ) -> None:
         response = await client.post(
             "/api/v1/auth/register",
-            json=_register_payload("audit@example.com"),
+            json=register_payload("audit@example.com"),
         )
         assert response.status_code == 201
         body = response.text.lower()
@@ -168,17 +169,17 @@ class TestSecretLeakageAudit:
         assert "validpass123" not in body
 
     async def test_audit_logs_never_carry_secrets(
-        self, client: AsyncClient, cap_auth_logs
+        self, client: AsyncClient, cap_auth_logs: Any
     ) -> None:
         """Per the plan: API responses AND logs must exclude
         ``hashed_password`` and raw/stored token material."""
         await client.post(
             "/api/v1/auth/register",
-            json=_register_payload("audit-logs@example.com"),
+            json=register_payload("audit-logs@example.com"),
         )
         await client.post(
             "/api/v1/auth/login",
-            json=_login_payload("audit-logs@example.com"),
+            json=login_payload("audit-logs@example.com"),
         )
 
         # Build the catalogue of what flowed into the auth logger:

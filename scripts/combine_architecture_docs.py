@@ -4,7 +4,6 @@ Combines all markdown files from docs/architecture/ into a single consolidated m
 Preserves directory structure as headers in the output.
 """
 
-import os
 from pathlib import Path
 from datetime import datetime
 
@@ -39,7 +38,7 @@ def combine_architecture_docs(output_file: str = "ARCHITECTURE_COMBINED.md") -> 
     with open(output_file, "w") as outfile:
         # Write header only if no index file exists
         if index_file not in md_files or not index_file.exists():
-            outfile.write(f"# Pheidipp Architecture - Combined Documentation\n\n")
+            outfile.write("# Pheidipp Architecture - Combined Documentation\n\n")
             outfile.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
             outfile.write("---\n\n")
         

@@ -40,10 +40,19 @@ import sys
 import textwrap
 import uuid
 from pathlib import Path
-from typing import Optional
+from typing import Any, Iterator, Optional, TypedDict, cast
 
 import pytest
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import Engine, create_engine, inspect, text
+
+
+class Phase12bSchema(TypedDict):
+    """Schema info for Phase-1.2b isolated schema."""
+
+    schema: str
+    sync_url: str
+    base_sync_url: str
+
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -102,27 +111,7 @@ def _migration_function_body(path: Path, fn: str) -> str:
     return match.group(1) if match else ""
 
 
-def _migration_creates_table(path: Path, name: str) -> bool:
-    return (
-        f"op.create_table('{name}'"
-        in _migration_function_body(path, "upgrade")
-    )
 
-
-def _migration_creates_index(path: Path, name: str) -> bool:
-    return (
-        f"op.create_index('{name}'"
-        in _migration_function_body(path, "upgrade")
-    )
-
-
-def _migration_creates_fk(path: Path, name: str) -> bool:
-    return (
-        f"op.create_foreign_key(\n        '{name}'"
-        in _migration_function_body(path, "upgrade")
-        or f"op.create_foreign_key('{name}'" in _migration_function_body(path, "upgrade")
-        or f"'op.create_foreign_key('{name}'" in _migration_function_body(path, "upgrade")
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -406,7 +395,7 @@ def _test_async_dsn() -> Optional[str]:
 
 
 @pytest.fixture
-def phase_1_2b_schema():
+def phase_1_2b_schema() -> Iterator[Phase12bSchema]:
     """Set up an isolated Postgres schema, ``alembic upgrade`` to the
     Phase-1.2b head (pinned — NOT the current repo head), then yield
     a dict with the schema name and a sync URL pointed at the schema.
@@ -440,11 +429,11 @@ def phase_1_2b_schema():
                 f"(rc={rc}).\n"
                 f"STDOUT:\n{stdout}\nSTDERR:\n{stderr}"
             )
-        yield {
-            "schema": schema,
-            "sync_url": schema_url,
-            "base_sync_url": base,
-        }
+        yield Phase12bSchema(
+            schema=schema,
+            sync_url=schema_url,
+            base_sync_url=base,
+        )
     finally:
         _drop_isolated_schema(base, schema)
 
@@ -456,7 +445,7 @@ class TestPhase12bMigrationUpgrades:
     asserts the resulting tables, columns, and invariants."""
 
     def test_alembic_upgrade_to_phase_1_2b_revision_succeeds_on_fresh_schema(
-        self, phase_1_2b_schema
+        self, phase_1_2b_schema: Phase12bSchema
     ) -> None:
         """Reaches this point only if ``alembic upgrade
         PHASE_1_2B_REVISION`` returned without exception — the
@@ -478,7 +467,7 @@ class TestPhase12bMigrationUpgrades:
         ],
     )
     def test_phase_1_1_and_phase_1_2a_tables_preserved(
-        self, phase_1_2b_schema, preserved_table: str
+        self, phase_1_2b_schema: Phase12bSchema, preserved_table: str
     ) -> None:
         engine = create_engine(phase_1_2b_schema["sync_url"])
         try:
@@ -504,7 +493,7 @@ class TestPhase12bMigrationUpgrades:
         ],
     )
     def test_phase_1_2b_tables_exist(
-        self, phase_1_2b_schema, new_table: str
+        self, phase_1_2b_schema: Phase12bSchema, new_table: str
     ) -> None:
         engine = create_engine(phase_1_2b_schema["sync_url"])
         try:
@@ -516,7 +505,7 @@ class TestPhase12bMigrationUpgrades:
             engine.dispose()
 
     def test_training_goals_partial_unique_index_in_pg_catalog(
-        self, phase_1_2b_schema
+        self, phase_1_2b_schema: Phase12bSchema
     ) -> None:
         """The active-goal partial unique index must surface in
         ``pg_indexes`` for the test schema with predicate
@@ -529,7 +518,7 @@ class TestPhase12bMigrationUpgrades:
         )
 
     def test_regeneration_pending_partial_index_in_pg_catalog(
-        self, phase_1_2b_schema
+        self, phase_1_2b_schema: Phase12bSchema
     ) -> None:
         _check_partial_unique_index_predicate(
             phase_1_2b_schema,
@@ -539,7 +528,7 @@ class TestPhase12bMigrationUpgrades:
         )
 
     def test_weekly_plans_plan_week_unique_constraint(
-        self, phase_1_2b_schema
+        self, phase_1_2b_schema: Phase12bSchema
     ) -> None:
         """``UNIQUE (training_plan_id, week_number)`` on weekly_plans
         must appear in ``pg_constraint`` **exactly once** and only
@@ -562,7 +551,7 @@ class TestPhase12bMigrationUpgrades:
         )
 
     def test_planned_sessions_slot_date_unique_constraint(
-        self, phase_1_2b_schema
+        self, phase_1_2b_schema: Phase12bSchema
     ) -> None:
         """``UNIQUE (weekly_plan_id, target_date, session_slot)`` on
         planned_sessions — the AM/PM disambiguation contract — must
@@ -583,7 +572,7 @@ class TestPhase12bMigrationUpgrades:
         )
 
     def test_checkpoints_planned_session_unique_constraint(
-        self, phase_1_2b_schema
+        self, phase_1_2b_schema: Phase12bSchema
     ) -> None:
         """Strict one-to-one between Checkpoint and PlannedSession —
         a UNIQUE constraint on ``checkpoints.planned_session_id``.
@@ -649,7 +638,7 @@ class TestPhase12bMigrationUpgrades:
         )
 
     def test_activities_planned_session_fk_in_pg_catalog(
-        self, phase_1_2b_schema
+        self, phase_1_2b_schema: Phase12bSchema
     ) -> None:
         """``fk_activities_planned_session`` must reference
         ``planned_sessions.id`` with ``ondelete='SET NULL'`` inside
@@ -678,7 +667,7 @@ class TestPhase12bMigrationUpgrades:
         )
 
     def test_training_plans_twin_state_id_column_exists_no_fk(
-        self, phase_1_2b_schema
+        self, phase_1_2b_schema: Phase12bSchema
     ) -> None:
         """``training_plans.twin_state_id`` is a nullable UUID column
         with NO FK (awaiting Phase-1.2c).
@@ -716,7 +705,7 @@ class TestPhase12bMigrationUpgrades:
         assert cols is not None, (
             "training_plans.twin_state_id column missing."
         )
-        attname, attnotnull, typname = cols
+        attname, attnotnull, _typname = cols
         assert attname == "twin_state_id"
         assert attnotnull is False, (
             "training_plans.twin_state_id must be NULLABLE."
@@ -757,7 +746,7 @@ class TestPhase12bMigrationUpgrades:
         )
 
     def test_phase_1_2b_tables_have_cascade_fks(
-        self, phase_1_2b_schema
+        self, phase_1_2b_schema: Phase12bSchema
     ) -> None:
         """TrainingPlan → TrainingGoal, WeeklyPlan → TrainingPlan,
         PlannedSession → WeeklyPlan + TrainingPlan, Checkpoint →
@@ -792,9 +781,9 @@ class TestPhase12bMigrationUpgrades:
         # All regressions should be CASCADE ('c') except the
         # exceptions to the plan ('a' for the activities FK, which
         # is on the activities table — out of scope for this list).
-        seen = {row[0]: set() for row in rows}
+        seen: dict[Any, set[str]] = {}
         for row in rows:
-            seen[row[0]].add(row[1])
+            seen.setdefault(row[0], set()).add(row[1])
 
         # training_plans, weekly_plans, weekly_sessions, checkpoints,
         # secondary_events follow the rows here all cascade 'c'.
@@ -837,8 +826,9 @@ class TestPhase12bMigrationDowngrade:
             # contract without depending on later sub-phases
             # (Phase-1.2c adds 7 more tables that, with head, would
             # require multiple downgrade steps to reach Phase-1.2a).
+            revision = PHASE_1_2B_REVISION or ""
             rc_up, out_up, err_up = _run_alembic_subprocess(
-                schema_url, ("upgrade", PHASE_1_2B_REVISION),
+                schema_url, ("upgrade", revision),
             )
             assert rc_up == 0, (
                 f"alembic upgrade {PHASE_1_2B_REVISION} failed "
@@ -916,7 +906,7 @@ class TestPhase12bMigrationDowngrade:
 
 
 def _count_constraint_in_schema(
-    schema_info: dict,
+    schema_info: Phase12bSchema,
     *,
     table: str,
     constraint_name: str,
@@ -962,12 +952,12 @@ def _count_constraint_in_schema(
 
 
 def _fetch_fk_row_in_schema(
-    schema_info: dict,
+    schema_info: Phase12bSchema,
     *,
     conrelid_table: str,
     confrelid_table: str,
     constraint_name: str,
-) -> Optional[tuple]:
+) -> tuple[Any, Any, Any] | None:
     """Return the matching FK row inside ``schema_info['schema']`` as
     ``(conname, confdeltype, constraint_def)``.
 
@@ -1014,11 +1004,11 @@ def _fetch_fk_row_in_schema(
         f"`{conrelid_table}` and `{confrelid_table}` in schema "
         f"`{schema_info['schema']}`. Got {len(rows)}."
     )
-    return rows[0] if rows else None
+    return cast(Optional[tuple[Any, Any, Any]], rows[0] if rows else None)
 
 
 def _check_partial_unique_index_predicate(
-    schema_info: dict,
+    schema_info: Phase12bSchema,
     *,
     table: str,
     index_name: str,
@@ -1122,7 +1112,7 @@ def _predicate_contains(normalised_predicate: str, expected_substr: str) -> bool
     return flat_expected in normalised_predicate
 
 
-def _count_activities_planned_session_fk(engine) -> int:
+def _count_activities_planned_session_fk(engine: Engine) -> int:
     """Count FKs from ``activities.planned_session_id`` →
     ``planned_sessions.id`` (after downgrade this gets zero).
 

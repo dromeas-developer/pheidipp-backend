@@ -43,6 +43,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime, timezone
+from decimal import Decimal
 from typing import Any, Mapping, Optional, TYPE_CHECKING
 
 from sqlalchemy.exc import IntegrityError
@@ -52,11 +53,15 @@ from app.models.athlete_fitness import AthleteFitness
 from app.models.athlete_physiology import AthletePhysiology
 from app.models.athlete_preferences import (
     AthletePreferences,
+    HrSource,
+    PowerSource,
     infer_data_tier,
 )
 from app.models.athlete_profile import AthleteProfile
 from app.models.enums import (
+    GoalEventType,
     GoalType,
+    InjurySeverity,
     MeasurementSource,
     RecoveryModifierLevel,
     SportBackground,
@@ -138,7 +143,7 @@ BOOTSTRAP_PRIOR_WEIGHT = 0.5
 # ---------------------------------------------------------------------------
 
 
-class _ProfileInput:
+class ProfileInput:
     """Subset of profile fields the onboarding transaction mutates."""
 
     __slots__ = ("timezone", "training_window", "height_cm")
@@ -147,7 +152,7 @@ class _ProfileInput:
         self,
         *,
         timezone: str,
-        training_window: Optional[dict],
+        training_window: Optional[dict[str, Any]],
         height_cm: Optional[float],
     ) -> None:
         self.timezone = timezone
@@ -155,7 +160,7 @@ class _ProfileInput:
         self.height_cm = height_cm
 
 
-class _PreferencesInput:
+class PreferencesInput:
     """Full AthletePreferences payload the onboarding transaction creates."""
 
     __slots__ = (
@@ -175,10 +180,10 @@ class _PreferencesInput:
         sport_background: SportBackground,
         years_structured_training: int,
         training_time_of_day: str,
-        weekly_schedule: dict,
+        weekly_schedule: dict[str, Any],
         gps_source: str,
-        hr_source: str,
-        power_source: str,
+        hr_source: HrSource,
+        power_source: PowerSource,
         primary_training_platform: str,
     ) -> None:
         self.sport_background = sport_background
@@ -191,7 +196,7 @@ class _PreferencesInput:
         self.primary_training_platform = primary_training_platform
 
 
-class _GoalInput:
+class GoalInput:
     """Full TrainingGoal payload the onboarding transaction creates."""
 
     __slots__ = (
@@ -214,7 +219,7 @@ class _GoalInput:
         self,
         *,
         goal_type: GoalType,
-        goal_event_type: Any,
+        goal_event_type: Optional[GoalEventType],
         goal_event_name: Optional[str],
         goal_event_date: Optional[date],
         custom_distance_km: Optional[float],
@@ -223,7 +228,7 @@ class _GoalInput:
         weekly_volume_km: float,
         fitness_level: int,
         recent_injury: Optional[str],
-        injury_severity: Any,
+        injury_severity: Optional[InjurySeverity],
         target_distance_km: Optional[float],
         target_time_minutes: Optional[int],
     ) -> None:
@@ -301,9 +306,9 @@ class OnboardingService:
         self,
         *,
         athlete_id: uuid.UUID,
-        profile_input: _ProfileInput,
-        prefs_input: _PreferencesInput,
-        goal_input: _GoalInput,
+        profile_input: ProfileInput,
+        prefs_input: PreferencesInput,
+        goal_input: GoalInput,
     ) -> OnboardingResult:
         """Run the full bootstrap sequence in one atomic transaction.
 
@@ -329,7 +334,7 @@ class OnboardingService:
                 "onboarding has already been completed"
             )
 
-        self._validate_goal_type(goal_input.goal_type)
+        self.validate_goal_type(goal_input.goal_type)
 
         # 1. Update the AthleteProfile row created during registration.
         profile_row = await self.profiles.get_by_athlete_id(athlete_id)
@@ -344,7 +349,7 @@ class OnboardingService:
         if profile_input.training_window is not None:
             profile_row.training_window = profile_input.training_window
         if profile_input.height_cm is not None:
-            profile_row.height_cm = profile_input.height_cm
+            profile_row.height_cm = Decimal(str(profile_input.height_cm))
         profile_row.structural_risk_flag = (
             prefs_input.sport_background != SportBackground.RUNNING_PRIMARY
         )
@@ -397,7 +402,7 @@ class OnboardingService:
         # 4. Bootstrap AthletePhysiology — age-graded threshold estimates
         #    derived from date_of_birth. ``cp`` and ``vo2max`` stay null.
         today = datetime.now(timezone.utc)
-        age_years = _age_in_years(profile_row.date_of_birth, today)
+        age_years = age_in_years(profile_row.date_of_birth, today)
         max_hr_est = 220 - age_years
         lt1_hr_est = round(max_hr_est * LT1_FACTOR, 2)
         lt2_hr_est = round(max_hr_est * LT2_FACTOR, 2)
@@ -405,14 +410,14 @@ class OnboardingService:
         physio_row = AthletePhysiology(
             athlete_id=athlete_id,
             lt1={
-                "hr": _bootstrap_signal(
+                "hr": bootstrap_signal(
                     value=lt1_hr_est, observation_date=today
                 ),
                 "power": None,
                 "pace": None,
             },
             lt2={
-                "hr": _bootstrap_signal(
+                "hr": bootstrap_signal(
                     value=lt2_hr_est, observation_date=today
                 ),
                 "power": None,
@@ -420,7 +425,7 @@ class OnboardingService:
             },
             cp=None,
             vo2max=None,
-            max_hr=_bootstrap_signal(
+            max_hr=bootstrap_signal(
                 value=float(max_hr_est), observation_date=today
             ),
         )
@@ -451,7 +456,7 @@ class OnboardingService:
 
         # 6. Append the first TwinState — append-only insert.
         data_tier = infer_data_tier(prefs_input.hr_source, prefs_input.power_source)
-        metric_confidence = _bootstrap_metric_confidence()
+        metric_confidence = bootstrap_metric_confidence()
         twin_state = TwinState(
             athlete_id=athlete_id,
             training_goal_id=goal_row.id,
@@ -571,7 +576,7 @@ class OnboardingService:
         height_cm: Optional[float] = None,
         location_lat: Optional[float] = None,
         location_lng: Optional[float] = None,
-        training_window: Optional[dict] = None,
+        training_window: Optional[dict[str, Any]] = None,
     ) -> AthleteProfile:
         """PATCH the mutable subset of ``AthleteProfile``.
 
@@ -593,11 +598,11 @@ class OnboardingService:
             raise AthleteNotFoundError("athlete profile missing")
 
         if height_cm is not None:
-            row.height_cm = height_cm
+            row.height_cm = Decimal(str(height_cm))
         if location_lat is not None:
-            row.location_lat = location_lat
+            row.location_lat = Decimal(str(location_lat))
         if location_lng is not None:
-            row.location_lng = location_lng
+            row.location_lng = Decimal(str(location_lng))
         if training_window is not None:
             row.training_window = training_window
 
@@ -698,17 +703,13 @@ class OnboardingService:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _validate_goal_type(goal_type: GoalType) -> None:
+    def validate_goal_type(goal_type: GoalType) -> None:
         """Reject ``GoalType`` values outside the onboarding whitelist.
 
         The IANA timezone identifier is validated by the Pydantic schema
         layer (``OnboardingProfileIn``) so an invalid timezone is
         rejected with HTTP 422 before the service is ever called.
         """
-        if not isinstance(goal_type, GoalType):
-            raise TypeError(
-                f"goal_type must be a GoalType enum member, got {type(goal_type).__name__}"
-            )
         if goal_type not in ALLOWED_ONBOARDING_GOAL_TYPES:
             raise InvalidGoalTypeError(
                 f"goal_type '{goal_type.value}' is not permitted at onboarding"
@@ -735,7 +736,7 @@ def TrainingGoalRepository_unique_violation(error: IntegrityError) -> bool:
     return pgcode == "23505"
 
 
-def _age_in_years(dob: date, now: datetime) -> int:
+def age_in_years(dob: date, now: datetime) -> int:
     """Compute completed years between *dob* and *now*.
 
     Mirrors the standard birthday-based computation. Negative ages are
@@ -748,7 +749,7 @@ def _age_in_years(dob: date, now: datetime) -> int:
     return max(0, age)
 
 
-def _bootstrap_signal(*, value: float, observation_date: datetime) -> dict:
+def bootstrap_signal(*, value: float, observation_date: datetime) -> dict[str, Any]:
     """Return the ``PhysiologyParameterState`` JSON shape for a
     bootstrap posterior — ``value``, ``uncertainty`` (population-level
     wide prior), ``prior_weight`` 0.5, ``dominant_source`` set to
@@ -764,7 +765,7 @@ def _bootstrap_signal(*, value: float, observation_date: datetime) -> dict:
     }
 
 
-def _bootstrap_metric_confidence() -> dict:
+def bootstrap_metric_confidence() -> dict[str, Any]:
     """Return the per-metric confidence JSONB for the bootstrap twin state.
 
     Only ``lt1_hr`` and ``lt2_hr`` are populated at bootstrap (both

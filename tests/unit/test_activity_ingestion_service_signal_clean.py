@@ -13,7 +13,8 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from typing import Any
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -66,9 +67,9 @@ class TestSignalCleanEnqueueHook:
         athlete_id = uuid.uuid4()
 
         # Set up a mock dispatcher that records calls.
-        defer_calls: list = []
+        defer_calls: list[dict[str, Any]] = []
 
-        def mock_defer(**kwargs) -> None:
+        def mock_defer(**kwargs: Any) -> None:
             defer_calls.append(kwargs)
 
         # Build a mock activity.
@@ -141,7 +142,7 @@ class TestSignalCleanEnqueueHook:
         mock_repo.update_load_scores = AsyncMock()
         service.activities = mock_repo
 
-        await service._run_ingestion_pipeline(
+        await service.run_ingestion_pipeline(
             athlete_id=athlete_id,
             activity_id=activity_id,
             file_bytes=b"fake fit",
@@ -160,9 +161,9 @@ class TestSignalCleanEnqueueHook:
         activity_id = uuid.uuid4()
         athlete_id = uuid.uuid4()
 
-        defer_calls: list = []
+        defer_calls: list[dict[str, Any]] = []
 
-        def mock_defer(**kwargs) -> None:
+        def mock_defer(**kwargs: Any) -> None:
             defer_calls.append(kwargs)
 
         mock_activity = MagicMock()
@@ -231,7 +232,7 @@ class TestSignalCleanEnqueueHook:
         mock_repo.update_load_scores = AsyncMock()
         service.activities = mock_repo
 
-        await service._run_ingestion_pipeline(
+        await service.run_ingestion_pipeline(
             athlete_id=athlete_id,
             activity_id=activity_id,
             file_bytes=b"fake fit",
@@ -246,9 +247,9 @@ class TestSignalCleanEnqueueHook:
         activity_id = uuid.uuid4()
         athlete_id = uuid.uuid4()
 
-        defer_calls: list = []
+        defer_calls: list[dict[str, Any]] = []
 
-        def mock_defer(**kwargs) -> None:
+        def mock_defer(**kwargs: Any) -> None:
             defer_calls.append(kwargs)
 
         mock_activity = MagicMock()
@@ -317,7 +318,7 @@ class TestSignalCleanEnqueueHook:
         mock_repo.update_load_scores = AsyncMock()
         service.activities = mock_repo
 
-        await service._run_ingestion_pipeline(
+        await service.run_ingestion_pipeline(
             athlete_id=athlete_id,
             activity_id=activity_id,
             file_bytes=b"fake fit",
@@ -333,9 +334,9 @@ class TestSignalCleanEnqueueHook:
         activity_id = uuid.uuid4()
         athlete_id = uuid.uuid4()
 
-        defer_calls: list = []
+        defer_calls: list[dict[str, Any]] = []
 
-        def mock_defer(**kwargs) -> None:
+        def mock_defer(**kwargs: Any) -> None:
             defer_calls.append(kwargs)
 
         mock_activity = MagicMock()
@@ -404,7 +405,7 @@ class TestSignalCleanEnqueueHook:
         mock_repo.update_load_scores = AsyncMock()
         service.activities = mock_repo
 
-        await service._run_ingestion_pipeline(
+        await service.run_ingestion_pipeline(
             athlete_id=athlete_id,
             activity_id=activity_id,
             file_bytes=b"fake fit",
@@ -423,7 +424,7 @@ class TestSignalCleanEnqueueHook:
         activity_id = uuid.uuid4()
         athlete_id = uuid.uuid4()
 
-        def mock_defer(**kwargs) -> None:
+        def mock_defer(**kwargs: Any) -> None:
             raise RuntimeError("queue backend unavailable")
 
         mock_activity = MagicMock()
@@ -495,7 +496,7 @@ class TestSignalCleanEnqueueHook:
         # The pipeline MUST NOT raise even though the defer failed.
         # The pipeline completes successfully; only the signal_clean
         # enqueue was missed (recoverable via backfill per Principle #14).
-        await service._run_ingestion_pipeline(
+        await service.run_ingestion_pipeline(
             athlete_id=athlete_id,
             activity_id=activity_id,
             file_bytes=b"fake fit",

@@ -19,6 +19,8 @@ exactly once.
 
 from __future__ import annotations
 
+from typing import Any
+
 import enum
 import uuid
 from datetime import datetime, timezone
@@ -38,6 +40,7 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
+from app.models._enum_helpers import enum_str_values
 
 
 class EventPublicationStatus(str, enum.Enum):
@@ -62,7 +65,7 @@ class SystemEvent(Base):
     athlete_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), nullable=False
     )
-    payload: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
     produced_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -107,7 +110,7 @@ class SystemEventOutbox(Base):
             name="event_publication_status",
             native_enum=False,
             length=16,
-            values_callable=lambda x: [e.value for e in x],
+            values_callable=enum_str_values,
         ),
         nullable=False,
         default=EventPublicationStatus.PENDING,

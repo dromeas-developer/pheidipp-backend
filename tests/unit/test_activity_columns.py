@@ -12,6 +12,8 @@ docs/implementation/phase-1/phase-1-2a-p1-profile-preferences-activity.md
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 from sqlalchemy import (
     Boolean,
@@ -231,18 +233,20 @@ class TestActivityTableIndexes:
         constraint."""
         # The Index's ``dialect_options['postgresql']['where']`` holds
         # the predicate (Alembic-autogen-round-trips this verbatim).
-        partial_unique = [
-            idx
-            for idx in get_indexes(Activity).values()
-            if idx.unique and idx.dialect_options.get("postgresql", {}).get("where") is not None
-        ]
+        partial_unique: list[Any] = []
+        for idx_ in get_indexes(Activity).values():
+            if not idx_.unique:
+                continue
+            dialect_opts: Any = idx_.dialect_options
+            if dialect_opts.get("postgresql", {}).get("where") is not None:
+                partial_unique.append(idx_)
         assert partial_unique, (
             "Expected the dedup index to declare a postgresql_where "
             "predicate — without one it would constrain "
             "manual_entry rows too, blocking stale-retry ingestion."
         )
-        for idx in partial_unique:
-            predicate = idx.dialect_options["postgresql"]["where"]
+        for idx_ in partial_unique:
+            predicate: Any = idx_.dialect_options["postgresql"]["where"]
             rendered = str(predicate).lower()
             assert "external_id" in rendered and "not null" in rendered, (
                 f"Expected the partial predicate to constrain `external_id IS NOT NULL`. Got: {predicate}"

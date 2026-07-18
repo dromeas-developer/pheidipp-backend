@@ -28,7 +28,7 @@ Invariants codified here:
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime
+from datetime import date
 from typing import List, Optional
 
 from sqlalchemy import func, select

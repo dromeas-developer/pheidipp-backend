@@ -1,71 +1,28 @@
 ---
 name: coder-handoff-blocks
 description: >
-  Load this when writing the Coder Handoff Notes section of an
-  implementation plan — i.e. after the Implementation Steps are already
-  drafted and you are producing the final handoff package. Not needed
-  during retrieval, verification, or tentative drafting (Steps 1-6 of the
-  Implementation Planning Process). Contains the full spec for the four
-  MANDATORY blocks: Coder Scope, Coder Batches, Batch Success Criteria,
-  and Context Needed.
+  Load this when producing batch BRDs in Step 9 of the Implementation
+  Planning Process — after the Implementation Steps are drafted, batches
+  are grouped, and you are writing the per-batch BRD files. Not needed
+  during retrieval, verification, or tentative drafting (Steps 1-6).
+  Contains the full spec for Context Needed tiers and Batch Success
+  Criteria. In Resolution Mode, also triggered when a plan update
+  touches a BRD's Context Needed or Batch Success Criteria — load it
+  to update those blocks per this spec.
 ---
 
-# Coder Handoff Notes — Mandatory Block Specifications
+# Batch BRD — Context Needed & Batch Success Criteria Spec
 
-Everything the coder needs that is not captured in the rest of the plan:
-- known risks in the implementation
-- places where the architecture requires a specific interpretation
-- things that are easy to get wrong
-- rationale for step ordering beyond what the Coder Batches block already
-  encodes mechanically — the block is for *what* order, this is for *why*
-- if an ADR was written: state its path and what constraint it imposes that
-  the coder must not violate during implementation
+Under the BRD output model, the Implementation Architect produces one
+self-contained BRD file per batch. Each BRD contains only that batch's
+Coder-owned steps, contracts, invariants, and context. The old "Coder
+Scope" and "Coder Batches" blocks are now implicit: every step in a BRD
+is Coder-owned by construction, and the BRD itself is exactly one batch.
 
-Four blocks are MANDATORY and must appear first, in this order, in every
-Coder Handoff Notes section.
-
-## Coder Scope
-
-List every step number and its owner. The coder executes only the steps
-listed under Execute and skips all others.
-
-```
-## Coder Scope
-Execute:  Steps N, N, N  [OWNER: Coder] — includes migration generation
-Skip:     Step N (DevOps — migration review and application),
-          Step N (Test Architect — tests)
-```
-
-## Coder Batches
-
-Every plan's Execute steps grouped into ordered, dependency-respecting
-batches. This is not optional and not just for long plans — the coder is
-always invoked once per batch, never once for an entire plan, so every
-plan needs at least one batch. Construct batches so that:
-
-- a plan with 6 or fewer Coder-owned steps still needs this block — it is
-  valid, and often correct, for it to contain a single batch covering all
-  of them ("Batch 1: Steps 1-6"). Do not fragment a small plan into
-  multiple batches for its own sake; one honest batch is fine
-- steps within a batch depend only on files that exist before the plan
-  starts, or were created earlier in the same batch — never on a later batch
-- a file touched by several steps stays inside one batch wherever
-  possible, rather than being reopened across a batch boundary
-- each batch is a coherent unit of work with its own one-line theme
-- step count is not a proxy for batch size. A single step that touches an
-  already-large method with several interacting concerns (an ordering
-  constraint against other events, a conditional branch, a payload
-  change) can cost more to implement correctly than four small additive
-  steps combined. If one step in a batch is disproportionately complex
-  relative to the rest of the plan, say so in the batch's theme rather
-  than letting it look identical to a simple one
-
-```
-## Coder Batches
-Batch 1: Steps N, N       — <theme>
-Batch 2: Steps N, N, N    — <theme>
-Batch 3: Steps N          — <theme, flagged if disproportionately complex>
-```
+The two blocks with active content rules are **Batch Success Criteria**
+and **Context Needed** — specified below. These appear in every batch
+BRD at the locations shown in the Implementation Plan Format template
+(`## Batch Success Criteria` and `## Context Needed`).
 
 ## Batch Success Criteria
 
@@ -87,14 +44,13 @@ Rules:
   restate its criteria
 - If a batch involves an ordering or contract claim that could plausibly
   be stated elsewhere in the plan too (event firing order is the most
-  common case — see the Event Contracts table), state the criterion
-  specifically enough to catch a disagreement — name the exact order, not
-  "events fire correctly." Writing this criterion is also your check:
-  before finalizing it, confirm it agrees with what the Event Contracts
-  table, Non-Obvious Decisions, and Pseudocode each say about the same
-  ordering. A plan that states the same fact two different ways in two
-  sections is a defect the coder should never have to notice and resolve
-  on your behalf
+  common case — see the Event Contracts table in overview.md), state the
+  criterion specifically enough to catch a disagreement — name the exact
+  order, not "events fire correctly." Writing this criterion is also your
+  check: before finalizing it, confirm it agrees with what overview.md's
+  Event Contracts table and Pseudocode each say about the same ordering.
+  A plan that states the same fact two different ways in two sections is
+  a defect the coder should never have to notice and resolve on your behalf
 
 ```
 ## Batch Success Criteria
@@ -107,7 +63,7 @@ Batch 2 assumes Batch 1 is complete. Batch 2 complete when:
 
 ## Context Needed
 
-For each Execute step, the specific existing files, architecture
+For each step in this batch, the specific existing files, architecture
 sections, and invariants that step depends on. Nothing more. You already
 know this: every step you write cites the specific pattern, contract, or
 existing component it depends on in its own prose (a repository method, a
@@ -152,9 +108,9 @@ Further rules:
 - Existing files: exact paths, not "the repositories directory"
 - Architecture/invariants: name the specific section or invariant ID, not
   the whole document
-- If a step genuinely needs nothing beyond the plan's own Scope and
-  Architecture Contracts sections (rare — most steps reference something
-  specific), write "Primary: plan sections only"
+- If a step genuinely needs nothing beyond the BRD's own Scope and
+  Relevant Architecture Contracts sections (rare — most steps reference
+  something specific), write "Primary: BRD sections only"
 - Add a `Forbidden:` line for a step only when you know, from your own
   retrieval earlier in this session, of a *specific* adjacent file or
   service the coder could plausibly but wrongly reach for — something
@@ -182,6 +138,26 @@ fetched together in Pre-Flight Step 3; Secondary and Fallback are
 requested only on demand.)
 ```
 
-These blocks also tell the coder a safe grouping for consolidating
+## Batch Grouping
+
+When grouping steps into batches in the overview (before producing BRDs):
+
+- A plan with 6 or fewer Coder-owned steps still needs at least one
+  batch — it is valid, and often correct, to have a single batch
+  covering all of them ("Batch 1: Steps 1-6"). Do not fragment a small
+  plan into multiple batches for its own sake; one honest batch is fine
+- Steps within a batch depend only on files that exist before the plan
+  starts, or were created earlier in the same batch — never on a later
+  batch
+- A file touched by several steps stays inside one batch wherever
+  possible, rather than being reopened across a batch boundary
+- Each batch is a coherent unit of work with its own one-line theme
+- Step count is not a proxy for batch size. A single step that touches
+  an already-large method with several interacting concerns can cost
+  more to implement correctly than four small additive steps combined.
+  If one step in a batch is disproportionately complex relative to the
+  rest of the plan, say so in the batch's theme
+
+These rules also tell the coder a safe grouping for consolidating
 same-file edits within a batch — see "Consolidate Same-File Edits" in the
 coder's Execution Protocol.

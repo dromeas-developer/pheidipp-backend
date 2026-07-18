@@ -18,11 +18,12 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, timedelta
+from typing import Any
 
 import pytest
 from httpx import AsyncClient
 
-from tests.payloads import _weekly_schedule_payload
+from tests.payloads import weekly_schedule_payload
 from tests.utils.http_helpers import bearer_header, http_register
 
 
@@ -34,7 +35,7 @@ from tests.utils.http_helpers import bearer_header, http_register
 @pytest.fixture
 async def onboarded_with_plan(
     client: AsyncClient,
-) -> tuple[str, str]:
+) -> tuple[uuid.UUID, str]:
     """Register + complete onboarding for a fresh athlete. Returns
     ``(athlete_id, access_token)``.
 
@@ -62,7 +63,7 @@ async def onboarded_with_plan(
             "sport_background": "running_primary",
             "years_structured_training": 3,
             "training_time_of_day": "morning",
-            "weekly_schedule": _weekly_schedule_payload(),
+            "weekly_schedule": weekly_schedule_payload(),
             "gps_source": "garmin_watch",
             "hr_source": "chest_strap_rr",
             "power_source": "none",
@@ -101,7 +102,7 @@ async def onboarded_with_plan(
 
 class TestGetPlanEndpoint:
     async def test_happy_path_returns_200_with_training_plan(
-        self, client: AsyncClient, onboarded_with_plan: tuple[str, str]
+        self, client: AsyncClient, onboarded_with_plan: tuple[uuid.UUID, str]
     ) -> None:
         aid, tok = onboarded_with_plan
         response = await client.get(
@@ -121,7 +122,7 @@ class TestGetPlanEndpoint:
         assert "race_week" in labels
 
     async def test_returns_phase_definitions_and_distributions(
-        self, client: AsyncClient, onboarded_with_plan: tuple[str, str]
+        self, client: AsyncClient, onboarded_with_plan: tuple[uuid.UUID, str]
     ) -> None:
         aid, tok = onboarded_with_plan
         response = await client.get(
@@ -136,7 +137,7 @@ class TestGetPlanEndpoint:
         assert len(body["phase_definitions"]) == len(body["phases"])
 
     async def test_strategic_rationale_populated(
-        self, client: AsyncClient, onboarded_with_plan: tuple[str, str]
+        self, client: AsyncClient, onboarded_with_plan: tuple[uuid.UUID, str]
     ) -> None:
         """``strategic_rationale`` is non-null for race_event plans."""
         aid, tok = onboarded_with_plan
@@ -175,7 +176,7 @@ class TestGetPlanEndpoint:
         assert response.status_code == 403
 
     async def test_missing_bearer_returns_401(
-        self, client: AsyncClient, onboarded_with_plan: tuple[str, str]
+        self, client: AsyncClient, onboarded_with_plan: tuple[uuid.UUID, str]
     ) -> None:
         aid, _ = onboarded_with_plan
         response = await client.get(f"/api/v1/athletes/{aid}/plan")
@@ -189,7 +190,7 @@ class TestGetPlanEndpoint:
 
 class TestGetPlanSessionsEndpoint:
     async def test_happy_path_returns_list(
-        self, client: AsyncClient, onboarded_with_plan: tuple[str, str]
+        self, client: AsyncClient, onboarded_with_plan: tuple[uuid.UUID, str]
     ) -> None:
         aid, tok = onboarded_with_plan
         response = await client.get(
@@ -197,7 +198,7 @@ class TestGetPlanSessionsEndpoint:
             headers=bearer_header(tok),
         )
         assert response.status_code == 200, response.text
-        body = response.json()
+        body: list[Any] = response.json()
         assert isinstance(body, list)
         assert len(body) > 0
 
@@ -209,7 +210,7 @@ class TestGetPlanSessionsEndpoint:
             assert session["session_type"]
 
     async def test_sessions_ordered_by_target_date(
-        self, client: AsyncClient, onboarded_with_plan: tuple[str, str]
+        self, client: AsyncClient, onboarded_with_plan: tuple[uuid.UUID, str]
     ) -> None:
         aid, tok = onboarded_with_plan
         response = await client.get(
@@ -253,7 +254,7 @@ class TestGetPlanSessionsEndpoint:
 
 class TestGetPlanUpcomingEndpoint:
     async def test_happy_path_returns_upcoming_capped_at_5(
-        self, client: AsyncClient, onboarded_with_plan: tuple[str, str]
+        self, client: AsyncClient, onboarded_with_plan: tuple[uuid.UUID, str]
     ) -> None:
         aid, tok = onboarded_with_plan
         response = await client.get(
@@ -268,7 +269,7 @@ class TestGetPlanUpcomingEndpoint:
         assert len(body["sessions"]) > 0
 
     async def test_all_upcoming_sessions_in_future(
-        self, client: AsyncClient, onboarded_with_plan: tuple[str, str]
+        self, client: AsyncClient, onboarded_with_plan: tuple[uuid.UUID, str]
     ) -> None:
         from datetime import date as _date, datetime
 
@@ -316,7 +317,7 @@ class TestGetPlanUpcomingEndpoint:
 
 class TestGetPlanCheckpointsEndpoint:
     async def test_happy_path_returns_checkpoints(
-        self, client: AsyncClient, onboarded_with_plan: tuple[str, str]
+        self, client: AsyncClient, onboarded_with_plan: tuple[uuid.UUID, str]
     ) -> None:
         aid, tok = onboarded_with_plan
         response = await client.get(
@@ -324,12 +325,12 @@ class TestGetPlanCheckpointsEndpoint:
             headers=bearer_header(tok),
         )
         assert response.status_code == 200, response.text
-        body = response.json()
+        body: list[Any] = response.json()
         assert isinstance(body, list)
         assert len(body) > 0
 
     async def test_checkpoint_types_include_three_documented_ones(
-        self, client: AsyncClient, onboarded_with_plan: tuple[str, str]
+        self, client: AsyncClient, onboarded_with_plan: tuple[uuid.UUID, str]
     ) -> None:
         aid, tok = onboarded_with_plan
         response = await client.get(
@@ -344,7 +345,7 @@ class TestGetPlanCheckpointsEndpoint:
         assert "progress_review" in types
 
     async def test_all_checkpoints_scheduled(
-        self, client: AsyncClient, onboarded_with_plan: tuple[str, str]
+        self, client: AsyncClient, onboarded_with_plan: tuple[uuid.UUID, str]
     ) -> None:
         aid, tok = onboarded_with_plan
         response = await client.get(

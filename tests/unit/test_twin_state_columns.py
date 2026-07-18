@@ -26,6 +26,8 @@ Architecture: docs/architecture/01-entities/twin-state.md
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 from sqlalchemy import (
     DateTime,
@@ -37,7 +39,6 @@ from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 
 from app.models.enums import (
-    DataTier,
     RecoveryModifierLevel,
     TwinConfidenceLevel,
     TwinTrigger,
@@ -47,7 +48,6 @@ from app.models.twin_state import TwinState
 from tests.utils.model_helpers import (
     get_columns,
     get_indexes,
-    get_check_constraints,
     get_foreign_keys_referencing,
     get_enum_values,
     get_server_default_text,
@@ -263,7 +263,8 @@ class TestTwinStatePartialUniqueIndex:
         multiple non-activity triggers (questionnaire,
         physiology_input, wellness_update) per athlete."""
         idx = get_indexes(TwinState)["uq_twin_states_athlete_activity"]
-        predicate = idx.dialect_options.get("postgresql", {}).get("where")
+        dialect_opts: Any = idx.dialect_options
+        predicate: Any = dialect_opts.get("postgresql", {}).get("where")
         assert predicate is not None, (
             "uq_twin_states_athlete_activity must declare a "
             "postgresql_where predicate — without it the index would "
@@ -272,7 +273,8 @@ class TestTwinStatePartialUniqueIndex:
 
     def test_athlete_activity_partial_predicate_is_activity_not_null(self) -> None:
         idx = get_indexes(TwinState)["uq_twin_states_athlete_activity"]
-        predicate = idx.dialect_options.get("postgresql", {}).get("where")
+        dialect_opts: Any = idx.dialect_options
+        predicate: Any = dialect_opts.get("postgresql", {}).get("where")
         rendered = str(predicate).lower()
         assert "activity_id" in rendered and "is not null" in rendered, (
             "uq_twin_states_athlete_activity partial predicate must "

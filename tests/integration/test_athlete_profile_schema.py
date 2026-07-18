@@ -202,7 +202,9 @@ class TestAthleteProfilePartialOnboardingPersistable:
         db_session.add(profile)
         await db_session.flush()
         await db_session.refresh(profile)
+        assert profile.location_lat is not None
         assert float(profile.location_lat) == pytest.approx(38.7223)
+        assert profile.location_lng is not None
         assert float(profile.location_lng) == pytest.approx(-9.1393)
 
     async def test_persisting_personalisation_jsonb_only(

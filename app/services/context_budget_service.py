@@ -26,9 +26,10 @@ import uuid
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Optional
 
-from app.models.enums import GoalType, MessageType, SportBackground
+from app.models.enums import GoalType, SportBackground
 
 if TYPE_CHECKING:
+    from app.models.twin_state import TwinState
     from app.repositories.athlete_preferences_repository import (
         AthletePreferencesRepository,
     )
@@ -193,7 +194,7 @@ class WorkoutGenerationContext:
     readiness: Optional[WorkoutReadinessDigest] = None
     data_tier: Optional[int] = None  # DataTier enum value
     target_type: Optional[str] = None  # 'power' | 'gap' | 'description'
-    relevant_objectives: list[dict[str, Any]] = field(default_factory=list)
+    relevant_objectives: list[dict[str, Any]] = field(default_factory=lambda: [])
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize to a plain dict for token estimation and prompt rendering."""
@@ -375,16 +376,16 @@ class ContextBudgetService:
         preferences: "AthletePreferencesRepository",
         planned_sessions: Optional["PlannedSessionRepository"] = None,
     ) -> None:
-        self._twin_states = twin_states
-        self._training_goals = training_goals
-        self._plans = plans
+        self.twin_states = twin_states
+        self.training_goals = training_goals
+        self.plans = plans
         self._profiles = profiles
         self._preferences = preferences
         # ``built_workout_context`` (Phase 1.5b) requires loading the
         # target ``PlannedSession``; optional so the Phase-1.5a callers
         # that pre-date the workout agent keep working without a
         # forced dependency.
-        self._planned_sessions = planned_sessions
+        self.planned_sessions = planned_sessions
 
     @staticmethod
     def estimate_tokens(obj: dict[str, Any]) -> int:
@@ -398,10 +399,9 @@ class ContextBudgetService:
         # -----------------------------------------------------------------
         # 1. Fetch data.
         # -----------------------------------------------------------------
-        twin_state = await self._twin_states.get_latest(athlete_id)
-        active_goal = await self._training_goals.get_active(athlete_id)
-        active_plan = await self._plans.get_active_for_athlete(athlete_id)
-        profile = await self._profiles.get_by_athlete_id(athlete_id)
+        twin_state = await self.twin_states.get_latest(athlete_id)
+        active_goal = await self.training_goals.get_active(athlete_id)
+        active_plan = await self.plans.get_active_for_athlete(athlete_id)
         preferences = await self._preferences.get_by_athlete_id(athlete_id)
 
         # -----------------------------------------------------------------
@@ -479,12 +479,12 @@ class ContextBudgetService:
             # Phase 1.5a: placeholder values so the prompt receives
             # something; Phase 2 refines this with session-type iteration.
             if active_plan.weekly_distributions:
-                week1 = active_plan.weekly_distributions[0] if len(active_plan.weekly_distributions) > 0 else {}
-                week2 = active_plan.weekly_distributions[1] if len(active_plan.weekly_distributions) > 1 else {}
+                week1: dict[str, Any] = active_plan.weekly_distributions[0] if len(active_plan.weekly_distributions) > 0 else {}
+                week2: dict[str, Any] = active_plan.weekly_distributions[1] if len(active_plan.weekly_distributions) > 1 else {}
                 first_block_preview = FirstBlockPreview(
-                    session_types_in_week_1=week1.get("session_types", []) if isinstance(week1, dict) else [],
-                    session_types_in_week_2=week2.get("session_types", []) if isinstance(week2, dict) else [],
-                    primary_focus=week1.get("primary_focus", "building aerobic base") if isinstance(week1, dict) else "building aerobic base",
+                    session_types_in_week_1=week1.get("session_types", []),
+                    session_types_in_week_2=week2.get("session_types", []),
+                    primary_focus=week1.get("primary_focus", "building aerobic base"),
                 )
 
         context = FirstMessageContext(
@@ -570,7 +570,7 @@ first_block_preview=first_block_preview,
         Phase-1.5a tracking TODO in :meth:`build_first_message_context`
         and is shared by both agents in this phase.
         """
-        if self._planned_sessions is None:
+        if self.planned_sessions is None:
             raise RuntimeError(
                 "build_workout_context requires a PlannedSessionRepository; "
                 "construct ContextBudgetService with planned_sessions=..."
@@ -579,9 +579,8 @@ first_block_preview=first_block_preview,
         # -----------------------------------------------------------------
         # 1. Fetch data.
         # -----------------------------------------------------------------
-        twin_state = await self._twin_states.get_latest(athlete_id)
-        session = await self._planned_sessions.get_by_id(planned_session_id)
-        preferences = await self._preferences.get_by_athlete_id(athlete_id)
+        twin_state = await self.twin_states.get_latest(athlete_id)
+        session = await self.planned_sessions.get_by_id(planned_session_id)
 
         # -----------------------------------------------------------------
         # 2. Build context sections.
@@ -651,7 +650,7 @@ first_block_preview=first_block_preview,
         return context
 
     def _compose_readiness_digest(
-        self, twin_state
+        self, twin_state: TwinState
     ) -> WorkoutReadinessDigest:
         """Translate a TwinState into the workout-context readiness shape.
 

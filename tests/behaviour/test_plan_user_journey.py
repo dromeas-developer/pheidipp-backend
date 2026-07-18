@@ -16,16 +16,17 @@ docs/implementation/phase-1/phase-1-4-p1-plan-generation.md
 from __future__ import annotations
 
 import uuid
+from typing import Any
 
 import pytest
 from httpx import AsyncClient
 
-from tests.payloads import _weekly_schedule_payload
+from tests.payloads import weekly_schedule_payload
 from tests.utils.http_helpers import bearer_header, http_register
 
 
 @pytest.fixture
-async def register_payload() -> dict:
+async def register_payload() -> dict[str, Any]:
     """Fresh registration payload — unique email avoids 409 collisions."""
     return {
         "email": f"plan-journey-{uuid.uuid4()}@example.com",
@@ -39,7 +40,7 @@ async def register_payload() -> dict:
 
 
 @pytest.fixture
-async def onboarding_payload() -> dict:
+async def onboarding_payload() -> dict[str, Any]:
     """Default onboarding payload — race_event, marathon, dates configured
     far enough out to pass the training-length gate."""
     from datetime import date, timedelta
@@ -54,7 +55,7 @@ async def onboarding_payload() -> dict:
             "sport_background": "running_primary",
             "years_structured_training": 3,
             "training_time_of_day": "morning",
-            "weekly_schedule": _weekly_schedule_payload(),
+            "weekly_schedule": weekly_schedule_payload(),
             "gps_source": "garmin_watch",
             "hr_source": "chest_strap_rr",
             "power_source": "none",
@@ -87,8 +88,8 @@ class TestOnboardingToPlanJourney:
     async def test_full_journey_produces_a_valid_plan(
         self,
         client: AsyncClient,
-        register_payload: dict,
-        onboarding_payload: dict,
+        register_payload: dict[str, Any],
+        onboarding_payload: dict[str, Any],
     ) -> None:
         # 1. Register.
         register_response = await client.post(
@@ -138,7 +139,7 @@ class TestOnboardingToPlanJourney:
             headers=bearer_header(access_token),
         )
         assert sessions_response.status_code == 200
-        sessions = sessions_response.json()
+        sessions: list[dict[str, Any]] = sessions_response.json()
         assert isinstance(sessions, list)
         assert len(sessions) > 0
         for s in sessions:
@@ -168,7 +169,7 @@ class TestOnboardingToPlanJourney:
     async def test_cross_athlete_cannot_access_other_athletes_plan(
         self,
         client: AsyncClient,
-        onboarding_payload: dict,
+        onboarding_payload: dict[str, Any],
     ) -> None:
         # First athlete — onboards + gets a plan.
         first_register = {

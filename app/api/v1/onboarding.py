@@ -50,9 +50,9 @@ from app.services.onboarding_errors import (
 )
 from app.services.onboarding_service import (
     OnboardingService,
-    _GoalInput,
-    _PreferencesInput,
-    _ProfileInput,
+    GoalInput,
+    PreferencesInput,
+    ProfileInput,
 )
 from app.services.plan_generation_errors import (
     PlanGenerationError,
@@ -92,12 +92,12 @@ async def complete_onboarding(
     for invalid input (handled by Pydantic upstream of this handler);
     403 when the JWT does not match the path athlete.
     """
-    profile_input = _ProfileInput(
+    profile_input = ProfileInput(
         timezone=payload.profile.timezone,
         training_window=payload.profile.training_window,
         height_cm=payload.profile.height_cm,
     )
-    prefs_input = _PreferencesInput(
+    prefs_input = PreferencesInput(
         sport_background=payload.preferences.sport_background,
         years_structured_training=payload.preferences.years_structured_training,
         training_time_of_day=payload.preferences.training_time_of_day,
@@ -107,7 +107,7 @@ async def complete_onboarding(
         power_source=payload.preferences.power_source,
         primary_training_platform=payload.preferences.primary_training_platform,
     )
-    goal_input = _GoalInput(
+    goal_input = GoalInput(
         goal_type=payload.goal.goal_type,
         goal_event_type=payload.goal.goal_event_type,
         goal_event_name=payload.goal.goal_event_name,

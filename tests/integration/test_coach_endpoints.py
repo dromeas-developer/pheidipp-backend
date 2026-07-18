@@ -11,19 +11,17 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime, timezone
-from typing import Any, AsyncIterator
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security.token_service import TokenService
-from app.models.activity import Activity
 from app.models.athlete import Athlete
 from app.models.athlete_auth import AthleteAuth
 from app.models.coaching_message import CoachingMessage
 from app.models.enums import (
-    ActivitySource,
     AuthProvider,
     DataTier,
     GoalEventType,
@@ -48,7 +46,6 @@ from app.repositories.twin_state_repository import TwinStateRepository
 from app.services.context_budget_service import ContextBudgetService
 from app.services.first_message_agent import FirstMessageAgent
 from app.core.prompt_registry import PromptRegistry
-from tests.utils.factories import make_athlete
 
 
 # ---------------------------------------------------------------------------
@@ -57,7 +54,7 @@ from tests.utils.factories import make_athlete
 
 
 async def _create_athlete_with_onboarding(
-    db_session, email: str | None = None
+    db_session: AsyncSession, email: str | None = None
 ) -> tuple[Athlete, TrainingGoal, TwinState, TrainingPlan]:
     """Create a fully-onboarded athlete (auth + goal + twin_state + plan)."""
     if email is None:
@@ -139,10 +136,10 @@ class TestPostFirstMessage:
     async def test_201_on_successful_generation(
         self,
         client: AsyncClient,
-        db_session,
+        db_session: AsyncSession,
         token_service: TokenService,
     ) -> None:
-        athlete, goal, twin, _ = await _create_athlete_with_onboarding(db_session)
+        athlete, _, twin, _ = await _create_athlete_with_onboarding(db_session)
         await db_session.flush()
 
         four_para_content = (
@@ -179,10 +176,10 @@ class TestPostFirstMessage:
     async def test_409_on_duplicate_call(
         self,
         client: AsyncClient,
-        db_session,
+        db_session: AsyncSession,
         token_service: TokenService,
     ) -> None:
-        athlete, goal, twin, _ = await _create_athlete_with_onboarding(db_session)
+        athlete, _, twin, _ = await _create_athlete_with_onboarding(db_session)
         await db_session.flush()
 
         existing_message = CoachingMessage(
@@ -218,10 +215,10 @@ class TestPostFirstMessage:
     async def test_503_on_llm_failure(
         self,
         client: AsyncClient,
-        db_session,
+        db_session: AsyncSession,
         token_service: TokenService,
     ) -> None:
-        athlete, goal, twin, _ = await _create_athlete_with_onboarding(db_session)
+        athlete, *_ = await _create_athlete_with_onboarding(db_session)
         await db_session.flush()
 
         from app.services.first_message_agent import LLMServiceUnavailableError
@@ -245,9 +242,9 @@ class TestPostFirstMessage:
     async def test_401_without_auth(
         self,
         client: AsyncClient,
-        db_session,
+        db_session: AsyncSession,
     ) -> None:
-        athlete, _, _, _ = await _create_athlete_with_onboarding(db_session)
+        athlete, *_ = await _create_athlete_with_onboarding(db_session)
         await db_session.flush()
 
         response = await client.post(
@@ -259,13 +256,13 @@ class TestPostFirstMessage:
     async def test_403_accessing_different_athlete(
         self,
         client: AsyncClient,
-        db_session,
+        db_session: AsyncSession,
         token_service: TokenService,
     ) -> None:
-        athlete1, goal1, twin1, _ = await _create_athlete_with_onboarding(
+        athlete1, *_ = await _create_athlete_with_onboarding(
             db_session, f"athlete1-{uuid.uuid4()}@example.com"
         )
-        athlete2, goal2, twin2, _ = await _create_athlete_with_onboarding(
+        athlete2, *_ = await _create_athlete_with_onboarding(
             db_session, f"athlete2-{uuid.uuid4()}@example.com"
         )
         await db_session.flush()
@@ -290,10 +287,10 @@ class TestGetCoachMessages:
     async def test_200_with_message_list(
         self,
         client: AsyncClient,
-        db_session,
+        db_session: AsyncSession,
         token_service: TokenService,
     ) -> None:
-        athlete, goal, twin, _ = await _create_athlete_with_onboarding(db_session)
+        athlete, _, twin, _ = await _create_athlete_with_onboarding(db_session)
         await db_session.flush()
 
         # Create some messages
@@ -330,13 +327,11 @@ class TestGetCoachMessages:
     async def test_messages_ordered_by_generated_at_desc(
         self,
         client: AsyncClient,
-        db_session,
+        db_session: AsyncSession,
         token_service: TokenService,
     ) -> None:
-        athlete, goal, twin, _ = await _create_athlete_with_onboarding(db_session)
+        athlete, _, twin, _ = await _create_athlete_with_onboarding(db_session)
         await db_session.flush()
-
-        from datetime import timedelta
 
         msg1 = CoachingMessage(
             athlete_id=athlete.id,
@@ -373,10 +368,10 @@ class TestGetCoachMessages:
     async def test_filter_by_message_type(
         self,
         client: AsyncClient,
-        db_session,
+        db_session: AsyncSession,
         token_service: TokenService,
     ) -> None:
-        athlete, goal, twin, _ = await _create_athlete_with_onboarding(db_session)
+        athlete, _, twin, _ = await _create_athlete_with_onboarding(db_session)
         await db_session.flush()
 
         msg1 = CoachingMessage(
@@ -409,10 +404,10 @@ class TestGetCoachMessages:
     async def test_limit_param(
         self,
         client: AsyncClient,
-        db_session,
+        db_session: AsyncSession,
         token_service: TokenService,
     ) -> None:
-        athlete, goal, twin, _ = await _create_athlete_with_onboarding(db_session)
+        athlete, _, twin, _ = await _create_athlete_with_onboarding(db_session)
         await db_session.flush()
 
         for i in range(5):
@@ -439,10 +434,10 @@ class TestGetCoachMessages:
     async def test_offset_param(
         self,
         client: AsyncClient,
-        db_session,
+        db_session: AsyncSession,
         token_service: TokenService,
     ) -> None:
-        athlete, goal, twin, _ = await _create_athlete_with_onboarding(db_session)
+        athlete, _, twin, _ = await _create_athlete_with_onboarding(db_session)
         await db_session.flush()
 
         for i in range(5):
@@ -469,9 +464,9 @@ class TestGetCoachMessages:
     async def test_401_without_auth(
         self,
         client: AsyncClient,
-        db_session,
+        db_session: AsyncSession,
     ) -> None:
-        athlete, _, _, _ = await _create_athlete_with_onboarding(db_session)
+        athlete, *_ = await _create_athlete_with_onboarding(db_session)
         await db_session.flush()
 
         response = await client.get(
@@ -483,13 +478,13 @@ class TestGetCoachMessages:
     async def test_403_accessing_different_athlete(
         self,
         client: AsyncClient,
-        db_session,
+        db_session: AsyncSession,
         token_service: TokenService,
     ) -> None:
-        athlete1, goal1, twin1, _ = await _create_athlete_with_onboarding(
+        athlete1, *_ = await _create_athlete_with_onboarding(
             db_session, f"athlete1-{uuid.uuid4()}@example.com"
         )
-        athlete2, goal2, twin2, _ = await _create_athlete_with_onboarding(
+        athlete2, *_ = await _create_athlete_with_onboarding(
             db_session, f"athlete2-{uuid.uuid4()}@example.com"
         )
         await db_session.flush()
@@ -512,10 +507,10 @@ class TestGenerationEventIntegrity:
     @pytest.mark.asyncio
     async def test_generation_event_written_on_success(
         self,
-        db_session,
+        db_session: AsyncSession,
         token_service: TokenService,
     ) -> None:
-        athlete, goal, twin, _ = await _create_athlete_with_onboarding(db_session)
+        athlete, _, twin, _ = await _create_athlete_with_onboarding(db_session)
         await db_session.flush()
 
         four_para_content = (

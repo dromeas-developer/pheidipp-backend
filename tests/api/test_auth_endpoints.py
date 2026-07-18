@@ -29,7 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.models.system_event import SystemEvent
-from tests.payloads import _login_payload, _register_payload
+from tests.payloads import login_payload, register_payload
 from tests.utils.assertions import assert_no_secrets_in_text
 
 
@@ -45,7 +45,7 @@ class TestRegisterEndpoint:
         self, client: AsyncClient, db_session: AsyncSession
     ) -> None:
         response = await client.post(
-            "/api/v1/auth/register", json=_register_payload("register@example.com")
+            "/api/v1/auth/register", json=register_payload("register@example.com")
         )
         assert response.status_code == 201
         body = response.json()
@@ -78,7 +78,7 @@ class TestRegisterEndpoint:
         anywhere in its structure."""
         response = await client.post(
             "/api/v1/auth/register",
-            json=_register_payload("leak-scan@example.com"),
+            json=register_payload("leak-scan@example.com"),
         )
         assert response.status_code == 201
         assert_no_secrets_in_text(response.text, message="/auth/register response")
@@ -88,12 +88,12 @@ class TestRegisterEndpoint:
     ) -> None:
         await client.post(
             "/api/v1/auth/register",
-            json=_register_payload("dup@example.com"),
+            json=register_payload("dup@example.com"),
         )
         # Second attempt with different casing must also fail.
         response = await client.post(
             "/api/v1/auth/register",
-            json=_register_payload("DUP@example.com"),
+            json=register_payload("DUP@example.com"),
         )
         assert response.status_code == 409
         assert "email" in response.json()["detail"].lower()
@@ -158,7 +158,7 @@ class TestRegisterEndpoint:
         """The stored email and the email in the response are both lowercase."""
         response = await client.post(
             "/api/v1/auth/register",
-            json=_register_payload("MiXedCase@Example.com"),
+            json=register_payload("MiXedCase@Example.com"),
         )
         assert response.status_code == 201
         assert response.json()["athlete"]["email"] == "mixedcase@example.com"
@@ -177,10 +177,10 @@ class TestLoginEndpoint:
     ) -> None:
         await client.post(
             "/api/v1/auth/register",
-            json=_register_payload("login@example.com"),
+            json=register_payload("login@example.com"),
         )
         response = await client.post(
-            "/api/v1/auth/login", json=_login_payload("login@example.com")
+            "/api/v1/auth/login", json=login_payload("login@example.com")
         )
         assert response.status_code == 200
         body = response.json()
@@ -193,7 +193,7 @@ class TestLoginEndpoint:
     ) -> None:
         await client.post(
             "/api/v1/auth/register",
-            json=_register_payload("wrong@example.com"),
+            json=register_payload("wrong@example.com"),
         )
         response = await client.post(
             "/api/v1/auth/login",
@@ -220,7 +220,7 @@ class TestLoginEndpoint:
         and unknown-email — that's the no-credential-leakage invariant."""
         await client.post(
             "/api/v1/auth/register",
-            json=_register_payload("known@example.com"),
+            json=register_payload("known@example.com"),
         )
         wrong = await client.post(
             "/api/v1/auth/login",
@@ -260,7 +260,7 @@ class TestRefreshEndpoint:
     ) -> None:
         register = await client.post(
             "/api/v1/auth/register",
-            json=_register_payload("refresh@example.com"),
+            json=register_payload("refresh@example.com"),
         )
         register_body = register.json()
         old_refresh = register_body["refresh_token"]
@@ -284,7 +284,7 @@ class TestRefreshEndpoint:
     ) -> None:
         register = await client.post(
             "/api/v1/auth/register",
-            json=_register_payload("replay@example.com"),
+            json=register_payload("replay@example.com"),
         )
         old_refresh = register.json()["refresh_token"]
         # First rotation succeeds.
@@ -311,7 +311,7 @@ class TestRefreshEndpoint:
     ) -> None:
         register = await client.post(
             "/api/v1/auth/register",
-            json=_register_payload("no-leak-refresh@example.com"),
+            json=register_payload("no-leak-refresh@example.com"),
         )
         response = await client.post(
             "/api/v1/auth/refresh",
@@ -334,7 +334,7 @@ class TestRequireSelfEndpoint:
     ) -> None:
         register = await client.post(
             "/api/v1/auth/register",
-            json=_register_payload("self-ok@example.com"),
+            json=register_payload("self-ok@example.com"),
         )
         athlete_id = register.json()["athlete"]["id"]
         access_token = register.json()["access_token"]
@@ -353,7 +353,7 @@ class TestRequireSelfEndpoint:
         athlete_id of B must return 403, NEVER 404."""
         register = await client.post(
             "/api/v1/auth/register",
-            json=_register_payload("mismatch@example.com"),
+            json=register_payload("mismatch@example.com"),
         )
         access_token = register.json()["access_token"]
         # A different UUID the JWT does not cover.
@@ -370,7 +370,7 @@ class TestRequireSelfEndpoint:
     ) -> None:
         register = await client.post(
             "/api/v1/auth/register",
-            json=_register_payload("no-auth-header@example.com"),
+            json=register_payload("no-auth-header@example.com"),
         )
         athlete_id = register.json()["athlete"]["id"]
 
@@ -384,7 +384,7 @@ class TestRequireSelfEndpoint:
     ) -> None:
         register = await client.post(
             "/api/v1/auth/register",
-            json=_register_payload("bad-bearer@example.com"),
+            json=register_payload("bad-bearer@example.com"),
         )
         athlete_id = register.json()["athlete"]["id"]
 
@@ -400,7 +400,7 @@ class TestRequireSelfEndpoint:
         """Craft an expired JWT directly and verify 401, not 403."""
         register = await client.post(
             "/api/v1/auth/register",
-            json=_register_payload("expired-jwt@example.com"),
+            json=register_payload("expired-jwt@example.com"),
         )
         athlete_id = register.json()["athlete"]["id"]
 
@@ -434,7 +434,7 @@ class TestRequireSelfEndpoint:
         clients being able to differentiate auth from authz failures."""
         register = await client.post(
             "/api/v1/auth/register",
-            json=_register_payload("distinct@example.com"),
+            json=register_payload("distinct@example.com"),
         )
         athlete_id = register.json()["athlete"]["id"]
         access_token = register.json()["access_token"]

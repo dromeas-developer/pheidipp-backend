@@ -29,7 +29,6 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.athlete import Athlete
 from app.models.generation_event import GenerationEvent
 from tests.utils.factories import make_athlete
 from tests.utils.schema_helpers import (
@@ -368,7 +367,6 @@ class TestGenerationEventRoundTripDB:
         await db_session.flush()
         evt_id = evt.id
 
-        from sqlalchemy import select
 
         result = await db_session.execute(
             select(GenerationEvent).where(GenerationEvent.id == evt_id)
@@ -398,7 +396,6 @@ class TestGenerationEventRoundTripDB:
         await db_session.flush()
         evt_id = evt.id
 
-        from sqlalchemy import select
 
         result = await db_session.execute(
             select(GenerationEvent).where(GenerationEvent.id == evt_id)

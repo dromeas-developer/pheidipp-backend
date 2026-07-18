@@ -30,8 +30,8 @@
         "z-ai/glm-5.2",
         "minimaxai/minimax-m3",
         "qwen/qwen3.5-397b-a17b",
-        "qwen/qwen3.5-122b-a10b",
-        "stepfun-ai/step-3.7-flash"
+        "stepfun-ai/step-3.7-flash",
+        "thinkingmachines/inkling"
       ]
     },
     "poolside": {
@@ -54,8 +54,19 @@
         "nvidia/minimax-m3":                  { "name": "Minimax m3 (nvidia cloud)" },
         "nvidia/mistral-medium-3.5":          { "name": "Mistral Medium 3.5 (nvidia cloud)" },
         "nvidia/qwen3.5-397b":                { "name": "Qwen3.5-397b (nvidia cloud)"},
-        "nvidia/step-3.7-flash":              { "name": "Step 3.7-flash (nvidia cloud)" }
+        "nvidia/step-3.7-flash":              { "name": "Step 3.7-flash (nvidia cloud)" },
+        "nvidia/inkling":                     { "name": "Inkling (nvidia cloud)" }
       }
+    }
+  },
+
+  // LSP — enable basedpyright for Python type checking diagnostics.
+  // LSP is disabled by default; this enables it with strict type checking.
+  "lsp": {
+    "python": {
+      "enabled": true,
+      "command": ["basedpyright-langserver", "--stdio"],
+      "extensions": [".py"]
     }
   },
 

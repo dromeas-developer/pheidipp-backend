@@ -18,6 +18,9 @@ Reference plan: docs/implementation/phase-1/phase-1-2b-p1-plan-sessions.md
 
 from __future__ import annotations
 
+import uuid
+from datetime import date
+
 import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import IntegrityError
@@ -65,9 +68,9 @@ async def _new_goal_and_plan(
 
 def _task_factory(
     *,
-    training_goal_id,
-    training_plan_id=None,
-    proposed_date,
+    training_goal_id: uuid.UUID,
+    training_plan_id: uuid.UUID | None = None,
+    proposed_date: date,
     rationale: str = "trajectory_at_risk: athlete missed 2nd consecutive week",
     trigger: str = "trajectory_at_risk",
     status: str = "pending_confirmation",

@@ -26,6 +26,7 @@ docs/implementation/phase-1/phase-1-4-p1-plan-generation.md
 from __future__ import annotations
 
 from datetime import date, timedelta
+from typing import Any
 
 import pytest
 
@@ -351,7 +352,7 @@ class _CI:
     fires at every transition."""
 
     @staticmethod
-    def lt2_low() -> dict:
+    def lt2_low() -> dict[str, Any]:
         return {
             "lt1_hr": "low",
             "lt2_hr": "low",
@@ -450,7 +451,7 @@ class TestCheckpointScheduling:
             date(2026, 7, 1) + timedelta(days=sum(a.weeks for a in allocations[:i]) * 7)
             for i in range(len(allocations))
         ]
-        high_confidence = {
+        high_confidence: dict[str, str | None] = {
             "lt1_hr": "high",
             "lt2_hr": "high",
             "lt1_power": "high",

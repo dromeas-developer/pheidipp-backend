@@ -11,6 +11,7 @@ implementation.
 """
 
 from __future__ import annotations
+from typing import Any
 
 import pytest
 
@@ -40,7 +41,7 @@ class TestPasswordHasherHash:
         assert a != b
 
     @pytest.mark.parametrize("value", ["", None, 123, 45.6, []])  # type: ignore[list-item]
-    def test_hash_rejects_invalid_input(self, value) -> None:
+    def test_hash_rejects_invalid_input(self, value: Any) -> None:
         with pytest.raises(ValueError):
             PasswordHasher.hash(value)  # type: ignore[arg-type]
 
@@ -69,7 +70,7 @@ class TestPasswordHasherVerify:
         assert PasswordHasher.verify("ValidPass123!", None) is False  # type: ignore[arg-type]
 
     @pytest.mark.parametrize("value", [None, "", 123, []])  # type: ignore[list-item]
-    def test_verify_rejects_invalid_password_type(self, value) -> None:
+    def test_verify_rejects_invalid_password_type(self, value: Any) -> None:
         h = PasswordHasher.hash("ValidPass123!")
         assert PasswordHasher.verify(value, h) is False  # type: ignore[arg-type]
 

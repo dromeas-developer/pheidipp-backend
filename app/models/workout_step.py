@@ -34,6 +34,8 @@ Invariants codified at the DB layer:
 
 from __future__ import annotations
 
+from typing import Any
+
 import uuid
 
 from sqlalchemy import (
@@ -41,7 +43,6 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
-    String,
     Text,
     UniqueConstraint,
 )
@@ -50,6 +51,7 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
+from app.models._enum_helpers import enum_str_values
 from app.models.enums import (
     PhysiologicalIntent,
     SessionPurpose,
@@ -89,7 +91,7 @@ class WorkoutStep(Base):
             name="step_type",
             native_enum=False,
             length=16,
-            values_callable=lambda x: [e.value for e in x],
+            values_callable=enum_str_values,
         ),
         nullable=False,
     )
@@ -106,7 +108,7 @@ class WorkoutStep(Base):
             name="session_type",
             native_enum=False,
             length=32,
-            values_callable=lambda x: [e.value for e in x],
+            values_callable=enum_str_values,
             create_type=False,
         ),
         nullable=False,
@@ -117,7 +119,7 @@ class WorkoutStep(Base):
             name="physiological_intent",
             native_enum=False,
             length=32,
-            values_callable=lambda x: [e.value for e in x],
+            values_callable=enum_str_values,
         ),
         nullable=False,
     )
@@ -127,7 +129,7 @@ class WorkoutStep(Base):
             name="session_purpose",
             native_enum=False,
             length=16,
-            values_callable=lambda x: [e.value for e in x],
+            values_callable=enum_str_values,
         ),
         nullable=False,
         default=SessionPurpose.GENERAL,
@@ -140,7 +142,7 @@ class WorkoutStep(Base):
     # Numeric ranges nullable for Tier 5-6 athletes; ``description``
     # must always be present so plain-language coaching is preserved.
     # ------------------------------------------------------------------
-    target: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    target: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
 
     duration_seconds: Mapped[int | None] = mapped_column(
         Integer, nullable=True

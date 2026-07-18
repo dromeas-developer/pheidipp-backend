@@ -15,6 +15,8 @@ on ``activity_id``.
 
 from __future__ import annotations
 
+from typing import Any
+
 import uuid
 from datetime import datetime, timezone
 
@@ -62,7 +64,7 @@ class RawSensorStream(Base):
     sampling_rate_hz: Mapped[float] = mapped_column(
         Float, nullable=False, default=1.0, server_default="1.0"
     )
-    available_channels: Mapped[dict] = mapped_column(
+    available_channels: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb")
     )
     cleaning_pipeline_version: Mapped[str] = mapped_column(

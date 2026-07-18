@@ -418,7 +418,7 @@ class TestUpdateInPlaceNoRow:
     async def test_raises_runtime_error_when_no_row(self) -> None:
         """A missing row raises ``RuntimeError`` with the expected
         message."""
-        repo, mock_session = _make_repo_without_row()
+        repo, _ = _make_repo_without_row()
         athlete_id = uuid.uuid4()
 
         with pytest.raises(RuntimeError) as exc_info:

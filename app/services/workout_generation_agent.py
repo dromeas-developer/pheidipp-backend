@@ -30,7 +30,9 @@ from __future__ import annotations
 import json
 import uuid
 from datetime import date, datetime, timezone
-from typing import Any, List, Optional, TYPE_CHECKING
+from typing import Any, List, Optional, cast
+
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from openai import (
     AsyncOpenAI,
@@ -54,6 +56,7 @@ from app.models.enums import (
 )
 from app.models.generated_workout import GeneratedWorkout
 from app.models.generation_event import GenerationEvent
+from app.models.planned_session import PlannedSession
 from app.models.workout_step import WorkoutStep
 from app.repositories.generated_workout_repository import (
     GeneratedWorkoutRepository,
@@ -81,15 +84,6 @@ from app.services.workout_target_types import (
     get_step_physiological_intent,
 )
 
-if TYPE_CHECKING:
-    from app.repositories.system_event_outbox_repository import (
-        SystemEventOutboxRepository,
-    )
-    from app.repositories.system_event_repository import (
-        SystemEventRepository,
-    )
-
-
 # ---------------------------------------------------------------------------
 # Internal helpers — pure functions kept module-level so unit tests can
 # import them without instantiating the agent.
@@ -99,7 +93,7 @@ if TYPE_CHECKING:
 #: Numeric signal types the LLM is allowed to populate. HR is excluded
 #: at this phase per the architecture contract — the workout agent
 #: emits power / gap / description targets only.
-_NON_NULL_NUMERIC_FIELDS_BY_TARGET_TYPE = {
+_NON_NULL_NUMERIC_FIELDS_BY_TARGET_TYPE: dict[str, set[str]] = {
     "power": {"target_power_watts"},
     "gap": {"target_gap_sec_per_km"},
     "description": set(),
@@ -159,9 +153,10 @@ def _coerce_int_range(value: Any) -> dict[str, Optional[int]]:
         # outputs that emit a point estimate.
         return {"min": None, "max": _coerce_int(value)}
     if isinstance(value, dict):
+        d: dict[str, Any] = cast(dict[str, Any], value)
         return {
-            "min": _coerce_int(value.get("min")),
-            "max": _coerce_int(value.get("max")),
+            "min": _coerce_int(d.get("min")),
+            "max": _coerce_int(d.get("max")),
         }
     return {"min": None, "max": None}
 
@@ -194,7 +189,7 @@ class WorkoutGenerationAgent:
 
     def __init__(
         self,
-        session,
+        session: AsyncSession,
         generated_workouts: GeneratedWorkoutRepository,
         workout_steps: WorkoutStepRepository,
         generation_events: GenerationEventRepository,
@@ -549,7 +544,7 @@ class WorkoutGenerationAgent:
         self,
         *,
         generated_content: str,
-        planned_session,
+        planned_session: PlannedSession,
         context: WorkoutGenerationContext,
     ) -> List[dict[str, Any]]:
         """Parse LLM JSON output into per-step records and validate structure.
@@ -590,11 +585,14 @@ class WorkoutGenerationAgent:
                 "LLM output top-level must be a JSON object"
             )
 
-        steps_raw = payload.get("steps")
+        payload_dict: dict[str, Any] = cast(dict[str, Any], payload)
+        steps_raw = payload_dict.get("steps")
         if not isinstance(steps_raw, list) or not steps_raw:
             raise WorkoutGenerationContractError(
                 "LLM output must include a non-empty 'steps' array"
             )
+
+        steps_list: list[dict[str, Any]] = cast(list[dict[str, Any]], steps_raw)
 
         target_type = (context.target_type or "description").lower()
         allowed_numeric_fields = _NON_NULL_NUMERIC_FIELDS_BY_TARGET_TYPE.get(
@@ -605,12 +603,7 @@ class WorkoutGenerationAgent:
 
         parsed: List[dict[str, Any]] = []
         expected_order = 1
-        for index, step_raw in enumerate(steps_raw):
-            if not isinstance(step_raw, dict):
-                raise WorkoutGenerationContractError(
-                    f"step at index {index} is not an object"
-                )
-
+        for index, step_raw in enumerate(steps_list):
             step_order = _coerce_int(step_raw.get("step_order"))
             if step_order != expected_order:
                 raise WorkoutGenerationContractError(
@@ -776,7 +769,7 @@ class WorkoutGenerationAgent:
         """
         description_text = (
             description.strip()
-            if isinstance(description, str) and description.strip()
+            if description.strip()
             else f"{step_type.value} step"
         )
 

@@ -14,6 +14,8 @@ fast and pinpoint regressions in the util module.
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from app.utils.ip_utils import (
@@ -77,7 +79,7 @@ class TestTruncateInvalidInput:
             12345,  # type: ignore[list-item]
         ],
     )
-    def test_invalid_returns_none(self, value) -> None:
+    def test_invalid_returns_none(self, value: Any) -> None:
         assert truncate_ip(value) is None
 
 

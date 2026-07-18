@@ -1,6 +1,8 @@
 """Shared assertion patterns that codify security and domain invariants."""
 from __future__ import annotations
 
+import logging
+
 # Security invariants
 SECRET_LEAKAGE_FIELDS = (
     "hashed_password",
@@ -18,7 +20,9 @@ def assert_no_secrets_in_text(text: str, *, message: str = "") -> None:
 
 
 def assert_no_secrets_in_logs(
-    records: list, *, extra_keys: tuple[str, ...] = ()
+    records: list[logging.LogRecord],
+    *,
+    extra_keys: tuple[str, ...] = (),
 ) -> None:
     """Scan LogRecord.__dict__ for forbidden fields.
 

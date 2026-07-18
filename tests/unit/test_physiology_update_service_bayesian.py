@@ -32,7 +32,6 @@ from app.models.athlete_physiology import AthletePhysiology
 from app.models.enums import (
     MeasurementSource,
     PhysiologyParameter,
-    TwinConfidenceLevel,
 )
 from app.services.physiology_update_service import (
     DECAY_TIME_CONSTANT_DAYS,

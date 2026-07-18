@@ -15,7 +15,7 @@ tools:
   glob:       false
   todowrite:  true
   webfetch:   false
-  skill:      false
+  skill:      true
 
   # Architecture retrieval
   "pheidipp-codebase-context_search_architecture":       true
@@ -38,8 +38,6 @@ tools:
   "pheidipp-codebase-context_get_feature_context":          true
 
   # Bulk / advanced retrieval
-  "pheidipp-codebase-context_multi_search":             true
-  "pheidipp-codebase-context_multi_context":            true
   "pheidipp-codebase-context_get_change_impact":        true
 
   # Release-plan maintenance
@@ -368,47 +366,38 @@ What could go wrong and what the fallback is.
 
 ---
 
-## Tool Selection Reference
+## Retrieval
 
-| Situation | Tool |
-|---|---|
-| Load a specific phase overview | `get_phase_context(phase_number)` |
-| Read a sub-phase doc before editing | Native `read` tool → `docs/release-plan/phase-N/phase-N-M-<title>.md` |
-| List features/sub-phases in a phase | `list_release_plan_features(phase?)` then `get_feature_context(id)` |
-| Understand impact before restructuring | `get_change_impact(concept)` — one call returns everything affected |
-| Discovery across multiple capabilities | `multi_search(searches[])` — one search per capability across domains |
-| Compare two entities or subsystems | `multi_context(concepts: ["A", "B"])` — cross-domain, one call |
-| Check who depends on a given entity | `get_related_contracts(entity_name)` |
-| Verify a specific entity contract | `get_entity_context(entity_name, sections?)` |
-| Verify a specific event contract | `get_event_context(event_name)` |
-| Invariants by type or enforcement layer | `search_invariants(query, invariant_type?, enforcement?)` |
-| Discover entity names before fetching | `list_entities()` |
-| Discover vision document names | `list_vision_entities(category?)` |
-| List all phases | `list_release_plan_phases()` |
-| List features in a phase | `list_release_plan_features(phase?)` |
-| Write a sub-phase document | Native write tool → `docs/release-plan/phase-N/phase-N-M-<title>.md` |
-| Update index after writing docs | `refresh_release_plan()` |
+Invoke `p-doc-explorer` via the `task` tool with a concept list derived
+from the phase's scope and capabilities:
+
+```
+Tool: task
+Input:
+{
+  "subagent_type": "p-doc-explorer",
+  "prompt": "Task: <one-line task description>\n\nConcepts:\n- <concept name>\n- ...\n\nDomains: all"
+}
+``` Its Brief returns the current architecture
+contracts, invariants, vision references, and release-plan context for
+every concept — already organized by domain. Do not run raw
+`multi_search`, `multi_context`, or `get_entity_context` calls yourself —
+Doc Explorer handles retrieval and condenses the results.
+
+Use `get_change_impact` for entities that phase sequencing modifies or
+extends. Use `get_feature_context` and `get_phase_context` for release-plan
+scope — these are single-target calls Doc Explorer does not cover.
 
 **Note on `get_feature_context`:** Feature IDs use the indexer's internal
 format (e.g. `1a`, `2b`) — not sub-phase IDs like `phase-1-1` or `phase-1-2a`.
 To read a sub-phase document, use the native read tool with the file path
-directly. Use `list_release_plan_features(phase=1)` to discover what feature
-IDs exist before calling `get_feature_context`.
+directly.
 
-**Retrieval pattern:**
-- Discovery and comparison → prefer bulk tools (`multi_search`, `multi_context`)
-- Impact analysis → `get_change_impact`
-- Verification and contract detail → prefer targeted tools (`get_entity_context`, `get_event_context`, `get_phase_context`)
-
-Do not use bulk retrieval when investigating a single concept, performing a
-targeted contract lookup, or when a bulk query would return substantially more
-information than required. Optimise for retrieval relevance and efficiency —
-not for maximising bulk tool usage.
-
-**Unknown section names:** when calling `get_entity_context` or
-`get_vision_context` without knowing which sections exist, omit the `sections`
-parameter to get the full document first. Identify the relevant sections from
-the result before making any follow-up filtered call. Never guess section names.
+**Write operations:**
+| Operation | Tool |
+|---|---|
+| Write a sub-phase document | Native write tool → `docs/release-plan/phase-N/phase-N-M-<title>.md` |
+| Update index after writing docs | `refresh_release_plan()` |
 
 ---
 

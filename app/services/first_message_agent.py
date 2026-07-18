@@ -21,6 +21,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional, TYPE_CHECKING
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from openai import (
     AsyncOpenAI,
     APIConnectionError,
@@ -93,7 +95,7 @@ class FirstMessageAgent:
 
     def __init__(
         self,
-        session,
+        session: AsyncSession,
         coaching_messages: CoachingMessageRepository,
         generation_events: GenerationEventRepository,
         context_budget: ContextBudgetService,
@@ -135,7 +137,7 @@ class FirstMessageAgent:
         )
 
     @staticmethod
-    def _validate_paragraph_count(content: str) -> None:
+    def validate_paragraph_count(content: str) -> None:
         """Ensure the message has exactly four paragraphs."""
         paragraphs = [p.strip() for p in content.split("\n\n") if p.strip()]
         if len(paragraphs) != 4:
@@ -265,7 +267,7 @@ class FirstMessageAgent:
             generated_content = response.choices[0].message.content or ""
 
             # Validate paragraph count.
-            self._validate_paragraph_count(generated_content)
+            self.validate_paragraph_count(generated_content)
 
             # -----------------------------------------------------------------
             # Success path.

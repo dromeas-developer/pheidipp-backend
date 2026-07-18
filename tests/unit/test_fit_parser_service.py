@@ -9,9 +9,9 @@ Reference: docs/implementation/phase-1/phase-1-6-p1-simple-fit-import.md
 
 from __future__ import annotations
 
-import uuid
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, patch, MagicMock
+from typing import Any, cast
+from unittest.mock import patch, MagicMock
 
 import pytest
 
@@ -20,11 +20,10 @@ from app.services.fit_parser_service import (
     FitParseError,
     FitParserService,
     ParsedFitData,
-    _BytesReader,
-    _coerce_duration_seconds,
-    _ensure_utc,
+    BytesReader,
+    coerce_duration_seconds,
+    ensure_utc,
 )
-from app.services.fit_parser_service import _BytesReader as BytesReader
 
 
 class TestFitParserServiceParse:
@@ -32,7 +31,7 @@ class TestFitParserServiceParse:
 
     def _mock_parsed_fit(
         self,
-        hr_records=None,
+        hr_records: list[int] | None = None,
         duration_seconds: int = 3600,
         start_time: datetime | None = None,
         has_power: bool = False,
@@ -43,7 +42,7 @@ class TestFitParserServiceParse:
             duration_seconds=duration_seconds,
             # Use explicit None check — [] is falsy so "hr_records or [...]" would
             # replace an empty list with the default. Preserve [] to test empty HR.
-            hr_records=hr_records if hr_records is not None else [120] * duration_seconds,
+            hr_records=cast("list[float | None]", hr_records if hr_records is not None else [120] * duration_seconds),
             power_records=[100] if has_power else [],
             has_hr=bool(hr_records),
             has_power=has_power,
@@ -140,19 +139,18 @@ class TestFitParserServiceParse:
     @pytest.mark.asyncio
     async def test_parse_runs_in_executor(self) -> None:
         """parse() runs _parse_sync in a thread pool executor."""
-        import asyncio
 
         service = FitParserService()
         mock_result = self._mock_parsed_fit(hr_records=[120])
 
         # Must be a sync callable — run_in_executor calls it synchronously,
         # passing the coroutine object instead of its result if it's async.
-        def _fake_parse_sync(bytes):
+        def _fake_parse_sync(bytes: bytes) -> ParsedFitData:
             return mock_result
 
         with patch.object(
             service, "_parse_sync", side_effect=_fake_parse_sync
-        ) as mock_sync:
+        ):
             # We can't easily test the executor directly without mocking
             # run_in_executor, but we verify the call chain works
             result = await service.parse(b"test-bytes")
@@ -214,31 +212,31 @@ class TestBytesReader:
 class TestHelperFunctions:
     """Module-level helper functions."""
 
-    def test_ensure_utc_naive_datetime(self) -> None:
+    def testensure_utc_naive_datetime(self) -> None:
         """Naive datetime gets UTC attached."""
         import datetime
         naive = datetime.datetime(2026, 6, 15, 8, 0, 0)
-        result = _ensure_utc(naive)
+        result = ensure_utc(naive)
         assert result.tzinfo is not None
         assert result.tzinfo == timezone.utc
 
-    def test_ensure_utc_aware_datetime(self) -> None:
+    def testensure_utc_aware_datetime(self) -> None:
         """Aware datetime is converted to UTC."""
         import datetime
         eastern = datetime.timezone(datetime.timedelta(hours=-4))
         aware = datetime.datetime(2026, 6, 15, 8, 0, 0, tzinfo=eastern)
-        result = _ensure_utc(aware)
+        result = ensure_utc(aware)
         assert result.tzinfo == timezone.utc
 
-    def test_coerce_duration_seconds_small_value(self) -> None:
+    def testcoerce_duration_seconds_small_value(self) -> None:
         """Values <= 10000 are treated as seconds."""
-        assert _coerce_duration_seconds(3600) == 3600
-        assert _coerce_duration_seconds(0) == 0
+        assert coerce_duration_seconds(3600) == 3600
+        assert coerce_duration_seconds(0) == 0
 
-    def test_coerce_duration_seconds_large_value_treated_as_ms(self) -> None:
+    def testcoerce_duration_seconds_large_value_treated_as_ms(self) -> None:
         """Values > 10000 are treated as milliseconds and divided by 1000."""
-        assert _coerce_duration_seconds(3600000) == 3600
-        assert _coerce_duration_seconds(60000) == 60
+        assert coerce_duration_seconds(3600000) == 3600
+        assert coerce_duration_seconds(60000) == 60
 
 
 class TestParsedFitData:
@@ -293,22 +291,18 @@ class TestFitParserServiceSportType:
     Reference: docs/implementation/phase-2/phase-2-1-p3-sport-type-filtering.md
     """
 
-    def _make_parsed(self, sport: int | None, sub_sport: int | None = None, **kwargs) -> ParsedFitData:
+    def _make_parsed(self, sport: int | None, sub_sport: int | None = None, **kwargs: Any) -> ParsedFitData:
         """Helper to build a minimal ParsedFitData with sport type fields."""
-        defaults = dict(
-            start_time=datetime(2026, 6, 15, 8, 0, tzinfo=timezone.utc),
-            duration_seconds=3600,
-            hr_records=[120] * 3600,
-        )
-        defaults.update(kwargs)
-        # Simulate sport extraction by directly constructing the dataclass with sport fields.
-        # In real parsing, these come from the FIT session message.
+        from typing import cast
         from app.models.enums import SportType
+        hr = cast("list[float | None]", kwargs.get("hr_records", [120] * 3600))
         return ParsedFitData(
+            start_time=kwargs.get("start_time", datetime(2026, 6, 15, 8, 0, tzinfo=timezone.utc)),
+            duration_seconds=kwargs.get("duration_seconds", 3600),
+            hr_records=hr,
             sport_type=SportType.UNKNOWN,  # default; patched per test
             detection_confidence="unknown",
             detection_version="v1",
-            **defaults,
         )
 
     def _patch_session_message(self, service: FitParserService, sport: int | None, sub_sport: int | None) -> None:

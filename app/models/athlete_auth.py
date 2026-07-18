@@ -11,6 +11,8 @@ is bcrypt with cost >= 12.
 
 from __future__ import annotations
 
+from typing import Any
+
 import uuid
 from datetime import datetime, timezone
 
@@ -29,6 +31,7 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
+from app.models._enum_helpers import enum_str_values
 from app.models.enums import AuthProvider
 
 
@@ -53,7 +56,7 @@ class AthleteAuth(Base):
             name="auth_provider",
             native_enum=False,
             length=32,
-            values_callable=lambda x: [e.value for e in x],
+            values_callable=enum_str_values,
         ),
         nullable=False,
     )
@@ -61,7 +64,7 @@ class AthleteAuth(Base):
     # bcrypt cost >= 12; null for OAuth providers.
     hashed_password: Mapped[str | None] = mapped_column(String(255), nullable=True)
     # Encrypted JSON (AES-256-GCM) — null for email provider.
-    provider_tokens: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    provider_tokens: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     is_primary: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,

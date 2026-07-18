@@ -20,7 +20,7 @@ from typing import List, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.weekly_plan import WeeklyPlan
+from app.models.weekly_plan import WeeklyPlan, WeeklySession
 
 
 class WeeklyPlanRepository:
@@ -95,7 +95,7 @@ class WeeklySessionRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def add_many(self, sessions) -> list:
+    async def add_many(self, sessions: List[WeeklySession]) -> List[WeeklySession]:
         """Insert all ``WeeklySession`` rows in one flush (no commit)."""
         for weekly_session in sessions:
             self.session.add(weekly_session)

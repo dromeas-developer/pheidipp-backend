@@ -6,9 +6,7 @@ docs/architecture/03-agents/post-workout-agent.md
 
 from __future__ import annotations
 
-import json
 import uuid
-from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -16,41 +14,41 @@ import pytest
 from app.agents.post_workout_agent import (
     PostWorkoutAgent,
     PostWorkoutContext,
-    _describe_load,
-    _format_phase_position,
+    describe_load,
+    format_phase_position,
 )
 from app.models.activity import Activity
 from app.models.coaching_message import CoachingMessage
-from app.models.enums import MessageType, RecoveryModifierLevel, TwinConfidenceLevel, TwinTrigger
+from app.models.enums import RecoveryModifierLevel, TwinConfidenceLevel
 from app.models.twin_state import TwinState
 from app.services.compliance_service import ComplianceFindings
 
 
 class TestDescribeLoad:
-    """_describe_load renders aerobic_load as plain-language descriptor."""
+    """describe_load renders aerobic_load as plain-language descriptor."""
 
     def test_none_returns_no_load_recorded(self) -> None:
-        assert _describe_load(None) == "no load recorded"
+        assert describe_load(None) == "no load recorded"
 
     def test_light_load_under_30(self) -> None:
-        assert _describe_load(15.0) == "light aerobic load"
+        assert describe_load(15.0) == "light aerobic load"
 
     def test_moderate_load_30_to_60(self) -> None:
-        assert _describe_load(45.0) == "moderate aerobic load"
+        assert describe_load(45.0) == "moderate aerobic load"
 
     def test_steady_load_60_to_100(self) -> None:
-        assert _describe_load(80.0) == "steady aerobic load"
+        assert describe_load(80.0) == "steady aerobic load"
 
     def test_heavy_load_100_plus(self) -> None:
-        assert _describe_load(150.0) == "heavy aerobic load"
+        assert describe_load(150.0) == "heavy aerobic load"
 
 
 class TestFormatPhasePosition:
-    """_format_phase_position renders plan position for paragraph 3."""
+    """format_phase_position renders plan position for paragraph 3."""
 
     def test_no_planned_session_returns_neutral_phrase(self) -> None:
         twin_state = MagicMock()
-        result = _format_phase_position(None, twin_state)
+        result = format_phase_position(None, twin_state)
         assert "early in the current training block" in result
 
     def test_with_planned_session_formats_week_and_phase(self) -> None:
@@ -59,7 +57,7 @@ class TestFormatPhasePosition:
         planned_session.week_number = 3
         # Mock the enum value
         planned_session.phase_label = MagicMock(value="threshold_build")
-        result = _format_phase_position(planned_session, twin_state)
+        result = format_phase_position(planned_session, twin_state)
         assert "week 3" in result
         assert "threshold build" in result
 
@@ -95,7 +93,7 @@ class TestPostWorkoutAgentIdempotency:
         """When a CoachingMessage already exists, generate() returns it without LLM call."""
         athlete_id = uuid.uuid4()
         activity_id = uuid.uuid4()
-        twin_state_id = uuid.uuid4()
+        uuid.uuid4()
 
         # Existing message
         existing_message = MagicMock(spec=CoachingMessage)
@@ -199,7 +197,7 @@ class TestPostWorkoutAgentLLMCall:
         mock_activity = MagicMock(spec=Activity)
         mock_activity.id = activity_id
         mock_activity.athlete_id = athlete_id
-        # Must be a float — _describe_load does numeric comparison (< 30, etc.).
+        # Must be a float — describe_load does numeric comparison (< 30, etc.).
         # Without this, MagicMock() is compared, raising TypeError.
         mock_activity.aerobic_load = 85.0
         # neuromuscular_load and structural_load are serialised to JSON inside
@@ -248,7 +246,7 @@ class TestPostWorkoutAgentLLMCall:
 
         # planned_session_id must be None so the agent skips the
         # planned_sessions.get_by_id path — MagicMock() as id would flow
-        # through _format_phase_position and corrupt the LLM context string.
+        # through format_phase_position and corrupt the LLM context string.
         mock_activity.planned_session_id = None
 
         # Mock LLM response
@@ -294,7 +292,7 @@ class TestPostWorkoutAgentLLMCall:
         mock_activity = MagicMock(spec=Activity)
         mock_activity.id = activity_id
         mock_activity.athlete_id = athlete_id
-        # Must be a float — _describe_load does numeric comparison (< 30, etc.).
+        # Must be a float — describe_load does numeric comparison (< 30, etc.).
         mock_activity.aerobic_load = 85.0
         # neuromuscular_load and structural_load are serialised to JSON inside
         # the context dict — MagicMock breaks json.dumps().
@@ -302,7 +300,7 @@ class TestPostWorkoutAgentLLMCall:
         mock_activity.structural_load = None
         # planned_session_id must be None so the agent skips the
         # planned_sessions.get_by_id path — MagicMock() as id would flow
-        # through _format_phase_position and corrupt the LLM context string.
+        # through format_phase_position and corrupt the LLM context string.
         mock_activity.planned_session_id = None
 
         mock_twin_state = MagicMock(spec=TwinState)

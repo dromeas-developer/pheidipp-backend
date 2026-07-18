@@ -46,9 +46,9 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import List, Optional, Sequence
+from typing import Any, Optional, cast
 
-from fitparse import FitFile, FitParseError as UpstreamFitParseError
+from fitparse import FitFile, FitParseError as UpstreamFitParseError  # type: ignore[reportMissingTypeStubs]
 
 from app.core.logging_utils import log_event
 from app.models.enums import SportType
@@ -124,14 +124,14 @@ class ParsedFitData:
 
     start_time: datetime
     duration_seconds: int
-    hr_records: Sequence[Optional[float]] = field(default_factory=list)
-    power_records: Sequence[Optional[float]] = field(default_factory=list)
+    hr_records: list[Optional[float]] = field(default_factory=lambda: [])
+    power_records: list[Optional[float]] = field(default_factory=lambda: [])
     has_hr: bool = False
     has_power: bool = False
     has_rr_intervals: bool = False
     # Phase-2 additions:
-    gps_records: List[GpsRecord] = field(default_factory=list)
-    rr_records: Sequence[Optional[float]] = field(default_factory=list)
+    gps_records: list[GpsRecord] = field(default_factory=lambda: [])
+    rr_records: list[Optional[float]] = field(default_factory=lambda: [])
     total_distance_m: Optional[float] = None
     total_ascent_m: Optional[float] = None
     has_gps: bool = False
@@ -206,7 +206,7 @@ class FitParserService:
     # ------------------------------------------------------------------
 
     def _parse_sync(self, file_bytes: bytes) -> ParsedFitData:
-        fit = FitFile(_BytesReader(file_bytes))
+        fit = FitFile(BytesReader(file_bytes))
         # ``parse`` is a generator that yields definition + data
         # messages. We only need data messages for record extraction.
         # fit.parse() has no return (populates internal buffers as a
@@ -223,27 +223,24 @@ class FitParserService:
         total_ascent_m: Optional[float] = None
         has_gps: bool = False
 
-        session_seen = False
-
         # Sport type detection variables (Phase-2.1-P3)
         sport_int: Optional[int] = None
         sub_sport_int: Optional[int] = None
         sport_type = SportType.UNKNOWN
         detection_confidence = "unknown"
 
-        for message in fit.messages:
+        for message in fit.messages:  # type: ignore[reportUnknownVariableType]
             if message.name == "session":  # type: ignore[attr-defined]
-                session_seen = True
                 if start_time is None:
                     raw_start = message.get_value(self.SESSION_START_FIELD)  # type: ignore[attr-defined]
                     if isinstance(raw_start, datetime):
-                        start_time = _ensure_utc(raw_start)
-                raw_total = (
+                        start_time = ensure_utc(raw_start)
+                raw_val: Any = cast(Any, (
                     message.get_value(self.SESSION_TOTAL_TIMER_FIELD)  # type: ignore[attr-defined]
                     or message.get_value(self.SESSION_TOTAL_ELAPSED_FIELD)  # type: ignore[attr-defined]
-                )
-                if isinstance(raw_total, (int, float)):
-                    duration_seconds = _coerce_duration_seconds(raw_total)
+                ))
+                if isinstance(raw_val, (int, float)):
+                    duration_seconds = coerce_duration_seconds(raw_val)
                 # Session-level totals
                 raw_dist = message.get_value(self.SESSION_TOTAL_DISTANCE_FIELD)  # type: ignore[attr-defined]
                 if isinstance(raw_dist, (int, float)):
@@ -255,8 +252,10 @@ class FitParserService:
                     total_ascent_m = float(raw_elev)
 
                 # Extract sport type from FIT sport message (Phase-2.1-P3)
-                sport_int = message.get_value("sport")  # type: ignore[attr-defined]
-                sub_sport_int = message.get_value("sub_sport")  # type: ignore[attr-defined]
+                sport_int_raw = message.get_value("sport")  # type: ignore[attr-defined]
+                sub_sport_int_raw = message.get_value("sub_sport")  # type: ignore[attr-defined]
+                sport_int = sport_int_raw if isinstance(sport_int_raw, int) else None
+                sub_sport_int = sub_sport_int_raw if isinstance(sub_sport_int_raw, int) else None
                 sport_type, detection_confidence = _map_fit_sport_to_enum(sport_int, sub_sport_int)
                 continue
 
@@ -282,11 +281,11 @@ class FitParserService:
                     rr_records.append(float(raw_rr))
 
             # GPS records: position_lat, position_long, distance, altitude, speed
-            raw_lat = message.get_value("position_lat")  # type: ignore[attr-defined]
-            raw_long = message.get_value("position_long")  # type: ignore[attr-defined]
-            raw_dist = message.get_value("distance")  # type: ignore[attr-defined]
-            raw_alt = message.get_value("altitude")  # type: ignore[attr-defined]
-            raw_speed = message.get_value("speed")  # type: ignore[attr-defined]
+            raw_lat: Optional[float] = cast(Optional[float], message.get_value("position_lat"))  # type: ignore[attr-defined]
+            raw_long: Optional[float] = cast(Optional[float], message.get_value("position_long"))  # type: ignore[attr-defined]
+            raw_dist: Optional[float] = cast(Optional[float], message.get_value("distance"))  # type: ignore[attr-defined]
+            raw_alt: Optional[float] = cast(Optional[float], message.get_value("altitude"))  # type: ignore[attr-defined]
+            raw_speed: Optional[float] = cast(Optional[float], message.get_value("speed"))  # type: ignore[attr-defined]
 
             if raw_lat is not None or raw_long is not None:
                 # We have GPS data on this record
@@ -314,7 +313,7 @@ class FitParserService:
             if start_time is None:
                 raw_ts = message.get_value(self.TIMESTAMP_FIELD)  # type: ignore[attr-defined]
                 if isinstance(raw_ts, datetime):
-                    start_time = _ensure_utc(raw_ts)
+                    start_time = ensure_utc(raw_ts)
 
         # Fall back to record-derived duration when the session
         # message did not carry a total_timer_time. The duration
@@ -355,7 +354,7 @@ class FitParserService:
 # ---------------------------------------------------------------------------
 
 
-class _BytesReader:
+class BytesReader:
     """Lightweight ``file-like`` wrapper that ``fitparse`` accepts.
 
     ``fitparse.FitFile`` accepts anything that exposes ``read`` /
@@ -395,14 +394,14 @@ class _BytesReader:
         return None
 
 
-def _ensure_utc(value: datetime) -> datetime:
+def ensure_utc(value: datetime) -> datetime:
     """Return ``value`` coerced to UTC; naive values get UTC attached."""
     if value.tzinfo is None:
         return value.replace(tzinfo=timezone.utc)
     return value.astimezone(timezone.utc)
 
 
-def _coerce_duration_seconds(value: float | int) -> int:
+def coerce_duration_seconds(value: float | int) -> int:
     """Normalise FIT duration values to whole seconds.
 
     Some FIT producers emit the field already divided by 1000

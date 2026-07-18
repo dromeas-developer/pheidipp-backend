@@ -53,14 +53,43 @@ class TwinStateRepository:
     async def get_by_activity(
         self, activity_id: uuid.UUID
     ) -> Optional[TwinState]:
-        """Return the TwinState recorded for *activity_id*, if any.
+        """Return the most recent TwinState recorded for *activity_id*.
 
-        Activity-linked triggers guarantee at most one TwinState per
-        activity (partial unique index on
-        ``(athlete_id, activity_id) WHERE activity_id IS NOT NULL``).
+        After the ``uq_twin_states_athlete_activity`` unique index was
+        dropped (Phase 2.3-P3), multiple TwinStates may exist for the
+        same ``activity_id`` — a calibration record may coexist with a
+        prior ``activity_sync`` record. This method returns the most
+        recent one (``ORDER BY created_at DESC LIMIT 1``) so existing
+        callers that expect "the TwinState for this activity" keep
+        working without a behavioural change.
         """
         result = await self.session.execute(
-            select(TwinState).where(TwinState.activity_id == activity_id)
+            select(TwinState)
+            .where(TwinState.activity_id == activity_id)
+            .order_by(TwinState.created_at.desc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_by_activity_and_trigger(
+        self, activity_id: uuid.UUID, trigger: str
+    ) -> Optional[TwinState]:
+        """Return the most recent TwinState for *activity_id* with the
+        given *trigger*, if any.
+
+        Used by ``TwinRecalibrationService.insert_if_not_exists`` to
+        detect a prior calibration TwinState for the same activity
+        without scanning unrelated triggers. Returns ``None`` when no
+        matching record exists.
+        """
+        result = await self.session.execute(
+            select(TwinState)
+            .where(
+                TwinState.activity_id == activity_id,
+                TwinState.trigger == trigger,
+            )
+            .order_by(TwinState.created_at.desc())
+            .limit(1)
         )
         return result.scalar_one_or_none()
 

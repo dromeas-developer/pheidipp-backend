@@ -134,7 +134,7 @@ class TestAthleteFitnessFormInvariantChecks:
 
     def test_aggregate_form_invariant_check(self) -> None:
         checks = get_check_constraints(AthleteFitness)
-        found = any(
+        assert any(
             "aggregate" in get_check_text(c)
             and "fitness" in get_check_text(c)
             and "fatigue" in get_check_text(c)

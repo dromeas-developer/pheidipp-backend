@@ -16,7 +16,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -173,7 +173,7 @@ def _agent(
     mock_training_goals_repo: AsyncMock,
     mock_plans_repo: AsyncMock,
     mock_twin_states_repo: AsyncMock,
-    mock_events_publisher: AsyncMock | None = None,
+    mock_events_publisher: MagicMock | None = None,
 ) -> FirstMessageAgent:
     return FirstMessageAgent(
         session=mock_session,
@@ -256,7 +256,7 @@ class TestFirstMessageAgentPrecondition:
 
         # Configure insert to return the argument passed so model_validate()
         # receives a real object with valid attribute values.
-        async def _return_insert_arg(msg, /):
+        async def _return_insert_arg(msg: Any, /):
             msg.id = uuid.uuid4()
             msg.generated_at = datetime.now(timezone.utc)
             msg.twin_state_id = uuid.uuid4()
@@ -282,8 +282,8 @@ class TestFirstMessageAgentPrecondition:
             mock_build.return_value = mock_client
 
             # Patch TwinState fetch
-            mock_context_budget._twin_states = AsyncMock()
-            mock_context_budget._twin_states.get_latest.return_value = MagicMock(
+            mock_context_budget.twin_states = AsyncMock()
+            mock_context_budget.twin_states.get_latest.return_value = MagicMock(
                 id=uuid.uuid4()
             )
 
@@ -317,7 +317,7 @@ class TestParagraphValidation:
     def test_raises_on_fewer_than_four_paragraphs(self) -> None:
         content = "Paragraph one.\n\nParagraph two.\n\nParagraph three."
         with pytest.raises(ParagraphCountViolationError):
-            FirstMessageAgent._validate_paragraph_count(content)
+            FirstMessageAgent.validate_paragraph_count(content)
 
     def test_raises_on_more_than_four_paragraphs(self) -> None:
         content = (
@@ -328,7 +328,7 @@ class TestParagraphValidation:
             "Paragraph five."
         )
         with pytest.raises(ParagraphCountViolationError):
-            FirstMessageAgent._validate_paragraph_count(content)
+            FirstMessageAgent.validate_paragraph_count(content)
 
     def test_passes_on_exactly_four_paragraphs(self) -> None:
         content = (
@@ -338,12 +338,12 @@ class TestParagraphValidation:
             "Paragraph four."
         )
         # Should NOT raise.
-        FirstMessageAgent._validate_paragraph_count(content)
+        FirstMessageAgent.validate_paragraph_count(content)
 
     def test_strips_empty_paragraphs(self) -> None:
         content = "Para one.\n\n\n\nPara two.\n\n   \n\nPara three.\n\nPara four."
         # Should NOT raise — empty/whitespace-only paragraphs are ignored.
-        FirstMessageAgent._validate_paragraph_count(content)
+        FirstMessageAgent.validate_paragraph_count(content)
 
 
 # ---------------------------------------------------------------------------
@@ -376,15 +376,15 @@ class TestFirstMessageAgentSuccessPath:
         mock_context_budget.estimate_tokens.return_value = 500
 
         twin_state_id = uuid.uuid4()
-        mock_context_budget._twin_states = AsyncMock()
-        mock_context_budget._twin_states.get_latest.return_value = MagicMock(
+        mock_context_budget.twin_states = AsyncMock()
+        mock_context_budget.twin_states.get_latest.return_value = MagicMock(
             id=twin_state_id
         )
 
         # Configure insert to return the CoachingMessage argument that was passed
         # to it. This ensures model_validate() receives a real object with valid
         # attribute values (id, generated_at, twin_state_id) rather than a mock.
-        async def _return_insert_arg(msg, /):
+        async def _return_insert_arg(msg: Any, /):
             msg.id = uuid.uuid4()
             msg.generated_at = datetime.now(timezone.utc)
             msg.twin_state_id = uuid.uuid4()
@@ -454,15 +454,15 @@ class TestFirstMessageAgentSuccessPath:
         mock_context_budget.estimate_tokens.return_value = 500
 
         twin_state_id = uuid.uuid4()
-        mock_context_budget._twin_states = AsyncMock()
-        mock_context_budget._twin_states.get_latest.return_value = MagicMock(
+        mock_context_budget.twin_states = AsyncMock()
+        mock_context_budget.twin_states.get_latest.return_value = MagicMock(
             id=twin_state_id
         )
 
         # Configure insert to return the CoachingMessage argument that was passed
         # to it. This ensures model_validate() receives a real object with valid
         # attribute values (id, generated_at, twin_state_id) rather than a mock.
-        async def _return_insert_arg(msg, /):
+        async def _return_insert_arg(msg: Any, /):
             msg.id = uuid.uuid4()
             msg.generated_at = datetime.now(timezone.utc)
             msg.twin_state_id = uuid.uuid4()
@@ -528,15 +528,15 @@ class TestFirstMessageAgentSuccessPath:
         mock_context_budget.estimate_tokens.return_value = 500
 
         twin_state_id = uuid.uuid4()
-        mock_context_budget._twin_states = AsyncMock()
-        mock_context_budget._twin_states.get_latest.return_value = MagicMock(
+        mock_context_budget.twin_states = AsyncMock()
+        mock_context_budget.twin_states.get_latest.return_value = MagicMock(
             id=twin_state_id
         )
 
         # Configure insert to return the CoachingMessage argument that was passed
         # to it. This ensures model_validate() receives a real object with valid
         # attribute values (id, generated_at, twin_state_id) rather than a mock.
-        async def _return_insert_arg(msg, /):
+        async def _return_insert_arg(msg: Any, /):
             msg.id = uuid.uuid4()
             msg.generated_at = datetime.now(timezone.utc)
             msg.twin_state_id = uuid.uuid4()
@@ -609,15 +609,15 @@ class TestFirstMessageAgentFailurePath:
         mock_prompt_registry.get_prompt.return_value = "You are the coach."
         mock_context_budget.estimate_tokens.return_value = 500
 
-        mock_context_budget._twin_states = AsyncMock()
-        mock_context_budget._twin_states.get_latest.return_value = MagicMock(
+        mock_context_budget.twin_states = AsyncMock()
+        mock_context_budget.twin_states.get_latest.return_value = MagicMock(
             id=uuid.uuid4()
         )
 
         with patch.object(FirstMessageAgent, "_build_llm_client") as mock_build:
             mock_client = AsyncMock()
             mock_client.chat.completions.create = AsyncMock(
-                side_effect=APITimeoutError("timeout")
+                side_effect=APITimeoutError(request=MagicMock())
             )
             mock_build.return_value = mock_client
 
@@ -671,8 +671,8 @@ class TestFirstMessageAgentFailurePath:
         mock_prompt_registry.get_prompt.return_value = "You are the coach."
         mock_context_budget.estimate_tokens.return_value = 500
 
-        mock_context_budget._twin_states = AsyncMock()
-        mock_context_budget._twin_states.get_latest.return_value = MagicMock(
+        mock_context_budget.twin_states = AsyncMock()
+        mock_context_budget.twin_states.get_latest.return_value = MagicMock(
             id=uuid.uuid4()
         )
 
@@ -729,8 +729,8 @@ class TestFirstMessageAgentFailurePath:
         mock_prompt_registry.get_prompt.return_value = "You are the coach."
         mock_context_budget.estimate_tokens.return_value = 500
 
-        mock_context_budget._twin_states = AsyncMock()
-        mock_context_budget._twin_states.get_latest.return_value = MagicMock(
+        mock_context_budget.twin_states = AsyncMock()
+        mock_context_budget.twin_states.get_latest.return_value = MagicMock(
             id=uuid.uuid4()
         )
 
@@ -787,8 +787,8 @@ class TestFirstMessageAgentFailurePath:
         mock_prompt_registry.get_prompt.return_value = "You are the coach."
         mock_context_budget.estimate_tokens.return_value = 500
 
-        mock_context_budget._twin_states = AsyncMock()
-        mock_context_budget._twin_states.get_latest.return_value = MagicMock(
+        mock_context_budget.twin_states = AsyncMock()
+        mock_context_budget.twin_states.get_latest.return_value = MagicMock(
             id=uuid.uuid4()
         )
 
@@ -859,15 +859,15 @@ class TestFirstMessageAgentTokenCapture:
         mock_context_budget.estimate_tokens.return_value = 500
 
         twin_state_id = uuid.uuid4()
-        mock_context_budget._twin_states = AsyncMock()
-        mock_context_budget._twin_states.get_latest.return_value = MagicMock(
+        mock_context_budget.twin_states = AsyncMock()
+        mock_context_budget.twin_states.get_latest.return_value = MagicMock(
             id=twin_state_id
         )
 
         # Configure insert to return the CoachingMessage argument that was passed
         # to it. This ensures model_validate() receives a real object with valid
         # attribute values (id, generated_at, twin_state_id) rather than a mock.
-        async def _return_insert_arg(msg, /):
+        async def _return_insert_arg(msg: Any, /):
             msg.id = uuid.uuid4()
             msg.generated_at = datetime.now(timezone.utc)
             msg.twin_state_id = uuid.uuid4()

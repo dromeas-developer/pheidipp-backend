@@ -17,6 +17,8 @@ writes are out of scope for this plan.
 
 from __future__ import annotations
 
+from typing import Any
+
 import uuid
 from datetime import date, datetime, timezone
 from decimal import Decimal
@@ -27,6 +29,7 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
+from app.models._enum_helpers import enum_str_values
 from app.models.enums import Sex
 
 
@@ -59,7 +62,7 @@ class AthleteProfile(Base):
             name="sex",
             native_enum=False,
             length=32,
-            values_callable=lambda x: [e.value for e in x],
+            values_callable=enum_str_values,
         ),
         nullable=False,
     )
@@ -74,10 +77,10 @@ class AthleteProfile(Base):
     # architecture doc for fit rules (e.g. ``gap_curve_model`` requires
     # ``r_squared >= 0.70`` to upgrade ``current_effort_generation``).
     # ------------------------------------------------------------------
-    gap_curve_model: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-    weather_response_model: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-    banister_constants: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-    cycle_personal_model: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    gap_curve_model: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    weather_response_model: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    banister_constants: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    cycle_personal_model: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
     # ------------------------------------------------------------------
     # Location and scheduling.
@@ -92,7 +95,7 @@ class AthleteProfile(Base):
     location_lat: Mapped[Decimal | None] = mapped_column(Numeric(9, 6), nullable=True)
     location_lng: Mapped[Decimal | None] = mapped_column(Numeric(9, 6), nullable=True)
     timezone: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    training_window: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    training_window: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
     # ------------------------------------------------------------------
     # Effort-generation and risk state.
@@ -111,7 +114,7 @@ class AthleteProfile(Base):
         Integer, nullable=True
     )
     structural_risk_flag: Mapped[bool | None] = mapped_column(nullable=True)
-    objective_thresholds: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    objective_thresholds: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

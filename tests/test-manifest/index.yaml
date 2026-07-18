@@ -42,84 +42,91 @@ selection:
   - tests/integration/test_physiology_update_service_first_observation_integration.py
   - tests/integration/test_athlete_physiology_repository_update_in_place_integration.py
   - tests/behaviour/test_physiology_update_user_journey.py
-regression:
-- tests/unit/test_first_message_agent.py
-- tests/unit/test_context_budget_service.py
-- tests/unit/test_twin_context_assembler.py
-- tests/unit/test_prompt_registry.py
-- tests/unit/test_coaching_repositories.py
-- tests/integration/test_coach_endpoints.py
-- tests/unit/test_generated_workout_repository.py
-- tests/unit/test_workout_step_repository.py
-- tests/unit/test_planned_session_repository.py
-- tests/unit/test_workout_target_types.py
-- tests/unit/test_workout_generation_agent.py
-- tests/integration/test_workout_endpoints.py
-- tests/unit/test_fit_parser_service.py
-- tests/unit/test_load_computation_service.py
-- tests/unit/test_twin_recalibration_service.py
-- tests/unit/test_compliance_service.py
-- tests/unit/test_calibration_eligibility_service.py
-- tests/unit/test_object_storage_client.py
-- tests/unit/test_post_workout_agent.py
-- tests/unit/test_activity_ingestion_service.py
-- tests/unit/test_signal_cleaning_service.py
-- tests/unit/test_signal_cleaning_object_storage.py
-- tests/unit/test_activity_ingestion_service_signal_clean.py
-- tests/unit/test_activity_repository_update_cleaning_version.py
-- tests/integration/test_signal_cleaning_service_integration.py
-- tests/integration/test_signal_cleaning_task_integration.py
-- tests/integration/test_activity_ingestion_signal_clean_enqueue_integration.py
-- tests/integration/test_activity_repository_cleaning_version_integration.py
-- tests/behaviour/test_signal_cleaning_user_journey.py
-- tests/integration/test_physiology_measurement_repository_integration.py
-- tests/integration/test_threshold_detection_service_integration.py
-- tests/behaviour/test_threshold_detection_user_journey.py
-- tests/unit/test_physiology_update_service_bayesian.py
-- tests/unit/test_physiology_update_service_pure_helpers.py
-- tests/unit/test_physiology_update_service_orchestration.py
-- tests/unit/test_athlete_physiology_repository_update_in_place.py
-- tests/integration/test_physiology_update_service_integration.py
-- tests/integration/test_physiology_update_service_idempotency_integration.py
-- tests/integration/test_physiology_update_service_confidence_transitions_integration.py
-- tests/integration/test_physiology_update_service_first_observation_integration.py
-- tests/integration/test_athlete_physiology_repository_update_in_place_integration.py
-- tests/behaviour/test_physiology_update_user_journey.py
-release:
-- tests/unit/test_first_message_agent.py
-- tests/unit/test_context_budget_service.py
-- tests/unit/test_twin_context_assembler.py
-- tests/unit/test_prompt_registry.py
-- tests/unit/test_coaching_repositories.py
-- tests/integration/test_coach_endpoints.py
-- tests/unit/test_generated_workout_repository.py
-- tests/unit/test_workout_step_repository.py
-- tests/unit/test_planned_session_repository.py
-- tests/unit/test_workout_target_types.py
-- tests/unit/test_workout_generation_agent.py
-- tests/integration/test_workout_endpoints.py
-- tests/unit/test_signal_cleaning_service.py
-- tests/unit/test_signal_cleaning_object_storage.py
-- tests/unit/test_activity_ingestion_service_signal_clean.py
-- tests/unit/test_activity_repository_update_cleaning_version.py
-- tests/integration/test_signal_cleaning_service_integration.py
-- tests/integration/test_signal_cleaning_task_integration.py
-- tests/integration/test_activity_ingestion_signal_clean_enqueue_integration.py
-- tests/integration/test_activity_repository_cleaning_version_integration.py
-- tests/behaviour/test_signal_cleaning_user_journey.py
-- tests/integration/test_physiology_measurement_repository_integration.py
-- tests/integration/test_threshold_detection_service_integration.py
-- tests/behaviour/test_threshold_detection_user_journey.py
-- tests/unit/test_physiology_update_service_bayesian.py
-- tests/unit/test_physiology_update_service_pure_helpers.py
-- tests/unit/test_physiology_update_service_orchestration.py
-- tests/unit/test_athlete_physiology_repository_update_in_place.py
-- tests/integration/test_physiology_update_service_integration.py
-- tests/integration/test_physiology_update_service_idempotency_integration.py
-- tests/integration/test_physiology_update_service_confidence_transitions_integration.py
-- tests/integration/test_physiology_update_service_first_observation_integration.py
-- tests/integration/test_athlete_physiology_repository_update_in_place_integration.py
-- tests/behaviour/test_physiology_update_user_journey.py
+  - tests/unit/test_twin_recalibration_service_calibration_pure_helpers.py
+  - tests/unit/test_twin_recalibration_service_insert_if_not_exists.py
+  - tests/unit/test_twin_recalibration_service_calibration.py
+  - tests/unit/test_twin_recalibration_service_event_firing.py
+  - tests/integration/test_threshold_detection_task_integration.py
+  - tests/integration/test_signal_clean_threshold_detection_defer_integration.py
+  - tests/behaviour/test_twin_recalibration_calibration_user_journey.py
+  regression:
+  - tests/unit/test_first_message_agent.py
+  - tests/unit/test_context_budget_service.py
+  - tests/unit/test_twin_context_assembler.py
+  - tests/unit/test_prompt_registry.py
+  - tests/unit/test_coaching_repositories.py
+  - tests/integration/test_coach_endpoints.py
+  - tests/unit/test_generated_workout_repository.py
+  - tests/unit/test_workout_step_repository.py
+  - tests/unit/test_planned_session_repository.py
+  - tests/unit/test_workout_target_types.py
+  - tests/unit/test_workout_generation_agent.py
+  - tests/integration/test_workout_endpoints.py
+  - tests/unit/test_fit_parser_service.py
+  - tests/unit/test_load_computation_service.py
+  - tests/unit/test_twin_recalibration_service.py
+  - tests/unit/test_compliance_service.py
+  - tests/unit/test_calibration_eligibility_service.py
+  - tests/unit/test_object_storage_client.py
+  - tests/unit/test_post_workout_agent.py
+  - tests/unit/test_activity_ingestion_service.py
+  - tests/unit/test_signal_cleaning_service.py
+  - tests/unit/test_signal_cleaning_object_storage.py
+  - tests/unit/test_activity_ingestion_service_signal_clean.py
+  - tests/unit/test_activity_repository_update_cleaning_version.py
+  - tests/integration/test_signal_cleaning_service_integration.py
+  - tests/integration/test_signal_cleaning_task_integration.py
+  - tests/integration/test_activity_ingestion_signal_clean_enqueue_integration.py
+  - tests/integration/test_activity_repository_cleaning_version_integration.py
+  - tests/behaviour/test_signal_cleaning_user_journey.py
+  - tests/integration/test_physiology_measurement_repository_integration.py
+  - tests/integration/test_threshold_detection_service_integration.py
+  - tests/behaviour/test_threshold_detection_user_journey.py
+  - tests/unit/test_physiology_update_service_bayesian.py
+  - tests/unit/test_physiology_update_service_pure_helpers.py
+  - tests/unit/test_physiology_update_service_orchestration.py
+  - tests/unit/test_athlete_physiology_repository_update_in_place.py
+  - tests/integration/test_physiology_update_service_integration.py
+  - tests/integration/test_physiology_update_service_idempotency_integration.py
+  - tests/integration/test_physiology_update_service_confidence_transitions_integration.py
+  - tests/integration/test_physiology_update_service_first_observation_integration.py
+  - tests/integration/test_athlete_physiology_repository_update_in_place_integration.py
+  - tests/behaviour/test_physiology_update_user_journey.py
+  release:
+  - tests/unit/test_first_message_agent.py
+  - tests/unit/test_context_budget_service.py
+  - tests/unit/test_twin_context_assembler.py
+  - tests/unit/test_prompt_registry.py
+  - tests/unit/test_coaching_repositories.py
+  - tests/integration/test_coach_endpoints.py
+  - tests/unit/test_generated_workout_repository.py
+  - tests/unit/test_workout_step_repository.py
+  - tests/unit/test_planned_session_repository.py
+  - tests/unit/test_workout_target_types.py
+  - tests/unit/test_workout_generation_agent.py
+  - tests/integration/test_workout_endpoints.py
+  - tests/unit/test_signal_cleaning_service.py
+  - tests/unit/test_signal_cleaning_object_storage.py
+  - tests/unit/test_activity_ingestion_service_signal_clean.py
+  - tests/unit/test_activity_repository_update_cleaning_version.py
+  - tests/integration/test_signal_cleaning_service_integration.py
+  - tests/integration/test_signal_cleaning_task_integration.py
+  - tests/integration/test_activity_ingestion_signal_clean_enqueue_integration.py
+  - tests/integration/test_activity_repository_cleaning_version_integration.py
+  - tests/behaviour/test_signal_cleaning_user_journey.py
+  - tests/integration/test_physiology_measurement_repository_integration.py
+  - tests/integration/test_threshold_detection_service_integration.py
+  - tests/behaviour/test_threshold_detection_user_journey.py
+  - tests/unit/test_physiology_update_service_bayesian.py
+  - tests/unit/test_physiology_update_service_pure_helpers.py
+  - tests/unit/test_physiology_update_service_orchestration.py
+  - tests/unit/test_athlete_physiology_repository_update_in_place.py
+  - tests/integration/test_physiology_update_service_integration.py
+  - tests/integration/test_physiology_update_service_idempotency_integration.py
+  - tests/integration/test_physiology_update_service_confidence_transitions_integration.py
+  - tests/integration/test_physiology_update_service_first_observation_integration.py
+  - tests/integration/test_athlete_physiology_repository_update_in_place_integration.py
+  - tests/behaviour/test_physiology_update_user_journey.py
 coverage:
   routes:
     covered:
@@ -141,6 +148,8 @@ coverage:
     - activity_ingested
     - activity_calibration_eligible
     - physiology_updated
+    - twin_recalibrated
+    - twin_confidence_upgraded
     partial: []
     missing: []
   invariants:
@@ -196,6 +205,26 @@ coverage:
     - One AthletePhysiology row per athlete — the row id is preserved across update_in_place (no second row created)
     - Confidence is monotonic (only increases, never decreases) — the prior_weight decays over time, but the per-metric level
       (LOW/MEDIUM/HIGH) ratchets up only
+    - Per-metric confidence ratchet (ADR-011) — a metric that previously reached MEDIUM stays MEDIUM even if prior_weight
+      has decayed below 4.0; None previous means "no data" (not "low confidence"), so computed wins
+    - Calibration TwinState trigger — a calibration TwinState can coexist with a prior activity_sync TwinState
+      for the same activity (dual-trigger scenario); a prior calibration TwinState supersedes everything
+    - twin_recalibrated event — fires for every new calibration TwinState (no threshold gate, unlike physiology_updated)
+    - twin_confidence_upgraded event — fires only when confidence_level strictly increases
+    - threshold_detection worker task — orchestrates detect → apply_observations → recalibrate_for_calibration →
+      commit in a single transaction (ADR-009 decoupling)
+    - signal_clean → threshold_detection defer — fires AFTER signal_clean commit, swallowed on failure
     partial: []
     missing: []
-cross_phase_dependencies: {}
+cross_phase_dependencies:
+  phase-2-3-p3-twin-recalibration-pipeline:
+  - phase-2-2-p1-signal-cleaning
+  - phase-2-3-p1-threshold-detection
+  - phase-2-3-p2-physiology-update
+  description: The Phase 2.3 P3 twin recalibration pipeline depends on the
+    signal cleaning pipeline (Phase 2.2 P1) for the RawSensorStream
+    contract, the threshold detection service (Phase 2.3 P1) for the
+    ThresholdObservation data shape, and the physiology update service
+    (Phase 2.3 P2) for the PhysiologyUpdateResult data shape. The
+    tests for this plan use the same factory helpers and signal-cleaning
+    integration patterns as those plans.

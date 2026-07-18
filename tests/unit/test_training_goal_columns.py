@@ -12,6 +12,8 @@ Architecture: docs/architecture/01-entities/training-goal.md
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 from sqlalchemy import (
     Date,
@@ -187,7 +189,8 @@ class TestTrainingGoalActivePartialUniqueIndex:
         """The partial predicate must constrain ``status = 'active'`` —
         other statuses don't participate in the unique constraint."""
         idx = get_indexes(TrainingGoal)["ix_training_goals_athlete_active"]
-        predicate = idx.dialect_options.get("postgresql", {}).get("where")
+        dialect_opts: Any = idx.dialect_options
+        predicate: Any = dialect_opts.get("postgresql", {}).get("where")
         assert predicate is not None, (
             "ix_training_goals_athlete_active must declare a "
             "postgresql_where predicate — without it the index would "

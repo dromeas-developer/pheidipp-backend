@@ -11,6 +11,8 @@ personalisation models.
 
 from __future__ import annotations
 
+from typing import Any
+
 import uuid
 from datetime import datetime, timezone
 
@@ -19,7 +21,6 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Integer,
-    String,
     func,
 )
 from sqlalchemy import Enum as SAEnum
@@ -27,6 +28,7 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
+from app.models._enum_helpers import enum_str_values
 from app.models.enums import (
     DataTier,
     GpsSource,
@@ -86,7 +88,7 @@ class AthletePreferences(Base):
             name="sport_background",
             native_enum=False,
             length=32,
-            values_callable=lambda x: [e.value for e in x],
+            values_callable=enum_str_values,
         ),
         nullable=False,
     )
@@ -109,11 +111,11 @@ class AthletePreferences(Base):
             name="training_time_of_day",
             native_enum=False,
             length=16,
-            values_callable=lambda x: [e.value for e in x],
+            values_callable=enum_str_values,
         ),
         nullable=False,
     )
-    weekly_schedule: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    weekly_schedule: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
 
     # ------------------------------------------------------------------
     # Hardware / platform.
@@ -129,7 +131,7 @@ class AthletePreferences(Base):
             name="gps_source",
             native_enum=False,
             length=32,
-            values_callable=lambda x: [e.value for e in x],
+            values_callable=enum_str_values,
         ),
         nullable=False,
     )
@@ -139,7 +141,7 @@ class AthletePreferences(Base):
             name="hr_source",
             native_enum=False,
             length=32,
-            values_callable=lambda x: [e.value for e in x],
+            values_callable=enum_str_values,
         ),
         nullable=False,
     )
@@ -149,7 +151,7 @@ class AthletePreferences(Base):
             name="power_source",
             native_enum=False,
             length=32,
-            values_callable=lambda x: [e.value for e in x],
+            values_callable=enum_str_values,
         ),
         nullable=False,
     )
@@ -159,7 +161,7 @@ class AthletePreferences(Base):
             name="primary_training_platform",
             native_enum=False,
             length=32,
-            values_callable=lambda x: [e.value for e in x],
+            values_callable=enum_str_values,
         ),
         nullable=False,
     )

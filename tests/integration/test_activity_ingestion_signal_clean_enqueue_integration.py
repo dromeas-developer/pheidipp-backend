@@ -22,11 +22,10 @@ Step 8 — Wire the enqueue hook into ``ActivityIngestionService._run_ingestion_
 
 from __future__ import annotations
 
-import io
 import uuid
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
-from typing import Any, List, Optional, Callable
+from typing import Any, Optional, Callable
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -56,7 +55,6 @@ from app.models.twin_state import TwinState
 from app.services.activity_ingestion_service import (
     ActivityIngestionService,
 )
-from app.services.event_publisher import EventPublisher
 from tests.utils.factories import make_athlete
 
 
@@ -79,7 +77,7 @@ class _RecordingDispatcher:
     path.
     """
 
-    call_log: List[dict] = field(default_factory=list)
+    call_log: list[dict[str, Any]] = field(default_factory=lambda: [])
     raise_on_call: bool = False
 
     def __call__(self, **kwargs: Any) -> int:
@@ -105,14 +103,14 @@ class _NoOpEventPublisher:
     """
 
     def __init__(self) -> None:
-        self.events: list[dict] = []
+        self.events: list[dict[str, Any]] = []
 
     async def publish(
         self,
         *,
         event_type: str,
         athlete_id: uuid.UUID,
-        payload: Optional[dict] = None,
+        payload: Optional[dict[str, Any]] = None,
     ) -> None:
         self.events.append(
             {
@@ -256,8 +254,8 @@ def _stub_fit_parser():
 
         async def parse(self, file_bytes: bytes) -> ParsedFitData:
             duration = 3600
-            hr = [150] * duration
-            power = [200] * duration
+            hr: list[float | None] = [150.0] * duration
+            power: list[float | None] = [200.0] * duration
             gps = [
                 GpsRecord(
                     timestamp=datetime(2026, 6, 15, 8, 0, tzinfo=timezone.utc),
@@ -410,7 +408,6 @@ class TestEnqueueHookDeferFailureSwallowed:
         ``Activity`` row is fully populated (load scores,
         cleaning_pipeline_version still null because cleaning
         never ran — only the defer failed)."""
-        from app.models.activity import Activity
         from app.repositories.activity_repository import ActivityRepository
 
         athlete_id, _ = await _create_athlete_with_full_onboarding(db_session)

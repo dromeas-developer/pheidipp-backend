@@ -31,6 +31,8 @@ Invariants codified at the DB layer:
 
 from __future__ import annotations
 
+from typing import Any
+
 import uuid
 from datetime import datetime, timezone
 
@@ -40,7 +42,6 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     func,
-    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -89,7 +90,7 @@ class AthleteFitness(Base):
     # ------------------------------------------------------------------
     # Aggregate score — always populated, ``form`` derived.
     # ------------------------------------------------------------------
-    aggregate: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    aggregate: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
 
     # ------------------------------------------------------------------
     # Per-dimension scores — optional. When populated, each carries
@@ -97,15 +98,15 @@ class AthleteFitness(Base):
     # when ``FitnessUpdateService`` has data quality for the
     # dimension (per architecture doc).
     # ------------------------------------------------------------------
-    aerobic: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-    neuromuscular: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-    structural: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    aerobic: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    neuromuscular: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    structural: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
     # ------------------------------------------------------------------
     # ``BanisterTimeConstants`` — JSONB carrying the dimension-by-
     # dimension tau values plus ``source`` and ``fitted_at``.
     # ------------------------------------------------------------------
-    time_constants: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    time_constants: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
 
     # ------------------------------------------------------------------
     # Anchoring reference — last activity that wrote this row.

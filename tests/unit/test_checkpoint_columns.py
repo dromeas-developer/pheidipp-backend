@@ -21,12 +21,11 @@ import pytest
 from sqlalchemy import (
     Boolean,
     DateTime,
-    Integer,
     String,
     Text,
 )
 from sqlalchemy import Enum as SAEnum
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID as PG_UUID
+from sqlalchemy.dialects.postgresql import ARRAY, UUID as PG_UUID
 
 from app.models.checkpoint import Checkpoint
 from app.models.enums import CheckpointStatus, CheckpointType

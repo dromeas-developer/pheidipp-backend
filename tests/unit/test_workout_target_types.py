@@ -11,7 +11,6 @@ Reference plan: docs/implementation/phase-1/phase-1-5b-p1-workout-generation.md
 
 from __future__ import annotations
 
-import pytest
 
 from app.models.enums import (
     DataTier,

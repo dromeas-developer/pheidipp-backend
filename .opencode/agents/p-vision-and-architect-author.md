@@ -15,7 +15,7 @@ tools:
   glob:       false
   todowrite:  true
   webfetch:   false
-  skill:      false
+  skill:      true
 
   # Architecture retrieval
   "pheidipp-codebase-context_search_architecture":      true
@@ -38,8 +38,6 @@ tools:
   "pheidipp-codebase-context_get_feature_context":         true
 
   # Bulk retrieval
-  "pheidipp-codebase-context_multi_search":             true
-  "pheidipp-codebase-context_multi_context":            true
   "pheidipp-codebase-context_get_change_impact":        true
 
   # Documentation maintenance
@@ -162,37 +160,24 @@ proceeding. Do not make a change that silently breaks release plan assumptions.
 
 ### Step 3 — Retrieve Context
 
-Use the retrieval pattern that matches what you need:
+Invoke `p-doc-explorer` via the `task` tool with a concept list derived
+from the affected documents and their scope:
 
-**Discovery — understanding a concept across all corpora:**
 ```
-multi_search(searches: [
-  { domain: "architecture", query: "<concept> contracts and ownership" },
-  { domain: "vision",       query: "<concept> product intent" },
-  { domain: "release_plan", query: "<concept> delivery assumptions" }
-])
-```
+Tool: task
+Input:
+{
+  "subagent_type": "p-doc-explorer",
+  "prompt": "Task: <one-line task description>\n\nConcepts:\n- <concept name>\n- ...\n\nDomains: all"
+}
+``` Its Brief returns the current architecture
+contracts, invariants, vision references, and release-plan context for
+every concept — already organized by domain. Do not run raw
+`multi_search`, `multi_context`, or `get_entity_context` calls yourself —
+Doc Explorer handles retrieval and condenses the results.
 
-**Comparison — understanding how two concepts relate:**
-```
-multi_context(concepts: ["ConceptA", "ConceptB"])
-```
-Returns full cross-domain context for both in one call. Use when evaluating
-whether a change to one concept forces a change to another.
-
-**Verification — confirming a specific contract before editing:**
-Use targeted single tools when you know exactly what you need:
-- `get_entity_context(entity_name, sections?)` — specific entity, specific sections
-- `get_event_context(event_name)` — producer/consumer contracts for one event
-- `get_related_contracts(entity_name)` — which entities depend on this one
-- `search_invariants(query, invariant_type?, enforcement?)` — constraints by type
-- `get_vision_context(entity_name, sections?)` — specific vision document sections
-
-**Discovery — when you don't know exact names:**
-- `list_entities()` — all architecture entity names
-- `list_vision_entities(category?)` — vision document names by category
-- `list_release_plan_phases()` — all release phases
-- `get_phase_context(phase_number)` — full phase spec
+Use `get_change_impact` only for existing entities the change modifies or
+extends — Doc Explorer does not cover blast-radius analysis.
 
 ### Step 4 — Evaluate Consistency
 
@@ -365,28 +350,6 @@ clarification before retrieving anything.
 * Concise — 80–150 lines maximum
 * Documents why this path over alternatives, not what the path is
 * Never contains implementation plans or release sequencing
-
----
-
-## Retrieval Efficiency
-
-Prefer `multi_search` and `multi_context` when gathering information about
-multiple independent concepts simultaneously.
-
-Use targeted single-tool retrieval when:
-* investigating a specific entity in depth
-* verifying a specific event contract
-* retrieving a specific invariant type
-* reviewing a single ownership boundary
-
-Optimise for retrieval relevance and efficiency — not for maximising bulk tool
-usage. A targeted `get_entity_context` with `sections` is better than a broad
-`multi_search` when you know exactly what you need.
-
-When calling `get_entity_context` or `get_vision_context` without knowing
-which sections exist, omit the `sections` parameter to retrieve the full
-document — then identify the relevant sections from the result rather than
-guessing section names upfront.
 
 ---
 

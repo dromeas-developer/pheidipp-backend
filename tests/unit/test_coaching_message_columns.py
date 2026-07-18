@@ -23,6 +23,8 @@ Architecture: docs/architecture/01-entities/coaching-message.md
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 from sqlalchemy import (
     DateTime,
@@ -167,7 +169,8 @@ class TestCoachingMessageFirstMessagePartialUniqueIndex:
 
     def test_first_message_partial_predicate_present(self) -> None:
         idx = get_indexes(CoachingMessage)["uq_coaching_messages_athlete_first_message"]
-        predicate = idx.dialect_options.get("postgresql", {}).get("where")
+        dialect_opts: Any = idx.dialect_options
+        predicate: Any = dialect_opts.get("postgresql", {}).get("where")
         assert predicate is not None, (
             "uq_coaching_messages_athlete_first_message must declare "
             "a postgresql_where predicate — without it the index "
@@ -206,7 +209,8 @@ class TestCoachingMessagePostWorkoutPartialUniqueIndex:
 
     def test_post_workout_partial_predicate_present(self) -> None:
         idx = get_indexes(CoachingMessage)["uq_coaching_messages_activity_post_workout"]
-        predicate = idx.dialect_options.get("postgresql", {}).get("where")
+        dialect_opts: Any = idx.dialect_options
+        predicate: Any = dialect_opts.get("postgresql", {}).get("where")
         assert predicate is not None, (
             "uq_coaching_messages_activity_post_workout must declare "
             "a postgresql_where predicate."
@@ -219,7 +223,8 @@ class TestCoachingMessagePostWorkoutPartialUniqueIndex:
         NULL`` so non-post_workout rows with NULL activity_id are
         exempt from the uniqueness constraint."""
         idx = get_indexes(CoachingMessage)["uq_coaching_messages_activity_post_workout"]
-        predicate = idx.dialect_options.get("postgresql", {}).get("where")
+        dialect_opts: Any = idx.dialect_options
+        predicate: Any = dialect_opts.get("postgresql", {}).get("where")
         rendered = str(predicate).lower()
         assert "message_type" in rendered, (
             "Predicate must include `message_type` filter."

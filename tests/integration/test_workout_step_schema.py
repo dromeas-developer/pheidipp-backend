@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date
+from typing import Any
 
 import pytest
 from sqlalchemy import create_engine, text
@@ -145,7 +146,7 @@ async def _new_full_chain(
     return workout, goal
 
 
-def _default_target() -> dict:
+def _default_target() -> dict[str, Any]:
     return {
         "signal_type": "hr",
         "primary": {"min": 130, "max": 145, "unit": "bpm"},
@@ -162,7 +163,7 @@ def _workout_step_factory(
     session_type: SessionType = SessionType.EASY_RUN,
     physiological_intent: PhysiologicalIntent = PhysiologicalIntent.LOW_AEROBIC,
     session_purpose: SessionPurpose = SessionPurpose.GENERAL,
-    target: dict | None = None,
+    target: dict[str, Any] | None = None,
     duration_seconds: int | None = 1800,
     description: str = "20-minute easy aerobic run",
 ) -> WorkoutStep:

@@ -63,7 +63,7 @@ def get_check_text(check: CheckConstraint) -> str:
     return str(expr) if expr is not None else ""
 
 
-def get_server_default_text(column: Column) -> str:
+def get_server_default_text(column: Column[Any]) -> str:
     """Return the server_default argument as a string.
 
     SQLAlchemy's ``Column.server_default`` is typed as
@@ -92,7 +92,7 @@ def has_column(model: type[DeclarativeBase], name: str) -> bool:
     return any(column.key == name for column in model.__table__.columns)
 
 
-def get_enum_values(column: Column, enum_cls: type) -> list[str]:
+def get_enum_values(column: Column[Any], enum_cls: type) -> list[str]:
     """Return the list of value names for a SQLAlchemy Enum column.
 
     Safely extracts enum values from a column that has been narrowed

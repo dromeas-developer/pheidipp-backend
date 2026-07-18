@@ -12,7 +12,6 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from app.models.activity import Activity
-from app.models.enums import ActivitySource, SportType
 from app.repositories.activity_repository import ActivityRepository
 
 

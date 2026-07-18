@@ -98,7 +98,7 @@ class TokenService:
 
     def verify_access_token(self, token: str) -> AccessTokenClaims:
         """Verify a JWT and return its claims. Raises TokenVerificationError otherwise."""
-        if not isinstance(token, str) or not token:
+        if not token:
             raise TokenVerificationError("missing token")
         try:
             payload = jwt.decode(
@@ -151,7 +151,7 @@ class TokenService:
     @staticmethod
     def hash_refresh_token(raw: str) -> str:
         """One-way SHA-256 hex digest of a refresh token."""
-        if not isinstance(raw, str) or not raw:
+        if not raw:
             raise ValueError("refresh token must be a non-empty string")
         return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 

@@ -63,7 +63,7 @@ class PromptRegistry:
     DEFAULT_PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
 
     def __init__(self, prompts_dir: Path | None = None) -> None:
-        self._prompts_dir: Path = prompts_dir or self.DEFAULT_PROMPTS_DIR
+        self.prompts_dir: Path = prompts_dir or self.DEFAULT_PROMPTS_DIR
         self._cache: Dict[str, str] = {}
         self._cache_lock = threading.Lock()
 
@@ -84,7 +84,7 @@ class PromptRegistry:
             cached = self._cache.get(cache_key)
             if cached is not None:
                 return cached
-            content = self._load_prompt_from_disk(agent_name, version)
+            content = self.load_prompt_from_disk(agent_name, version)
             self._cache[cache_key] = content
             return content
 
@@ -98,10 +98,10 @@ class PromptRegistry:
         with self._cache_lock:
             self._cache.clear()
 
-    def _load_prompt_from_disk(
+    def load_prompt_from_disk(
         self, agent_name: str, version: str
     ) -> str:
-        path = self._build_prompt_path(agent_name, version)
+        path = self.build_prompt_path(agent_name, version)
         if not path.is_file():
             raise PromptNotFoundError(
                 agent_name=agent_name,
@@ -110,10 +110,10 @@ class PromptRegistry:
             )
         return path.read_text(encoding="utf-8")
 
-    def _build_prompt_path(
+    def build_prompt_path(
         self, agent_name: str, version: str
     ) -> Path:
-        return self._prompts_dir / f"{agent_name}_{version}.md"
+        return self.prompts_dir / f"{agent_name}_{version}.md"
 
 
 # ---------------------------------------------------------------------------

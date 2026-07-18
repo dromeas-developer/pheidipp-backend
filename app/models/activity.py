@@ -21,6 +21,8 @@ semantics and zero-downtime additive intent.
 
 from __future__ import annotations
 
+from typing import Any
+
 import uuid
 from datetime import date, datetime, timezone
 
@@ -42,6 +44,7 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
+from app.models._enum_helpers import enum_str_values
 from app.models.enums import ActivitySource, SportType
 
 
@@ -95,7 +98,7 @@ class Activity(Base):
             name="activity_source",
             native_enum=False,
             length=32,
-            values_callable=lambda x: [e.value for e in x],
+            values_callable=enum_str_values,
         ),
         nullable=False,
     )
@@ -121,7 +124,7 @@ class Activity(Base):
             name="sport_type",
             native_enum=False,
             length=32,
-            values_callable=lambda x: [e.value for e in x],
+            values_callable=enum_str_values,
         ),
         nullable=False,
         server_default="unknown",
@@ -161,7 +164,7 @@ class Activity(Base):
     calibration_eligible: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"
     )
-    quality_flags: Mapped[dict] = mapped_column(
+    quality_flags: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb")
     )
 

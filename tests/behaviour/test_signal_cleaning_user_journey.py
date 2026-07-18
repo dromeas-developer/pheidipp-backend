@@ -28,22 +28,19 @@ from __future__ import annotations
 
 import io
 import uuid
-from datetime import date, datetime, timezone
 from pathlib import Path
+from typing import Any
 
 import pytest
 from httpx import AsyncClient, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.session import AsyncSessionLocal
-from app.models.activity import Activity
-from app.models.enums import ActivitySource, SportType
-from app.models.raw_sensor_stream import RawSensorStream
+from app.models.enums import ActivitySource
 from app.repositories.activity_repository import ActivityRepository
 from app.repositories.raw_sensor_stream_repository import (
     RawSensorStreamRepository,
 )
-from tests.payloads import _onboarding_payload, _register_payload
+from tests.payloads import onboarding_payload
 from tests.utils.http_helpers import bearer_header, http_register
 
 
@@ -73,7 +70,7 @@ async def _upload_and_stage(
     token: str,
     *,
     source: ActivitySource = ActivitySource.MANUAL_UPLOAD,
-    extra_data: dict | None = None,
+    extra_data: dict[str, Any] | None = None,
 ) -> Response:
     """POST /upload and return the parsed JSON body.
 
@@ -85,8 +82,8 @@ async def _upload_and_stage(
     # ``planned_session_id`` and ``notes`` are Form fields; files are
     # UploadFile(File=...). Using ``data={}`` for the form fields and
     # ``files=`` for the FIT upload mirrors what the real client sends.
-    form_data: dict = {}
-    if extra_data:
+    form_data: dict[str, Any] = {}
+    if extra_data is not None:
         form_data.update(extra_data)
 
     response = await client.post(
@@ -109,7 +106,7 @@ async def _read_activity(
     athlete_id: uuid.UUID,
     activity_id: uuid.UUID,
     token: str,
-) -> dict:
+) -> Any:
     """GET /athletes/{id}/activities/{aid} and return the JSON body."""
     response = await client.get(
         f"/api/v1/athletes/{athlete_id}/activities/{activity_id}",
@@ -138,7 +135,7 @@ async def _complete_onboarding(
     )
     ob_response = await client.post(
         f"/api/v1/athletes/{athlete_id}/onboarding",
-        json=_onboarding_payload(),
+        json=onboarding_payload(),
         headers=bearer_header(token),
     )
     assert ob_response.status_code == 201, ob_response.text
@@ -369,7 +366,7 @@ class TestActivityCrossAthleteGuard:
         # Athlete B (using athlete A's token... wait, the helper above
         # already used a different email for athlete B).
         # Let's get athlete B's token:
-        aid_b, tok_b = await http_register(
+        aid_b, _ = await http_register(
             client, f"behaviour-cross-c-{uuid.uuid4()}@example.com"
         )
 

@@ -44,7 +44,7 @@ class TestOnboardingErrorHierarchy:
             InvalidGoalTypeError,
         ],
     )
-    def test_inherits_from_base_exception(self, error_class) -> None:
+    def test_inherits_from_base_exception(self, error_class: type) -> None:
         assert issubclass(error_class, OnboardingError)
 
     def test_base_class_is_an_exception(self) -> None:
@@ -60,7 +60,7 @@ class TestOnboardingErrorHierarchy:
             InvalidGoalTypeError,
         ],
     )
-    def test_is_subclass_of_exception(self, error_class) -> None:
+    def test_is_subclass_of_exception(self, error_class: type) -> None:
         """All onboarding errors are catchable as ``Exception``."""
         assert issubclass(error_class, Exception)
 
@@ -82,7 +82,7 @@ class TestErrorInstantiation:
         ],
     )
     def test_carries_supplied_message(
-        self, error_class, message: str
+        self, error_class: type, message: str
     ) -> None:
         err = error_class(message)
         assert message in str(err)
@@ -166,7 +166,7 @@ class TestHTTPMappingContract:
         list(HTTP_STATUS_BY_ERROR.items()),
     )
     def test_documented_status_code(
-        self, error_class, expected_status: int
+        self, error_class: type, expected_status: int
     ) -> None:
         """The expected_status mapping is part of the public contract
         documented in the Phase-1.3 plan."""

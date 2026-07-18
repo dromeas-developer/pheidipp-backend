@@ -72,11 +72,14 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple, cast
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.athlete_preferences import AthletePreferences
 from app.models.checkpoint import Checkpoint
+from app.models.training_goal import TrainingGoal
+from app.models.twin_state import TwinState
 from app.models.enums import (
     CheckpointStatus,
     CheckpointType,
@@ -385,9 +388,9 @@ class PlanGenerationService:
         self,
         *,
         athlete_id: uuid.UUID,
-        goal_row,
-        twin_state_row,
-        prefs_row,
+        goal_row: TrainingGoal,
+        twin_state_row: TwinState,
+        prefs_row: AthletePreferences,
         plan_start: date,
     ) -> PlanGenerationResult:
         """race_event-specific orchestration: gate → allocation → persist."""
@@ -443,9 +446,9 @@ class PlanGenerationService:
         self,
         *,
         athlete_id: uuid.UUID,
-        goal_row,
-        twin_state_row,
-        prefs_row,
+        goal_row: TrainingGoal,
+        twin_state_row: TwinState,
+        prefs_row: AthletePreferences,
         plan_start: date,
     ) -> PlanGenerationResult:
         """target_performance path: gap analysis → reuse race_event template."""
@@ -499,7 +502,7 @@ class PlanGenerationService:
         config: _PlanConfig,
         twin_metric_confidence: Dict[str, Optional[str]],
         goal_event_type: str,
-        prefs_row,
+        prefs_row: AthletePreferences,
     ) -> PlanGenerationResult:
         """Run the full insertion sequence in one transaction."""
         allocations = allocate_race_event_phases(total_weeks=config.total_weeks)
@@ -1043,7 +1046,7 @@ def _fitness_level_to_self_report(fitness_level: int) -> int:
 
 
 def _estimate_current_performance(
-    *, twin_state_row, target_distance_km: float
+    *, twin_state_row: TwinState, target_distance_km: float
 ) -> float:
     """Best effort estimate of the athlete's current race time (minutes).
 
@@ -1094,7 +1097,7 @@ def _estimate_weeks_to_target(
 
 
 def _normalise_weekly_schedule(
-    weekly_schedule: Any,
+    weekly_schedule: dict[str, Any],
 ) -> Dict[str, Dict[str, Any]]:
     """Normalise the JSONB weekly schedule to a per-day dict.
 
@@ -1103,18 +1106,17 @@ def _normalise_weekly_schedule(
     out: Dict[str, Dict[str, Any]] = {
         day: {"available": False} for day in DAYS_OF_WEEK
     }
-    if not isinstance(weekly_schedule, dict):
-        return out
-    for day, cfg in weekly_schedule.items():
+    for day, cfg_value in weekly_schedule.items():
         if day not in out:
             continue
-        if not isinstance(cfg, dict):
+        if not isinstance(cfg_value, dict):
             continue
+        cfg_dict: Dict[str, Any] = cast(Dict[str, Any], cfg_value)
         out[day] = {
-            "available": bool(cfg.get("available", False)),
-            "max_hours": float(cfg.get("max_hours", 0.0)),
-            "long_workout": bool(cfg.get("long_workout", False)),
-            "doubles_eligible": bool(cfg.get("doubles_eligible", False)),
+            "available": bool(cfg_dict.get("available", False)),
+            "max_hours": float(cfg_dict.get("max_hours", 0.0)),
+            "long_workout": bool(cfg_dict.get("long_workout", False)),
+            "doubles_eligible": bool(cfg_dict.get("doubles_eligible", False)),
         }
     return out
 

@@ -22,13 +22,13 @@ from __future__ import annotations
 
 import json
 import uuid
+from typing import Any
 
 import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.athlete import Athlete
 from app.models.athlete_physiology import AthletePhysiology
 from tests.utils.factories import make_athlete
 from tests.utils.schema_helpers import db_columns, db_foreign_keys, db_indexes
@@ -40,11 +40,11 @@ TABLE = "athlete_physiology"
 def _physiology_factory(
     *,
     athlete_id: uuid.UUID,
-    lt1: dict | None = None,
-    lt2: dict | None = None,
-    cp: dict | None = None,
-    vo2max: dict | None = None,
-    max_hr: dict | None = None,
+    lt1: dict[str, Any] | None = None,
+    lt2: dict[str, Any] | None = None,
+    cp: dict[str, Any] | None = None,
+    vo2max: dict[str, Any] | None = None,
+    max_hr: dict[str, Any] | None = None,
 ) -> AthletePhysiology:
     default_lt1 = {
         "hr": {
@@ -363,8 +363,9 @@ class TestAthletePhysiologyMutabilityDB:
         }
         await db_session.flush()
         await db_session.refresh(row)
-        assert row.cp is not None
-        assert row.cp["value"] == 280.0
+        cp = row.cp
+        assert cp is not None
+        assert cp["value"] == 280.0
 
 
 # ---------------------------------------------------------------------------

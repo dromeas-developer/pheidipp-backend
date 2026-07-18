@@ -121,7 +121,7 @@ class TestRecordMetric:
         assert entry == previous + 1
 
     def test_unknown_metric_is_silently_ignored(self) -> None:
-        before = logging_utils.snapshot_metrics()
+        logging_utils.snapshot_metrics()
         logging_utils.record_metric("not.a.real.metric", auth_provider="email")
         after = logging_utils.snapshot_metrics()
         # No key should have been added.

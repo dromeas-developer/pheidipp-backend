@@ -459,12 +459,12 @@ class TestPhase12aMigrationUpgrades:
     and columns."""
 
     def test_alembic_upgrade_head_succeeds_on_fresh_schema(
-        self, phase_1_2a_schema
+        self, phase_1_2a_schema: dict[str, str]
     ) -> None:
         """Reaches this point only if alembic upgrade returned
         without exception — the fixture raises otherwise."""
 
-    def test_phase_1_1_tables_are_preserved(self, phase_1_2a_schema) -> None:
+    def test_phase_1_1_tables_are_preserved(self, phase_1_2a_schema: dict[str, str]) -> None:
         """The Phase-1.1 tables the migration is built on must all
         exist after ``alembic upgrade head``. Their existence proves
         the migration chain ran every prior migration in the chain.
@@ -488,7 +488,7 @@ class TestPhase12aMigrationUpgrades:
             engine.dispose()
 
     def test_migration_extends_athlete_profiles_with_phase_1_2a_columns(
-        self, phase_1_2a_schema
+        self, phase_1_2a_schema: dict[str, str]
     ) -> None:
         """``athlete_profiles`` carries the full Phase-1.2a column
         set AND retains the unique-on-athlete_id invariant."""
@@ -528,7 +528,7 @@ class TestPhase12aMigrationUpgrades:
             engine.dispose()
 
     def test_migration_creates_athlete_preferences_with_check_constraint(
-        self, phase_1_2a_schema
+        self, phase_1_2a_schema: dict[str, str]
     ) -> None:
         """The new table exists with all expected columns, a unique
         constraint on ``athlete_id``, and the named CHECK constraint
@@ -584,7 +584,7 @@ class TestPhase12aMigrationUpgrades:
             engine.dispose()
 
     def test_migration_creates_activities_with_lean_schema(
-        self, phase_1_2a_schema
+        self, phase_1_2a_schema: dict[str, str]
     ) -> None:
         """The new table exists with the lean column set and no
         workout-summary fields."""
@@ -633,7 +633,7 @@ class TestPhase12aMigrationUpgrades:
             engine.dispose()
 
     def test_migration_partial_dedup_index_in_pg_catalog(
-        self, phase_1_2a_schema
+        self, phase_1_2a_schema: dict[str, str]
     ) -> None:
         """The partial unique index on activities must surface in
         the Postgres catalog with the predicate visible. SQLAlchemy
@@ -676,7 +676,7 @@ class TestPhase12aMigrationUpgrades:
             engine.dispose()
 
     def test_migration_athlete_fk_cascade_in_pg_catalog(
-        self, phase_1_2a_schema,
+        self, phase_1_2a_schema: dict[str, str],
     ) -> None:
         """The two new tables declare ``ondelete='CASCADE'`` on
         ``athlete_id`` so the activity/preferences rows vanish when

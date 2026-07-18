@@ -16,7 +16,6 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timedelta, timezone
 
-import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.athlete import Athlete

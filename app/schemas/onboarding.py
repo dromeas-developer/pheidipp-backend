@@ -21,7 +21,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional, cast
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -226,7 +226,9 @@ def _coerce_orm_row(row: Any) -> Dict[str, Any]:
     mapper = getattr(row, "__mapper__", None)
     if mapper is None:
         # Plain dict-shaped input — pass it through unchanged.
-        return row if isinstance(row, dict) else dict(row)
+        if isinstance(row, dict):
+            return cast(Dict[str, Any], row)
+        return cast(Dict[str, Any], dict(row))
     coerced: Dict[str, Any] = {}
     for column in mapper.columns:
         coerced[column.key] = _coerce_orm_value(getattr(row, column.key))
@@ -374,13 +376,14 @@ class AthleteProfilePatchIn(BaseModel):
     @classmethod
     def _reject_immutable_fields(cls, data: Any) -> Any:
         if isinstance(data, dict):
-            forbidden = set(data.keys()) & _IMMUTABLE_PROFILE_FIELDS
+            restricted = cast(dict[str, Any], data)
+            forbidden = restricted.keys() & _IMMUTABLE_PROFILE_FIELDS
             if forbidden:
                 raise ValueError(
                     "profile fields are immutable after registration: "
                     + ", ".join(sorted(forbidden))
                 )
-        return data
+        return cast(Any, data)
 
 
 class AthletePreferencesPatchIn(BaseModel):
@@ -482,7 +485,7 @@ class AthleteProfileResponse(BaseModel):
     def _coerce_from_orm(cls, data: Any) -> Any:
         """Accept ORM rows and coerce ``Enum``/``Decimal`` to wire types."""
         if isinstance(data, dict):
-            return data
+            return cast(Dict[str, Any], data)
         return _coerce_orm_row(data)
 
 
@@ -530,7 +533,7 @@ class AthletePreferencesResponse(BaseModel):
     def _coerce_from_orm(cls, data: Any) -> Any:
         """Accept ORM rows and coerce ``Enum`` members to ``.value``."""
         if isinstance(data, dict):
-            return data
+            return cast(Dict[str, Any], data)
         return _coerce_orm_row(data)
 
 

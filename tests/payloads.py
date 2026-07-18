@@ -9,7 +9,6 @@ session is constructed at import time.
 
 from __future__ import annotations
 
-import uuid
 from datetime import date
 from typing import Any, Optional
 
@@ -32,7 +31,7 @@ def make_register_payload(
     sex: Sex = Sex.NOT_SPECIFIED,
     height_cm: Optional[float] = 175.0,
     dob: Optional[date] = None,
-) -> dict:
+) -> dict[str, Any]:
     """Return a registration request payload that matches the
     ``RegisterRequest`` schema exactly.
     """
@@ -50,14 +49,14 @@ def make_register_payload(
 def make_login_payload(
     email: str = "athlete@example.com",
     password: str = "ValidPass123!",
-) -> dict:
+) -> dict[str, Any]:
     """Return a ``LoginRequest`` payload with the given creds."""
     return {"email": email, "password": password}
 
 
-# Aliases the existing test files already reference.
-_register_payload = make_register_payload
-_login_payload = make_login_payload
+# Public aliases so test files can import these directly.
+register_payload = make_register_payload
+login_payload = make_login_payload
 
 
 # ---------------------------------------------------------------------------
@@ -70,7 +69,7 @@ _login_payload = make_login_payload
 # ---------------------------------------------------------------------------
 
 
-def _weekly_schedule_payload() -> dict[str, dict[str, Any]]:
+def weekly_schedule_payload() -> dict[str, dict[str, Any]]:
     """Return a representative 7-day weekly schedule payload.
 
     Mirrors the canonical shape expected by ``OnboardingPreferencesIn``
@@ -126,8 +125,8 @@ def make_onboarding_profile_in(
     *,
     timezone: str = "Europe/Lisbon",
     height_cm: Optional[float] = 180.0,
-    training_window: Optional[dict] = None,
-) -> dict:
+    training_window: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
     """Return an ``OnboardingProfileIn`` payload."""
     return {
         "timezone": timezone,
@@ -141,14 +140,14 @@ def make_onboarding_preferences_in(
     sport_background: SportBackground = SportBackground.RUNNING_PRIMARY,
     years_structured_training: int = 3,
     training_time_of_day: str = "morning",
-    weekly_schedule: Optional[dict] = None,
+    weekly_schedule: Optional[dict[str, Any]] = None,
     gps_source: GpsSource = GpsSource.GARMIN_WATCH,
     hr_source: HrSource = HrSource.CHEST_STRAP_RR,
     power_source: PowerSource = PowerSource.NONE,
     primary_training_platform: PrimaryTrainingPlatform = (
         PrimaryTrainingPlatform.MANUAL
     ),
-) -> dict:
+) -> dict[str, Any]:
     """Return an ``OnboardingPreferencesIn`` payload.
 
     Default sources map to ``DataTier.TIER_3`` (chest-strap-RR +
@@ -161,7 +160,7 @@ def make_onboarding_preferences_in(
         else sport_background,
         "years_structured_training": years_structured_training,
         "training_time_of_day": training_time_of_day,
-        "weekly_schedule": weekly_schedule or _weekly_schedule_payload(),
+        "weekly_schedule": weekly_schedule or weekly_schedule_payload(),
         "gps_source": gps_source.value
         if hasattr(gps_source, "value")
         else gps_source,
@@ -186,7 +185,7 @@ def make_onboarding_goal_in_race_event(
     weekly_volume_km: float = 40.0,
     fitness_level: int = 3,
     recent_injury: Optional[str] = None,
-) -> dict:
+) -> dict[str, Any]:
     """Return an ``OnboardingTrainingGoalIn`` payload for a ``race_event``.
 
     ``event_date`` defaults to 90 days out so the wire-format string
@@ -216,7 +215,7 @@ def make_onboarding_goal_in_target_performance(
     weekly_volume_hours: float = 5.0,
     weekly_volume_km: float = 30.0,
     fitness_level: int = 3,
-) -> dict:
+) -> dict[str, Any]:
     """Return an ``OnboardingTrainingGoalIn`` payload for ``target_performance``."""
     return {
         "goal_type": GoalType.TARGET_PERFORMANCE.value,
@@ -244,7 +243,7 @@ def make_onboarding_payload(
     power_source: PowerSource = PowerSource.NONE,
     goal_kind: str = "race_event",
     height_cm: Optional[float] = 180.0,
-) -> dict:
+) -> dict[str, Any]:
     """Return a full ``OnboardingRequest`` payload.
 
     Combines profile + preferences + goal so a single call satisfies
@@ -276,8 +275,8 @@ def make_profile_patch_payload(
     height_cm: Optional[float] = None,
     location_lat: Optional[float] = None,
     location_lng: Optional[float] = None,
-    training_window: Optional[dict] = None,
-) -> dict:
+    training_window: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
     """Return an ``AthleteProfilePatchIn`` payload — mutable fields only."""
     return {
         "height_cm": height_cm,
@@ -289,13 +288,13 @@ def make_profile_patch_payload(
 
 def make_preferences_patch_payload(
     *,
-    weekly_schedule: Optional[dict] = None,
+    weekly_schedule: Optional[dict[str, Any]] = None,
     sport_background: Optional[SportBackground] = None,
     years_structured_training: Optional[int] = None,
     training_time_of_day: Optional[str] = None,
     hr_source: Optional[HrSource] = None,
     power_source: Optional[PowerSource] = None,
-) -> dict:
+) -> dict[str, Any]:
     """Return an ``AthletePreferencesPatchIn`` payload — every field optional.
 
     ``model_dump(exclude_unset=True)`` at the API layer means any
@@ -325,6 +324,6 @@ def make_preferences_patch_payload(
 
 
 # Convenience aliases mirroring the auth-payload convention.
-_onboarding_payload = make_onboarding_payload
-_profile_patch_payload = make_profile_patch_payload
-_preferences_patch_payload = make_preferences_patch_payload
+onboarding_payload = make_onboarding_payload
+profile_patch_payload = make_profile_patch_payload
+preferences_patch_payload = make_preferences_patch_payload

@@ -55,6 +55,7 @@ from app.models.enums import MessageType
 from app.models.generation_event import GenerationEvent
 from app.models.planned_session import PlannedSession
 from app.models.twin_state import TwinState
+from app.repositories.activity_repository import ActivityRepository
 from app.repositories.coaching_message_repository import (
     CoachingMessageRepository,
 )
@@ -67,6 +68,7 @@ from app.services.compliance_service import (
     ComplianceFindings,
     ComplianceService,
 )
+from sqlalchemy.ext.asyncio import AsyncSession
 
 if TYPE_CHECKING:
     from app.services.event_publisher import EventPublisher
@@ -128,7 +130,9 @@ class PostWorkoutContext:
     compliance: Optional[Dict[str, Any]] = None
     execution: Optional[Dict[str, Any]] = None
     comparable_session: Optional[Dict[str, Any]] = None
-    objective_updates: List[Dict[str, Any]] = field(default_factory=list)
+    objective_updates: list[dict[str, Any]] = field(
+        default_factory=list[dict[str, Any]]
+    )
     readiness: Optional[Dict[str, Any]] = None
     load_scores: Optional[Dict[str, Any]] = None
 
@@ -150,7 +154,7 @@ class PostWorkoutContext:
 # ---------------------------------------------------------------------------
 
 
-def _describe_load(aerobic_load: Optional[float]) -> str:
+def describe_load(aerobic_load: Optional[float]) -> str:
     """Render a plain-language descriptor for the heuristic aerobic load.
 
     At Phase-1.6 the load is heuristic (population-based thresholds)
@@ -168,7 +172,7 @@ def _describe_load(aerobic_load: Optional[float]) -> str:
     return "heavy aerobic load"
 
 
-def _format_phase_position(
+def format_phase_position(
     planned_session: Optional[PlannedSession],
     twin_state: TwinState,
 ) -> str:
@@ -214,24 +218,24 @@ class PostWorkoutAgent:
 
     def __init__(
         self,
-        session,
+        session: AsyncSession,
         coaching_messages: CoachingMessageRepository,
         generation_events: GenerationEventRepository,
-        activities,
+        activities: ActivityRepository,
         planned_sessions: PlannedSessionRepository,
         twin_states: TwinStateRepository,
         prompt_registry: PromptRegistry,
         compliance_service: Optional[ComplianceService] = None,
         events: Optional["EventPublisher"] = None,
     ) -> None:
-        self._session = session
-        self._coaching_messages = coaching_messages
-        self._generation_events = generation_events
-        self._activities = activities
-        self._planned_sessions = planned_sessions
-        self._twin_states = twin_states
-        self._prompt_registry = prompt_registry
-        self._compliance_service = compliance_service or ComplianceService()
+        self._session: AsyncSession = session
+        self._coaching_messages: CoachingMessageRepository = coaching_messages
+        self._generation_events: GenerationEventRepository = generation_events
+        self._activities: ActivityRepository = activities
+        self._planned_sessions: PlannedSessionRepository = planned_sessions
+        self._twin_states: TwinStateRepository = twin_states
+        self._prompt_registry: PromptRegistry = prompt_registry
+        self._compliance_service: ComplianceService = compliance_service or ComplianceService()
         if events is None:
             self._events = _build_default_publisher(session)
         else:
@@ -482,14 +486,14 @@ class PostWorkoutAgent:
                 if twin_state.readiness_level.value == "amber"
                 else "in a recovery window"
             ),
-            "phase_position": _format_phase_position(planned_session, twin_state),
+            "phase_position": format_phase_position(planned_session, twin_state),
         }
 
         load_scores = {
             "aerobic_load": activity.aerobic_load,
             "neuromuscular_load": activity.neuromuscular_load,
             "structural_load": activity.structural_load,
-            "load_descriptor": _describe_load(activity.aerobic_load),
+            "load_descriptor": describe_load(activity.aerobic_load),
         }
 
         return PostWorkoutContext(
@@ -570,7 +574,7 @@ class PostWorkoutAgent:
 # ---------------------------------------------------------------------------
 
 
-def _build_default_publisher(session):
+def _build_default_publisher(session: AsyncSession) -> EventPublisher:
     """Build the default ``EventPublisher`` for a session."""
     from app.repositories.system_event_outbox_repository import (
         SystemEventOutboxRepository,

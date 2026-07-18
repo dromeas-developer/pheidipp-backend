@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime, timezone
+from typing import Any
 
 import pytest
 from sqlalchemy import create_engine, text
@@ -98,7 +99,7 @@ def _twin_state_factory(
     fatigue: float = 0.0,
     form: float = 0.0,
     readiness_level: RecoveryModifierLevel = RecoveryModifierLevel.GREEN,
-    metric_confidence: dict | None = None,
+    metric_confidence: dict[str, Any] | None = None,
 ) -> TwinState:
     return TwinState(
         athlete_id=athlete_id,
@@ -169,7 +170,7 @@ class TestTwinStatePartialUniqueIndexDB:
     non-null ``(athlete_id, activity_id)`` must raise
     ``IntegrityError``; two with NULL ``activity_id`` must coexist."""
 
-    def _partial_unique_index(self) -> dict | None:
+    def _partial_unique_index(self) -> dict[str, Any] | None:
         for idx in db_indexes(TABLE):
             cols = set(idx.get("column_names") or [])
             if cols == {"athlete_id", "activity_id"} and idx.get("unique"):
@@ -377,7 +378,6 @@ class TestTwinStateForeignKeysDB:
     ) -> None:
         """Athlete FK ON DELETE CASCADE — twin history is wiped when
         the athlete account is deleted."""
-        from sqlalchemy import select
 
         athlete = Athlete(email="twin-cascade-athlete@example.com")
         db_session.add(athlete)
@@ -409,14 +409,12 @@ class TestTwinStateForeignKeysDB:
 
         # Use a fresh session because we need to test against the
         # persisted state.
-        from sqlalchemy.ext.asyncio import async_sessionmaker
 
-        from app.db.base import Base
 
         # Re-create a fresh session from the test engine.
         # Easier: just delete the athlete and re-query.
         async with db_session.bind.begin() as conn:
-            await conn.execute(
+            await conn.execute(  # type: ignore[attr-defined]
                 text("DELETE FROM athletes WHERE id = :id"),
                 {"id": athlete.id},
             )

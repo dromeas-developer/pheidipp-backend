@@ -26,7 +26,7 @@ class PasswordHasher:
 
         Returns the bcrypt hash string (utf-8 decoded) for persistence.
         """
-        if not isinstance(password, str) or not password:
+        if not password:
             raise ValueError("password must be a non-empty string")
         # Bcrypt has a 72-byte input cap; truncate to that length to avoid
         # silent truncation asymmetry between hash and verify.
@@ -41,7 +41,7 @@ class PasswordHasher:
         Returns False on any failure — including malformed hashes — without
         leaking which condition failed (timing-safe by construction).
         """
-        if not isinstance(password, str) or not password or not isinstance(hashed, str):
+        if not password or not hashed:
             return False
         try:
             password_bytes = password.encode("utf-8")[:72]

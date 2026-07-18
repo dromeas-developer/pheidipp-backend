@@ -1,13 +1,13 @@
 ---
 description: >-
-  Read-only codebase resolver, invoked only via Task by p-coder (Coder
-  Mode) or p-test-architect (Test Architect Mode) — never invoked
-  directly or ad hoc. Takes a caller-supplied, already-resolved file list
-  (a batch's Context Needed tiers, or a test stage's capability group) and
-  returns a condensed Brief: current file content, signatures, existing
-  sibling implementations, registration points, and fixture matches,
-  plus a Verification/Confidence header. Does not perform open-ended
-  repository discovery, does not decide what is relevant beyond what the
+  Read-only codebase resolver, invoked only via Task by p-test-architect
+  (Test Architect Mode) — never invoked directly or ad hoc. Takes a
+  caller-supplied, already-resolved file list (a test stage's capability
+  group) and returns a condensed Brief: current file content, signatures,
+  existing sibling implementations, registration points, and fixture
+  matches, plus a Verification/Confidence header. Does not perform
+  open-ended repository discovery, does not decide what is relevant beyond
+  what the
   caller named, and never writes or edits anything.
 mode: subagent
 model: opencode/deepseek-v4-flash-free
@@ -74,7 +74,10 @@ Identify which mode you're in from what the caller states explicitly — do
 not guess from input shape alone, since a malformed call in one mode can
 superficially resemble the other.
 
-**Coder Mode.** Caller: `p-coder`. Input: a batch's `## Context Needed`
+**Coder Mode (DEPRECATED — `p-coder` no longer invokes this agent as of
+2026-07-18; the coder is now self-sufficient with direct MCP file access.
+This section is retained for reference only. No active caller uses it.):**
+Caller: `p-coder`. Input: a batch's `## Context Needed`
 section (Primary/Secondary/Fallback/Forbidden per step) plus the step list.
 The Coder `edit`s these files directly, so your brief supports orientation
 — it does not substitute for the Coder's own fresh fetch immediately before

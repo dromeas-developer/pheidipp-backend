@@ -17,26 +17,20 @@ from __future__ import annotations
 import json
 import uuid
 from datetime import date, datetime, timezone
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from app.models.enums import (
     DataTier,
-    PhysiologicalIntent,
     RecoveryModifierLevel,
-    SessionPurpose,
     SessionType,
-    StepType,
     TwinConfidenceLevel,
-    TwinTrigger,
 )
 from app.models.generated_workout import GeneratedWorkout
-from app.models.generation_event import GenerationEvent
+from app.models.workout_step import WorkoutStep
 from app.models.planned_session import PlannedSession
 from app.models.twin_state import TwinState
-from app.models.workout_step import WorkoutStep
 from app.repositories.generation_event_repository import GenerationEventRepository
 from app.repositories.generated_workout_repository import GeneratedWorkoutRepository
 from app.repositories.planned_session_repository import PlannedSessionRepository
@@ -53,7 +47,6 @@ from app.services.workout_generation_errors import (
     LLMServiceUnavailableError,
     PlannedSessionNotFoundError,
     WorkoutAlreadyGeneratedError,
-    WorkoutGenerationContractError,
 )
 from app.core.prompt_registry import PromptRegistry
 
@@ -328,23 +321,18 @@ class TestIdempotencyGate:
         mock_context_budget.estimate_tokens.return_value = 500
 
         # Configure insert to return the workout passed to it
-        async def _return_insert_arg(workout, /):
+        async def _return_insert_arg(workout: GeneratedWorkout, /) -> GeneratedWorkout:
             workout.id = uuid.uuid4()
             workout.generated_at = datetime.now(timezone.utc)
             return workout
 
         mock_generated_workouts_repo.insert.side_effect = _return_insert_arg
-        mock_workout_steps_repo.insert_many.side_effect = lambda steps: steps
+
+        def _return_steps(steps: list[WorkoutStep]) -> list[WorkoutStep]:
+            return steps
+        mock_workout_steps_repo.insert_many.side_effect = _return_steps
 
         # Valid LLM response with non-empty steps array (required by validator).
-        # The validator enforces:
-        #   - steps MUST be strictly sequential from step_order=1
-        #   - first step MUST be 'warmup'
-        #   - last step MUST be 'cooldown'
-        #   - 'work' step's physiological_intent MUST match
-        #     SESSION_INTENT_MAP[session_type] (THRESHOLD for this fixture)
-        #   - target_type='gap' requires target_gap_sec_per_km non-null on
-        #     every step (numeric discipline per data tier)
         mock_llm_response = MagicMock()
         mock_llm_response.usage = MagicMock(total_tokens=200)
         mock_llm_response.choices = [
@@ -733,13 +721,16 @@ class TestContextAssembly:
         mock_prompt_registry.get_prompt.return_value = "workout prompt"
         mock_context_budget.estimate_tokens.return_value = 500
 
-        async def _return_insert_arg(workout, /):
+        async def _return_insert_arg(workout: GeneratedWorkout, /) -> GeneratedWorkout:
             workout.id = uuid.uuid4()
             workout.generated_at = datetime.now(timezone.utc)
             return workout
 
         mock_generated_workouts_repo.insert.side_effect = _return_insert_arg
-        mock_workout_steps_repo.insert_many.side_effect = lambda steps: steps
+
+        def _return_steps(steps: list[WorkoutStep]) -> list[WorkoutStep]:
+            return steps
+        mock_workout_steps_repo.insert_many.side_effect = _return_steps
 
         # Valid LLM response: validator enforces first=warmup, last=cooldown,
         # strictly sequential step_order from 1, and target_type-driven

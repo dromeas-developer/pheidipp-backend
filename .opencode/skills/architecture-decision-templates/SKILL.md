@@ -61,7 +61,7 @@ No explanatory prose. Omit if the rule is structural and not expressible in code
 After writing the ADR, call `refresh_architecture` to index it. Then
 reference it in the implementation plan's **Architecture Contracts**
 section with the `DECISION` label, and state the constraint it imposes in
-**Coder Handoff Notes**.
+**Coder Notes**.
 
 ---
 
@@ -79,10 +79,11 @@ to the Architecture Author.
 ## Discovered Conflict
 What the architecture specifies and what implemented reality shows.
 Name the exact architecture document, the exact invariant or contract,
-and the exact code evidence — cite `implemented-state.md`'s relevant
-section (e.g. Registration Status, Service Wiring, Transaction Boundaries)
-when it directly demonstrates the conflict; fall back to specific file/line
-evidence from scoped retrieval when the snapshot doesn't cover it.
+and the exact code evidence — cite the State Explorer's brief
+(e.g. its registry of entities, services, repositories, event producers,
+transaction boundaries) when it directly demonstrates the conflict; fall
+back to specific file/line evidence from scoped retrieval when the
+registry doesn't cover it.
 
 ## Why This Cannot Be Resolved In The Plan
 Why the implementation plan cannot bridge this gap without redefining

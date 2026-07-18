@@ -12,6 +12,7 @@ from __future__ import annotations
 import tempfile
 import uuid
 from pathlib import Path
+from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -216,7 +217,7 @@ class TestS3CleanedStream:
         mock_error_response = {"Error": {"Code": "PreconditionFailed"}}
         mock_s3 = MagicMock()
         mock_s3.put_object.side_effect = ClientError(
-            mock_error_response, "PutObject"
+            cast(Any, mock_error_response), "PutObject"
         )
 
         with patch.object(client, "_s3_client", mock_s3):

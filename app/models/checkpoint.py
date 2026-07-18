@@ -36,10 +36,11 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy import Enum as SAEnum
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID as PG_UUID
+from sqlalchemy.dialects.postgresql import ARRAY, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
+from app.models._enum_helpers import enum_str_values
 from app.models.enums import CheckpointStatus, CheckpointType
 
 
@@ -87,12 +88,12 @@ class Checkpoint(Base):
             name="checkpoint_type",
             native_enum=False,
             length=32,
-            values_callable=lambda x: [e.value for e in x],
+            values_callable=enum_str_values,
         ),
         nullable=False,
     )
     target_metric: Mapped[str] = mapped_column(String(128), nullable=False)
-    secondary_metrics: Mapped[list] = mapped_column(
+    secondary_metrics: Mapped[list[str]] = mapped_column(
         ARRAY(String), nullable=False, default=list, server_default="{}"
     )
 
@@ -112,7 +113,7 @@ class Checkpoint(Base):
             name="checkpoint_status",
             native_enum=False,
             length=16,
-            values_callable=lambda x: [e.value for e in x],
+            values_callable=enum_str_values,
         ),
         nullable=False,
     )

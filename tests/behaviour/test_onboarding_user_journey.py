@@ -19,17 +19,13 @@ docs/implementation/phase-1/phase-1-3-p1-onboarding-twin-bootstrap.md
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-
 from httpx import AsyncClient
 
 from tests.payloads import (
-    _login_payload,
-    _onboarding_payload,
-    _preferences_patch_payload,
-    _profile_patch_payload,
-    _register_payload,
-    _weekly_schedule_payload,
+    login_payload,
+    onboarding_payload,
+    preferences_patch_payload,
+    profile_patch_payload,
 )
 from tests.utils.assertions import assert_no_secrets_in_text
 from tests.utils.http_helpers import bearer_header, http_register
@@ -53,14 +49,14 @@ class TestOnboardingUserJourney:
         # 2. Re-login (independent session).
         login = await client.post(
             "/api/v1/auth/login",
-            json=_login_payload("behaviour-journey@example.com"),
+            json=login_payload("behaviour-journey@example.com"),
         )
         login_token = login.json()["access_token"]
 
         # 3. Onboard.
         onb = await client.post(
             f"/api/v1/athletes/{aid}/onboarding",
-            json=_onboarding_payload(),
+            json=onboarding_payload(),
             headers=bearer_header(token),
         )
         assert onb.status_code == 201, onb.text
@@ -98,7 +94,7 @@ class TestOnboardingUserJourney:
         # 7. PATCH preferences — flip Saturday only.
         patch_prefs = await client.patch(
             f"/api/v1/athletes/{aid}/preferences",
-            json=_preferences_patch_payload(
+            json=preferences_patch_payload(
                 weekly_schedule={"saturday": {"available": False}}
             ),
             headers=bearer_header(token),
@@ -115,7 +111,7 @@ class TestOnboardingUserJourney:
         # 8. PATCH profile — mutable fields only.
         patch_profile = await client.patch(
             f"/api/v1/athletes/{aid}/profile",
-            json=_profile_patch_payload(height_cm=181.0),
+            json=profile_patch_payload(height_cm=181.0),
             headers=bearer_header(token),
         )
         assert patch_profile.status_code == 200
@@ -133,7 +129,7 @@ class TestOnboardingUserJourney:
         # 10. A second onboarding attempt is rejected.
         replay = await client.post(
             f"/api/v1/athletes/{aid}/onboarding",
-            json=_onboarding_payload(),
+            json=onboarding_payload(),
             headers=bearer_header(token),
         )
         assert replay.status_code == 409
@@ -148,7 +144,7 @@ class TestOnboardingUserJourney:
         )
         onb = await client.post(
             f"/api/v1/athletes/{aid}/onboarding",
-            json=_onboarding_payload(goal_kind="target_performance"),
+            json=onboarding_payload(goal_kind="target_performance"),
             headers=bearer_header(token),
         )
         assert onb.status_code == 201, onb.text
@@ -217,7 +213,7 @@ class TestOnboardingSecretLeakageAudit:
         )
         onb = await client.post(
             f"/api/v1/athletes/{aid}/onboarding",
-            json=_onboarding_payload(),
+            json=onboarding_payload(),
             headers=bearer_header(token),
         )
         assert onb.status_code == 201
@@ -243,7 +239,7 @@ class TestOnboardingResponseShape:
         )
         onb = await client.post(
             f"/api/v1/athletes/{aid}/onboarding",
-            json=_onboarding_payload(),
+            json=onboarding_payload(),
             headers=bearer_header(token),
         )
         body = onb.json()
@@ -268,7 +264,7 @@ class TestOnboardingResponseShape:
         )
         await client.post(
             f"/api/v1/athletes/{aid}/onboarding",
-            json=_onboarding_payload(),
+            json=onboarding_payload(),
             headers=bearer_header(token),
         )
         prefs = await client.get(

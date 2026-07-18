@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
+from typing import Any
 
 import pytest
 from sqlalchemy import create_engine, text
@@ -68,7 +69,7 @@ def _plan_factory(
     training_goal_id: uuid.UUID,
     status: TrainingPlanStatus = TrainingPlanStatus.ACTIVE,
     twin_state_id: uuid.UUID | None = None,
-    strategic_rationale: dict | None = None,
+    strategic_rationale: dict[str, Any] | None = None,
 ) -> TrainingPlan:
     return TrainingPlan(
         training_goal_id=training_goal_id,
@@ -157,7 +158,6 @@ class TestTrainingPlanTwinStateFKWired:
         ``pg_constraint.confdeltype``. Pin the value so a Phase-1.2c
         migration that wires the FK with an unexpected cascade
         mode (e.g. RESTRICT) fails this tripwire."""
-        from sqlalchemy import text
 
         engine = create_engine(get_sync_database_url())
         try:
@@ -260,7 +260,6 @@ class TestTrainingPlanGoalForeignKey:
     def test_training_goal_id_fk_cascade_in_pg_catalog(self) -> None:
         """``ondelete='CASCADE'`` is a name-independent catalog fact:
         ``pg_constraint.confdeltype='c'`` for the FK row above."""
-        from sqlalchemy import text
 
         engine = create_engine(get_sync_database_url())
         try:

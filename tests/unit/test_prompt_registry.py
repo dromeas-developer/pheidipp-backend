@@ -98,7 +98,7 @@ class TestPromptNotFound:
     def test_raises_for_partial_match(self, registry: PromptRegistry) -> None:
         """Registry checks exact filename, not partial."""
         # Write first_message_v1.md only
-        (registry._prompts_dir / "first_message_v1.md").write_text(
+        (registry.prompts_dir / "first_message_v1.md").write_text(
             "content", encoding="utf-8"
         )
         with pytest.raises(PromptNotFoundError):
@@ -214,11 +214,11 @@ class TestDefaultRegistry:
 
 class TestPromptPathBuilding:
     def test_builds_correct_path(self, registry: PromptRegistry) -> None:
-        path = registry._build_prompt_path("first_message", "v1")
+        path = registry.build_prompt_path("first_message", "v1")
         assert path.name == "first_message_v1.md"
 
     def test_version_embedded_in_filename(self, registry: PromptRegistry) -> None:
-        path = registry._build_prompt_path("workout_generation", "v2")
+        path = registry.build_prompt_path("workout_generation", "v2")
         assert path.name == "workout_generation_v2.md"
 
 

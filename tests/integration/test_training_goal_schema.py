@@ -31,6 +31,8 @@ Reference plan: docs/implementation/phase-1/phase-1-2b-p1-plan-sessions.md
 from __future__ import annotations
 
 import uuid
+from datetime import date
+from typing import Any
 
 import pytest
 from sqlalchemy import create_engine, text
@@ -51,7 +53,6 @@ from tests.utils.schema_helpers import (
     db_columns,
     db_foreign_keys,
     db_indexes,
-    db_unique_constraints,
     get_sync_database_url,
 )
 
@@ -69,7 +70,7 @@ def _goal_factory(
     goal_type: GoalType = GoalType.FITNESS_IMPROVEMENT,
     goal_event_type: GoalEventType | None = None,
     goal_event_name: str | None = None,
-    goal_event_date=None,
+    goal_event_date: date | None = None,
     custom_distance_km: float | None = None,
     weekly_volume_hours: float = 5.0,
     weekly_volume_km: float = 30.0,
@@ -147,7 +148,7 @@ class TestTrainingGoalActivePartialUniqueIndex:
     """One active goal per athlete (partial unique index on
     ``athlete_id WHERE status = 'active'``)."""
 
-    def _active_partial_index(self) -> dict | None:
+    def _active_partial_index(self) -> dict[str, Any] | None:
         for idx in db_indexes(TABLE):
             cols = set(idx.get("column_names") or [])
             if cols >= {"athlete_id"} and idx.get("unique"):

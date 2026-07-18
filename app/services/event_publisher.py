@@ -15,6 +15,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from typing import Any
 from uuid import UUID
 
 from app.models.system_event import EventPublicationStatus, SystemEvent
@@ -32,7 +33,7 @@ class OutboxEvent:
     event_type: str
     version: str
     athlete_id: UUID
-    payload: dict
+    payload: dict[str, Any]
 
 
 class EventPublisher:
@@ -51,7 +52,7 @@ class EventPublisher:
         *,
         event_type: str,
         athlete_id: UUID,
-        payload: dict,
+        payload: dict[str, Any],
         version: str = "v1",
     ) -> SystemEvent:
         """Insert the event row and an outbox row in the same transaction.

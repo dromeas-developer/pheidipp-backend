@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime, timedelta, timezone
+from typing import Any
 
 import pytest
 from sqlalchemy import select
@@ -48,6 +49,7 @@ from app.models.enums import (
     PlannedSessionStatus,
     PowerSource,
     PrimaryTrainingPlatform,
+    Sex,
     SportBackground,
     TrainingGoalStatus,
     TrainingPlanStatus,
@@ -61,9 +63,9 @@ from app.models.weekly_plan import WeeklyPlan
 from app.services.auth_service import AuthService
 from app.services.onboarding_service import (
     OnboardingService,
-    _GoalInput,
-    _PreferencesInput,
-    _ProfileInput,
+    GoalInput,
+    PreferencesInput,
+    ProfileInput,
 )
 from app.services.plan_generation_errors import (
     InvalidGoalTypeError,
@@ -75,7 +77,7 @@ from app.services.plan_generation_service import (
     QUALITY_SESSION_TYPES,
     SANDWICHED_SESSION_TYPES,
 )
-from tests.payloads import _weekly_schedule_payload
+from tests.payloads import weekly_schedule_payload
 
 
 # ---------------------------------------------------------------------------
@@ -91,7 +93,7 @@ async def _register_athlete(
         email=email,
         password="ValidPass123!",
         date_of_birth=datetime(1990, 1, 1, tzinfo=timezone.utc).date(),
-        sex="not_specified",
+        sex=Sex.NOT_SPECIFIED,
         height_cm=180.0,
         ip_address="203.0.113.10",
         user_agent="PlanGenTest/1.0",
@@ -109,28 +111,28 @@ def _onboarding_inputs(
     *,
     days_out: int = 7 * 12,
     goal_event_type: GoalEventType = GoalEventType.MARATHON,
-) -> tuple[_ProfileInput, _PreferencesInput, _GoalInput]:
+) -> tuple[ProfileInput, PreferencesInput, GoalInput]:
     """Default race-event inputs targeting ``days_out`` from today so the
     training-length gate passes with a comfortable margin (3 years
     experience, goal 12 weeks out — well below the
     ``marathon + intermediate`` threshold of 24 weeks)."""
-    profile = _ProfileInput(
+    profile = ProfileInput(
         timezone="Europe/Lisbon",
         training_window=None,
         height_cm=180.0,
     )
-    prefs = _PreferencesInput(
+    prefs = PreferencesInput(
         sport_background=SportBackground.RUNNING_PRIMARY,
         years_structured_training=3,
         training_time_of_day="morning",
-        weekly_schedule=_weekly_schedule_payload(),
+        weekly_schedule=weekly_schedule_payload(),
         gps_source=GpsSource.GARMIN_WATCH,
         hr_source=HrSource.CHEST_STRAP_RR,
         power_source=PowerSource.NONE,
         primary_training_platform=PrimaryTrainingPlatform.MANUAL,
     )
     event_date = date.today() + timedelta(days=days_out)
-    goal = _GoalInput(
+    goal = GoalInput(
         goal_type=GoalType.RACE_EVENT,
         goal_event_type=goal_event_type,
         goal_event_name="Test Marathon",
@@ -250,6 +252,7 @@ class TestRaceEventPlanStructure:
                 )
             )
         ).scalar_one()
+        assert goal.goal_event_date is not None
         assert phases[-1]["end_date"] <= goal.goal_event_date.isoformat()
 
     async def test_total_weeks_matches_event_date_horizon(
@@ -311,7 +314,7 @@ class TestWeeklyStructuralRules:
     """Per the architecture — enforced by the synthesiser."""
 
     @staticmethod
-    def _is_quality(s_type) -> bool:
+    def _is_quality(s_type: Any) -> bool:
         from app.models.enums import SessionType
 
         return s_type in QUALITY_SESSION_TYPES and s_type in {
@@ -324,7 +327,7 @@ class TestWeeklyStructuralRules:
         }
 
     @staticmethod
-    def _is_sandwiched(s_type) -> bool:
+    def _is_sandwiched(s_type: Any) -> bool:
         from app.models.enums import SessionType
 
         return s_type in SANDWICHED_SESSION_TYPES and s_type in {
@@ -355,7 +358,7 @@ class TestWeeklyStructuralRules:
                 .order_by(WeeklyPlan.week_number.asc())
             )
         ).scalars().all()
-        sessions_per_week = []
+        sessions_per_week: list[list[PlannedSession]] = []
         for week in weeks:
             rows = (
                 await db_session.execute(
@@ -369,7 +372,7 @@ class TestWeeklyStructuralRules:
 
     @pytest.mark.parametrize("week_index", [1, 4, 8])
     async def test_no_two_consecutive_quality_unless_blocked(
-        self, structure, week_index: int
+        self, structure: Any, week_index: int
     ) -> None:
         """Quality sessions (threshold / vo2max / tempo / interval /
         long_run / hill_repeats / fartlek) appear consecutive only when
@@ -390,7 +393,7 @@ class TestWeeklyStructuralRules:
                 )
 
     async def test_long_run_followed_by_rest_or_recovery(
-        self, structure
+        self, structure: Any
     ) -> None:
         from app.models.enums import SessionType
 
@@ -416,7 +419,7 @@ class TestWeeklyStructuralRules:
                 )
 
     async def test_threshold_sandwiched_between_easy_or_rest(
-        self, structure
+        self, structure: Any
     ) -> None:
         """Threshold sessions live between easy/rest on the previous
         and next available day."""
@@ -635,7 +638,7 @@ class TestSupersessionAtomicity:
                 )
             )
         ).scalar_one()
-        first_plan_id = (
+        (
             await db_session.execute(
                 select(TrainingPlan.id).where(
                     TrainingPlan.training_goal_id == goal.id
@@ -750,7 +753,7 @@ class TestInvalidGoalTypes:
             sport_background=SportBackground.RUNNING_PRIMARY,
             years_structured_training=3,
             training_time_of_day="morning",
-            weekly_schedule=_weekly_schedule_payload(),
+            weekly_schedule=weekly_schedule_payload(),
             gps_source=GpsSource.GARMIN_WATCH,
             hr_source=HrSource.CHEST_STRAP_RR,
             power_source=PowerSource.NONE,
@@ -788,11 +791,11 @@ class TestTrainingLengthGateRaisesError:
         onboarding = OnboardingService(session=db_session)
         profile, prefs, goal = _onboarding_inputs(days_out=7 * 60)
         # 60 weeks out + novice — gate must reject.
-        prefs = _PreferencesInput(
+        prefs = PreferencesInput(
             sport_background=SportBackground.RUNNING_PRIMARY,
             years_structured_training=1,  # novice
             training_time_of_day="morning",
-            weekly_schedule=_weekly_schedule_payload(),
+            weekly_schedule=weekly_schedule_payload(),
             gps_source=GpsSource.GARMIN_WATCH,
             hr_source=HrSource.CHEST_STRAP_RR,
             power_source=PowerSource.NONE,

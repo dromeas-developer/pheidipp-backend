@@ -53,35 +53,6 @@ from tests.utils.factories import make_athlete
 # ---------------------------------------------------------------------------
 
 
-def _state(
-    *,
-    value: float = 165.0,
-    uncertainty: float = 1.0,
-    prior_weight: float = 0.5,
-    dominant_source: str = "training_hr_deflection",
-    last_observation_date: str = "2026-06-15",
-) -> Dict[str, Any]:
-    """Build a full ``PhysiologyParameterState`` dict.
-
-    ``last_observation_date`` defaults to ``"2026-06-15"`` to match
-    the default ``measurement_date`` of the sibling ``_observation()``
-    helper. Tests that need a different gap (e.g. an explicit 7-day
-    decay exercise) pass the date explicitly. The previous default
-    of ``"2026-05-01"`` created a 45-day gap that decayed the prior
-    weight via the 42-day time constant, causing tests asserting
-    same-day math to fail (the unit-test fix is recorded in
-    ``tests/README.md`` dated 2026-07-13; this is the same fix
-    extended to the integration layer).
-    """
-    return {
-        "value": value,
-        "uncertainty": uncertainty,
-        "prior_weight": prior_weight,
-        "dominant_source": dominant_source,
-        "last_observation_date": last_observation_date,
-    }
-
-
 def _observation(
     *,
     parameter: PhysiologyParameter = PhysiologyParameter.CP,

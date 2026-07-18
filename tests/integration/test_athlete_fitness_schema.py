@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime, timezone
+from typing import Any
 
 import pytest
 from sqlalchemy import create_engine, text
@@ -33,7 +34,6 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.activity import Activity
-from app.models.athlete import Athlete
 from app.models.athlete_fitness import AthleteFitness
 from app.models.enums import ActivitySource
 from tests.utils.factories import make_athlete
@@ -51,7 +51,7 @@ TABLE = "athlete_fitness"
 
 def _aggregate(
     *, fitness: float, fatigue: float, form: float | None = None
-) -> dict:
+) -> dict[str, Any]:
     return {
         "fitness": fitness,
         "fatigue": fatigue,
@@ -59,7 +59,7 @@ def _aggregate(
     }
 
 
-def _default_time_constants(source: str = "population_default") -> dict:
+def _default_time_constants(source: str = "population_default") -> dict[str, Any]:
     return {
         "fitness_tau_days": 42.0,
         "fatigue_tau_days": 7.0,
@@ -71,11 +71,11 @@ def _default_time_constants(source: str = "population_default") -> dict:
 def _fitness_factory(
     *,
     athlete_id: uuid.UUID,
-    aggregate: dict | None = None,
-    aerobic: dict | None = None,
-    neuromuscular: dict | None = None,
-    structural: dict | None = None,
-    time_constants: dict | None = None,
+    aggregate: dict[str, Any] | None = None,
+    aerobic: dict[str, Any] | None = None,
+    neuromuscular: dict[str, Any] | None = None,
+    structural: dict[str, Any] | None = None,
+    time_constants: dict[str, Any] | None = None,
     last_activity_id: uuid.UUID | None = None,
 ) -> AthleteFitness:
     return AthleteFitness(
@@ -332,6 +332,7 @@ class TestAthleteFitnessDimensionFormChecksDB:
         db_session.add(row)
         await db_session.flush()
         await db_session.refresh(row)
+        assert row.aerobic is not None
         assert row.aerobic["form"] == 7.0
 
 

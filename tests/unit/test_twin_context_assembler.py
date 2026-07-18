@@ -12,7 +12,6 @@ Reference plan: docs/implementation/phase-1/phase-1-5a-first-coach-message.md
 from __future__ import annotations
 
 import uuid
-from typing import Any
 from unittest.mock import MagicMock
 
 import pytest

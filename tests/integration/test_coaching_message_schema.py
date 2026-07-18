@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime, timezone
+from typing import Any
 
 import pytest
 from sqlalchemy import create_engine, text
@@ -168,7 +169,7 @@ class TestCoachingMessageFirstMessagePartialUniqueDB:
     """Two ``first_message`` rows for the same athlete must raise
     ``IntegrityError``."""
 
-    def _partial_unique_index(self) -> dict | None:
+    def _partial_unique_index(self) -> dict[str, Any] | None:
         for idx in db_indexes(TABLE):
             cols = set(idx.get("column_names") or ())
             if cols == {"athlete_id"} and idx.get("unique"):
@@ -268,7 +269,7 @@ class TestCoachingMessagePostWorkoutPartialUniqueDB:
     """Two ``post_workout`` rows for the same activity must raise
     ``IntegrityError``."""
 
-    def _activity_partial_unique_index(self) -> dict | None:
+    def _activity_partial_unique_index(self) -> dict[str, Any] | None:
         for idx in db_indexes(TABLE):
             cols = set(idx.get("column_names") or ())
             if cols == {"activity_id"} and idx.get("unique"):

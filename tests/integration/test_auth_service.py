@@ -17,6 +17,7 @@ PostgreSQL connection and assert:
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import Any
 
 import pytest
 from sqlalchemy import select
@@ -49,7 +50,7 @@ def _register_kwargs(
     *,
     ip_address: str | None = "192.0.2.10",
     user_agent: str | None = "PheidippTest/1.0",
-) -> dict:
+) -> dict[str, Any]:
     return {
         "email": email,
         "password": password,

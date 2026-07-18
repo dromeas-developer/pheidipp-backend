@@ -53,8 +53,6 @@ from app.services.physiology_update_service import (
     MissingAthletePhysiologyError,
     PhysiologyUpdateResult,
     PhysiologyUpdateService,
-    bayesian_update,
-    init_null_parameter_state,
 )
 from app.services.threshold_detection_service import ThresholdObservation
 
@@ -234,9 +232,7 @@ class TestApplyObservationsMissingPhysiology:
     @pytest.mark.asyncio
     async def test_raises_when_no_physiology_row(self) -> None:
         """A missing row raises ``MissingAthletePhysiologyError``."""
-        service, mock_physiology_repo, mock_measurement_repo, mock_events = (
-            _make_service(physiology_row=None)
-        )
+        service, *_ = _make_service(physiology_row=None)
         athlete_id = uuid.uuid4()
 
         with pytest.raises(MissingAthletePhysiologyError):
@@ -249,7 +245,7 @@ class TestApplyObservationsMissingPhysiology:
     async def test_no_measurement_inserts_on_missing_row(self) -> None:
         """No ``PhysiologyMeasurement`` rows are inserted when the
         physiology row is missing."""
-        service, mock_physiology_repo, mock_measurement_repo, mock_events = (
+        service, _, mock_measurement_repo, _ = (
             _make_service(physiology_row=None)
         )
 
@@ -265,7 +261,7 @@ class TestApplyObservationsMissingPhysiology:
     async def test_no_event_published_on_missing_row(self) -> None:
         """No ``physiology_updated`` event is published when the
         physiology row is missing."""
-        service, mock_physiology_repo, mock_measurement_repo, mock_events = (
+        service, _, _, mock_events = (
             _make_service(physiology_row=None)
         )
 
@@ -880,7 +876,7 @@ class TestGetParameterState:
             lt1={"hr": hr_state, "power": None, "pace": None},
         )
 
-        result = PhysiologyUpdateService._get_parameter_state(
+        result = PhysiologyUpdateService.get_parameter_state(
             physiology, PhysiologyParameter.LT1_HR
         )
 
@@ -893,7 +889,7 @@ class TestGetParameterState:
             lt2={"hr": hr_state, "power": None, "pace": None},
         )
 
-        result = PhysiologyUpdateService._get_parameter_state(
+        result = PhysiologyUpdateService.get_parameter_state(
             physiology, PhysiologyParameter.LT2_HR
         )
 
@@ -904,7 +900,7 @@ class TestGetParameterState:
         cp_state = _state(value=260.0)
         physiology = _physiology_row(cp=cp_state)
 
-        result = PhysiologyUpdateService._get_parameter_state(
+        result = PhysiologyUpdateService.get_parameter_state(
             physiology, PhysiologyParameter.CP
         )
 
@@ -916,7 +912,7 @@ class TestGetParameterState:
         max_hr_state = _state(value=195.0)
         physiology = _physiology_row(max_hr=max_hr_state)
 
-        result = PhysiologyUpdateService._get_parameter_state(
+        result = PhysiologyUpdateService.get_parameter_state(
             physiology, PhysiologyParameter.MAX_HR
         )
 
@@ -928,7 +924,7 @@ class TestGetParameterState:
             lt1={"hr": None, "power": None, "pace": None},
         )
 
-        result = PhysiologyUpdateService._get_parameter_state(
+        result = PhysiologyUpdateService.get_parameter_state(
             physiology, PhysiologyParameter.LT1_HR
         )
 
@@ -938,7 +934,7 @@ class TestGetParameterState:
         """A null ``cp`` column returns ``None``."""
         physiology = _physiology_row(cp=None)
 
-        result = PhysiologyUpdateService._get_parameter_state(
+        result = PhysiologyUpdateService.get_parameter_state(
             physiology, PhysiologyParameter.CP
         )
 
@@ -952,7 +948,7 @@ class TestGetParameterState:
             lt1={"hr": hr_state, "power": None, "pace": None},
         )
 
-        result = PhysiologyUpdateService._get_parameter_state(
+        result = PhysiologyUpdateService.get_parameter_state(
             physiology, PhysiologyParameter.LT1_HR
         )
 
@@ -966,7 +962,7 @@ class TestGetParameterState:
         physiology = _physiology_row()
 
         with pytest.raises(ValueError, match="unsupported physiology parameter"):
-            PhysiologyUpdateService._get_parameter_state(
+            PhysiologyUpdateService.get_parameter_state(
                 physiology, "not_a_real_parameter"  # type: ignore[arg-type]
             )
 
@@ -993,7 +989,7 @@ class TestApplyUpdatedStates:
         )
         new_hr_state = _state(value=142.0)
 
-        PhysiologyUpdateService._apply_updated_states(
+        PhysiologyUpdateService.apply_updated_states(
             physiology,
             {PhysiologyParameter.LT1_HR: new_hr_state},
         )
@@ -1007,7 +1003,7 @@ class TestApplyUpdatedStates:
         physiology = _physiology_row(cp=_state(value=260.0))
         new_cp_state = _state(value=265.0)
 
-        PhysiologyUpdateService._apply_updated_states(
+        PhysiologyUpdateService.apply_updated_states(
             physiology,
             {PhysiologyParameter.CP: new_cp_state},
         )
@@ -1029,7 +1025,7 @@ class TestApplyUpdatedStates:
         with patch(
             "app.services.physiology_update_service.flag_modified"
         ) as mock_flag:
-            PhysiologyUpdateService._apply_updated_states(
+            PhysiologyUpdateService.apply_updated_states(
                 physiology,
                 {PhysiologyParameter.LT1_HR: _state(value=142.0)},
             )
@@ -1052,7 +1048,7 @@ class TestApplyUpdatedStates:
         with patch(
             "app.services.physiology_update_service.flag_modified"
         ) as mock_flag:
-            PhysiologyUpdateService._apply_updated_states(
+            PhysiologyUpdateService.apply_updated_states(
                 physiology,
                 {
                     PhysiologyParameter.LT1_HR: _state(value=142.0),
@@ -1071,7 +1067,7 @@ class TestApplyUpdatedStates:
         sub-state populated."""
         physiology = _physiology_row(lt1=None)
 
-        PhysiologyUpdateService._apply_updated_states(
+        PhysiologyUpdateService.apply_updated_states(
             physiology,
             {PhysiologyParameter.LT1_HR: _state(value=142.0)},
         )

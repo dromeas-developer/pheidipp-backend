@@ -52,6 +52,7 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
+from app.models._enum_helpers import enum_str_values
 from app.models.enums import (
     CheckpointType,
     PhaseLabel,
@@ -107,7 +108,7 @@ class PlannedSession(Base):
             name="phase_label",
             native_enum=False,
             length=32,
-            values_callable=lambda x: [e.value for e in x],
+            values_callable=enum_str_values,
         ),
         nullable=False,
     )
@@ -117,7 +118,7 @@ class PlannedSession(Base):
             name="session_type",
             native_enum=False,
             length=32,
-            values_callable=lambda x: [e.value for e in x],
+            values_callable=enum_str_values,
             create_type=False,
         ),
         nullable=False,
@@ -136,7 +137,7 @@ class PlannedSession(Base):
             name="checkpoint_type",
             native_enum=False,
             length=32,
-            values_callable=lambda x: [e.value for e in x],
+            values_callable=enum_str_values,
             create_type=False,
         ),
         nullable=True,
@@ -152,7 +153,7 @@ class PlannedSession(Base):
             name="planned_session_status",
             native_enum=False,
             length=32,
-            values_callable=lambda x: [e.value for e in x],
+            values_callable=enum_str_values,
         ),
         nullable=False,
     )
@@ -180,7 +181,7 @@ class PlannedSession(Base):
             name="session_slot",
             native_enum=False,
             length=8,
-            values_callable=lambda x: [e.value for e in x],
+            values_callable=enum_str_values,
         ),
         nullable=True,
     )
@@ -190,7 +191,7 @@ class PlannedSession(Base):
             name="session_priority",
             native_enum=False,
             length=16,
-            values_callable=lambda x: [e.value for e in x],
+            values_callable=enum_str_values,
         ),
         nullable=False,
     )

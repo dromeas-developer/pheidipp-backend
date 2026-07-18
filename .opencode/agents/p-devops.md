@@ -15,6 +15,7 @@ tools:
   bash:     true
   webfetch: false
   todowrite: true
+  skill:    true
 
   # File access
   "pheidipp-codebase-context_get_files":    true
@@ -108,225 +109,29 @@ say so — Test Pack Mode is an opt-in shortcut, not a guess.
 
 ---
 
-## Service Map
+## Infrastructure Reference
 
-| Service | Role | Port |
-|---|---|---|
-| `api` | FastAPI application — tests run inside this container | 8000 |
-| `worker` | ARQ job processor — same image as api | — |
-| `db` | TimescaleDB (pg16) — hosts both `pheidipp` and `test_pheidipp` | 5432 |
-| `minio` | FIT file object storage | 9000/9001 |
-
-The `api` container must be healthy before tests can run. The `db` container
-must be healthy before any migration can run. Both depend on healthchecks
-defined in docker-compose — `docker-build.sh` waits for them.
-
-When diagnosing failures, use `bash scripts/docker-logs.sh` to inspect
-all container logs. To inspect a specific service: the script may accept
-a service name argument — check if it does before assuming it logs all services.
+Service map, database architecture, command inventory, check-file rule, and
+TimescaleDB augmentation procedures are in the `infrastructure-reference`
+skill. Load it for "what commands exist and how they work." This agent retains
+only the decision logic for when to use them and what to do with the results.
 
 ---
 
-## Database Architecture
+## Root Cause Triage
 
-The project runs **two databases inside the same Docker stack**:
+Root cause category definitions, owner mapping, confidence levels, evidence
+standards, and plan-comparison guidance are in
+`docs/architecture/04-platform/root-cause-taxonomy.md`. Reference that file
+for the shared vocabulary used by both this agent and
+`p-implementation-validator` for routing alignment.
 
-| Database | Variable | Used by |
-|---|---|---|
-| `pheidipp` | `DATABASE_URL` | Production application |
-| `test_pheidipp` | `TEST_DATABASE_URL` | Test suite and test migrations |
-
-The scripts handle the distinction automatically — you never set `DATABASE_URL`
-manually. The separation matters for Step 3 (test DB migration) vs Step 6
-(prod DB migration): they are independent operations against independent DBs.
-
-**Alembic uses a sync engine (psycopg2), the app uses async (asyncpg).** This
-is handled transparently by `get_postgres_url(sync=True)` in `app/core/config.py`
-and is already wired in `alembic/env.py`. Never touch this wiring.
-
-**Two `db-revision` scripts exist, targeting different databases.**
-`db-revision.sh` targets the production DB (`DATABASE_URL` / `pheidipp`).
-`db-revision-test.sh` targets the test DB (`TEST_DATABASE_URL` /
-`test_pheidipp`) — it loads `.env.test` and overrides `DATABASE_URL` the
-same way `db-upgrade-test.sh` does. Both accept `"check"` as the revision
-message to run in verification-only mode.
-
-**The pending-changes check in Step 4 uses `db-revision-test.sh`, not
-`db-revision.sh`.** At that point in the flow, only `test_pheidipp` has
-been migrated (Step 3) — `pheidipp` is not touched until Step 6. Running
-the check against prod at Step 4 would therefore always show a non-empty
-diff (prod is still on the old revision), which is a false positive, not
-a real drift finding. Checking against `test_pheidipp` — which was just
-upgraded to head in Step 3 — is the correct target: it verifies the
-coder's migration file actually captures every ORM model change, not just
-that `alembic upgrade head` ran without error. `db-revision.sh` (prod)
-remains available as a command but is not part of the standard execution
-steps below.
-
-**If the test DB is in a broken state** (failed mid-migration, schema
-corrupted, migration history diverged from prod) there is no
-`db-reset-test.sh` script currently. Reset manually:
-```bash
-docker compose exec db psql -U postgres -c "DROP DATABASE IF EXISTS test_pheidipp;"
-docker compose exec db psql -U postgres -c "CREATE DATABASE test_pheidipp;"
-bash scripts/db-upgrade-test.sh
-```
-Record this in the report if performed. Flag to the human that a
-`scripts/db-reset-test.sh` would prevent this step in future.
-
----
-
-## Command Execution (NON-NEGOTIABLE)
-
-Only these commands are permitted:
-
-```
-bash scripts/docker-build.sh              # build and start all services
-bash scripts/docker-down.sh               # stop all services
-bash scripts/docker-logs.sh               # inspect container logs on failure
-bash scripts/db-upgrade-test.sh           # migrate test_pheidipp (reads .env.test)
-bash scripts/db-upgrade.sh               # migrate pheidipp (reads .env / DATABASE_URL)
-bash scripts/db-revision.sh "<message>"       # autogenerate revision / check against prod DB
-bash scripts/db-revision-test.sh "<message>"  # autogenerate revision / check against test_pheidipp
-bash scripts/run-tests.sh [paths...]     # run pytest inside api container against test_pheidipp
-```
-
-**How `run-tests.sh` works:**
-- Loads `.env.test` to get `TEST_DATABASE_URL`
-- Overrides `DATABASE_URL` with `TEST_DATABASE_URL` for the pytest run
-- Runs `docker compose exec -e DATABASE_URL="$DATABASE_URL" api bash -c "pytest <paths> -v"`
-- Pass test paths as space-separated arguments: `bash scripts/run-tests.sh tests/unit/ tests/integration/test_auth.py`
-- No arguments = runs the full `tests/` directory
-
-**How `db-upgrade-test.sh` works:**
-- Loads `.env.test` to get `TEST_DATABASE_URL`
-- Overrides `DATABASE_URL` with `TEST_DATABASE_URL`
-- Runs `alembic upgrade head` against `test_pheidipp`
-
-If a required script is missing → STOP and report which script is absent.
-Do not attempt to run `alembic`, `pytest`, or `python` directly.
-
----
-
-## Check File Rule (NON-NEGOTIABLE)
-
-`db-revision.sh "check"` and `db-revision-test.sh "check"` each generate a
-file named `<hash>_check.py` in `alembic/versions/`. This is a
-schema-verification artefact — NOT an official revision. It must NEVER be
-applied to any database, regardless of which script produced it.
-
-Before EVERY `db-upgrade.sh` or `db-upgrade-test.sh` call:
-1. Use `find_files` to search `alembic/versions/` for files matching `*_check.py`
-2. If any found → DELETE them via bash `rm`, record in report, then continue
-3. Never apply a migration whose filename contains `_check`
-
----
-
-## Root Cause Triage — Shared Reference
-
-This section defines the vocabulary used by both modes whenever
-`Result: FAIL`. Every failure — test failures, migration drift, a failed
-pending-changes check, a build failure — is expressed as one or more
-**Root Cause (RC)** entries using this vocabulary. A run with only one
-underlying problem still produces exactly one RC entry; the point is
-uniform structure, not manufacturing multiple entries where one suffices.
-
-### Grouping rule
-
-Before assigning categories, cluster failures that share the same
-underlying cause into a single RC. If 50 tests fail because of one
-enum-serialization bug, that is one RC listing its member tests — not 50
-RC entries. Use error type, traceback signature, and shared module/file
-as your clustering signal. List representative test names (a handful) plus
-a total count when the member list is long; the exhaustive list still
-belongs in `## Full Failure Detail`, tagged by RC id.
-
-### Category → Owner mapping
-
-| Category | Meaning | Default Owner |
-|---|---|---|
-| **Implementation** | Application code contradicts the plan/contract, or is genuinely wrong relative to intended behaviour. | `p-coder` |
-| **Test Suite** | The test *content* is wrong — a bad assertion, stale expectation, incorrect fixture data, or a test helper that computes or wires the wrong thing (e.g. a foreign-key helper building the wrong relationship, a default timestamp that's simply incorrect). This is about what a test or its support code *returns or asserts*, not about the platform it runs on. | `p-test-architect` |
-| **Infrastructure** | Environment, tooling, or platform failure — Docker configuration, CI environment, dependency installation, Alembic configuration, PostgreSQL startup, permissions, networking, path configuration, pytest plugin configuration, environment variables. This is about whether the run could execute at all, not about what any individual test does. | `p-devops` |
-| **Specification / Plan Gap** | Code and test are internally consistent with each other, but the plan does not clearly state which behaviour is correct, so category cannot be determined from plan text alone. | `p-architect` (the plan owner in this pipeline — same routing `p-implementation-validator` uses for its own "PLAN GAP" findings) |
-| **Investigation Required** | None of the above could be established at Medium confidence or higher. | `Unassigned` |
+**Agent-specific triage notes:**
 
 You are diagnosing and routing, not fixing. Even when the fix looks
 obvious, do not touch application source or test assertion files to
-"just fix it" — that authority belongs to the owner named above. Your
-report is what lets them act without re-deriving what you already found.
-
-**Infrastructure and Test Suite are the pair most likely to be confused —
-they are not the same thing.** Infrastructure is about whether the
-platform runs at all: containers, connections, configuration, the
-environment underneath the tests. Test Suite is about whether the test's
-own logic and data are correct: what a fixture returns, what a helper
-computes, what an assertion expects. The question to ask is **"does the
-fix live in test *content* (what a fixture/helper/assertion does), or in
-the platform/tooling underneath it?"** Content → Test Suite. Platform →
-Infrastructure.
-
-**Illustrative examples:**
-
-| Symptom | Category | Owner |
-|---|---|---|
-| A test's own setup uses a stale or incorrect default timestamp | Test Suite | p-test-architect |
-| A foreign-key test helper builds the wrong relationship | Test Suite | p-test-architect |
-| A Docker container fails to start or never reports healthy | Infrastructure | p-devops |
-| Alembic cannot connect to the database, or a required extension is missing | Infrastructure | p-devops |
-| An enum is serialized with `.value` where the contract expects `str(enum)` (or vice versa) | Implementation | p-coder |
-| No migration revision file exists because the coder never generated one | Implementation | p-coder — the omission is the coder's, not the environment's |
-| Migration generation was attempted but the script itself failed due to environment/Alembic configuration | Infrastructure | p-devops — distinct from the row above: here generation was attempted and the tooling broke, not skipped |
-
-### Default owners may be overridden — with a stated reason
-
-The table above gives defaults, not absolutes. Override a default owner
-only when the *remedy*, not just the mechanical category, genuinely
-belongs elsewhere — and always state the override reason explicitly in
-the RC entry; never deviate silently. For example, a failed manifest
-write is mechanically an Infrastructure-category problem, but its remedy
-is a manual correction to a file only `p-test-architect` owns, so it
-routes there by explicit override rather than to `p-devops` by default —
-see Step 5's manifest-write note below for the worked example.
-
-### Confidence levels
-
-| Level | Criterion |
-|---|---|
-| **Confirmed** | You traced the exact failing line/mechanism AND compared it directly against explicit plan text (or, for a Test Suite issue, against the test's own code) with no reasonable alternative reading. |
-| **High** | The category is strongly implied by error type/location/pattern, but you did not do a direct word-for-word plan comparison, or the plan strongly implies the answer without stating it explicitly. |
-| **Medium** | A plausible category was pattern-matched from the traceback shape alone, without confirming against plan text at all — or the plan text exists but is not fully unambiguous. |
-| **Low** | Multiple explanations remain plausible, or no useful textual evidence could be gathered. |
-
-**Any RC at Low confidence is routed to `Unassigned` regardless of its
-tentative category.** A low-confidence guess routed to `p-coder` or
-`p-test-architect` is exactly the misrouting failure mode this structure
-exists to prevent — say what you suspect, but do not assign ownership on
-a guess.
-
-### Comparing against the plan
-
-For Implementation vs. Test Suite vs. Specification/Plan Gap calls
-specifically, fetch the implementation plan named in the validator report
-header (`docs/implementation/<path-to-plan>.md`) via `get_files`, once,
-batched with any other Step 5b fetches. Read only the Implementation
-Steps, Invariants, or Event Contracts sections relevant to the failing
-RC's subject — do not read the whole plan speculatively for every RC if
-one targeted section answers it. This is the same targeted-read
-discipline `p-implementation-validator` and `p-coder` already use for
-architecture lookups; it is not a license to re-review the whole plan end
-to end. Infrastructure-category calls do not need this — they are
-diagnosed from the platform/environment evidence itself, not the plan.
-
-### Evidence is mandatory and must be a trail, not a verdict
-
-Every RC's `Evidence` field is a short bulleted list of what you actually
-did and observed — the specific assertions/traceback lines you looked at,
-which file you inspected, what you found there, and the conclusion it
-supports — not a single summary sentence. The goal is that the owner
-reading your report does not have to repeat your investigation to trust
-your conclusion. See the RC template under Output Format for the exact
-shape.
+"just fix it" — that authority belongs to the owner named in the taxonomy.
+Your report is what lets them act without re-deriving what you already found.
 
 ---
 
@@ -398,21 +203,17 @@ report, then continue unless services are completely down.
 
 ### 0. Read Implementation State
 
-Use `find_files` to locate `docs/implementation/implemented-state.md`.
-Use `get_files` to read it.
+Load the `git-session-delta` skill and run it.
 
-This file is regenerated by the coder after every session and already
-contains everything needed for a fingerprint and for cross-checking the
-migration in Step 2:
+This recovers everything needed for a fingerprint and for cross-checking
+the migration in Step 2:
 * Base Commit / Current Commit (git SHA before and after this session)
-* Current DB Revision
 * Files Added / Modified / Deleted (the expected scope of this change)
+* Deviation notes from commit messages in this session's range
 
-Record the commit range and current DB revision in the report.
-
-If the file is missing → record its absence and continue. This is not a
-blocking failure, but Step 2's table-scope verification will fall back to
-the plan's Scope section alone (less reliable — flag this in the report).
+Record the commit range and file delta in the report. Do not record
+current DB revision in this step — Step 4 discovers that independently
+via `db-revision-test.sh "check"`.
 
 ### 1. Services
 
@@ -447,10 +248,10 @@ evidence `EMPTY_MIGRATION — likely missing __init__.py import`.
 
 **Step 2b — Review for drift:**
 Verify that the revision touches only the tables and columns this plan
-introduced. Cross-check against `implemented-state.md`'s Files Added /
-Files Modified lists (a new `app/models/<x>.py` should correspond to a
-`create_table` for `<x>`; a modified model file to `add_column` or
-`alter_column`).
+introduced. Cross-check against the `git-session-delta` skill's Files
+Added / Files Modified lists (a new `app/models/<x>.py` should
+correspond to a `create_table` for `<x>`; a modified model file to
+`add_column` or `alter_column`).
 
 If the revision touches any table NOT explained by this plan's scope, the
 coder should have removed autogenerated drift before handoff — if it did
@@ -459,7 +260,7 @@ removed in the report. Because DevOps resolves this in-session, it does
 not need an RC entry — record it as a note, not a routed finding, unless
 you are unsure whether the drift removal is actually safe, in which case
 treat it as an RC (Category `Specification / Plan Gap`, Owner
-`p-architect`, Confidence per your certainty) instead of guessing.
+`p-implementation-architect`, Confidence per your certainty) instead of guessing.
 
 **Step 2c — Augment for TimescaleDB (if required):**
 If the plan flags a hypertable requirement and the coder has not already
@@ -730,7 +531,7 @@ Failure after a clean test DB upgrade indicates an environment difference
 full output and record as an RC: Category `Infrastructure` (environment/
 extension difference between test and prod — Owner `p-devops`) or
 `Investigation Required` (Owner `Unassigned`) depending on how clear the
-cause is. Escalate to `p-architect` instead only if the divergence itself
+cause is. Escalate to `p-implementation-architect` instead only if the divergence itself
 looks like a plan-level environment assumption that needs an
 architecture decision rather than just a configuration fix — state that
 reasoning explicitly if you do.
@@ -784,7 +585,7 @@ If any of these do not hold, use Full Pipeline Mode instead.
    requiring a migration means Test Pack Mode's skipped steps (2, 3, 4,
    6) actually matter this time. Recommend Full Pipeline Mode instead
    rather than silently running an incomplete check.
-4. **Skip** Execution Protocol Steps 0 (implemented-state read —
+4. **Skip** Execution Protocol Steps 0 (implementation-state read —
    optional context only, fetch it if convenient but do not block on
    it), 1 (services — attempt `docker-build.sh` only if the stack is not
    already known-healthy from the prior run; do not force a full
@@ -818,10 +619,9 @@ Validator report: reports/<plan-id>_validation.md
 Test execution group: <smoke|feature|regression|release>
 
 ## Implementation State
-base_commit: <from implemented-state.md>
-current_commit: <from implemented-state.md>
-db_revision: <from implemented-state.md>
-implemented_state_available: <yes/no>
+base_commit: <from git-session-delta skill>
+current_commit: <from git-session-delta skill>
+db_revision: <discovered in Step 4 via db-revision-test.sh "check">
 
 ## Result: PASS | FAIL
 
@@ -872,7 +672,7 @@ is only one. Do not fall back to a single blanket description here.*
 
 ### RC1 — <short title>
 - **Category:** Implementation | Test Suite | Infrastructure | Specification / Plan Gap | Investigation Required
-- **Owner:** p-coder | p-test-architect | p-devops | p-architect | Unassigned
+- **Owner:** p-coder | p-test-architect | p-devops | p-implementation-architect | Unassigned
 - **Confidence:** Confirmed | High | Medium | Low
 - **Evidence:**
   - <specific observation, e.g. "14 failing assertions">
@@ -894,7 +694,7 @@ is only one. Do not fall back to a single blanket description here.*
 | p-coder | RC1, RC2 |
 | p-test-architect | RC3 |
 | p-devops | — |
-| p-architect | — |
+| p-implementation-architect | — |
 | Unassigned | — |
 
 ## Recommended Execution Order

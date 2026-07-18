@@ -32,7 +32,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 from app.models.athlete_profile import AthleteProfile
 from app.models.enums import Sex
-from tests.utils.model_helpers import get_columns, has_column, get_enum_values
+from tests.utils.model_helpers import get_columns, get_enum_values
 
 
 class TestPhase11ColumnsPreserved:

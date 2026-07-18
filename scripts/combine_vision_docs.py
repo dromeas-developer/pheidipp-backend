@@ -4,7 +4,6 @@ Combines all markdown files from docs/vision/ into a single consolidated markdow
 Uses reading-order.md to determine file ordering.
 """
 
-import os
 import re
 from pathlib import Path
 from datetime import datetime
@@ -70,7 +69,7 @@ def combine_vision_docs(output_file: str = "VISION_COMBINED.md") -> None:
     
     with open(output_file, "w") as outfile:
         # Write header
-        outfile.write(f"# Pheidipp Vision - Combined Documentation\n\n")
+        outfile.write("# Pheidipp Vision - Combined Documentation\n\n")
         outfile.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
         outfile.write("*Document order based on reading-order.md*\n\n")
         outfile.write("---\n\n")

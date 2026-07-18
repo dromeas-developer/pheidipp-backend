@@ -48,7 +48,6 @@ from tests.utils.model_helpers import (
     get_unique_constraints,
     get_check_constraints,
     get_indexes,
-    get_foreign_keys_referencing,
     get_check_text,
     get_server_default_text,
     get_enum_values,

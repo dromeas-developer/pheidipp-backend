@@ -15,7 +15,7 @@ tools:
   glob:       false
   todowrite:  false
   webfetch:   true
-  skill:      false
+  skill:      true
 
   # Architecture retrieval
   "pheidipp-codebase-context_search_architecture":      true
@@ -38,8 +38,6 @@ tools:
   "pheidipp-codebase-context_get_feature_context":         true
 
   # Bulk / advanced retrieval
-  "pheidipp-codebase-context_multi_search":             true
-  "pheidipp-codebase-context_multi_context":            true
   "pheidipp-codebase-context_get_change_impact":        true
 
   # Explicitly disabled
@@ -108,67 +106,26 @@ constrain retrieval depth when the question requires it.
 
 ## Retrieval Protocol
 
-### Default: Start With Bulk Tools
-
-For any question that touches more than one domain, open with a single
-`multi_search` call batching all your initial queries:
+Invoke `p-doc-explorer` via the `task` tool with a concept list built
+from the question or analysis scope:
 
 ```
-searches: [
-  { domain: "architecture", query: "..." },
-  { domain: "vision",       query: "..." },
-  { domain: "release_plan", query: "..." }
-]
-```
+Tool: task
+Input:
+{
+  "subagent_type": "p-doc-explorer",
+  "prompt": "Task: <one-line task description>\n\nConcepts:\n- <concept name>\n- ...\n\nDomains: all"
+}
+``` Its Brief returns the current architecture contracts,
+invariants, vision references, and release-plan context for every concept —
+already organized by domain. Do not run raw `multi_search`, `multi_context`,
+or `get_entity_context` calls yourself — Doc Explorer handles retrieval
+and condenses the results.
 
-For any question that requires full context on more than one concept, use
-`multi_context(concepts: ["A", "B", "C"])` — one call returns cross-domain
-context for all named concepts simultaneously.
-
-For impact analysis before recommending a change to an existing entity or
-contract, use `get_change_impact(concept)` — one call returns affected
-architecture entities, event couplings, agents, release plan features, and
-vision references. Use it when the change surface is uncertain. Skip it for
-net-new concepts that nothing yet depends on.
-
-### Targeted Retrieval
-
-Use single-domain tools only when the question is clearly scoped to one domain
-or when you need a specific section of a known entity:
-
-| Need | Tool |
-|---|---|
-| Specific entity spec (sections optional) | `get_entity_context(name, sections?)` |
-| Event producer/consumer contracts | `get_event_context(event_name)` |
-| What depends on a given entity | `get_related_contracts(entity_name)` |
-| Invariants by type or enforcement | `search_invariants(query, invariant_type?, enforcement?)` |
-| Vision document for a known entity | `get_vision_context(entity_name, sections?)` |
-| Full phase spec | `get_phase_context(phase_number)` |
-| Full feature spec | `get_feature_context(feature_id)` |
-
-When calling `get_entity_context` or `get_vision_context` without knowing which
-sections exist, omit the `sections` parameter to retrieve the full document.
-Identify the relevant sections from the result and use them in any follow-up
-call. Never guess section names — an empty result from a wrong section name
-wastes a retrieval call.
-
-### Discovery (When You Don't Know The Exact Name)
-
-| Need | Tool |
-|---|---|
-| All architecture entity names | `list_entities()` |
-| Vision entity names by category | `list_vision_entities(category?)` |
-| All release phases | `list_release_plan_phases()` |
-| Features in a phase | `list_release_plan_features(phase?)` |
-
-### `search_invariants` Filters
-
-`invariant_type`: `uniqueness` | `cardinality` | `behavioral` | `range`
-`enforcement`: `database` | `application` | `api`
-
-Filter when you know the kind of constraint you're looking for. Searching
-`behavioral` + `application` retrieves append-only rules and processing
-boundary constraints without returning database schema invariants.
+This agent's primary work is documentation analysis — cross-corpus consistency
+checks, architecture pressure-testing, release sequencing review. Use as many
+calls as the analysis genuinely requires, but always through Doc Explorer
+rather than direct corpus queries.
 
 ---
 

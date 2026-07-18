@@ -32,6 +32,8 @@ Invariants codified at the DB layer:
 
 from __future__ import annotations
 
+from typing import Any
+
 import uuid
 from datetime import datetime, timezone
 
@@ -81,30 +83,30 @@ class AthletePhysiology(Base):
     # each signal entry is either ``{value, uncertainty, prior_weight,
     # dominant_source, last_observation_date}`` or JSON ``null``.
     # ------------------------------------------------------------------
-    lt1: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    lt1: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
 
     # ------------------------------------------------------------------
     # LT2 — same shape as LT1.
     # ------------------------------------------------------------------
-    lt2: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    lt2: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
 
     # ------------------------------------------------------------------
     # Critical Power — full ``PhysiologyParameterState`` or null until
     # the first qualifying observation.
     # ------------------------------------------------------------------
-    cp: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    cp: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
     # ------------------------------------------------------------------
     # VO2max — two sub-states (``ml_kg_min``, ``power``). Either or
     # both may be null.
     # ------------------------------------------------------------------
-    vo2max: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    vo2max: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
     # ------------------------------------------------------------------
     # ``max_hr`` — bootstrapped from ``220 - age`` with prior_weight 0.5
     # at onboarding.
     # ------------------------------------------------------------------
-    max_hr: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    max_hr: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

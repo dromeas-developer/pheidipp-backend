@@ -27,8 +27,8 @@ from __future__ import annotations
 import gzip
 import json
 import uuid
-from datetime import date, datetime, timezone
-from typing import List, Optional, cast
+from datetime import date
+from typing import Any, List, Optional, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -204,7 +204,7 @@ def _make_service(
     raw_stream_exists: bool = True,
     cleaned_stream: CleanedStream | None = None,
     planned_sessions: Optional[dict[uuid.UUID, MagicMock]] = None,
-    activities_for_athlete: Optional[List[MagicMock]] = None,
+    activities_for_athlete: Optional[list[Any]] = None,
 ) -> ThresholdDetectionService:
     """Build a fully-wired ``ThresholdDetectionService`` with mocks.
 
@@ -354,7 +354,7 @@ class TestDetectMissingActivity:
         """A missing activity row returns an empty observation list."""
         service = _make_service(activity=None)
         # Override: activity not found.
-        service._activities.get_by_id = AsyncMock(return_value=None)
+        service.activities.get_by_id = AsyncMock(return_value=None)  # type: ignore[attr-defined]
 
         result = await service.detect(uuid.uuid4(), uuid.uuid4())
 
@@ -383,7 +383,7 @@ class TestDetectNotCalibrationEligible:
 
         assert result == []
         # No stream download was attempted.
-        cast(AsyncMock, service._object_storage.download_fit).assert_not_called()
+        cast(AsyncMock, service.object_storage).download_fit.assert_not_called()  # type: ignore[attr-defined]
 
 
 # ---------------------------------------------------------------------------
@@ -403,7 +403,7 @@ class TestDetectNonRunningSport:
         result = await service.detect(activity.athlete_id, activity.id)
 
         assert result == []
-        cast(AsyncMock, service._object_storage.download_fit).assert_not_called()
+        cast(AsyncMock, service.object_storage).download_fit.assert_not_called()  # type: ignore[attr-defined]
 
     @pytest.mark.asyncio
     async def test_detect_swimming_returns_empty(self) -> None:
@@ -440,7 +440,7 @@ class TestDetectMissingRawSensorStream:
 
         assert result == []
         # No download attempted because the gate fires first.
-        cast(AsyncMock, service._object_storage.download_fit).assert_not_called()
+        cast(AsyncMock, service.object_storage).download_fit.assert_not_called()  # type: ignore[attr-defined]
 
 
 # ---------------------------------------------------------------------------
@@ -522,7 +522,7 @@ class TestSignalSelection:
         )
         # Build a stream with RR data — RR inflection needs ≥8 min
         # per intensity level (480s each). We use 3 levels at 600s each.
-        records = []
+        records: list[CleanedRecord] = []
         for t in range(600):
             records.append(
                 _make_cleaned_record(
@@ -574,7 +574,7 @@ class TestSignalSelection:
         # Build a stream with power data showing a clear ratio
         # breakpoint. Sub-threshold: ratio stable. Above LT2: ratio
         # declines.
-        records = []
+        records: list[CleanedRecord] = []
         for t in range(600):
             records.append(
                 _make_cleaned_record(
@@ -640,7 +640,7 @@ class TestHrDeflectionAlgorithm:
         )
         # 4 distinct intensity steps with strong linear HR-intensity
         # relationship (R² will be high).
-        records = []
+        records: list[CleanedRecord] = []
         for t in range(120):
             # Intensity 1: slow pace, low HR.
             records.append(
@@ -696,7 +696,7 @@ class TestHrDeflectionAlgorithm:
         activity = _mock_activity(
             has_hr=True, has_rr_intervals=False, has_power=False
         )
-        records = []
+        records: list[CleanedRecord] = []
         for t in range(60):
             records.append(
                 _make_cleaned_record(
@@ -752,7 +752,7 @@ class TestRrInflectionAlgorithm:
         )
         # 3 intensity levels, each ≥8 min (480s), with RMSSD
         # dropping >15% below baseline at higher intensities.
-        records = []
+        records: list[CleanedRecord] = []
         for t in range(600):
             records.append(
                 _make_cleaned_record(
@@ -806,7 +806,7 @@ class TestRrInflectionAlgorithm:
             has_hr=True, has_rr_intervals=True, has_power=False
         )
         # Only 2 short intensity levels — each <8 min.
-        records = []
+        records: list[CleanedRecord] = []
         for t in range(120):
             records.append(
                 _make_cleaned_record(
@@ -855,7 +855,7 @@ class TestPowerHrRatioAlgorithm:
         )
         # Build a stream with a clear ratio breakpoint: sub-threshold
         # ratio is stable, above-LT2 ratio declines.
-        records = []
+        records: list[CleanedRecord] = []
         for t in range(600):
             # Sub-threshold: ratio = 200/140 = 1.43
             records.append(
@@ -922,7 +922,7 @@ class TestNaturalTrainingAnalysis:
         stream = _make_stream([])
         service = _make_service(activity=activity, cleaned_stream=stream)
         # Remove the planned session repository.
-        service._planned_sessions = None
+        service.planned_sessions = None  # type: ignore[attr-defined]
 
         result = await service.detect(activity.athlete_id, activity.id)
 
@@ -941,7 +941,7 @@ class TestNaturalTrainingAnalysis:
         stream = _make_stream([])
 
         # Build 2 easy runs (below the 3-run minimum).
-        easy_runs = []
+        easy_runs: list[Activity] = []
         planned_sessions_map: dict[uuid.UUID, MagicMock] = {}
         for _ in range(2):
             run = _mock_activity(
@@ -987,7 +987,7 @@ class TestHrDriftMethod:
         )
         # Build a 30-min steady-state segment with increasing HR
         # (drift > 5 bpm). Use constant pace and grade.
-        records = []
+        records: list[CleanedRecord] = []
         for t in range(30 * 60):  # 30 minutes
             # HR drifts from 140 to 150 over 30 min (drift = 10 bpm).
             hr = 140.0 + (10.0 * t / (30 * 60))
@@ -1031,7 +1031,7 @@ class TestHrRecoveryMethod:
         activity = _mock_activity(
             has_hr=True, has_rr_intervals=False, has_power=False
         )
-        records = []
+        records: list[CleanedRecord] = []
         # Ramp up to peak HR (190 bpm) over 20 minutes.
         for t in range(20 * 60):
             hr = 120.0 + (70.0 * t / (20 * 60))
@@ -1098,7 +1098,7 @@ class TestDetectDoesNotWriteMeasurement:
             has_hr=True, has_rr_intervals=False, has_power=False
         )
         # Build a stream that will produce observations.
-        records = []
+        records: list[CleanedRecord] = []
         for t in range(120):
             records.append(
                 _make_cleaned_record(
@@ -1129,7 +1129,7 @@ class TestDetectDoesNotWriteMeasurement:
         await service.detect(activity.athlete_id, activity.id)
 
         # The repository's insert method must never be called.
-        cast(AsyncMock, service._physiology_measurements.insert).assert_not_called()
+        cast(AsyncMock, service.physiology_measurements.insert).assert_not_called()
 
 
 # ---------------------------------------------------------------------------

@@ -13,6 +13,7 @@ import tempfile
 import uuid
 from datetime import date
 from pathlib import Path
+from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -21,11 +22,9 @@ from botocore.exceptions import ClientError
 from app.services.object_storage_client import (
     ObjectStorageClient,
     ObjectStorageConflictError,
-    ObjectStorageError,
-    ObjectStorageNotConfiguredError,
     ObjectStorageUploadError,
     StoredFitObject,
-    _md5_base64,
+    md5_base64,
 )
 
 
@@ -216,7 +215,7 @@ class TestLocalFallbackUpload:
             assert isinstance(result, StoredFitObject)
             assert result.key.startswith("fit-files/")
             assert result.byte_count == len(file_bytes)
-            assert result.content_md5 == _md5_base64(file_bytes)
+            assert result.content_md5 == md5_base64(file_bytes)
 
     @pytest.mark.asyncio
     async def test_creates_nested_directories(self) -> None:
@@ -284,7 +283,6 @@ class TestS3Upload:
     @pytest.mark.asyncio
     async def test_upload_fit_s3_conflict(self) -> None:
         """S3 PreconditionFailed error raises ObjectStorageConflictError."""
-        from botocore.exceptions import ClientError
 
         client = ObjectStorageClient(
             endpoint_url="http://minio:9000",
@@ -296,7 +294,7 @@ class TestS3Upload:
             "Error": {"Code": "PreconditionFailed"}
         }
         mock_s3 = MagicMock()
-        mock_s3.put_object.side_effect = ClientError(mock_error_response, "PutObject")
+        mock_s3.put_object.side_effect = ClientError(cast(Any, mock_error_response), "PutObject")
 
         with patch.object(client, "_s3_client", mock_s3):
             with pytest.raises(ObjectStorageConflictError):
@@ -345,7 +343,6 @@ class TestS3Upload:
     @pytest.mark.asyncio
     async def test_exists_s3_false_404(self) -> None:
         """S3 head_object returns False when key returns 404."""
-        from botocore.exceptions import ClientError
 
         client = ObjectStorageClient(
             endpoint_url="http://minio:9000",
@@ -355,7 +352,7 @@ class TestS3Upload:
 
         mock_error_response = {"Error": {"Code": "404"}}
         mock_s3 = MagicMock()
-        mock_s3.head_object.side_effect = ClientError(mock_error_response, "HeadObject")
+        mock_s3.head_object.side_effect = ClientError(cast(Any, mock_error_response), "HeadObject")
 
         with patch.object(client, "_s3_client", mock_s3):
             result = await client.exists("nonexistent/key.fit")
@@ -365,7 +362,6 @@ class TestS3Upload:
     @pytest.mark.asyncio
     async def test_exists_s3_other_error_raises(self) -> None:
         """S3 head_object raises ObjectStorageUploadError for non-404 errors."""
-        from botocore.exceptions import ClientError
 
         client = ObjectStorageClient(
             endpoint_url="http://minio:9000",
@@ -375,7 +371,7 @@ class TestS3Upload:
 
         mock_error_response = {"Error": {"Code": "500"}}
         mock_s3 = MagicMock()
-        mock_s3.head_object.side_effect = ClientError(mock_error_response, "HeadObject")
+        mock_s3.head_object.side_effect = ClientError(cast(Any, mock_error_response), "HeadObject")
 
         with patch.object(client, "_s3_client", mock_s3):
             with pytest.raises(ObjectStorageUploadError):
@@ -383,11 +379,11 @@ class TestS3Upload:
 
 
 class TestMd5Base64:
-    """_md5_base64 helper."""
+    """md5_base64 helper."""
 
     def test_returns_base64_string(self) -> None:
         import base64
-        result = _md5_base64(b"hello")
+        result = md5_base64(b"hello")
         # MD5 of "hello" in base64
         assert isinstance(result, str)
         # Verify it's valid base64
@@ -395,13 +391,13 @@ class TestMd5Base64:
         assert len(decoded) == 16  # MD5 produces 16 bytes
 
     def test_deterministic(self) -> None:
-        result1 = _md5_base64(b"test")
-        result2 = _md5_base64(b"test")
+        result1 = md5_base64(b"test")
+        result2 = md5_base64(b"test")
         assert result1 == result2
 
     def test_different_inputs_different_hashes(self) -> None:
-        result1 = _md5_base64(b"test1")
-        result2 = _md5_base64(b"test2")
+        result1 = md5_base64(b"test1")
+        result2 = md5_base64(b"test2")
         assert result1 != result2
 
 

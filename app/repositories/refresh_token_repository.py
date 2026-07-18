@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Optional, cast
+from typing import Any, Optional, cast
 
 from sqlalchemy import select, update
 from sqlalchemy.engine import CursorResult
@@ -72,8 +72,8 @@ class RefreshTokenRepository:
             .values(ip_address=None)
             .execution_options(synchronize_session="fetch")
         )
-        cursor_result = cast(CursorResult, result)
-        return int(cursor_result.rowcount if cursor_result.rowcount is not None else 0)
+        cursor_result = cast("CursorResult[Any]", result)
+        return cursor_result.rowcount
 
     @staticmethod
     def is_active(

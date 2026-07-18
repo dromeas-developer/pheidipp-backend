@@ -27,18 +27,15 @@ docs/implementation/phase-1/phase-1-3-p1-onboarding-twin-bootstrap.md
 from __future__ import annotations
 
 import uuid
-from uuid import UUID
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from tests.payloads import (
-    _onboarding_payload,
-    _preferences_patch_payload,
-    _profile_patch_payload,
-    _register_payload,
-    _weekly_schedule_payload,
+    onboarding_payload,
+    preferences_patch_payload,
+    profile_patch_payload,
+    weekly_schedule_payload,
 )
 from tests.utils.assertions import assert_no_secrets_in_text
 from tests.utils.http_helpers import bearer_header, http_register
@@ -54,7 +51,7 @@ async def onboarded_athlete(client: AsyncClient):
         client, "onboarding-http@example.com"
     )
 
-    payload = _onboarding_payload()
+    payload = onboarding_payload()
     response = await client.post(
         f"/api/v1/athletes/{aid}/onboarding",
         json=payload,
@@ -78,7 +75,7 @@ class TestCompleteOnboardingEndpoint:
         aid, tok = await http_register(
             client, "happy-path-onboarding@example.com"
         )
-        payload = _onboarding_payload()
+        payload = onboarding_payload()
         response = await client.post(
             f"/api/v1/athletes/{aid}/onboarding",
             json=payload,
@@ -105,7 +102,7 @@ class TestCompleteOnboardingEndpoint:
         )
         await client.post(
             f"/api/v1/athletes/{aid}/onboarding",
-            json=_onboarding_payload(),
+            json=onboarding_payload(),
             headers=bearer_header(tok),
         )
         twin = await client.get(
@@ -127,7 +124,7 @@ class TestCompleteOnboardingEndpoint:
         aid, tok = onboarded_athlete
         response = await client.post(
             f"/api/v1/athletes/{aid}/onboarding",
-            json=_onboarding_payload(),
+            json=onboarding_payload(),
             headers=bearer_header(tok),
         )
         assert response.status_code == 409
@@ -139,7 +136,7 @@ class TestCompleteOnboardingEndpoint:
         aid, tok = await http_register(
             client, "bad-timezone@example.com"
         )
-        payload = _onboarding_payload(timezone="Not/A/Real/Zone")
+        payload = onboarding_payload(timezone="Not/A/Real/Zone")
         response = await client.post(
             f"/api/v1/athletes/{aid}/onboarding",
             json=payload,
@@ -155,7 +152,7 @@ class TestCompleteOnboardingEndpoint:
         aid, tok = await http_register(
             client, "bad-goal-type@example.com"
         )
-        payload = _onboarding_payload()
+        payload = onboarding_payload()
         payload["goal"]["goal_type"] = "fitness_improvement"
         response = await client.post(
             f"/api/v1/athletes/{aid}/onboarding",
@@ -170,7 +167,7 @@ class TestCompleteOnboardingEndpoint:
         aid, tok = await http_register(
             client, "race-event-missing@example.com"
         )
-        payload = _onboarding_payload(goal_kind="race_event")
+        payload = onboarding_payload(goal_kind="race_event")
         # Drop the required event name.
         del payload["goal"]["goal_event_name"]
         response = await client.post(
@@ -186,7 +183,7 @@ class TestCompleteOnboardingEndpoint:
         aid, tok = await http_register(
             client, "tp-missing@example.com"
         )
-        payload = _onboarding_payload(goal_kind="target_performance")
+        payload = onboarding_payload(goal_kind="target_performance")
         del payload["goal"]["target_distance_km"]
         response = await client.post(
             f"/api/v1/athletes/{aid}/onboarding",
@@ -201,7 +198,7 @@ class TestCompleteOnboardingEndpoint:
         aid, tok = await http_register(
             client, "tp-ok@example.com"
         )
-        payload = _onboarding_payload(goal_kind="target_performance")
+        payload = onboarding_payload(goal_kind="target_performance")
         response = await client.post(
             f"/api/v1/athletes/{aid}/onboarding",
             json=payload,
@@ -215,7 +212,7 @@ class TestCompleteOnboardingEndpoint:
         aid, tok = await http_register(
             client, "missing-day@example.com"
         )
-        payload = _onboarding_payload()
+        payload = onboarding_payload()
         # Drop sunday from the weekly schedule.
         del payload["preferences"]["weekly_schedule"]["sunday"]
         response = await client.post(
@@ -240,7 +237,7 @@ class TestCompleteOnboardingEndpoint:
         # Try to onboard athlete B using athlete A's token.
         response = await client.post(
             f"/api/v1/athletes/{aid_a}/onboarding",
-            json=_onboarding_payload(),
+            json=onboarding_payload(),
             headers=bearer_header(tok_a),
         )
         # Athlete A is the JWT owner — 201, no cross-athlete mismatch.
@@ -249,7 +246,7 @@ class TestCompleteOnboardingEndpoint:
         unknown_id = str(uuid.uuid4())
         cross = await client.post(
             f"/api/v1/athletes/{unknown_id}/onboarding",
-            json=_onboarding_payload(),
+            json=onboarding_payload(),
             headers=bearer_header(tok_a),
         )
         assert cross.status_code == 403
@@ -265,7 +262,7 @@ class TestCompleteOnboardingEndpoint:
         )
         response = await client.post(
             f"/api/v1/athletes/{aid}/onboarding",
-            json=_onboarding_payload(),
+            json=onboarding_payload(),
         )
         assert response.status_code == 401
 
@@ -396,7 +393,7 @@ class TestPatchProfileEndpoint:
         aid, tok = onboarded_athlete
         response = await client.patch(
             f"/api/v1/athletes/{aid}/profile",
-            json=_profile_patch_payload(
+            json=profile_patch_payload(
                 height_cm=183.5,
                 location_lat=38.7,
                 location_lng=-9.1,
@@ -542,7 +539,7 @@ class TestPatchPreferencesEndpoint:
         aid, tok = onboarded_athlete
         response = await client.patch(
             f"/api/v1/athletes/{aid}/preferences",
-            json=_preferences_patch_payload(
+            json=preferences_patch_payload(
                 weekly_schedule={"saturday": {"available": False}}
             ),
             headers=bearer_header(tok),
@@ -559,7 +556,7 @@ class TestPatchPreferencesEndpoint:
         self, client: AsyncClient, onboarded_athlete: tuple[str, str]
     ) -> None:
         aid, tok = onboarded_athlete
-        sat_patch = _preferences_patch_payload(
+        sat_patch = preferences_patch_payload(
             weekly_schedule={"saturday": {"available": False}}
         )
         first = await client.patch(
@@ -592,11 +589,11 @@ class TestPatchPreferencesEndpoint:
         """
         aid, tok = onboarded_athlete
         # Drop Sunday from a full schedule — surface a partial patch.
-        partial = _weekly_schedule_payload()
+        partial = weekly_schedule_payload()
         del partial["sunday"]
         response = await client.patch(
             f"/api/v1/athletes/{aid}/preferences",
-            json=_preferences_patch_payload(weekly_schedule=partial),
+            json=preferences_patch_payload(weekly_schedule=partial),
             headers=bearer_header(tok),
         )
         assert response.status_code == 200, response.text
@@ -604,7 +601,7 @@ class TestPatchPreferencesEndpoint:
         # The omitted Sunday kept its stored value (max_hours = 1.0).
         assert (
             body["weekly_schedule"]["sunday"]["max_hours"]
-            == (_weekly_schedule_payload())["sunday"]["max_hours"]
+            == (weekly_schedule_payload())["sunday"]["max_hours"]
         )
         # The explicit days were written through.
         for day in partial:
@@ -623,7 +620,7 @@ class TestPatchPreferencesEndpoint:
         bad = {"funday": {"available": True, "max_hours": 1.0}}
         response = await client.patch(
             f"/api/v1/athletes/{aid}/preferences",
-            json=_preferences_patch_payload(weekly_schedule=bad),
+            json=preferences_patch_payload(weekly_schedule=bad),
             headers=bearer_header(tok),
         )
         assert response.status_code == 422
@@ -642,7 +639,7 @@ class TestPatchPreferencesEndpoint:
         aid, tok = onboarded_athlete
         response = await client.patch(
             f"/api/v1/athletes/{aid}/preferences",
-            json=_preferences_patch_payload(
+            json=preferences_patch_payload(
                 weekly_schedule={"saturday": {"available": False}}
             ),
             headers=bearer_header(tok),
@@ -672,7 +669,7 @@ class TestPatchPreferencesEndpoint:
         aid, tok = onboarded_athlete
         response = await client.patch(
             f"/api/v1/athletes/{aid}/preferences",
-            json=_preferences_patch_payload(
+            json=preferences_patch_payload(
                 weekly_schedule={"saturday": {"max_hours": 99}}
             ),
             headers=bearer_header(tok),
@@ -681,7 +678,7 @@ class TestPatchPreferencesEndpoint:
 
         response = await client.patch(
             f"/api/v1/athletes/{aid}/preferences",
-            json=_preferences_patch_payload(
+            json=preferences_patch_payload(
                 weekly_schedule={"sunday": {"available": "maybe"}}
             ),
             headers=bearer_header(tok),

@@ -11,7 +11,6 @@ from __future__ import annotations
 import uuid
 
 import pytest
-from sqlalchemy import inspect
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.coaching_message import CoachingMessage
@@ -52,7 +51,7 @@ class TestCoachingMessageRepositoryAppendOnly:
 
     def test_no_delete_method(self) -> None:
         """CoachingMessageRepository must NOT expose delete()."""
-        public_methods = [
+        [
             m for m in dir(CoachingMessageRepository)
             if not m.startswith("_")
         ]

@@ -104,9 +104,8 @@ from app.services.signal_cleaning_service import (
 from app.services.threshold_detection_service import (
     ALGORITHM_HR_DEFLECTION,
     ThresholdDetectionService,
-    WEIGHT_HR_DEFLECTION,
 )
-from tests.utils.http_helpers import bearer_header, http_register
+from tests.utils.http_helpers import http_register
 
 
 # ---------------------------------------------------------------------------
@@ -479,14 +478,14 @@ class FakeEventPublisher:
     """
 
     def __init__(self) -> None:
-        self.events: list[dict] = []
+        self.events: list[dict[str, Any]] = []
 
     async def publish(
         self,
         *,
         event_type: str,
         athlete_id: uuid.UUID,
-        payload: dict,
+        payload: dict[str, Any],
         version: str = "v1",
     ) -> None:
         self.events.append({
@@ -701,8 +700,9 @@ class TestPhysiologyUpdateThresholdToEventJourney:
         assert "dominant_sources" in event.payload
         assert "prior_weights" in event.payload
         # parameters_updated is a list of parameter names (strings).
-        assert isinstance(event.payload["parameters_updated"], list)
-        assert len(event.payload["parameters_updated"]) >= 1
+        parameters_updated: list[str] = event.payload.get("parameters_updated", [])
+        assert isinstance(parameters_updated, list)
+        assert len(parameters_updated) >= 1
         # dominant_sources and prior_weights are dicts keyed by
         # parameter name.
         assert isinstance(event.payload["dominant_sources"], dict)
@@ -1052,7 +1052,7 @@ class TestPhysiologyUpdateConfidenceTransitionsJourney:
             date(2026, 6, 15),
             date(2026, 6, 15),
         ]
-        activities = []
+        activities: list[Activity] = []
         for activity_date in activity_dates:
             activity = await _create_running_activity(
                 db_session,
@@ -1163,7 +1163,7 @@ class TestPhysiologyUpdateConfidenceTransitionsJourney:
         # to ~4.79 after eight observations (below the 8.0 HIGH
         # threshold).
         activity_dates = [date(2026, 6, 15)] * 8
-        activities = []
+        activities: list[Activity] = []
         for activity_date in activity_dates:
             activity = await _create_running_activity(
                 db_session,

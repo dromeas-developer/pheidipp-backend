@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import time
 from datetime import datetime, timedelta, timezone
+from typing import Any
 from uuid import UUID, uuid4
 
 import jwt as pyjwt
@@ -38,7 +39,7 @@ from app.core.security.token_service import (
 )
 
 
-def _decode_test_jwt(token: str) -> dict:
+def _decode_test_jwt(token: str) -> dict[str, Any]:
     """Decode a token using the same secret/issuer ``TokenService`` used.
 
     Centralising this lookup prevents drift between the hardcoded
@@ -68,7 +69,7 @@ class TestIssueAccessToken:
         self, token_service: TokenService
     ) -> None:
         athlete_id = uuid4()
-        token, exp = token_service.issue_access_token(athlete_id)
+        token, _ = token_service.issue_access_token(athlete_id)
         payload = _decode_test_jwt(token)
         # ``sub`` is required to match the v1 JWT spec; ``athlete_id``
         # is the explicit claim used by ``require_self``.
@@ -287,7 +288,7 @@ class TestVerifyAccessToken:
             svc.verify_access_token(no_sub)
 
     @pytest.mark.parametrize("value", [None, "", 0, [], {}])  # type: ignore[list-item]
-    def test_rejects_non_string_input(self, value) -> None:
+    def test_rejects_non_string_input(self, value: Any) -> None:
         svc = TokenService()
         with pytest.raises(TokenVerificationError):
             svc.verify_access_token(value)  # type: ignore[arg-type]
@@ -368,7 +369,7 @@ class TestAccessTtlProperty:
 class TestMissingSecretKey:
     """The service refuses to construct without a JWT secret."""
 
-    def test_raises_runtime_when_secret_missing(self, monkeypatch) -> None:
+    def test_raises_runtime_when_secret_missing(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr("app.config.settings.JWT_SECRET_KEY", "")
         with pytest.raises(RuntimeError):
             TokenService()

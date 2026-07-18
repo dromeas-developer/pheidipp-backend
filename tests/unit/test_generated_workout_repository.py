@@ -53,9 +53,9 @@ def sample_workout_dict() -> dict[str, Any]:
     }
 
 
-def make_workout(**overrides) -> GeneratedWorkout:
+def make_workout(**overrides: Any) -> GeneratedWorkout:
     """Factory that returns a GeneratedWorkout with sensible defaults."""
-    kwargs = {
+    kwargs: dict[str, Any] = {
         "planned_session_id": uuid.uuid4(),
         "twin_state_id": uuid.uuid4(),
         "theoretical_targets": {"targets": [], "description": "threshold session"},

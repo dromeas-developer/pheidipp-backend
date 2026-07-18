@@ -18,6 +18,7 @@ Reference plan: docs/implementation/phase-1/phase-1-2b-p1-plan-sessions.md
 
 from __future__ import annotations
 
+from typing import cast
 import uuid
 from datetime import date
 
@@ -265,7 +266,6 @@ class TestCheckpointForeignKeyCascade:
         await db_session.flush()
         cp_id = cp.id
 
-        from sqlalchemy import delete as sa_delete, select
 
         await db_session.execute(
             sa_delete(PlannedSession).where(PlannedSession.id == sess.id)
@@ -314,7 +314,7 @@ class TestCheckpointCheckConstraints:
             db_session, athlete
         )
         cp = _checkpoint_factory(
-            planned_session_id=sess.id, status="bad_status"
+            planned_session_id=sess.id, status=cast(CheckpointStatus, "bad_status")
         )
         db_session.add(cp)
         with pytest.raises(IntegrityError):

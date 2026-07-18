@@ -34,7 +34,7 @@ from app.services.fit_parser_service import (
     FitParserService,
     GpsRecord,
     ParsedFitData,
-    _BytesReader,
+    BytesReader,
 )
 from app.services.first_message_agent import (
     FirstMessageAgent,
@@ -51,6 +51,8 @@ from app.services.load_computation_service import (
     estimate_max_hr_from_age,
 )
 from app.services.twin_recalibration_service import (
+    BanisterUpdateResult,
+    CalibrationRecalibrationResult,
     MissingAthleteFitnessError,
     MissingTrainingGoalError,
     RecalibrationResult,
@@ -83,9 +85,9 @@ from app.services.onboarding_results import (
 )
 from app.services.onboarding_service import (
     OnboardingService,
-    _GoalInput,
-    _PreferencesInput,
-    _ProfileInput,
+    GoalInput,
+    PreferencesInput,
+    ProfileInput,
 )
 from app.services.physiology_update_service import (
     MissingAthletePhysiologyError,
@@ -102,14 +104,7 @@ from app.services.plan_generation_service import (
     SessionDayAssignment,
 )
 from app.core.prompt_registry import PromptNotFoundError, PromptRegistry
-from app.services.twin_recalibration_service import (
-    BanisterUpdateResult,
-    MissingAthleteFitnessError,
-    MissingTrainingGoalError,
-    RecalibrationResult,
-    TwinRecalibrationError,
-    TwinRecalibrationService,
-)
+from app.services.signal_cleaning_service import SignalCleaningService
 from app.services.workout_generation_agent import WorkoutGenerationAgent
 from app.services.workout_generation_errors import (
     LLMServiceUnavailableError as WorkoutLLMServiceUnavailableError,
@@ -146,6 +141,7 @@ __all__ = [
     "AuthService",
     "BanisterUpdateResult",
     "CalibrationEligibilityService",
+    "CalibrationRecalibrationResult",
     "ComplianceError",
     "ComplianceFindings",
     "ComplianceService",
@@ -201,6 +197,7 @@ __all__ = [
     "RecalibrationResult",
     "SESSION_INTENT_MAP",
     "SessionDayAssignment",
+    "SignalCleaningService",
     "StoredFitObject",
     "ThresholdDetectionService",
     "ThresholdObservation",
@@ -217,10 +214,10 @@ __all__ = [
     "WorkoutGenerationContractError",
     "WorkoutGenerationError",
     "WorkoutLLMServiceUnavailableError",
-    "_BytesReader",
-    "_GoalInput",
-    "_PreferencesInput",
-    "_ProfileInput",
+    "BytesReader",
+    "GoalInput",
+    "PreferencesInput",
+    "ProfileInput",
     "ComputedObservations",
     "estimate_max_hr_from_age",
     "get_object_storage_client",

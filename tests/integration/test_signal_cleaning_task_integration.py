@@ -18,12 +18,9 @@ Step 7 — Add the signal_clean procrastinate task.
 
 from __future__ import annotations
 
-import gzip
-import json
 import uuid
 from datetime import date, datetime, timezone
-from typing import Optional
-from unittest.mock import AsyncMock
+from typing import Any, Optional
 
 import pytest
 from sqlalchemy import select
@@ -153,7 +150,6 @@ class TestSignalCleanTaskHappyPath:
 
         # Build a service that mirrors the task's body, but with
         # the parser stubbed.
-        from app.services.fit_parser_service import FitParserService
         from app.services.signal_cleaning_service import (
             SignalCleaningService,
         )
@@ -180,7 +176,7 @@ class TestSignalCleanTaskHappyPath:
         await db_session.commit()
 
         # The task returns a dict; assert the contract.
-        task_return: dict = {
+        task_return: dict[str, Any] = {
             "activity_id": str(activity.id),
             "raw_sensor_stream_id": (
                 str(result.raw_sensor_stream_id)
@@ -324,7 +320,7 @@ class TestSignalCleanTaskManualEntry:
 
         athlete = await make_athlete(db_session)
         object_storage = _build_real_object_storage()
-        fit_key = await _upload_raw_fit(
+        await _upload_raw_fit(
             object_storage,
             athlete_id=athlete.id,
             activity_date=date(2026, 6, 15),

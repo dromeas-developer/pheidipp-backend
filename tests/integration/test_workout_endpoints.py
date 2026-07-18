@@ -11,18 +11,16 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime, timezone
-from typing import Any, AsyncIterator
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security.token_service import TokenService
-from app.models.activity import Activity
 from app.models.athlete import Athlete
 from app.models.athlete_auth import AthleteAuth
 from app.models.enums import (
-    ActivitySource,
     AuthProvider,
     DataTier,
     GoalEventType,
@@ -31,7 +29,6 @@ from app.models.enums import (
     PlannedSessionStatus,
     RecoveryModifierLevel,
     SessionPriority,
-    SessionSlot,
     SessionType,
     TrainingGoalStatus,
     TrainingPlanStatus,
@@ -44,14 +41,10 @@ from app.models.training_goal import TrainingGoal
 from app.models.training_plan import TrainingPlan
 from app.models.twin_state import TwinState
 from app.models.weekly_plan import WeeklyPlan
-from app.models.workout_step import WorkoutStep
-from app.repositories.generation_event_repository import GenerationEventRepository
-from app.services.workout_generation_agent import WorkoutGenerationAgent
 from app.services.workout_generation_errors import (
     LLMServiceUnavailableError,
     WorkoutAlreadyGeneratedError,
 )
-from tests.utils.factories import make_athlete
 
 
 # ---------------------------------------------------------------------------
@@ -60,7 +53,7 @@ from tests.utils.factories import make_athlete
 
 
 async def _create_athlete_with_onboarding(
-    db_session, email: str | None = None
+    db_session: AsyncSession, email: str | None = None
 ) -> tuple[Athlete, TrainingGoal, TwinState, TrainingPlan, PlannedSession, WeeklyPlan]:
     """Create a fully-onboarded athlete with a planned session for today."""
     if email is None:
@@ -159,7 +152,7 @@ def _mock_workout_response(
     planned_session_id: uuid.UUID,
     twin_state_id: uuid.UUID,
     generation_date: date,
-) -> tuple[GeneratedWorkout, list[WorkoutStep]]:
+) -> tuple[MagicMock, list[MagicMock]]:
     """Create a mock GeneratedWorkout with steps for endpoint mocking."""
     workout_id = uuid.uuid4()
     workout = MagicMock(spec=GeneratedWorkout)
@@ -247,10 +240,10 @@ class TestGetToday:
     async def test_200_with_existing_workout(
         self,
         client: AsyncClient,
-        db_session,
+        db_session: AsyncSession,
         token_service: TokenService,
     ) -> None:
-        athlete, goal, twin, plan, planned_session, weekly_plan = (
+        athlete, _, twin, _, planned_session, _ = (
             await _create_athlete_with_onboarding(db_session)
         )
         await db_session.flush()
@@ -285,7 +278,7 @@ class TestGetToday:
     async def test_404_when_no_session_for_today(
         self,
         client: AsyncClient,
-        db_session,
+        db_session: AsyncSession,
         token_service: TokenService,
     ) -> None:
         # Build an athlete with an active plan but NO planned session for
@@ -360,18 +353,14 @@ class TestGetToday:
     async def test_403_accessing_different_athlete(
         self,
         client: AsyncClient,
-        db_session,
+        db_session: AsyncSession,
         token_service: TokenService,
     ) -> None:
-        athlete1, goal1, twin1, plan1, planned_session1, weekly_plan1 = (
-            await _create_athlete_with_onboarding(
-                db_session, f"athlete1-{uuid.uuid4()}@example.com"
-            )
+        athlete1, *_ = await _create_athlete_with_onboarding(
+            db_session, f"athlete1-{uuid.uuid4()}@example.com"
         )
-        athlete2, goal2, twin2, plan2, planned_session2, weekly_plan2 = (
-            await _create_athlete_with_onboarding(
-                db_session, f"athlete2-{uuid.uuid4()}@example.com"
-            )
+        athlete2, *_ = await _create_athlete_with_onboarding(
+            db_session, f"athlete2-{uuid.uuid4()}@example.com"
         )
         await db_session.flush()
 
@@ -386,11 +375,9 @@ class TestGetToday:
     async def test_401_without_auth(
         self,
         client: AsyncClient,
-        db_session,
+        db_session: AsyncSession,
     ) -> None:
-        athlete, goal, twin, plan, planned_session, weekly_plan = (
-            await _create_athlete_with_onboarding(db_session)
-        )
+        athlete, *_ = await _create_athlete_with_onboarding(db_session)
         await db_session.flush()
 
         response = await client.get(f"/athletes/{athlete.id}/today")
@@ -409,10 +396,10 @@ class TestPostGenerateWorkout:
     async def test_201_on_successful_generation(
         self,
         client: AsyncClient,
-        db_session,
+        db_session: AsyncSession,
         token_service: TokenService,
     ) -> None:
-        athlete, goal, twin, plan, planned_session, weekly_plan = (
+        athlete, _, twin, _, planned_session, _ = (
             await _create_athlete_with_onboarding(db_session)
         )
         await db_session.flush()
@@ -446,10 +433,10 @@ class TestPostGenerateWorkout:
     async def test_409_when_workout_already_generated(
         self,
         client: AsyncClient,
-        db_session,
+        db_session: AsyncSession,
         token_service: TokenService,
     ) -> None:
-        athlete, goal, twin, plan, planned_session, weekly_plan = (
+        athlete, _, _, _, planned_session, _ = (
             await _create_athlete_with_onboarding(db_session)
         )
         await db_session.flush()
@@ -477,10 +464,10 @@ class TestPostGenerateWorkout:
     async def test_502_on_llm_failure(
         self,
         client: AsyncClient,
-        db_session,
+        db_session: AsyncSession,
         token_service: TokenService,
     ) -> None:
-        athlete, goal, twin, plan, planned_session, weekly_plan = (
+        athlete, _, _, _, planned_session, _ = (
             await _create_athlete_with_onboarding(db_session)
         )
         await db_session.flush()
@@ -506,12 +493,10 @@ class TestPostGenerateWorkout:
     async def test_404_when_session_not_found(
         self,
         client: AsyncClient,
-        db_session,
+        db_session: AsyncSession,
         token_service: TokenService,
     ) -> None:
-        athlete, goal, twin, plan, planned_session, weekly_plan = (
-            await _create_athlete_with_onboarding(db_session)
-        )
+        athlete, *_ = await _create_athlete_with_onboarding(db_session)
         await db_session.flush()
 
         nonexistent_session_id = uuid.uuid4()
@@ -528,18 +513,14 @@ class TestPostGenerateWorkout:
     async def test_403_accessing_different_athlete(
         self,
         client: AsyncClient,
-        db_session,
+        db_session: AsyncSession,
         token_service: TokenService,
     ) -> None:
-        athlete1, goal1, twin1, plan1, planned_session1, weekly_plan1 = (
-            await _create_athlete_with_onboarding(
-                db_session, f"athlete1-{uuid.uuid4()}@example.com"
-            )
+        athlete1, _, _, _, planned_session1, _ = await _create_athlete_with_onboarding(
+            db_session, f"athlete1-{uuid.uuid4()}@example.com"
         )
-        athlete2, goal2, twin2, plan2, planned_session2, weekly_plan2 = (
-            await _create_athlete_with_onboarding(
-                db_session, f"athlete2-{uuid.uuid4()}@example.com"
-            )
+        athlete2, *_ = await _create_athlete_with_onboarding(
+            db_session, f"athlete2-{uuid.uuid4()}@example.com"
         )
         await db_session.flush()
 
@@ -554,9 +535,9 @@ class TestPostGenerateWorkout:
     async def test_401_without_auth(
         self,
         client: AsyncClient,
-        db_session,
+        db_session: AsyncSession,
     ) -> None:
-        athlete, goal, twin, plan, planned_session, weekly_plan = (
+        athlete, _, _, _, planned_session, _ = (
             await _create_athlete_with_onboarding(db_session)
         )
         await db_session.flush()
@@ -579,10 +560,10 @@ class TestIdempotency:
     async def test_second_post_returns_409_with_same_workout(
         self,
         client: AsyncClient,
-        db_session,
+        db_session: AsyncSession,
         token_service: TokenService,
     ) -> None:
-        athlete, goal, twin, plan, planned_session, weekly_plan = (
+        athlete, _, twin, _, planned_session, _ = (
             await _create_athlete_with_onboarding(db_session)
         )
         await db_session.flush()

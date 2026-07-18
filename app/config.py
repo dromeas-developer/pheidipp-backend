@@ -1,6 +1,5 @@
-from pydantic import Field, AnyUrl
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from urllib.parse import urlparse
 
 
 class Settings(BaseSettings):

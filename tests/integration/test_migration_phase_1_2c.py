@@ -53,7 +53,7 @@ import subprocess
 import sys
 import uuid
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import pytest
 from sqlalchemy import create_engine, inspect, text
@@ -153,20 +153,6 @@ def _migration_function_body(path: Path, fn: str) -> str:
     return match.group(1) if match else ""
 
 
-def _migration_creates_table(path: Path, name: str) -> bool:
-    return (
-        f"op.create_table('{name}'"
-        in _migration_function_body(path, "upgrade")
-    )
-
-
-def _migration_creates_index(path: Path, name: str) -> bool:
-    return (
-        f"op.create_index('{name}'"
-        in _migration_function_body(path, "upgrade")
-    )
-
-
 def _migration_creates_check(path: Path, name: str) -> bool:
     body = _migration_function_body(path, "upgrade")
     # SAEnum inline or CreateTable column-level CheckConstraint
@@ -174,15 +160,6 @@ def _migration_creates_check(path: Path, name: str) -> bool:
     return (
         f"name='{name}'" in body
         or f'name="{name}"' in body
-    )
-
-
-def _migration_emits_fk_to_table(path: Path, table_name: str) -> bool:
-    """Detect ``op.create_foreign_key`` targeting ``table_name``."""
-    body = _migration_function_body(path, "upgrade")
-    return (
-        f"op.create_foreign_key(" in body
-        and f"'{table_name}'" in body
     )
 
 
@@ -627,7 +604,7 @@ class TestPhase12cUpgradeFunctional:
     produces every documented table with its invariants."""
 
     def test_all_phase_12c_tables_created(
-        self, phase_1_2c_schema: dict
+        self, phase_1_2c_schema: dict[str, Any]
     ) -> None:
         engine = create_engine(phase_1_2c_schema["sync_url"])
         try:
@@ -652,7 +629,7 @@ class TestPhase12cUpgradeFunctional:
             engine.dispose()
 
     def test_phase_12a_and_12b_tables_survive(
-        self, phase_1_2c_schema: dict
+        self, phase_1_2c_schema: dict[str, Any]
     ) -> None:
         """Every Phase-1.1 / 1.2a / 1.2b table survives the upgrade
         — the migration is purely additive."""
@@ -690,7 +667,7 @@ class TestPhase12cUpgradeFunctional:
             engine.dispose()
 
     def test_twin_state_partial_unique_index_present(
-        self, phase_1_2c_schema: dict
+        self, phase_1_2c_schema: dict[str, Any]
     ) -> None:
         """``uq_twin_states_athlete_activity`` must exist in the
         upgraded schema."""
@@ -712,7 +689,7 @@ class TestPhase12cUpgradeFunctional:
         )
 
     def test_training_plans_twin_state_fk_present(
-        self, phase_1_2c_schema: dict
+        self, phase_1_2c_schema: dict[str, Any]
     ) -> None:
         """``training_plans.twin_state_id`` must have an FK to
         ``twin_states.id`` after the upgrade."""
@@ -740,7 +717,7 @@ class TestPhase12cUpgradeFunctional:
         )
 
     def test_athlete_fitness_form_invariant_check_active(
-        self, phase_1_2c_schema: dict
+        self, phase_1_2c_schema: dict[str, Any]
     ) -> None:
         """``ck_athlete_fitness_aggregate_form_invariant`` must be
         active on the upgraded schema."""
@@ -761,7 +738,7 @@ class TestPhase12cUpgradeFunctional:
         )
 
     def test_generation_events_failure_reason_check_active(
-        self, phase_1_2c_schema: dict
+        self, phase_1_2c_schema: dict[str, Any]
     ) -> None:
         """``ck_generation_events_failure_reason_consistency`` must
         be active on the upgraded schema."""

@@ -51,7 +51,7 @@ import math
 import statistics
 from dataclasses import dataclass
 from datetime import date
-from typing import Optional
+from typing import Optional, Sequence
 
 from app.config import settings
 from app.models.enums import DataTier, SportType
@@ -243,6 +243,8 @@ class LoadComputationService:
         hrr_total = max(1, inputs.max_hr_estimate - inputs.resting_hr)
         accumulator = 0.0
         for hr in inputs.parsed_fit.hr_records:
+            if hr is None:
+                continue
             hrr_pct = (hr - inputs.resting_hr) / hrr_total
             # Clamp hrr_pct to ``[-0.25, 1.25]`` so a single HR
             # outlier below resting or wildly above the max
@@ -258,7 +260,7 @@ class LoadComputationService:
         return accumulator / self.BANISTER_NORMALISATION
 
     def _compute_power_aerobic_load(
-        self, power_records: list[int], cp: int
+        self, power_records: Sequence[Optional[float]], cp: int
     ) -> float:
         """Power-based aerobic load: fourth-power intensity factor.
 
@@ -278,7 +280,7 @@ class LoadComputationService:
             )
         accumulator = 0.0
         for watts in power_records:
-            if watts <= 0:
+            if watts is None or watts <= 0:
                 continue
             intensity = watts / cp
             accumulator += (intensity**4)
@@ -316,11 +318,16 @@ class LoadComputationService:
         if not values:
             return None
 
+        # Filter out None values for stats computation
+        clean_values: list[float] = [v for v in values if v is not None]
+        if not clean_values:
+            return None
+
         # Coefficient of variation
-        mean_val = statistics.mean(values)
+        mean_val = statistics.mean(clean_values)
         if mean_val <= 0:
             return None
-        stdev_val = statistics.stdev(values)
+        stdev_val = statistics.stdev(clean_values)
         cv = stdev_val / mean_val
 
         # Time above VO2max (95% of LT2 intensity)
@@ -332,7 +339,7 @@ class LoadComputationService:
             # Rough power correlate (assuming 3 W/hr estimate)
             lt2_threshold = lt2_hr * 3
 
-        time_above_vo2 = sum(1 for v in values if v >= lt2_threshold)
+        time_above_vo2 = sum(1 for v in clean_values if v >= lt2_threshold)
 
         duration_hours = max(inputs.parsed_fit.duration_seconds / 3600.0, 0.001)
         time_above_vo2_hours = time_above_vo2 / 3600.0

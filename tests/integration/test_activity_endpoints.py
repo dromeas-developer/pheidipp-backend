@@ -12,10 +12,11 @@ from __future__ import annotations
 import io
 import uuid
 from datetime import date, datetime, timezone
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from httpx import ASGITransport, AsyncClient
+from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.activity import Activity
@@ -39,7 +40,7 @@ def _access_token(athlete_id: uuid.UUID) -> str:
 
 async def _create_athlete_with_onboarding(
     db_session: AsyncSession,
-) -> tuple:
+) -> tuple[Any, Any, Any]:
     """Create an athlete with full onboarding context for activity tests.
 
     Returns (athlete, auth_token_payload).
@@ -109,7 +110,7 @@ async def _create_athlete_with_onboarding(
     db_session.add(twin)
 
     await db_session.flush()
-    return athlete, goal, twin
+    return athlete, goal, twin  # noqa: F811
 
 
 def _fake_fit_bytes() -> bytes:
@@ -134,7 +135,7 @@ class TestPostUploadActivity:
         Phase-1.8: 202 Accepted with task_id is the correct response
         because processing happens asynchronously via the fit_ingest worker.
         """
-        athlete, goal, twin = await _create_athlete_with_onboarding(db_session)
+        athlete, *_ = await _create_athlete_with_onboarding(db_session)
         token = _access_token(athlete.id)
 
         # Mock the procrastinate task deferral
@@ -160,7 +161,7 @@ class TestPostUploadActivity:
     @pytest.mark.asyncio
     async def test_upload_requires_auth(self, client: AsyncClient, db_session: AsyncSession) -> None:
         """require_self auth: JWT athlete_id must match path parameter."""
-        athlete = await make_athlete(db_session, f"auth-{uuid.uuid4()}@example.com")
+        await make_athlete(db_session, f"auth-{uuid.uuid4()}@example.com")
 
         # Use wrong athlete_id in JWT (by using a different token)
         response = await client.post(
@@ -173,7 +174,7 @@ class TestPostUploadActivity:
     @pytest.mark.asyncio
     async def test_upload_empty_file_returns_422(self, client: AsyncClient, db_session: AsyncSession) -> None:
         """Empty file returns 422 Unprocessable Entity."""
-        athlete, goal, twin = await _create_athlete_with_onboarding(db_session)
+        athlete, *_ = await _create_athlete_with_onboarding(db_session)
         token = _access_token(athlete.id)
 
         response = await client.post(
@@ -187,7 +188,7 @@ class TestPostUploadActivity:
     @pytest.mark.asyncio
     async def test_upload_file_too_large_returns_413(self, client: AsyncClient, db_session: AsyncSession) -> None:
         """File exceeding 10MB limit returns 413."""
-        athlete, goal, twin = await _create_athlete_with_onboarding(db_session)
+        athlete, *_ = await _create_athlete_with_onboarding(db_session)
         token = _access_token(athlete.id)
 
         # Create file larger than 10MB
@@ -208,7 +209,7 @@ class TestListActivities:
     @pytest.mark.asyncio
     async def test_list_returns_empty_initially(self, client: AsyncClient, db_session: AsyncSession) -> None:
         """New athlete with no activities returns empty list."""
-        athlete, goal, twin = await _create_athlete_with_onboarding(db_session)
+        athlete, *_ = await _create_athlete_with_onboarding(db_session)
         token = _access_token(athlete.id)
 
         response = await client.get(
@@ -224,7 +225,7 @@ class TestListActivities:
     @pytest.mark.asyncio
     async def test_list_returns_activities(self, client: AsyncClient, db_session: AsyncSession) -> None:
         """Activity list returns existing activities for the athlete."""
-        athlete, goal, twin = await _create_athlete_with_onboarding(db_session)
+        athlete, *_ = await _create_athlete_with_onboarding(db_session)
         token = _access_token(athlete.id)
 
         # Create an activity directly
@@ -255,8 +256,8 @@ class TestListActivities:
     @pytest.mark.asyncio
     async def test_list_requires_auth(self, client: AsyncClient, db_session: AsyncSession) -> None:
         """require_self: cross-athlete access returns 403."""
-        athlete1, goal1, twin1 = await _create_athlete_with_onboarding(db_session)
-        athlete2, goal2, twin2 = await _create_athlete_with_onboarding(db_session)
+        _, *_ = await _create_athlete_with_onboarding(db_session)
+        athlete2, *_ = await _create_athlete_with_onboarding(db_session)
 
         # Using athlete1's token to access athlete2's activities
         response = await client.get(
@@ -273,7 +274,7 @@ class TestGetActivity:
     @pytest.mark.asyncio
     async def test_get_activity_returns_activity(self, client: AsyncClient, db_session: AsyncSession) -> None:
         """GET returns the activity details."""
-        athlete, goal, twin = await _create_athlete_with_onboarding(db_session)
+        athlete, *_ = await _create_athlete_with_onboarding(db_session)
         token = _access_token(athlete.id)
 
         activity = Activity(
@@ -302,7 +303,7 @@ class TestGetActivity:
     @pytest.mark.asyncio
     async def test_get_activity_not_found(self, client: AsyncClient, db_session: AsyncSession) -> None:
         """Non-existent activity returns 404."""
-        athlete, goal, twin = await _create_athlete_with_onboarding(db_session)
+        athlete, *_ = await _create_athlete_with_onboarding(db_session)
         token = _access_token(athlete.id)
 
         response = await client.get(
@@ -319,7 +320,7 @@ class TestPostAnalyseActivity:
     @pytest.mark.asyncio
     async def test_analyse_returns_coaching_message(self, client: AsyncClient, db_session: AsyncSession) -> None:
         """POST /analyse returns a coaching message."""
-        athlete, goal, twin = await _create_athlete_with_onboarding(db_session)
+        athlete, _, twin = await _create_athlete_with_onboarding(db_session)
         token = _access_token(athlete.id)
 
         # Create activity with load scores
@@ -370,7 +371,7 @@ class TestPostAnalyseActivity:
     @pytest.mark.asyncio
     async def test_analyse_idempotent(self, client: AsyncClient, db_session: AsyncSession) -> None:
         """Second call to /analyse returns the existing message (no second LLM call)."""
-        athlete, goal, twin = await _create_athlete_with_onboarding(db_session)
+        athlete, _, twin = await _create_athlete_with_onboarding(db_session)
         token = _access_token(athlete.id)
 
         activity = Activity(
@@ -426,7 +427,7 @@ class TestPostAnalyseActivity:
     @pytest.mark.asyncio
     async def test_analyse_activity_not_found(self, client: AsyncClient, db_session: AsyncSession) -> None:
         """Non-existent activity returns 404."""
-        athlete, goal, twin = await _create_athlete_with_onboarding(db_session)
+        athlete, *_ = await _create_athlete_with_onboarding(db_session)
         token = _access_token(athlete.id)
 
         with patch("app.api.v1.activity.build_post_workout_agent") as mock_build:
@@ -448,8 +449,8 @@ class TestGetActivityAnalysis:
 
     @pytest.mark.asyncio
     async def test_get_analysis_returns_message(self, client: AsyncClient, db_session: AsyncSession) -> None:
-        """GET /analysis returns the existing coaching message."""
-        athlete, goal, twin = await _create_athlete_with_onboarding(db_session)
+        """GET /analysis returns existing analysis."""
+        athlete, _, twin = await _create_athlete_with_onboarding(db_session)
         token = _access_token(athlete.id)
 
         activity = Activity(
@@ -489,7 +490,7 @@ class TestGetActivityAnalysis:
     @pytest.mark.asyncio
     async def test_get_analysis_not_found(self, client: AsyncClient, db_session: AsyncSession) -> None:
         """When no analysis exists, returns 404 with instructions."""
-        athlete, goal, twin = await _create_athlete_with_onboarding(db_session)
+        athlete, *_ = await _create_athlete_with_onboarding(db_session)
         token = _access_token(athlete.id)
 
         activity = Activity(
@@ -525,7 +526,7 @@ class TestSignalAvailabilityFlags:
     @pytest.mark.asyncio
     async def test_get_activity_returns_all_signal_flags(self, client: AsyncClient, db_session: AsyncSession) -> None:
         """GET returns has_hr, has_power, has_rr_intervals, has_gps."""
-        athlete, goal, twin = await _create_athlete_with_onboarding(db_session)
+        athlete, *_ = await _create_athlete_with_onboarding(db_session)
         token = _access_token(athlete.id)
 
         activity = Activity(
@@ -561,7 +562,7 @@ class TestSignalAvailabilityFlags:
     @pytest.mark.asyncio
     async def test_get_activity_with_power_only(self, client: AsyncClient, db_session: AsyncSession) -> None:
         """GET returns has_power=True when only power data is available."""
-        athlete, goal, twin = await _create_athlete_with_onboarding(db_session)
+        athlete, *_ = await _create_athlete_with_onboarding(db_session)
         token = _access_token(athlete.id)
 
         activity = Activity(
@@ -596,7 +597,7 @@ class TestSignalAvailabilityFlags:
     @pytest.mark.asyncio
     async def test_get_activity_with_rr_intervals_only(self, client: AsyncClient, db_session: AsyncSession) -> None:
         """GET returns has_rr_intervals=True when only RR interval data is available."""
-        athlete, goal, twin = await _create_athlete_with_onboarding(db_session)
+        athlete, *_ = await _create_athlete_with_onboarding(db_session)
         token = _access_token(athlete.id)
 
         activity = Activity(
@@ -631,7 +632,7 @@ class TestSignalAvailabilityFlags:
     @pytest.mark.asyncio
     async def test_get_activity_with_gps_only(self, client: AsyncClient, db_session: AsyncSession) -> None:
         """GET returns has_gps=True when GPS data is available."""
-        athlete, goal, twin = await _create_athlete_with_onboarding(db_session)
+        athlete, *_ = await _create_athlete_with_onboarding(db_session)
         token = _access_token(athlete.id)
 
         activity = Activity(
@@ -666,7 +667,7 @@ class TestSignalAvailabilityFlags:
     @pytest.mark.asyncio
     async def test_list_activities_returns_signal_flags(self, client: AsyncClient, db_session: AsyncSession) -> None:
         """GET /activities list returns signal flags for each activity."""
-        athlete, goal, twin = await _create_athlete_with_onboarding(db_session)
+        athlete, *_ = await _create_athlete_with_onboarding(db_session)
         token = _access_token(athlete.id)
 
         activity = Activity(
@@ -702,7 +703,7 @@ class TestSignalAvailabilityFlags:
     @pytest.mark.asyncio
     async def test_get_activity_calibration_eligible_flag(self, client: AsyncClient, db_session: AsyncSession) -> None:
         """GET returns calibration_eligible flag populated by CalibrationEligibilityService."""
-        athlete, goal, twin = await _create_athlete_with_onboarding(db_session)
+        athlete, *_ = await _create_athlete_with_onboarding(db_session)
         token = _access_token(athlete.id)
 
         activity = Activity(
@@ -742,7 +743,7 @@ class TestSportTypeResponse:
     @pytest.mark.asyncio
     async def test_get_activity_returns_sport_type(self, client: AsyncClient, db_session: AsyncSession) -> None:
         """GET /activities/{aid} returns sport_type field populated from parsed FIT."""
-        athlete, goal, twin = await _create_athlete_with_onboarding(db_session)
+        athlete, *_ = await _create_athlete_with_onboarding(db_session)
         token = _access_token(athlete.id)
 
         activity = Activity(
@@ -778,7 +779,7 @@ class TestSportTypeResponse:
     @pytest.mark.asyncio
     async def test_get_activity_returns_sport_type_cycling(self, client: AsyncClient, db_session: AsyncSession) -> None:
         """Cycling activity shows sport_type='cycling' in GET response."""
-        athlete, goal, twin = await _create_athlete_with_onboarding(db_session)
+        athlete, *_ = await _create_athlete_with_onboarding(db_session)
         token = _access_token(athlete.id)
 
         activity = Activity(
@@ -814,7 +815,7 @@ class TestSportTypeResponse:
     @pytest.mark.asyncio
     async def test_get_activity_returns_sport_type_unknown(self, client: AsyncClient, db_session: AsyncSession) -> None:
         """Activity with undetectable sport shows sport_type='unknown'."""
-        athlete, goal, twin = await _create_athlete_with_onboarding(db_session)
+        athlete, *_ = await _create_athlete_with_onboarding(db_session)
         token = _access_token(athlete.id)
 
         activity = Activity(
@@ -851,7 +852,7 @@ class TestSportTypeResponse:
     @pytest.mark.asyncio
     async def test_list_activities_returns_sport_type(self, client: AsyncClient, db_session: AsyncSession) -> None:
         """GET /activities list returns sport_type for each activity."""
-        athlete, goal, twin = await _create_athlete_with_onboarding(db_session)
+        athlete, *_ = await _create_athlete_with_onboarding(db_session)
         token = _access_token(athlete.id)
 
         activity1 = Activity(
@@ -897,7 +898,7 @@ class TestSportTypeResponse:
     @pytest.mark.asyncio
     async def test_manual_entry_has_unknown_sport_type(self, client: AsyncClient, db_session: AsyncSession) -> None:
         """Manual-entry activities default to sport_type='unknown'."""
-        athlete, goal, twin = await _create_athlete_with_onboarding(db_session)
+        athlete, *_ = await _create_athlete_with_onboarding(db_session)
         token = _access_token(athlete.id)
 
         activity = Activity(

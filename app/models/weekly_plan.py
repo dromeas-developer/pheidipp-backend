@@ -21,6 +21,8 @@ Invariants codified at the DB layer:
 
 from __future__ import annotations
 
+from typing import Any
+
 import uuid
 from datetime import date, datetime, timezone
 
@@ -41,6 +43,7 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
+from app.models._enum_helpers import enum_str_values
 from app.models.enums import (
     CheckpointType,
     SessionType,
@@ -79,7 +82,7 @@ class WeeklyPlan(Base):
     # ------------------------------------------------------------------
     # Intent (post pre-week review).
     # ------------------------------------------------------------------
-    adjusted_intent: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    adjusted_intent: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
 
     status: Mapped[WeeklyPlanStatus] = mapped_column(
         SAEnum(
@@ -87,7 +90,7 @@ class WeeklyPlan(Base):
             name="weekly_plan_status",
             native_enum=False,
             length=16,
-            values_callable=lambda x: [e.value for e in x],
+            values_callable=enum_str_values,
         ),
         nullable=False,
     )
@@ -177,7 +180,7 @@ class WeeklySession(Base):
             name="session_type",
             native_enum=False,
             length=32,
-            values_callable=lambda x: [e.value for e in x],
+            values_callable=enum_str_values,
         ),
         nullable=False,
     )
@@ -198,7 +201,7 @@ class WeeklySession(Base):
             name="checkpoint_type",
             native_enum=False,
             length=32,
-            values_callable=lambda x: [e.value for e in x],
+            values_callable=enum_str_values,
             create_type=False,
         ),
         nullable=True,

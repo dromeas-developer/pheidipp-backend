@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
-from typing import Optional
+from typing import Any, Optional
 from uuid import UUID
 
 from app.models.athlete_preferences import AthletePreferences
@@ -61,7 +61,7 @@ class ProfileSnapshot:
     timezone: Optional[str]
     location_lat: Optional[float]
     location_lng: Optional[float]
-    training_window: Optional[dict]
+    training_window: Optional[dict[str, Any]]
     structural_risk_flag: Optional[bool]
 
 
@@ -80,7 +80,7 @@ class PreferencesSnapshot:
     sport_background: str
     years_structured_training: int
     training_time_of_day: str
-    weekly_schedule: dict
+    weekly_schedule: dict[str, Any]
     gps_source: str
     hr_source: str
     power_source: str

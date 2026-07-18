@@ -13,9 +13,9 @@ it composes both repositories and ensures the invariant by construction.
 
 from __future__ import annotations
 
-import uuid
-from datetime import datetime, timezone
 from typing import Any
+import uuid
+from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -35,7 +35,7 @@ class SystemEventRepository:
         event_type: str,
         version: str,
         athlete_id: uuid.UUID,
-        payload: dict,
+        payload: dict[str, Any],
         produced_at: datetime,
     ) -> SystemEvent:
         """Insert a SystemEvent within the caller's transaction.

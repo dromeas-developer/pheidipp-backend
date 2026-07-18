@@ -15,8 +15,8 @@ import re
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, call
-from typing import cast, Optional, Sequence
+from unittest.mock import AsyncMock, MagicMock
+from typing import Any, Optional, Sequence, cast
 
 import pytest
 
@@ -27,9 +27,7 @@ from app.services.object_storage_client import ObjectStorageConflictError
 from app.services.signal_cleaning_service import (
     PIPELINE_VERSION,
     RR_DEVIATION_THRESHOLD,
-    AvailableChannels,
     CleaningResult,
-    RawSensorStreamRepository,
     SignalCleaningIneligibleError,
     SignalCleaningNotFoundError,
     SignalCleaningService,
@@ -80,7 +78,9 @@ def _parsed_fit_data_hr_only(
 
     hr_values defaults to a constant 150 bpm for `duration` seconds.
     """
-    hr = hr_values or [150.0] * duration
+    hr: list[Optional[float]] = (
+        list(hr_values) if hr_values is not None else [150.0] * duration
+    )
     return ParsedFitData(
         start_time=datetime(2026, 6, 15, 8, 0, tzinfo=timezone.utc),
         duration_seconds=duration,
@@ -101,11 +101,19 @@ def _parsed_fit_data_full(
     gps_altitude_values: Sequence[Optional[float]] | None = None,
 ) -> ParsedFitData:
     """ParsedFitData with all channel data."""
-    hr = hr_values or [150.0] * duration
-    power = power_values or [200.0] * duration
-    rr = rr_values or [1000.0] * (duration // 2)  # half the rate of HR
+    hr: list[Optional[float]] = (
+        list(hr_values) if hr_values is not None else [150.0] * duration
+    )
+    power: list[Optional[float]] = (
+        list(power_values) if power_values is not None else [200.0] * duration
+    )
+    rr: list[Optional[float]] = (
+        list(rr_values)
+        if rr_values is not None
+        else [1000.0] * (duration // 2)  # half the rate of HR
+    )
 
-    gps_records = []
+    gps_records: list[GpsRecord] = []
     start_time = datetime(2026, 6, 15, 8, 0, tzinfo=timezone.utc)
     for i in range(duration):
         speed = (gps_speed_values or [3.0] * duration)[i]
@@ -142,18 +150,18 @@ async def _run_clean_and_return_result(
 
     The mock activity must have ``fit_file_key`` set.
     """
-    service._activities.get_by_id = AsyncMock(return_value=mock_activity)
-    service._raw_streams.exists_for_activity = AsyncMock(
+    service.activities.get_by_id = AsyncMock(return_value=mock_activity)
+    service.raw_streams.exists_for_activity = AsyncMock(
         return_value=raw_stream_exists
     )
-    service._object_storage.download_fit = AsyncMock(
+    service.object_storage.download_fit = AsyncMock(
         return_value=b"fake-fit-bytes"
     )
-    service._fit_parser.parse = AsyncMock(return_value=mock_parsed)
-    service._object_storage.build_cleaned_stream_key = MagicMock(
+    service.fit_parser.parse = AsyncMock(return_value=mock_parsed)
+    service.object_storage.build_cleaned_stream_key = MagicMock(
         return_value=f"cleaned-streams/{mock_activity.athlete_id}/{mock_activity.id}/stream.gz"
     )
-    service._object_storage.upload_cleaned_stream = AsyncMock(
+    service.object_storage.upload_cleaned_stream = AsyncMock(
         return_value=MagicMock()
     )
 
@@ -165,20 +173,18 @@ async def _run_clean_and_return_result(
         stream.id = uuid.uuid4()
         return stream
 
-    service._raw_streams.insert = _insert
-    service._activities.update_cleaning_version = AsyncMock()
+    service.raw_streams.insert = _insert
+    service.activities.update_cleaning_version = AsyncMock()
 
     result = await service.clean(activity_id)
 
     # Verify persistence calls were made when created=True
     if result.created:
         assert captured_stream, "insert() was not called on created=True"
-        assert (
-            cast(AsyncMock, service._activities.update_cleaning_version).call_count
-            == 1
-        )
-        call_args = cast(AsyncMock, service._activities.update_cleaning_version).call_args
-        assert call_args.kwargs["version"] == PIPELINE_VERSION
+    assert service.activities.update_cleaning_version.call_count == 1
+    call_args = service.activities.update_cleaning_version.call_args
+    assert call_args is not None
+    assert call_args.kwargs["version"] == PIPELINE_VERSION
 
     return result
 
@@ -200,7 +206,7 @@ class TestCleanMissingActivity:
             activity_repository=AsyncMock(),
             fit_parser=AsyncMock(),
         )
-        service._activities.get_by_id = AsyncMock(return_value=None)
+        service.activities.get_by_id = AsyncMock(return_value=None)
 
         with pytest.raises(SignalCleaningNotFoundError):
             await service.clean(uuid.uuid4())
@@ -225,16 +231,16 @@ class TestCleanManualEntry:
             activity_repository=AsyncMock(),
             fit_parser=AsyncMock(),
         )
-        service._activities.get_by_id = AsyncMock(return_value=mock)
-        service._raw_streams.exists_for_activity = AsyncMock(return_value=False)
+        service.activities.get_by_id = AsyncMock(return_value=mock)
+        service.raw_streams.exists_for_activity = AsyncMock(return_value=False)
 
         result = await service.clean(activity_id)
 
         assert result.created is False
         assert result.reason == "manual_entry"
         # No pipeline or persistence calls
-        cast(AsyncMock, service._object_storage.download_fit).assert_not_called()
-        cast(AsyncMock, service._raw_streams.insert).assert_not_called()
+        cast(AsyncMock, service.object_storage.download_fit).assert_not_called()
+        cast(AsyncMock, service.raw_streams.insert).assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -257,17 +263,17 @@ class TestCleanIdempotency:
             activity_repository=AsyncMock(),
             fit_parser=AsyncMock(),
         )
-        service._activities.get_by_id = AsyncMock(return_value=mock)
+        service.activities.get_by_id = AsyncMock(return_value=mock)
         # RawSensorStream already exists for this activity.
-        service._raw_streams.exists_for_activity = AsyncMock(return_value=True)
+        service.raw_streams.exists_for_activity = AsyncMock(return_value=True)
 
         result = await service.clean(activity_id)
 
         assert result.created is False
         assert result.reason == "already_cleaned"
-        cast(AsyncMock, service._object_storage.download_fit).assert_not_called()
-        cast(AsyncMock, service._fit_parser.parse).assert_not_called()
-        cast(AsyncMock, service._raw_streams.insert).assert_not_called()
+        cast(AsyncMock, service.object_storage.download_fit).assert_not_called()
+        cast(AsyncMock, service.fit_parser.parse).assert_not_called()
+        cast(AsyncMock, service.raw_streams.insert).assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -290,15 +296,15 @@ class TestCleanIneligibleGate:
             activity_repository=AsyncMock(),
             fit_parser=AsyncMock(),
         )
-        service._activities.get_by_id = AsyncMock(return_value=mock)
-        service._raw_streams.exists_for_activity = AsyncMock(return_value=False)
+        service.activities.get_by_id = AsyncMock(return_value=mock)
+        service.raw_streams.exists_for_activity = AsyncMock(return_value=False)
 
         with pytest.raises(SignalCleaningIneligibleError):
             await service.clean(activity_id)
 
         # Nothing was cleaned or written.
-        cast(AsyncMock, service._object_storage.download_fit).assert_not_called()
-        cast(AsyncMock, service._raw_streams.insert).assert_not_called()
+        cast(AsyncMock, service.object_storage.download_fit).assert_not_called()
+        cast(AsyncMock, service.raw_streams.insert).assert_not_called()
 
     @pytest.mark.asyncio
     async def test_clean_non_running_raises_ineligible_error(self) -> None:
@@ -313,8 +319,8 @@ class TestCleanIneligibleGate:
             activity_repository=AsyncMock(),
             fit_parser=AsyncMock(),
         )
-        service._activities.get_by_id = AsyncMock(return_value=mock)
-        service._raw_streams.exists_for_activity = AsyncMock(return_value=False)
+        service.activities.get_by_id = AsyncMock(return_value=mock)
+        service.raw_streams.exists_for_activity = AsyncMock(return_value=False)
 
         with pytest.raises(SignalCleaningIneligibleError):
             await service.clean(activity_id)
@@ -371,12 +377,12 @@ class TestCleanHrStreamCreated:
         # The service uses the loaded activity's `id` (not the
         # `activity_id` argument) when calling update_cleaning_version
         # — see app/services/signal_cleaning_service.py
-        # `await self._activities.update_cleaning_version(
+        # `await self.activities.update_cleaning_version(
         #     activity_id=activity.id, version=PIPELINE_VERSION)`.
         # The `activity_id` and `mock.id` are independent UUIDs
         # created in the test, so the assertion must use `mock.id`
         # to match the call site.
-        cast(AsyncMock, service._activities.update_cleaning_version).assert_called_once_with(
+        cast(AsyncMock, service.activities.update_cleaning_version).assert_called_once_with(
             activity_id=mock.id, version=PIPELINE_VERSION
         )
 
@@ -405,18 +411,18 @@ class TestCleanHrStreamCreated:
             stream.id = uuid.uuid4()
             return stream
 
-        service._activities.get_by_id = AsyncMock(return_value=mock)
-        service._raw_streams.exists_for_activity = AsyncMock(return_value=False)
-        service._object_storage.download_fit = AsyncMock(return_value=b"fit")
-        service._fit_parser.parse = AsyncMock(return_value=parsed)
-        service._object_storage.build_cleaned_stream_key = MagicMock(
+        service.activities.get_by_id = AsyncMock(return_value=mock)
+        service.raw_streams.exists_for_activity = AsyncMock(return_value=False)
+        service.object_storage.download_fit = AsyncMock(return_value=b"fit")
+        service.fit_parser.parse = AsyncMock(return_value=parsed)
+        service.object_storage.build_cleaned_stream_key = MagicMock(
             return_value=f"cleaned-streams/{mock.athlete_id}/{mock.id}/stream.gz"
         )
-        service._object_storage.upload_cleaned_stream = AsyncMock(
+        service.object_storage.upload_cleaned_stream = AsyncMock(
             return_value=MagicMock()
         )
-        service._raw_streams.insert = _insert
-        service._activities.update_cleaning_version = AsyncMock()
+        service.raw_streams.insert = _insert
+        service.activities.update_cleaning_version = AsyncMock()
 
         await service.clean(activity_id)
 
@@ -456,7 +462,7 @@ class TestCleanPowerArtifacts:
 
         # The stream is created (power still has many valid samples), but
         # the spike samples were removed in _remove_artifacts.
-        assert cast(AsyncMock, service._fit_parser.parse).call_count == 1
+        assert cast(AsyncMock, service.fit_parser.parse).call_count == 1
 
     @pytest.mark.asyncio
     async def test_clean_available_channels_power_false_when_all_artifacted(
@@ -577,22 +583,22 @@ class TestCleanShortStream:
             fit_parser=AsyncMock(),
         )
 
-        captured_inserts: list = []
-        service._activities.get_by_id = AsyncMock(return_value=mock)
-        service._raw_streams.exists_for_activity = AsyncMock(return_value=False)
-        service._object_storage.download_fit = AsyncMock(return_value=b"fit")
-        service._fit_parser.parse = AsyncMock(return_value=parsed)
-        service._raw_streams.insert = AsyncMock(
-            side_effect=lambda s: captured_inserts.append(s)
+        captured_inserts: list[Any] = []
+        service.activities.get_by_id = AsyncMock(return_value=mock)
+        service.raw_streams.exists_for_activity = AsyncMock(return_value=False)
+        service.object_storage.download_fit = AsyncMock(return_value=b"fit")
+        service.fit_parser.parse = AsyncMock(return_value=parsed)
+        service.raw_streams.insert = AsyncMock(
+            side_effect=lambda s: captured_inserts.append(s)  # type: ignore[reportUnknownLambdaType]
         )
-        service._activities.update_cleaning_version = AsyncMock()
+        service.activities.update_cleaning_version = AsyncMock()
 
         result = await service.clean(activity_id)
 
         assert result.created is False
         assert result.reason == "short_stream"
         assert len(captured_inserts) == 0
-        service._activities.update_cleaning_version.assert_not_called()
+        service.activities.update_cleaning_version.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -646,7 +652,7 @@ class TestCleanRetryIdempotency:
 
         call_count = 0
 
-        async def _upload_with_conflict_once(**kwargs):
+        async def _upload_with_conflict_once(**kwargs: Any) -> MagicMock:
             nonlocal call_count
             call_count += 1
             if call_count == 1:
@@ -660,25 +666,25 @@ class TestCleanRetryIdempotency:
             activity_repository=AsyncMock(),
             fit_parser=AsyncMock(),
         )
-        service._activities.get_by_id = AsyncMock(return_value=mock)
-        service._raw_streams.exists_for_activity = AsyncMock(return_value=False)
-        service._object_storage.download_fit = AsyncMock(return_value=b"fit")
-        service._fit_parser.parse = AsyncMock(return_value=parsed)
-        service._object_storage.build_cleaned_stream_key = MagicMock(
+        service.activities.get_by_id = AsyncMock(return_value=mock)
+        service.raw_streams.exists_for_activity = AsyncMock(return_value=False)
+        service.object_storage.download_fit = AsyncMock(return_value=b"fit")
+        service.fit_parser.parse = AsyncMock(return_value=parsed)
+        service.object_storage.build_cleaned_stream_key = MagicMock(
             return_value=f"cleaned-streams/{mock.athlete_id}/{mock.id}/stream.gz"
         )
-        service._object_storage.upload_cleaned_stream = _upload_with_conflict_once
-        service._raw_streams.insert = AsyncMock(
-            side_effect=lambda s: setattr(s, "id", uuid.uuid4()) or s
+        service.object_storage.upload_cleaned_stream = _upload_with_conflict_once
+        service.raw_streams.insert = AsyncMock(
+            side_effect=lambda s: setattr(s, "id", uuid.uuid4()) or s  # type: ignore[reportUnknownLambdaType, reportUnknownArgumentType]
         )
-        service._activities.update_cleaning_version = AsyncMock()
+        service.activities.update_cleaning_version = AsyncMock()
 
         result = await service.clean(activity_id)
 
         # After the conflict, the service caught it and proceeded to insert.
         assert result.created is True
         assert result.raw_sensor_stream_id is not None
-        service._activities.update_cleaning_version.assert_called_once()
+        service.activities.update_cleaning_version.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
@@ -962,7 +968,7 @@ class TestRrDeviationFilter:
             duration_seconds=parsed.duration_seconds,
             hr_records=parsed.hr_records,
             power_records=[],
-            rr_records=rr_values,
+            rr_records=cast(list[float | None], rr_values),
             gps_records=[],
             has_hr=True,
             has_power=False,
@@ -1301,7 +1307,6 @@ class TestRrDeviationFilter:
         # Deviation nulls ~30 outliers near the baseline→outlier
         # transition → cumulative null ≥ 481 → null fraction
         # > 80% → post-P2 rr_intervals=False.
-        duration = _SUFFICIENT_DURATION  # 600
         rr_values: Sequence[Optional[float]] = [100.0] * 480 + [800.0] * 30 + [400.0] * 90
         parsed = _parsed_fit_data_full(rr_values=rr_values)
 
@@ -1368,9 +1373,9 @@ class TestRrDeviationFilterRegression:
         parsed = ParsedFitData(
             start_time=datetime(2026, 6, 15, 8, 0, tzinfo=timezone.utc),
             duration_seconds=_SUFFICIENT_DURATION,
-            hr_records=hr_values,
+            hr_records=cast(list[float | None], hr_values),
             power_records=[],
-            rr_records=rr_values,
+            rr_records=cast(list[float | None], rr_values),
             gps_records=[],
             has_hr=True,
             has_power=False,
@@ -1426,8 +1431,8 @@ class TestRrDeviationFilterRegression:
             activity_repository=AsyncMock(),
             fit_parser=AsyncMock(),
         )
-        service._activities.get_by_id = AsyncMock(return_value=mock)
-        service._raw_streams.exists_for_activity = AsyncMock(return_value=True)
+        service.activities.get_by_id = AsyncMock(return_value=mock)
+        service.raw_streams.exists_for_activity = AsyncMock(return_value=True)
 
         result = await service.clean(activity_id)
 
@@ -1437,9 +1442,9 @@ class TestRrDeviationFilterRegression:
         # called inside ``clean`` only after the idempotency
         # guard passes; its absence proves the guard short-
         # circuited before the new deviation pass.
-        cast(AsyncMock, service._object_storage.download_fit).assert_not_called()
-        cast(AsyncMock, service._fit_parser.parse).assert_not_called()
-        cast(AsyncMock, service._raw_streams.insert).assert_not_called()
+        cast(AsyncMock, service.object_storage.download_fit).assert_not_called()
+        cast(AsyncMock, service.fit_parser.parse).assert_not_called()
+        cast(AsyncMock, service.raw_streams.insert).assert_not_called()
 
 
 class TestSessionDeadFieldRemoved:

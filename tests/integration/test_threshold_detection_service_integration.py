@@ -48,8 +48,7 @@ import gzip
 import json
 import uuid
 from datetime import date, datetime, timezone
-from typing import Iterable, List, Optional
-from unittest.mock import AsyncMock
+from typing import Any, List, Optional
 
 import pytest
 from sqlalchemy import select
@@ -373,8 +372,8 @@ async def _create_planned_session(
     athlete_id: uuid.UUID,
     session_type: SessionType = SessionType.EASY_RUN,
     target_date: Optional[date] = None,
-    parent_chain: Optional[tuple] = None,
-) -> tuple:
+    parent_chain: Optional[tuple[Any, Any, Any]] = None,
+) -> tuple[Any, Any, Any, Any]:
     """Insert a ``PlannedSession`` row with the full parent chain
     (TrainingGoal → TrainingPlan → WeeklyPlan → PlannedSession).
 
@@ -526,23 +525,6 @@ def _build_service(
         physiology_measurement_repository=physiology_measurement_repo,
         planned_session_repository=planned_session_repo,
     )
-
-
-def _observation_summary(observations: list) -> List[dict]:
-    """Reduce a list of ``ThresholdObservation`` to a comparable
-    list of dicts. Used to assert on the result of ``detect()``
-    without depending on dataclass equality semantics."""
-    return [
-        {
-            "parameter": obs.parameter,
-            "source": obs.source,
-            "weight": obs.weight,
-            "algorithm": obs.algorithm_used,
-            "activity_id": obs.activity_id,
-            "measurement_date": obs.measurement_date,
-        }
-        for obs in observations
-    ]
 
 
 # ---------------------------------------------------------------------------

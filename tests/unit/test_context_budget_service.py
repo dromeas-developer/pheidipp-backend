@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import uuid
 from datetime import date
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock, PropertyMock
 
 import pytest
@@ -34,7 +33,6 @@ from app.services.context_budget_service import (
     ContextBudgetService,
     FIRST_MESSAGE_PRIORITY_PROFILE,
     MAX_TOKENS,
-    ContextSection,
     FirstMessageContext,
 )
 
@@ -263,7 +261,7 @@ class TestBuildFirstMessageContext:
         mock_twin_state: MagicMock,
     ) -> None:
         twin_states_repo.get_latest.return_value = mock_twin_state
-        service._twin_states = twin_states_repo  # inject directly
+        service.twin_states = twin_states_repo  # inject directly
 
         await service.build_first_message_context(athlete_id)
 
@@ -498,6 +496,7 @@ class TestBuildFirstMessageContext:
         preferences_repo.get_by_athlete_id.return_value = mock_prefs
 
         context = await service.build_first_message_context(athlete_id)
+        assert context.computed_observations is not None
 
         assert context.computed_observations["structural_risk_flag"] is True
         assert context.computed_observations["structural_risk_reason"] == "non-running primary sport background"
@@ -521,6 +520,7 @@ class TestBuildFirstMessageContext:
         preferences_repo.get_by_athlete_id.return_value = mock_prefs
 
         context = await service.build_first_message_context(athlete_id)
+        assert context.computed_observations is not None
 
         assert context.computed_observations["structural_risk_flag"] is False
 

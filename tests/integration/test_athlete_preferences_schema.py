@@ -15,6 +15,8 @@ docs/implementation/phase-1/phase-1-2a-p1-profile-preferences-activity.md
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -35,7 +37,7 @@ from tests.utils.schema_helpers import db_columns, db_unique_constraints, db_che
 TABLE = "athlete_preferences"
 
 
-def _valid_weekly_schedule() -> dict:
+def _valid_weekly_schedule() -> dict[str, Any]:
     """Return a representative weekly-schedule payload."""
     return {
         "monday": {
@@ -183,7 +185,7 @@ class TestYearsStructuredTrainingNonNegative:
         checks = db_check_constraints(TABLE)
         # Look for a check whose SQL expression mentions the column
         # and 0.
-        found = []
+        found: list[str] = []
         for c in checks:
             sqltext = (c.get("sqltext") or "").lower()
             if "years_structured_training" in sqltext and ">= 0" in sqltext:

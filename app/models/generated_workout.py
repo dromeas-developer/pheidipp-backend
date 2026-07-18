@@ -37,6 +37,8 @@ Invariants codified at the DB layer:
 
 from __future__ import annotations
 
+from typing import Any
+
 import uuid
 from datetime import date, datetime, timezone
 
@@ -48,7 +50,6 @@ from sqlalchemy import (
     Index,
     Text,
     func,
-    text,
     UniqueConstraint,
 )
 from sqlalchemy import Enum as SAEnum
@@ -56,6 +57,7 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
+from app.models._enum_helpers import enum_str_values
 from app.models.enums import RecoveryModifierLevel
 
 
@@ -92,8 +94,8 @@ class GeneratedWorkout(Base):
     # `TargetSet` is the JSONB shape: ``{targets: WorkoutTarget[],
     # description: string}``.
     # ------------------------------------------------------------------
-    theoretical_targets: Mapped[dict] = mapped_column(JSONB, nullable=False)
-    adjusted_targets: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    theoretical_targets: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    adjusted_targets: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
 
     # ------------------------------------------------------------------
     # Modifier annotation — defaults to ``green`` per architecture.
@@ -104,7 +106,7 @@ class GeneratedWorkout(Base):
             name="recovery_modifier_level",
             native_enum=False,
             length=8,
-            values_callable=lambda x: [e.value for e in x],
+            values_callable=enum_str_values,
             create_type=False,
         ),
         nullable=False,

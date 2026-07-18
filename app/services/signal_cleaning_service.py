@@ -366,10 +366,10 @@ class SignalCleaningService:
         # the repositories hold the session internally. The service
         # does not store a direct reference to the session — the
         # validation report flagged `self._session` as dead.
-        self._object_storage = object_storage
-        self._raw_streams = raw_stream_repository
-        self._activities = activity_repository
-        self._fit_parser = fit_parser
+        self.object_storage = object_storage
+        self.raw_streams = raw_stream_repository
+        self.activities = activity_repository
+        self.fit_parser = fit_parser
 
     # ------------------------------------------------------------------
     # Public API.
@@ -419,7 +419,7 @@ class SignalCleaningService:
                 is the idempotency outcome on retry and is caught
                 internally.
         """
-        activity = await self._activities.get_by_id(activity_id)
+        activity = await self.activities.get_by_id(activity_id)
         if activity is None:
             raise SignalCleaningNotFoundError(
                 f"activity {activity_id} does not exist"
@@ -437,7 +437,7 @@ class SignalCleaningService:
         # Idempotency: a row already exists → retry after a
         # partial-then-committed run. Return success without
         # re-running the pipeline.
-        if await self._raw_streams.exists_for_activity(activity_id):
+        if await self.raw_streams.exists_for_activity(activity_id):
             log_event(
                 event="signal_cleaning.skipped",
                 activity_id=str(activity_id),
@@ -468,8 +468,8 @@ class SignalCleaningService:
                 f"activity {activity_id} has no fit_file_key"
             )
 
-        fit_bytes = await self._object_storage.download_fit(fit_key)
-        parsed: ParsedFitData = await self._fit_parser.parse(fit_bytes)
+        fit_bytes = await self.object_storage.download_fit(fit_key)
+        parsed: ParsedFitData = await self.fit_parser.parse(fit_bytes)
 
         # Pipeline order is fixed — see the method docstring and
         # signal-cleaning.md step ordering. Each method's output is
@@ -513,12 +513,12 @@ class SignalCleaningService:
         # retry after a partial-then-committed upload hits
         # ``ObjectStorageConflictError`` — that conflict is the
         # idempotency outcome.
-        key = self._object_storage.build_cleaned_stream_key(
+        key = self.object_storage.build_cleaned_stream_key(
             activity.athlete_id, activity.id
         )
         payload = gzip.compress(stream.to_json_bytes())
         try:
-            await self._object_storage.upload_cleaned_stream(
+            await self.object_storage.upload_cleaned_stream(
                 athlete_id=activity.athlete_id,
                 activity_id=activity.id,
                 payload_bytes=payload,
@@ -534,7 +534,7 @@ class SignalCleaningService:
                 outcome="success",
             )
 
-        inserted = await self._raw_streams.insert(
+        inserted = await self.raw_streams.insert(
             RawSensorStream(
                 activity_id=activity.id,
                 fit_file_key=key,
@@ -543,7 +543,7 @@ class SignalCleaningService:
                 cleaning_pipeline_version=PIPELINE_VERSION,
             )
         )
-        await self._activities.update_cleaning_version(
+        await self.activities.update_cleaning_version(
             activity_id=activity.id, version=PIPELINE_VERSION
         )
 

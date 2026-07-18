@@ -38,7 +38,7 @@ def truncate_ip(ip: Optional[str]) -> Optional[str]:
     """
     if ip is None:
         return None
-    if not isinstance(ip, str) or not ip.strip():
+    if not ip.strip():
         return None
     candidate = ip.strip()
     try:

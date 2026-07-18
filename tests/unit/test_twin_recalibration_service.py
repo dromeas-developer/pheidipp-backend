@@ -10,23 +10,19 @@ from __future__ import annotations
 
 import math
 import uuid
-from dataclasses import dataclass
 from datetime import datetime, timezone
-from unittest.mock import MagicMock, patch
+from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 
 from app.models.athlete_fitness import AthleteFitness
-from app.models.enums import (
-    DataTier,
-    TwinConfidenceLevel,
-    TwinTrigger,
-)
+
 from app.services.twin_recalibration_service import (
     BanisterUpdateResult,
     TwinRecalibrationService,
-    _days_since,
-    _read_time_constants,
+    days_since,
+    read_time_constants,
     POPULATION_TIME_CONSTANTS,
 )
 
@@ -36,8 +32,8 @@ class TestBanisterUpdate:
 
     @staticmethod
     def _fitness_row(
-        aggregate: dict | None = None,
-        time_constants: dict | None = None,
+        aggregate: dict[str, Any] | None = None,
+        time_constants: dict[str, Any] | None = None,
         last_activity_id: uuid.UUID | None = None,
     ) -> MagicMock:
         """Create a mock AthleteFitness row with JSONB aggregate."""
@@ -52,7 +48,7 @@ class TestBanisterUpdate:
         row = self._fitness_row(
             aggregate={"fitness": 0.0, "fatigue": 0.0, "form": 0.0}
         )
-        result = TwinRecalibrationService._apply_banister_update(
+        result = TwinRecalibrationService.apply_banister_update(
             fitness_row=row,
             aerobic_load=0.0,
         )
@@ -65,7 +61,7 @@ class TestBanisterUpdate:
         row = self._fitness_row(
             aggregate={"fitness": 0.0, "fatigue": 0.0, "form": 0.0}
         )
-        result = TwinRecalibrationService._apply_banister_update(
+        result = TwinRecalibrationService.apply_banister_update(
             fitness_row=row,
             aerobic_load=100.0,
         )
@@ -82,7 +78,7 @@ class TestBanisterUpdate:
         # days_since=1 for single-day spacing (Phase 1.6 simplification)
         # fitness_decay = exp(-1/42) ≈ 0.976
         # fatigue_decay = exp(-1/7) ≈ 0.860
-        result = TwinRecalibrationService._apply_banister_update(
+        result = TwinRecalibrationService.apply_banister_update(
             fitness_row=row,
             aerobic_load=50.0,
         )
@@ -99,7 +95,7 @@ class TestBanisterUpdate:
         row = self._fitness_row(
             aggregate={"fitness": 80.0, "fatigue": 30.0, "form": 50.0}
         )
-        result = TwinRecalibrationService._apply_banister_update(
+        result = TwinRecalibrationService.apply_banister_update(
             fitness_row=row,
             aerobic_load=20.0,
         )
@@ -110,7 +106,7 @@ class TestBanisterUpdate:
         row = self._fitness_row(
             aggregate={"fitness": 50.0, "fatigue": 30.0, "form": 20.0}
         )
-        result = TwinRecalibrationService._apply_banister_update(
+        result = TwinRecalibrationService.apply_banister_update(
             fitness_row=row,
             aerobic_load=-50.0,  # negative load
         )
@@ -123,7 +119,7 @@ class TestBanisterUpdate:
     def test_null_aggregate_defaults_to_zero(self) -> None:
         """Missing aggregate keys default to 0.0."""
         row = self._fitness_row(aggregate={})
-        result = TwinRecalibrationService._apply_banister_update(
+        result = TwinRecalibrationService.apply_banister_update(
             fitness_row=row,
             aerobic_load=50.0,
         )
@@ -136,7 +132,7 @@ class TestBanisterUpdate:
         row = self._fitness_row(
             aggregate={"fitness": 0.0, "fatigue": 0.0, "form": 0.0}
         )
-        TwinRecalibrationService._apply_banister_update(
+        TwinRecalibrationService.apply_banister_update(
             fitness_row=row,
             aerobic_load=100.0,
         )
@@ -150,7 +146,7 @@ class TestBanisterUpdate:
             aggregate={"fitness": 50.0, "fatigue": 30.0, "form": 20.0},
             time_constants={"fitness_tau_days": 21, "fatigue_tau_days": 3},
         )
-        result = TwinRecalibrationService._apply_banister_update(
+        result = TwinRecalibrationService.apply_banister_update(
             fitness_row=row,
             aerobic_load=50.0,
         )
@@ -164,12 +160,12 @@ class TestBanisterUpdate:
 
 
 class TestReadTimeConstants:
-    """_read_time_constants helper."""
+    """read_time_constants helper."""
 
     def test_returns_population_defaults_when_time_constants_none(self) -> None:
         row = MagicMock(spec=AthleteFitness)
         row.time_constants = None
-        result = _read_time_constants(row)
+        result = read_time_constants(row)
         assert result["fitness_tau_days"] == 42
         assert result["fatigue_tau_days"] == 7
         assert result["source"] == "population_default"
@@ -177,42 +173,42 @@ class TestReadTimeConstants:
     def test_returns_population_defaults_when_time_constants_empty(self) -> None:
         row = MagicMock(spec=AthleteFitness)
         row.time_constants = {}
-        result = _read_time_constants(row)
+        result = read_time_constants(row)
         assert result["fitness_tau_days"] == 42
         assert result["fatigue_tau_days"] == 7
 
     def test_uses_custom_time_constants(self) -> None:
         row = MagicMock(spec=AthleteFitness)
         row.time_constants = {"fitness_tau_days": 30, "fatigue_tau_days": 5}
-        result = _read_time_constants(row)
+        result = read_time_constants(row)
         assert result["fitness_tau_days"] == 30
         assert result["fatigue_tau_days"] == 5
 
     def test_missing_keys_fallback_to_defaults(self) -> None:
         row = MagicMock(spec=AthleteFitness)
         row.time_constants = {"fitness_tau_days": 30}  # missing fatigue_tau_days
-        result = _read_time_constants(row)
+        result = read_time_constants(row)
         assert result["fitness_tau_days"] == 30
         assert result["fatigue_tau_days"] == 7  # default
 
     def test_source_field_included(self) -> None:
         row = MagicMock(spec=AthleteFitness)
         row.time_constants = {"source": "custom_source"}
-        result = _read_time_constants(row)
+        result = read_time_constants(row)
         assert result["source"] == "custom_source"
 
 
 class TestDaysSince:
-    """_days_since helper — Phase 1.6 simplification returns 1."""
+    """days_since helper — Phase 1.6 simplification returns 1."""
 
     def test_returns_1_when_last_activity_id_is_none(self) -> None:
         """Phase 1.6: returns 1 regardless of reference."""
-        result = _days_since(last_activity_id=None, reference=None)
+        result = days_since(last_activity_id=None, reference=None)
         assert result == 1
 
     def test_returns_1_when_last_activity_id_provided(self) -> None:
         """Phase 1.6 simplification: days_since always 1."""
-        result = _days_since(
+        result = days_since(
             last_activity_id=uuid.uuid4(),
             reference=datetime.now(timezone.utc),
         )

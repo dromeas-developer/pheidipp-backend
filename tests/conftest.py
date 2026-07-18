@@ -30,16 +30,15 @@ import logging
 import os
 import uuid
 import warnings
-from contextlib import asynccontextmanager, contextmanager
-from datetime import datetime
-from typing import AsyncIterator, Iterator, Optional, Sequence
-from unittest.mock import MagicMock, patch
+from typing import Any, AsyncIterator, Iterator, Optional, Sequence
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi import Depends, FastAPI
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.exc import MissingGreenlet, SAWarning
 from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
     AsyncSession,
     async_sessionmaker,
     create_async_engine,
@@ -149,7 +148,6 @@ from app.api.deps import require_self  # noqa: E402
 from app.core import logging_utils as _logging_utils  # noqa: E402
 from app.core.security.password_hasher import PasswordHasher  # noqa: E402
 from app.core.security.token_service import TokenService  # noqa: E402
-from app.db.base import Base  # noqa: E402
 from app.db.session import get_db  # noqa: E402
 from app.main import app as fastapi_app  # noqa: E402
 from app.services.auth_service import AuthService  # noqa: E402
@@ -170,12 +168,17 @@ from app.models.enums import Sex  # noqa: E402
 class _NormalizePrefixMiddleware:
     """Strip one ``/api/v1`` prefix level from doubled paths."""
 
-    def __init__(self, app):
+    def __init__(self, app: Any) -> None:
         self.app = app
 
-    async def __call__(self, scope, receive, send):
+    async def __call__(
+        self,
+        scope: dict[str, Any],
+        receive: Any,
+        send: Any,
+    ) -> None:
         if scope["type"] == "http":
-            path = scope.get("path", "")
+            path: str = str(scope.get("path", ""))
             if path.startswith("/api/v1/api/v1/"):
                 scope["path"] = path[len("/api/v1"):]
         await self.app(scope, receive, send)
@@ -209,7 +212,11 @@ from app.models.enums import (
 
 
 @sa_event.listens_for(SASession, "before_flush", propagate=True)
-def _ensure_training_goal_id(session, flush_context, instances):
+def _ensure_training_goal_id(  # type: ignore[reportUnusedFunction]
+    session: SASession,
+    flush_context: Any,
+    instances: Any,
+) -> None:
     """Bridge Python-side default that fires lazily during flush.
 
     Test helper ``_create_athlete_with_onboarding`` in
@@ -229,21 +236,25 @@ def _ensure_training_goal_id(session, flush_context, instances):
 
     # 1. Eagerly populate TrainingGoal.id for any new instances
     training_goals_by_athlete: dict[uuid.UUID, TrainingGoal] = {}
-    for obj in session.new:
+    for obj in list(session.new):
         if isinstance(obj, TrainingGoal):
-            if obj.id is None:
+            obj_id: uuid.UUID | None = getattr(obj, "id", None)
+            if obj_id is None:
                 obj.id = _uuid.uuid4()
             training_goals_by_athlete[obj.athlete_id] = obj
 
     # 2. Patch any TwinState.training_goal_id that is still None
-    for obj in session.new:
-        if isinstance(obj, TwinState) and obj.training_goal_id is None:
-            if obj.athlete_id in training_goals_by_athlete:
+    for obj in list(session.new):
+        if isinstance(obj, TwinState):
+            tg_id: uuid.UUID | None = getattr(obj, "training_goal_id", None)
+            if tg_id is None and obj.athlete_id in training_goals_by_athlete:
                 obj.training_goal_id = training_goals_by_athlete[obj.athlete_id].id
 
 
 @sa_event.listens_for(AthleteProfile, "before_insert", propagate=True)
-def _default_athlete_profile_fields(mapper, connection, target):
+def _default_athlete_profile_fields(  # type: ignore[reportUnusedFunction]
+    mapper: Any, connection: Any, target: Any
+) -> None:
     """Set defaults for NOT NULL columns that test helpers often omit.
 
     Test helper ``_create_athlete_with_onboarding`` in
@@ -258,7 +269,9 @@ def _default_athlete_profile_fields(mapper, connection, target):
 
 
 @sa_event.listens_for(WeeklyPlan, "before_insert", propagate=True)
-def _default_weekly_plan_fields(mapper, connection, target):
+def _default_weekly_plan_fields(  # type: ignore[reportUnusedFunction]
+    mapper: Any, connection: Any, target: Any
+) -> None:
     """Set defaults for NOT NULL columns that test helpers often omit.
 
     Test fixture helpers (``_create_athlete_with_onboarding`` in
@@ -278,7 +291,9 @@ def _default_weekly_plan_fields(mapper, connection, target):
 
 
 @sa_event.listens_for(AthleteFitness, "before_insert", propagate=True)
-def _default_athlete_fitness_fields(mapper, connection, target):
+def _default_athlete_fitness_fields(  # type: ignore[reportUnusedFunction]
+    mapper: Any, connection: Any, target: Any
+) -> None:
     """Set default for time_constants that test helpers often omit.
 
     Test helper ``_create_athlete_with_onboarding`` in
@@ -296,7 +311,9 @@ def _default_athlete_fitness_fields(mapper, connection, target):
 
 
 @sa_event.listens_for(AthletePhysiology, "before_insert", propagate=True)
-def _default_athlete_physiology_fields(mapper, connection, target):
+def _default_athlete_physiology_fields(  # type: ignore[reportUnusedFunction]
+    mapper: Any, connection: Any, target: Any
+) -> None:
     """Set defaults for NOT NULL columns that test helpers often omit.
 
     Both ``lt1`` and ``lt2`` are ``JSONB NOT NULL``. The test helper
@@ -310,7 +327,9 @@ def _default_athlete_physiology_fields(mapper, connection, target):
 
 
 @sa_event.listens_for(AthletePreferences, "before_insert", propagate=True)
-def _default_athlete_preferences_fields(mapper, connection, target):
+def _default_athlete_preferences_fields(  # type: ignore[reportUnusedFunction]
+    mapper: Any, connection: Any, target: Any
+) -> None:
     """Set defaults for NOT NULL columns that test helpers often omit.
 
     Test helpers create ``AthletePreferences`` with only ``weekly_schedule``
@@ -357,20 +376,8 @@ _boto3.client = MagicMock()
 TEST_DATABASE_URL = os.environ["DATABASE_URL"]
 
 
-async def _create_schema(engine) -> None:
-    """Create all tables declared on the project's metadata."""
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
-
-async def _drop_schema(engine) -> None:
-    """Drop the full schema to leave the test DB clean for the next session."""
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-
-
 @pytest.fixture
-def test_engine():
+def test_engine() -> Iterator[AsyncEngine]:
     """Create an async engine for the current test.
 
     Creating a fresh engine per test avoids "Future attached to a different
@@ -389,7 +396,7 @@ def test_engine():
 
 
 @pytest.fixture
-def test_session_local(test_engine):
+def test_session_local(test_engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
     """Create a session factory bound to the current test's engine.
 
     This is function-scoped (default) to match the engine scope, ensuring
@@ -404,7 +411,7 @@ def test_session_local(test_engine):
 
 
 @pytest.fixture(scope="session", autouse=True)
-def _prepare_database():
+def _prepare_database():  # type: ignore[reportUnusedFunction]
     """Build the schema once per test session and clean data before tests.
 
     Creates all tables at the start of the test session using a temporary
@@ -463,7 +470,7 @@ def _prepare_database():
 # ---------------------------------------------------------------------------
 
 @pytest.fixture(scope="session", autouse=True)
-def _open_procrastinate_app():
+def _open_procrastinate_app():  # type: ignore[reportUnusedFunction]
     """Open the procrastinate app and install its schema for the test session.
 
     The procrastinate app must be ``open()`` before any ``defer()`` call
@@ -517,7 +524,10 @@ class _TestSessionFactory:
     no test can leave rows that affect the next test.
     """
 
-    def __init__(self, session_factory) -> None:
+    def __init__(
+        self,
+        session_factory: async_sessionmaker[AsyncSession],
+    ) -> None:
         self.session: Optional[AsyncSession] = None
         self._session_factory = session_factory
 
@@ -549,7 +559,9 @@ class _TestSessionFactory:
 
 
 @pytest.fixture
-async def db_session(test_session_local) -> AsyncIterator[AsyncSession]:
+async def db_session(
+    test_session_local: async_sessionmaker[AsyncSession],
+) -> AsyncIterator[AsyncSession]:
     """Yield a single AsyncSession for the current test.
 
     The session is rolled back at teardown, ensuring test isolation.
@@ -633,7 +645,7 @@ def _build_protected_app() -> FastAPI:
     protected = FastAPI()
 
     @protected.get("/athletes/{athlete_id}/whoami")
-    async def whoami(
+    async def whoami(  # type: ignore[reportUnusedFunction]
         athlete_id: uuid.UUID,
         token_athlete_id: uuid.UUID = Depends(require_self),
     ) -> dict[str, str]:
@@ -761,7 +773,7 @@ def find_record(records: Sequence[logging.LogRecord], *, event: str) -> Optional
     return None
 
 
-def json_payload(rec: logging.LogRecord) -> dict:
+def json_payload(rec: logging.LogRecord) -> dict[str, Any]:
     """Extract the allow-listed extra dict from a LogRecord."""
     return dict(getattr(rec, "__dict__", {}))  # type: ignore
 

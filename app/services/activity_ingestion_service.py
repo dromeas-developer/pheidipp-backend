@@ -79,7 +79,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
-from typing import Any, Optional
+from typing import Any, Callable, Optional, cast
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -127,7 +127,6 @@ from app.services.twin_recalibration_service import (
 
 # Additional imports for Phase-2.1
 from app.models.athlete_preferences import AthletePreferences, infer_data_tier
-from app.models.athlete_profile import AthleteProfile
 from app.models.athlete_physiology import AthletePhysiology
 
 
@@ -178,7 +177,7 @@ class ActivityIngestionResult:
 
     activity: Activity
     twin_state: TwinState
-    load_scores: dict
+    load_scores: dict[str, Any]
 
 
 # ---------------------------------------------------------------------------
@@ -385,7 +384,7 @@ class ActivityIngestionService:
             notes=notes,
         )
 
-        recalibration, scores = await self._run_ingestion_pipeline(
+        recalibration, scores = await self.run_ingestion_pipeline(
             athlete_id=athlete_id,
             activity_id=activity.id,
             file_bytes=file_bytes,
@@ -440,7 +439,7 @@ class ActivityIngestionService:
                 handling; the FIT file remains the immutable
                 reprocessing anchor in object storage.
         """
-        recalibration, scores = await self._run_ingestion_pipeline(
+        recalibration, scores = await self.run_ingestion_pipeline(
             athlete_id=athlete_id,
             activity_id=activity_id,
             file_bytes=file_bytes,
@@ -462,7 +461,7 @@ class ActivityIngestionService:
             },
         )
 
-    async def _run_ingestion_pipeline(
+    async def run_ingestion_pipeline(
         self,
         *,
         athlete_id: uuid.UUID,
@@ -553,7 +552,7 @@ class ActivityIngestionService:
         cp_estimate = self._resolve_cp_estimate(athlete_physiology)
         
         # Get structural risk flag from profile
-        structural_risk_flag = await self._read_structural_risk_flag(athlete_id)
+        structural_risk_flag = await self.read_structural_risk_flag(athlete_id)
         
         # Create comprehensive load computation inputs
         load_inputs = LoadComputationInputs(
@@ -595,7 +594,7 @@ class ActivityIngestionService:
         # for clarity (they may have been set directly on the object already)
         
         # Compute quality flags
-        quality_flags = self._compute_quality_flags(parsed)
+        quality_flags = self.compute_quality_flags(parsed)
         activity.quality_flags = quality_flags
         
         await self.session.flush()
@@ -732,7 +731,7 @@ class ActivityIngestionService:
         (``POPULATION_MAX_HR_FALLBACK_BPM``).
         """
         profile = await self.athlete_profiles.get_by_athlete_id(athlete_id)
-        if profile is None or profile.date_of_birth is None:
+        if profile is None:
             return None
         return profile.date_of_birth
 
@@ -797,14 +796,11 @@ class ActivityIngestionService:
         if physiology is None or physiology.cp is None:
             return None
         # CP is stored as JSONB with shape {"value": int, "uncertainty": float, ...}
-        cp_data = physiology.cp
-        if isinstance(cp_data, dict):
-            value = cp_data.get("value")
-            if isinstance(value, (int, float)):
-                return int(value)
+        if isinstance(value := physiology.cp.get("value"), (int, float)):
+            return int(value)
         return None
 
-    async def _read_structural_risk_flag(
+    async def read_structural_risk_flag(
         self, athlete_id: uuid.UUID
     ) -> bool:
         """Look up the structural risk flag for crossover athletes.
@@ -816,9 +812,9 @@ class ActivityIngestionService:
             return False
         return bool(profile.structural_risk_flag)
 
-    def _compute_quality_flags(
+    def compute_quality_flags(
         self, parsed: ParsedFitData
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Compute quality flags from parsed FIT data.
         
         Returns dict with:
@@ -828,7 +824,7 @@ class ActivityIngestionService:
         - has_gps_spikes: whether GPS speed spikes detected (>25 m/s)
         - has_rr_intervals: pass through to quality_flags
         """
-        quality_flags = {}
+        quality_flags: dict[str, Any] = {}
         
         # HR dropout: percentage of gaps in HR records > 5 seconds
         if not parsed.hr_records:
@@ -930,11 +926,11 @@ class ActivityIngestionService:
         itself (queue backend outage, etc.) are swallowed after
         logging so the ingestion commit path can still succeed.
         """
-        dispatcher = self._task_dispatcher
+        dispatcher: Callable[..., Any] | None = self._task_dispatcher
         if dispatcher is None:
-            from app.worker.app import app as procrastinate_app
+            from app.worker.app import signal_clean
 
-            dispatcher = procrastinate_app.tasks["signal_clean"].defer
+            dispatcher = cast(Callable[..., Any], signal_clean.defer)
 
         try:
             dispatcher(activity_id=str(activity_id))

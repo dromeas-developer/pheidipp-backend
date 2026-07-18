@@ -284,17 +284,17 @@ class ThresholdDetectionService:
         # worker constructs the service with `session=session` and
         # the repositories hold the session internally. The service
         # does not store a direct reference to the session.
-        self._object_storage = object_storage
-        self._raw_streams = raw_stream_repository
-        self._activities = activity_repository
-        self._athlete_physiology = athlete_physiology_repository
-        self._physiology_measurements = physiology_measurement_repository
+        self.object_storage = object_storage
+        self.raw_streams = raw_stream_repository
+        self.activities = activity_repository
+        self.athlete_physiology = athlete_physiology_repository
+        self.physiology_measurements = physiology_measurement_repository
         # Optional: only required by the LT1 natural training
         # analysis algorithm (method 3). Kept optional so existing
         # call sites that do not need natural training analysis
         # (unit tests that exercise only the per-session
         # algorithms) do not have to wire the repository.
-        self._planned_sessions = planned_session_repository
+        self.planned_sessions = planned_session_repository
 
     # ------------------------------------------------------------------
     # Public API.
@@ -351,7 +351,7 @@ class ThresholdDetectionService:
                 be deserialised or downloaded. Propagates so the
                 worker retries per procrastinate backoff.
         """
-        activity = await self._activities.get_by_id(activity_id)
+        activity = await self.activities.get_by_id(activity_id)
         if activity is None:
             return []
 
@@ -368,12 +368,12 @@ class ThresholdDetectionService:
         # Signal cleaning gate — missing RawSensorStream means
         # cleaning has not yet completed. Per ADR-009, downstream
         # consumers handle "not yet ready" by skipping.
-        raw_stream = await self._raw_streams.get_by_activity_id(activity_id)
+        raw_stream = await self.raw_streams.get_by_activity_id(activity_id)
         if raw_stream is None:
             return []
 
         # Download and deserialise the cleaned stream.
-        cleaned_bytes = await self._object_storage.download_fit(
+        cleaned_bytes = await self.object_storage.download_fit(
             raw_stream.fit_file_key
         )
         stream = _parse_cleaned_stream(cleaned_bytes)
@@ -540,9 +540,6 @@ def _hr_deflection(
         # HR bin. LT2 is the HR at the third-lowest HR bin (a
         # higher intensity where HR rises more steeply).
         lt2_hr = bin_means[2][1]
-
-    if lt1_hr is None:
-        return []
 
     confidence_weight = max(0.0, min(1.0, r_squared))
     measurement_date = activity.activity_date
@@ -894,11 +891,11 @@ async def _natural_training_analysis(
     # Guard: the natural training analysis requires the planned
     # session repository. If the service was constructed without
     # it, skip silently.
-    if service._planned_sessions is None:
+    if service.planned_sessions is None:
         return []
 
     # Query recent calibration-eligible running activities.
-    recent_activities = await service._activities.get_recent_activities_for_athlete(
+    recent_activities = await service.activities.get_recent_activities_for_athlete(
         athlete_id=athlete_id,
         sport_type=SportType.RUNNING,
         limit=NATURAL_TRAINING_LOOKBACK,
@@ -913,7 +910,7 @@ async def _natural_training_analysis(
     for candidate in recent_activities:
         if candidate.planned_session_id is None:
             continue
-        planned = await service._planned_sessions.get_by_id(
+        planned = await service.planned_sessions.get_by_id(
             candidate.planned_session_id
         )
         if planned is None:
@@ -927,7 +924,7 @@ async def _natural_training_analysis(
         # Download the cleaned stream. If the stream is missing
         # (cleaning not yet complete for this activity) skip
         # silently — natural training analysis fails open.
-        raw_stream = await service._raw_streams.get_by_activity_id(
+        raw_stream = await service.raw_streams.get_by_activity_id(
             candidate.id
         )
         if raw_stream is None:
@@ -935,7 +932,7 @@ async def _natural_training_analysis(
         if not candidate.has_hr:
             continue
         try:
-            cleaned_bytes = await service._object_storage.download_fit(
+            cleaned_bytes = await service.object_storage.download_fit(
                 raw_stream.fit_file_key
             )
             stream = _parse_cleaned_stream(cleaned_bytes)
@@ -1413,7 +1410,7 @@ def _segment_into_intensity_bins_from_series(
 
     step_size = intensity_range / 10.0
 
-    bins: Dict[float, Tuple[List, List]] = {}
+    bins: dict[float, tuple[list[tuple[int, Optional[float]]], list[tuple[int, Optional[float]]]]] = {}
     for (t_i, i_val), (t_v, v_val) in zip(intensity_series, value_series):
         if i_val is None:
             continue

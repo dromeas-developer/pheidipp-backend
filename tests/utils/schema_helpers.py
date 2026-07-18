@@ -5,6 +5,7 @@ No database engine is created at import time.
 from __future__ import annotations
 
 import os
+from typing import Any
 
 from sqlalchemy import create_engine, inspect
 
@@ -21,7 +22,7 @@ def get_sync_database_url() -> str:
     return database_url
 
 
-def _inspect_method(method_name: str, table: str) -> list[dict]:
+def _inspect_method(method_name: str, table: str) -> list[dict[str, Any]]:
     """Generic sync-engine inspect helper."""
     engine = create_engine(get_sync_database_url())
     try:
@@ -33,26 +34,26 @@ def _inspect_method(method_name: str, table: str) -> list[dict]:
         engine.dispose()
 
 
-def db_columns(table: str) -> list[dict]:
+def db_columns(table: str) -> list[dict[str, Any]]:
     """Return column metadata for a table."""
     return _inspect_method("get_columns", table)
 
 
-def db_unique_constraints(table: str) -> list[dict]:
+def db_unique_constraints(table: str) -> list[dict[str, Any]]:
     """Return unique constraint metadata for a table."""
     return _inspect_method("get_unique_constraints", table)
 
 
-def db_check_constraints(table: str) -> list[dict]:
+def db_check_constraints(table: str) -> list[dict[str, Any]]:
     """Return check constraint metadata for a table."""
     return _inspect_method("get_check_constraints", table)
 
 
-def db_indexes(table: str) -> list[dict]:
+def db_indexes(table: str) -> list[dict[str, Any]]:
     """Return index metadata for a table."""
     return _inspect_method("get_indexes", table)
 
 
-def db_foreign_keys(table: str) -> list[dict]:
+def db_foreign_keys(table: str) -> list[dict[str, Any]]:
     """Return foreign key metadata for a table."""
     return _inspect_method("get_foreign_keys", table)

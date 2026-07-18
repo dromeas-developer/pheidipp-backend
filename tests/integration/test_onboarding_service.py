@@ -47,7 +47,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime, timezone
-from typing import Optional
+from typing import Any
 
 import pytest
 from sqlalchemy import select
@@ -84,15 +84,14 @@ from app.services.auth_service import AuthService
 from app.services.onboarding_errors import (
     AthleteNotFoundError,
     OnboardingAlreadyCompleteError,
-    TrainingGoalConflictError,
 )
 from app.services.onboarding_service import (
     OnboardingService,
-    _GoalInput,
-    _PreferencesInput,
-    _ProfileInput,
+    GoalInput,
+    PreferencesInput,
+    ProfileInput,
 )
-from tests.payloads import _weekly_schedule_payload
+from tests.payloads import weekly_schedule_payload
 
 
 # ---------------------------------------------------------------------------
@@ -106,36 +105,36 @@ def onboarding_service(db_session: AsyncSession) -> OnboardingService:
     return OnboardingService(session=db_session)
 
 
-def _profile_input(**overrides) -> _ProfileInput:
+def _profile_input(**overrides: Any) -> ProfileInput:
     """Default profile input — Lisbon timezone, 180cm, no training window."""
-    defaults: dict = {
+    defaults: dict[str, Any] = {
         "timezone": "Europe/Lisbon",
         "training_window": None,
         "height_cm": 180.0,
     }
     defaults.update(overrides)
-    return _ProfileInput(**defaults)
+    return ProfileInput(**defaults)
 
 
-def _preferences_input(**overrides) -> _PreferencesInput:
+def _preferences_input(**overrides: Any) -> PreferencesInput:
     """Default preferences — running primary, Tier 3 HR-only hardware."""
-    defaults: dict = {
+    defaults: dict[str, Any] = {
         "sport_background": SportBackground.RUNNING_PRIMARY,
         "years_structured_training": 3,
         "training_time_of_day": "morning",
-        "weekly_schedule": _weekly_schedule_payload(),
+        "weekly_schedule": weekly_schedule_payload(),
         "gps_source": GpsSource.GARMIN_WATCH,
         "hr_source": HrSource.CHEST_STRAP_RR,
         "power_source": PowerSource.NONE,
         "primary_training_platform": PrimaryTrainingPlatform.MANUAL,
     }
     defaults.update(overrides)
-    return _PreferencesInput(**defaults)
+    return PreferencesInput(**defaults)
 
 
-def _goal_input_race_event(**overrides) -> _GoalInput:
+def _goal_input_race_event(**overrides: Any) -> GoalInput:
     """Default race-event goal payload — Lisbon half marathon, today as event date."""
-    defaults: dict = {
+    defaults: dict[str, Any] = {
         "goal_type": GoalType.RACE_EVENT,
         "goal_event_type": GoalEventType.HALF_MARATHON,
         "goal_event_name": "Lisbon Half Marathon",
@@ -151,12 +150,12 @@ def _goal_input_race_event(**overrides) -> _GoalInput:
         "target_time_minutes": None,
     }
     defaults.update(overrides)
-    return _GoalInput(**defaults)
+    return GoalInput(**defaults)
 
 
-def _goal_input_target_performance(**overrides) -> _GoalInput:
+def _goal_input_target_performance(**overrides: Any) -> GoalInput:
     """Default target-performance goal payload — 10k in 45 minutes."""
-    defaults: dict = {
+    defaults: dict[str, Any] = {
         "goal_type": GoalType.TARGET_PERFORMANCE,
         "goal_event_type": None,
         "goal_event_name": None,
@@ -172,7 +171,7 @@ def _goal_input_target_performance(**overrides) -> _GoalInput:
         "target_time_minutes": 45,
     }
     defaults.update(overrides)
-    return _GoalInput(**defaults)
+    return GoalInput(**defaults)
 
 
 async def _register_athlete(
@@ -204,7 +203,7 @@ async def _onboarded_athlete(
     db_session: AsyncSession,
     onboarding_service: OnboardingService,
     email: str,
-    **input_overrides,
+    **input_overrides: Any,
 ) -> Athlete:
     """Register + fully onboard an athlete; return the Athlete row."""
     athlete = await _register_athlete(db_session, email)
@@ -318,6 +317,7 @@ class TestAtomicSuccess:
         assert physio.cp is None
         assert physio.vo2max is None
         # max_hr carries the same provenance.
+        assert physio.max_hr is not None
         assert physio.max_hr["value"] == pytest.approx(184.0)
         assert (
             physio.max_hr["dominant_source"] == "questionnaire_estimate"
@@ -435,7 +435,7 @@ class TestAtomicSuccess:
         assert profile.timezone == "Europe/Lisbon"
         # Crossover athlete (cycling) ⇒ structural risk flag is True.
         assert profile.structural_risk_flag is True
-        assert float(profile.height_cm) == pytest.approx(180.0)
+        assert profile.height_cm == pytest.approx(180.0)
 
     async def test_running_primary_keeps_risk_flag_false(
         self,
@@ -607,7 +607,7 @@ class TestIdempotencyGuard:
         onboarding_service: OnboardingService,
     ) -> None:
         athlete = await _onboarded_athlete(
-            db_server := db_session,  # noqa: F841
+            db_session,
             onboarding_service,
             "idempotent-already-complete@example.com",
         )
@@ -848,7 +848,7 @@ class TestMidTransactionRollback:
             db_session, "invalid-goal-type-svc@example.com"
         )
 
-        invalid_goal = _GoalInput(
+        invalid_goal = GoalInput(
             goal_type=GoalType.FITNESS_IMPROVEMENT,
             goal_event_type=None,
             goal_event_name=None,
@@ -1030,7 +1030,9 @@ class TestTwinStateCorrectness:
             )
         ).scalar_one()
         # 36y → max_hr_est = 184.
+        assert twin.lt1_hr_bpm is not None
         assert float(twin.lt1_hr_bpm) == pytest.approx(138.0)
+        assert twin.lt2_hr_bpm is not None
         assert float(twin.lt2_hr_bpm) == pytest.approx(161.0)
 
     async def test_twin_created_at_is_populated(
@@ -1359,7 +1361,9 @@ class TestUpdateProfileService:
 
         assert updated.height_cm is not None
         assert float(updated.height_cm) == pytest.approx(185.0)
+        assert updated.location_lat is not None
         assert float(updated.location_lat) == pytest.approx(38.7223)
+        assert updated.location_lng is not None
         assert float(updated.location_lng) == pytest.approx(-9.1393)
         assert updated.training_window == {
             "start": "06:00",
@@ -1413,10 +1417,13 @@ class TestUpdateProfileService:
                 )
             )
         ).scalar_one()
+        assert refreshed_after_patch.height_cm is not None
         assert float(refreshed_after_patch.height_cm) == pytest.approx(
             181.5
         )
         # Untouched fields preserved.
+        assert refreshed_after_patch.location_lat is not None
+        assert seeded_location_lat is not None
         assert float(refreshed_after_patch.location_lat) == float(
             seeded_location_lat
         )
@@ -1523,7 +1530,7 @@ class TestUpdatePreferencesService:
             onboarding_service,
             "prefs-patch-full-schedule@example.com",
         )
-        new_schedule = _weekly_schedule_payload()
+        new_schedule = weekly_schedule_payload()
         new_schedule["monday"]["long_workout"] = True
         new_schedule["wednesday"]["long_workout"] = True
         new_schedule["saturday"]["available"] = False

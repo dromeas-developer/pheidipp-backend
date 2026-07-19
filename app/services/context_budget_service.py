@@ -370,6 +370,7 @@ class ContextBudgetService:
         twin_state = await self.twin_states.get_latest(athlete_id)
         active_goal = await self.training_goals.get_active(athlete_id)
         active_plan = await self.plans.get_active_for_athlete(athlete_id)
+        await self._profiles.get_by_athlete_id(athlete_id)
         preferences = await self._preferences.get_by_athlete_id(athlete_id)
 
 

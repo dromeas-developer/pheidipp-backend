@@ -4,9 +4,10 @@ Phase-1.2c introduces the ``twin_states`` table — the append-only
 snapshot foundation for the digital twin. The DB-level invariants
 codified here:
 
-* The partial unique index ``uq_twin_states_athlete_activity`` on
+* The partial index ``ix_twin_states_athlete_activity`` on
   ``(athlete_id, activity_id) WHERE activity_id IS NOT NULL``
-  enforces one TwinState per activity-linked trigger.
+  supports per-activity lookups (non-unique; uniqueness enforced
+  at the service layer since Phase 2.3 P3).
 * Multiple TwinStates with NULL ``activity_id`` are allowed (the
   partial predicate exempts non-activity triggers like
   ``questionnaire``, ``physiology_input``, ``wellness_update``).
@@ -164,32 +165,34 @@ class TestTwinStateDBSchemaColumns:
 # ---------------------------------------------------------------------------
 
 
-class TestTwinStatePartialUniqueIndexDB:
-    """``uq_twin_states_athlete_activity`` is UNIQUE WHERE
-    ``activity_id IS NOT NULL``. Two TwinStates with the same
-    non-null ``(athlete_id, activity_id)`` must raise
-    ``IntegrityError``; two with NULL ``activity_id`` must coexist."""
+class TestTwinStatePartialActivityIndexDB:
+    """``ix_twin_states_athlete_activity`` is a non-unique index
+    on ``(athlete_id, activity_id)`` with partial predicate
+    ``WHERE activity_id IS NOT NULL``. Two TwinStates with the same
+    non-null ``(athlete_id, activity_id)`` are permitted at the DB
+    layer (uniqueness is enforced at the service layer); two with
+    NULL ``activity_id`` coexist."""
 
-    def _partial_unique_index(self) -> dict[str, Any] | None:
+    def _partial_activity_index(self) -> dict[str, Any] | None:
         for idx in db_indexes(TABLE):
             cols = set(idx.get("column_names") or [])
-            if cols == {"athlete_id", "activity_id"} and idx.get("unique"):
+            if cols == {"athlete_id", "activity_id"}:
                 return idx
         return None
 
-    async def test_partial_unique_index_present(
+    async def test_partial_activity_index_present(
         self, db_session: AsyncSession
     ) -> None:
-        idx = self._partial_unique_index()
+        idx = self._partial_activity_index()
         assert idx is not None, (
-            "Expected a UNIQUE index on (athlete_id, activity_id) — "
-            "the activity dedup partial unique constraint."
+            "Expected a non-unique index on (athlete_id, activity_id) — "
+            "the activity lookup partial index ix_twin_states_athlete_activity."
         )
 
     async def test_partial_predicate_is_activity_id_not_null(
         self, db_session: AsyncSession
     ) -> None:
-        idx = self._partial_unique_index()
+        idx = self._partial_activity_index()
         assert idx is not None
         engine = create_engine(get_sync_database_url())
         try:
@@ -207,16 +210,19 @@ class TestTwinStatePartialUniqueIndexDB:
         assert row is not None
         ddl = (row[0] or "").lower()
         assert "activity_id" in ddl and "is not null" in ddl, (
-            f"Activity partial unique predicate must constrain "
+            f"Activity partial index predicate must constrain "
             f"`activity_id IS NOT NULL`. DDL: {row[0]!r}"
         )
 
 
 class TestTwinStateActivityUniquenessDB:
-    """Two TwinStates with the same non-null ``activity_id`` for the
-    same athlete must violate the partial unique index."""
+    """DB-layer behaviour for duplicate activity-linked TwinStates.
 
-    async def test_duplicate_activity_rejected(
+    Since Phase 2.3 P3 dropped the unique index, duplicates are permitted
+    at the DB layer — uniqueness is enforced at the service layer.
+    Non-activity triggers (NULL activity_id) continue to coexist."""
+
+    async def test_duplicate_activity_accepted(
         self, db_session: AsyncSession
     ) -> None:
         athlete = await make_athlete(db_session, "twin-dup-activity@example.com")
@@ -236,9 +242,14 @@ class TestTwinStateActivityUniquenessDB:
             trigger=TwinTrigger.CALIBRATION,
         )
         db_session.add_all([s1, s2])
-        with pytest.raises(IntegrityError):
-            await db_session.flush()
-        await db_session.rollback()
+        await db_session.flush()
+        await db_session.refresh(s1)
+        await db_session.refresh(s2)
+        assert s1.id != s2.id, (
+            "Two TwinStates for the same (athlete_id, activity_id) "
+            "must coexist at the DB layer — uniqueness moved to "
+            "the service layer in Phase 2.3 P3."
+        )
 
     async def test_multiple_null_activity_coexist(
         self, db_session: AsyncSession

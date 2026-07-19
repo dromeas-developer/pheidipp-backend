@@ -123,8 +123,11 @@ Read `reports/<plan-id>_devops.md` (or a Test Pack report). Check the
 for `p-coder` naming one or more RC ids. If absent or empty, STOP.
 
 Your scope is exactly those RCs. For each: read the `## Root Cause
-Analysis` entry (Category should be `Implementation`), the matching
-`## Full Failure Detail` entries, and `Suggested fix` if present.
+Analysis` entry (Category is usually `Implementation` for RCs routed to
+p-coder — if it says otherwise, the Routing Summary still governs, but
+flag the discrepancy before proceeding), the matching `## Full Failure
+Detail` entries (tagged `[RC#]` in their headings), and `Suggested fix`
+if present.
 Evidence and Suggested fix are context — verify before applying.
 
 Do not touch: `test_*.py` files, test infrastructure files (conftest,
@@ -647,31 +650,39 @@ Before declaring completion, verify:
   while implementing, not a fresh architectural review. The exhaustive
   cross-implementation and contract-consistency review is the validator's
   job, not yours; re-deriving it here duplicates work that happens anyway
-* invoke `p-diagnostics-fixer` via the `task` tool — **one invocation per file**,
-  not one invocation with all files. Each invocation starts fresh, fixes a single
-  file's type errors and lint violations, and returns. This prevents the
-  context-accumulation stalls that occur when the fixer has too many files in
-  one session. Invoke once per file you created or modified, in order:
+* invoke `p-diagnostics-fixer` via the `task` tool — batch files in groups
+  of up to 5 per invocation, one invocation per group. Each invocation starts
+  fresh and returns a text response. The fixer's own batching gate will stop
+  and return a batching plan if any group is too large — if that happens,
+  split per the plan and re-invoke. Group by proximity where possible
+  (files in the same service or module together). Invoke groups in order:
 
   ```
   Tool: task
   Input:
   {
     "subagent_type": "p-diagnostics-fixer",
-    "prompt": "plan_id: <plan-id>\n\nfile: <path/to/file.py>"
+    "prompt": "plan_id: <plan-id>\n\nfiles:\n<path/to/file1.py>\n<path/to/file2.py>\n..."
   }
   ```
 
-  After all invocations complete, verify each returned a result:
-  - A report at `reports/<plan_id>_diagnostics_<file>.md` → check for
-    unresolved errors and note them in your completion confirmation.
-  - A batching plan in the response text (no file) → the file had too many
-    diagnostics for one session. Create a `todowrite` tasklist from the
-    plan — each file becomes one task item. Process sequentially: invoke
-    the fixer for one file, confirm the report, mark done, start next.
-    Do NOT launch all in parallel. After all tasks complete, count
-    successes vs failures and include in your completion confirmation.
+  After all invocations complete, verify each returned a text response:
+  - `✅ PASS — <file>: zero diagnostics` → the file was already clean.
+    Note it and move on.
+  - A batching plan → the file had too many diagnostics for one session.
+    Create a `todowrite` tasklist from the plan — each file becomes one
+    task item. Process sequentially: invoke the fixer for one file,
+    confirm the response, mark done, start next. Do NOT launch all in
+    parallel. After all tasks complete, count successes vs failures
+    and include in your completion confirmation.
+  - A fix summary (diagnostics found → fixed → remaining, final gate
+    status) → check for unresolved errors and note them in your
+    completion confirmation.
+  
+  The diagnostics-fixer never writes report files — all results are
+  returned as text in its response.
 
+**Batch Mode only:**
 * invoke `p-documentation` via the `task` tool to update folder READMEs
   with the files this batch created or modified. Provide the BRD path
   and the list of files touched:
@@ -689,6 +700,12 @@ Before declaring completion, verify:
   which folders were affected, and updates or creates `README.md` files.
   One invocation covers the entire batch — the doc-writer batches its
   own folder checks and file reads internally. No loop needed.
+
+  Skip this step in Fix Mode (both Validator and DevOps Report paths).
+  Fix Mode changes are targeted corrections — they do not introduce new
+  components or restructure folders in ways that require README updates.
+  A Fix Mode invocation has no BRD path to provide, and p-documentation's
+  Incremental Mode requires one.
 
 If a Batch Success Criteria condition, or a routed finding's implied fix,
 cannot be satisfied as written — the plan's or report's own criterion

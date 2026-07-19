@@ -666,11 +666,12 @@ class TestPhase12cUpgradeFunctional:
         finally:
             engine.dispose()
 
-    def test_twin_state_partial_unique_index_present(
+    def test_twin_state_partial_activity_index_present(
         self, phase_1_2c_schema: dict[str, Any]
     ) -> None:
-        """``uq_twin_states_athlete_activity`` must exist in the
-        upgraded schema."""
+        """``ix_twin_states_athlete_activity`` must exist in the
+        upgraded schema (non-unique; uniqueness moved to the
+        service layer in Phase 2.3 P3)."""
         engine = create_engine(phase_1_2c_schema["sync_url"])
         try:
             with engine.connect() as conn:
@@ -678,13 +679,13 @@ class TestPhase12cUpgradeFunctional:
                     text(
                         "SELECT 1 FROM pg_index i "
                         "JOIN pg_class c ON c.oid = i.indexrelid "
-                        "WHERE c.relname = 'uq_twin_states_athlete_activity'"
+                        "WHERE c.relname = 'ix_twin_states_athlete_activity'"
                     )
                 ).fetchone()
         finally:
             engine.dispose()
         assert row is not None, (
-            "uq_twin_states_athlete_activity must exist in the "
+            "ix_twin_states_athlete_activity must exist in the "
             "upgraded schema."
         )
 

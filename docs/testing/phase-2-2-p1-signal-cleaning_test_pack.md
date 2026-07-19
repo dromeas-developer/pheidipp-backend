@@ -286,3 +286,43 @@ bash scripts/pytest.sh tests/behaviour/test_signal_cleaning_user_journey.py
 ```
 
 Prerequisites: `migrations: true` (same as integration — `raw_sensor_streams` table must exist). The 2 pending fixture tests (`TestCleaningPipelineVersionTransition`, `TestRawSensorStreamRowExistsAfterCleaning`) are skipped automatically by pytest markers; they will pass without further changes once `tests/fixtures/fit/running_tier3.fit` is committed.
+
+## Post-Generation Fix — 2026-07-18 (RC5a, oneoff unitary validation)
+
+**Issue**: One-off re-validation pass (`reports/oneoff_unitary_validation_20260718.md`,
+total 1524 passed / 43 failed / 0 skipped) routed RC5a to `p-test-architect`:
+32 of the 43 failures were in `tests/unit/test_signal_cleaning_service.py` with
+`AttributeError: 'SignalCleaningService' object has no attribute 'object_storage'`.
+Root cause: the production class renamed the stored attribute from `self.object_storage`
+to `self._object_storage` (private convention), but the constructor parameter name
+`object_storage=` is unchanged and remains keyword-only. The test file's
+`SignalCleaningService(...)` constructor calls (with the keyword arg `object_storage=`)
+were correct, but 14 attribute-access sites read/replaced methods on the constructed
+service via the old public-attribute name.
+
+**Fix**: Mechanical rename `service.object_storage` → `service._object_storage`
+across 14 attribute-access lines in `tests/unit/test_signal_cleaning_service.py`
+(lines 157, 161, 164, 242, 274, 306, 416, 418, 421, 589, 671, 673, 676, 1445).
+The constructor keyword arguments `object_storage=AsyncMock()` were deliberately
+left unchanged. The diagnostics-fixer added `# type: ignore[reportPrivateUsage]`
+to each renamed access — the same convention already used elsewhere in the file
+(TestSessionDeadFieldRemoved has `assert hasattr(service, "_object_storage")` at
+line 1562).
+
+**Classification**: One-off infrastructure mismatch (production encapsulation
+choice vs test coupling depth). Not a reusable failure class — no README or
+MOCKING_CONTRACT update warranted. No new canonical fixtures introduced.
+
+**Manifest**: `tests/test-manifest/phase-2-2.yaml` — `validation.implemented`
+stays `true` on `signal_cleaning_pipeline` and `rr_deviation_filter_remediation`;
+`validation.executable` and `validation.passed` downgraded to `false` on both
+features (the only two owning this test path). `last_reviewed_at` updated to
+`2026-07-18T00:00:00Z`. History entry appended documenting the cycle. Awaiting
+DevOps re-execution to confirm the 32-failure count drops to zero and the
+features can be re-promoted.
+
+**Self-check**: `bash scripts/pytest.sh --collect-only tests/unit/test_signal_cleaning_service.py`
+collects 31 items without errors in 0.10s. The `tests/test-manifest/phase-2-2.yaml`
+manifest references for `signal_cleaning_pipeline` and `rr_deviation_filter_remediation`
+remain valid (no path changes — the file itself is the affected artefact, not its
+manifest registration).

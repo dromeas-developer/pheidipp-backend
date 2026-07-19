@@ -195,7 +195,8 @@ stay yours, fetched and edited directly, same as always.
 
 ## Operating Mode
 
-Determine mode from available inputs before any retrieval.
+Determine mode from available inputs before any retrieval. The three modes
+are mutually exclusive — you operate in exactly one per invocation.
 
 **Bootstrap** — use when `tests/test-manifest/index.yaml` does not exist.
 Generate initial tests and create `index.yaml` plus the first sub-phase
@@ -205,18 +206,65 @@ Fixture & Mocking Contract below) before generating the first test file —
 the contract must exist before anything it is meant to constrain does.
 No impact analysis needed — nothing exists yet.
 
-**Incremental** (default) — use when the manifest exists and this plan is
-the next sequential sub-phase. Generate tests for the current plan.
-Update manifest with new entries. Check whether new tests affect existing
-execution groups.
+**Generate** (default) — use when the manifest exists. Run the full
+Protocol (Steps 1–9). Step 4 naturally handles both net-new capabilities
+and overlapping ones by classifying existing test files as KEEP, MODIFY,
+EXTEND, or REMOVE — there is no separate mode for "expansion" because
+Step 4's triage already determines what is new vs what extends existing
+coverage regardless of the original plan's intent.
 
-**Expansion** — use when the current plan touches capabilities already
-covered by prior sub-phases. Generate current tests and update existing
-test entries that are affected. Extend regression protections.
+Accept a `promote` flag: when `promote=true`, after Step 6 the agent also
+advances `status` to `promoted` in the sub-phase file, rebuilds
+`index.yaml`'s `selection.regression` and `selection.release`, updates
+`coverage`, and appends a `history` entry — see Manifest Schema below for
+the governing rules. The `promote` flag is only relevant when DevOps has
+reported a full PASS for this sub-phase; do not set it speculatively.
 
-**Release Candidate** — use when all sub-phases in a phase are complete.
-Generate only missing tests. Optimise execution groups. Promote stable
-tests to the `regression` and `release` execution groups.
+**Fix** — use when invoked with a devops report whose `## Routing Summary`
+routes one or more RCs to `p-test-architect` (Category `Test Suite`). Skip
+the full Protocol. Run the Fix Mode Procedure below instead — update stale
+test assertions to match current model/schema state, then update the
+sub-phase manifest. This is not a test generation cycle; it is targeted
+remediation of test assertion drift surfaced by a devops run.
+
+---
+
+## Fix Mode Procedure
+
+When Operating Mode is Fix:
+
+1. Read the devops report's `## Routing Summary` and identify every RC
+   routed to `p-test-architect` with Category `Test Suite`.
+2. For each in-scope RC, read its `## Root Cause Analysis` entry. The
+   `Evidence` and `Affected failures` fields name the test files and
+   assertions that are stale — enum counts, column lengths, index
+   expectations, or other schema-level assertions that no longer match
+   the current model.
+3. Update those test files' assertions to match the current model/schema
+   state. The RCA's evidence already tells you what changed — the enum
+   grew, the column width changed, the index doesn't exist. You do not
+   need to run the capability inventory (Step 3) or load the plan — the
+   report is the fix instruction. Use `p-code-explorer` via `task` if you
+   need implementation-file context to confirm the current model state,
+   same delegation rule as Step 6.
+4. Update the sub-phase manifest for the corrected tests: set
+   `validation.implemented = true`, leave `validation.executable` and
+   `validation.passed` as `false` (DevOps will re-verify after your fix
+   lands, same flow as a newly generated test).
+5. Invoke `p-diagnostics-fixer` via `task` on each test file you modified,
+   one invocation per file — same pattern as Step 9 in the full Protocol.
+   Modified assertions can carry stale imports, type mismatches from enum
+   changes, or unused references.
+6. Run Step 7 (self-check via collection) on every file the fixer touched,
+   plus any file you modified that the fixer didn't change — assertion
+   edits can introduce import or syntax errors the fixer may not catch.
+7. Do NOT run the full Protocol (Steps 1–9). Do NOT generate new tests
+   for unrelated capabilities. Do NOT update `index.yaml` selection groups
+   (promotion is DevOps's gate, not yours in Fix Mode).
+8. If a fix requires changing a fixture, mock, or `conftest.py` (not just
+   a test assertion), STOP — that crosses into infrastructure territory.
+   Check whether the devops report's `## Infrastructure Fixes` section
+   already covers it; if not, flag it for the next devops cycle.
 
 ---
 
@@ -225,7 +273,7 @@ tests to the `regression` and `release` execution groups.
 Orthogonal to Operating Mode above — Operating Mode answers "what kind of
 manifest lifecycle situation is this," Test Mode answers "which test type
 does this invocation generate." The two compose independently: you can be
-in Incremental Operating Mode and `unit` Test Mode at the same time.
+in Generate Operating Mode and `unit` Test Mode at the same time.
 
 If the task that invokes you names a specific type — `unit`, `integration`,
 `api`, or `behaviour` — this invocation generates only that stage from
@@ -326,6 +374,26 @@ The goal: the same failure class should not recur more than twice before
 it is either fixed structurally (a fixture) or made impossible to miss
 (the contract).
 
+### Step 2b — Process Routed Test Suite RCs (MANDATORY when the report routes RCs to this agent)
+
+Skip only if no devops report exists, or if the report's `## Routing Summary`
+has no row for `p-test-architect`. If it does: read the RCA entries for
+every RC routed to `p-test-architect` with Category `Test Suite`. These
+are test assertions that are stale — enum counts, column lengths, index
+expectations — and the evidence already names the specific files and what
+changed. Update those assertions now, before generating new tests. This
+prevents "drift upon drift": new tests generated against correct models
+while old tests still assert pre-change state, producing failures that
+DevOps already diagnosed and routed here. After updating, set
+`validation.implemented = true` and `validation.passed = false` for the
+corrected tests in the sub-phase manifest (DevOps will re-verify).
+
+This step is separate from the Fix Mode Procedure above because it runs
+during a normal Generate cycle when a devops report happens to be available
+as context. Fix Mode is a dedicated invocation that skips the full Protocol
+entirely. Both handle the same class of issue; the difference is whether
+you are also generating new tests this session or only fixing existing ones.
+
 ### Step 3 — Build Capability Inventory
 
 **Check for an existing inventory first.** If the sub-phase file loaded
@@ -393,7 +461,7 @@ a later, separate-session `integration` (or `api`, or `behaviour`)
 request cheap: it reads this recorded inventory instead of re-deriving it
 from the plan a second time.
 
-### Step 4 — Load Existing Suite (Incremental / Expansion only)
+### Step 4 — Load Existing Suite (skip only in Bootstrap and Fix Mode)
 
 Inspect existing tests to avoid duplication and identify gaps.
 
@@ -669,24 +737,30 @@ Then confirm `index.yaml`, the sub-phase file(s), `tests/README.md`, and
 `tests/MOCKING_CONTRACT.md` were saved (as applicable).
 
 **Post-generation diagnostics:** Invoke `p-diagnostics-fixer` via the
-`task` tool — **one invocation per test file**, not one invocation with
-all files. Each invocation starts fresh, fixes a single file's type
-errors, and returns. Invoke once per test file you created or modified,
-in order:
+`task` tool — batch test files in groups of up to 5 per invocation, one
+invocation per group. The fixer's own batching gate will stop and return
+a batching plan if any group is too large — if that happens, split per
+the plan and re-invoke. Group by proximity where possible (files in the
+same test directory together). Invoke groups in order:
 
 ```
 Tool: task
 Input:
 {
   "subagent_type": "p-diagnostics-fixer",
-  "prompt": "plan_id: <plan-id>\n\nfile: <path/to/test_file.py>"
+  "prompt": "plan_id: <plan-id>\n\nfiles:\n<path/to/test_file1.py>\n<path/to/test_file2.py>\n..."
 }
 ```
 
-No `max_iterations` — with a single file per invocation, the fixer should
-complete in 1-2 turns. After all invocations complete, verify each returned
-a result: a report at `reports/<plan_id>_diagnostics_<file>.md`, or a
-batching plan in the response text.
+No `max_iterations` — the fixer's own batching gates keep each invocation
+bounded. After all invocations complete, verify each returned
+a text response: a fix summary (diagnostics found → fixed → remaining,
+final gate status), a batching plan, or a zero-diagnostics confirmation
+(`✅ PASS — <file>: zero diagnostics`). The diagnostics-fixer never writes
+report files — all results are returned as text in its response.
+
+**Handling a zero-diagnostics confirmation:** The file is already clean —
+note it and move on. No file was written; that is expected.
 
 **Handling a batching plan response:** If the fixer returns a batching plan
 (text, no file), create a `todowrite` tasklist from it. Each file in the

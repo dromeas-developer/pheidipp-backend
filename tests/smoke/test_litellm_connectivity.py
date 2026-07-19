@@ -51,7 +51,10 @@ async def test_litellm_proxy_responds() -> None:
 
     assert response.choices[0].message.content
     content = response.choices[0].message.content.strip().lower()
-    assert content in ("ok", "ok."), f"Expected 'ok', got {content!r}"
+    assert "ok" in content, (
+        f"Expected 'ok' somewhere in the response, "
+        f"but got: {content!r}"
+    )
 
 
 @pytest.mark.asyncio

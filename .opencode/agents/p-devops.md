@@ -203,17 +203,21 @@ report, then continue unless services are completely down.
 
 ### 0. Read Implementation State
 
-Load the `git-session-delta` skill and run it.
+Use the `skill` tool to load `git-session-delta`, then follow its
+procedure exactly — run the four git commands it defines. Do not run
+git commands from memory without loading the skill first; the skill is
+the authoritative procedure and may change.
 
 This recovers everything needed for a fingerprint and for cross-checking
 the migration in Step 2:
 * Base Commit / Current Commit (git SHA before and after this session)
 * Files Added / Modified / Deleted (the expected scope of this change)
+* Touched Areas (classification per the skill's area-priority rules)
 * Deviation notes from commit messages in this session's range
 
-Record the commit range and file delta in the report. Do not record
-current DB revision in this step — Step 4 discovers that independently
-via `db-revision-test.sh "check"`.
+Record the commit range, file delta, and touched areas in the report.
+Do not record current DB revision in this step — Step 4 discovers that
+independently via `db-revision-test.sh "check"`.
 
 ### 1. Services
 
@@ -679,23 +683,30 @@ is only one. Do not fall back to a single blanket description here.*
   - <what you inspected, e.g. "inspected physiology_update_service.py">
   - <what you found, e.g. "apply_observations() rereads ORM state every iteration">
   - <the conclusion it supports, e.g. "working_state overwritten instead of accumulated">
+- **Files:**
+  - app: <application source files to modify — p-coder scope; list "none" if no app-code changes are needed>
+  - test: <test files to modify — p-test-architect scope; if the test files listed in Evidence are diagnostic only, state that explicitly>
 - **Affected failures:** <test/check name(s) or numeric range — representative sample + total count if >5>
-- **Suggested fix:** <optional, best-effort, non-binding — omit this line
-  entirely if you have no confident hypothesis; this is context to save
-  the owner from repeating your investigation, not an instruction they
-  must follow>
+- **Suggested fix:** <strongly preferred. Include whenever the evidence
+  converges on a fix direction, even if multi-line or conditional. Omit
+  only when genuinely uncertain — not when the fix is merely "not a
+  one-liner" or "might require architecture review." A suggested fix can
+  be conditional: "if this is an app bug, add a type guard; if the test
+  expectation is wrong, update the assertion to expect None." This is
+  context to save the owner from repeating your investigation, not an
+  instruction they must follow.>
 
 *(repeat as RC2, RC3, ... for every distinct root cause)*
 
 ## Routing Summary
 
-| Owner | Root Causes |
-|---|---|
-| p-coder | RC1, RC2 |
-| p-test-architect | RC3 |
-| p-devops | — |
-| p-implementation-architect | — |
-| Unassigned | — |
+| Owner | Root Causes | Failures |
+|---|---|---|
+| p-coder | RC1, RC2 | 4 |
+| p-test-architect | RC3 | 8 |
+| p-devops | — | — |
+| p-implementation-architect | — | — |
+| Unassigned | — | — |
 
 ## Recommended Execution Order
 
@@ -708,6 +719,11 @@ assertion failures are real).*
 2. <RC id(s) that can proceed independently/in parallel>
 
 ## Full Failure Detail
+
+*Group failure details under `### RC<N> — <title> (<count> failures)` headers.
+Tag individual entries with `[RC#]` for cross-reference.*
+
+### RC1 — <short title> (<count> failures)
 
 ### <test or check name> [RC1]
 <captured output or error summary>
@@ -727,6 +743,9 @@ Save report using `write` as
 `reports/<plan-id>_devops_testpack_<n>.md`, where `<n>` increments per
 Test Pack run for this plan (check `find_files` for prior
 `_testpack_` reports to determine the next index).
+
+For one-off/ad-hoc validation runs with no prior FAIL report and no
+plan-id: use `reports/oneoff_<description>_<YYYYMMDD>.md`.
 
 ```markdown
 # DevOps Test Pack Report — <plan-id> (pass <n>)

@@ -1,7 +1,7 @@
 version: "1.0"
 plan_id: "phase-1-2c-p1-twin-fitness-coaching-workouts"
 generated_at: "2026-06-24T12:45:00+00:00"
-last_reviewed_at: "2026-07-11T00:00:00+00:00"
+last_reviewed_at: "2026-07-18T00:00:00+00:00"
 
 # Plan covered by this sub-phase file:
 #   docs/implementation/phase-1/phase-1-2c-p1-twin-fitness-coaching-workouts.md
@@ -67,11 +67,11 @@ features:
     plan: "docs/implementation/phase-1/phase-1-2c-p1-twin-fitness-coaching-workouts.md"
     owned_by_plan:
       - "phase-1-2c-p1-twin-fitness-coaching-workouts"
-    description: "TwinState append-only snapshot table — inline fitness/fatigue/form/thresholds, metric_confidence JSONB, partial unique index on (athlete_id, activity_id) WHERE activity_id IS NOT NULL."
+    description: "TwinState append-only snapshot table — inline fitness/fatigue/form/thresholds, metric_confidence JSONB, partial lookup index on (athlete_id, activity_id) WHERE activity_id IS NOT NULL (uniqueness enforced at the service layer)."
     protects:
       - "twin_states carries the documented column set"
-      - "Partial unique index uq_twin_states_athlete_activity present with WHERE activity_id IS NOT NULL"
-      - "Two TwinStates for the same (athlete_id, activity_id) with non-null activity_id raise IntegrityError"
+      - "Partial non-unique index ix_twin_states_athlete_activity present with WHERE activity_id IS NOT NULL — supports per-activity lookups; uniqueness moved to service layer in Phase 2.3 P3"
+      - "Multiple TwinStates for the same (athlete_id, activity_id) are permitted at the DB layer; service layer enforces the dedup contract"
       - "Multiple TwinStates per athlete with NULL activity_id coexist (non-activity triggers permitted)"
       - "Index idx_twin_states_latest on (athlete_id, created_at) supports get_latest"
       - "athlete_id, training_goal_id, model_version, fitness, fatigue, form are NOT NULL"
@@ -530,6 +530,49 @@ coverage:
       - "CoachingMessage frequency guards (wellness_alert / cycle_check_in / weekly_summary dedup) — service-layer concern, Phase 1.5"
 
 history:
+  - date: "2026-07-19"
+    plan: "phase-1-2c-p1-twin-fitness-coaching-workouts"
+    tests_added: 0
+    tests_modified: 2
+    tests_removed: 0
+    result: "PENDING — Fix Mode (RC3). DevOps oneoff_regression_validation pass 1 routed 4 TwinState index schema test failures to p-test-architect. Migration 21f955c743cb (Phase 2.3 P3) intentionally dropped uq_twin_states_athlete_activity (unique) and replaced it with ix_twin_states_athlete_activity (non-unique). Updated tests/integration/test_twin_state_schema.py: renamed TestTwinStatePartialUniqueIndexDB -> TestTwinStatePartialActivityIndexDB, _partial_unique_index -> _partial_activity_index (removed unique filter), test_partial_unique_index_present -> test_partial_activity_index_present, test_duplicate_activity_rejected -> test_duplicate_activity_accepted (duplicates now permitted at DB layer). Updated tests/integration/test_migration_phase_1_2c.py: test_twin_state_partial_unique_index_present -> test_twin_state_partial_activity_index_present (queries ix_twin_states_athlete_activity instead of uq_twin_states_athlete_activity). Production code unchanged. validation.executable and validation.passed reset to false — DevOps will re-verify."
+    coverage_delta: >
+      Updated phase-1-2c-twin-state-schema feature description and protect list
+      to reflect non-unique index (uniqueness moved to service layer in Phase 2.3 P3).
+      No new tests added — assertions corrected to match current schema state.
+  - date: "2026-07-18"
+    plan: "phase-1-2c-p1-twin-fitness-coaching-workouts"
+    tests_added: 0
+    tests_modified: 1
+    tests_removed: 0
+    result: "FIXED-PENDING-REVERIFY"
+    coverage_delta: >
+      DevOps one-off unitary validation report (reports/oneoff_unitary_validation_20260718.md,
+      RC2 — Test Suite category) flagged 5 schema/contract drift failures
+      in tests/unit/test_twin_state_columns.py::
+      TestTwinStatePartialUniqueIndex that originated from the TwinState
+      DB-level unique index being dropped in Phase 2.3 P3 (uniqueness
+      moved to the service layer to support dedup short-circuit and
+      per-trigger re-entry). Fix: the class was renamed from
+      TestTwinStatePartialUniqueIndex to TestTwinStateAthleteActivityPartialIndex
+      and all 5 test methods were updated to assert the new contract:
+      (1) test_athlete_activity_partial_index_present — asserts the
+      non-unique "ix_twin_states_athlete_activity" index exists (was
+      asserting the unique "uq_..." name); (2) test_athlete_activity_index_is_not_unique
+      — asserts idx.unique is False (was True); (3-4) the two predicate
+      tests still assert the postgresql_where="activity_id IS NOT NULL"
+      predicate (the predicate survived the index relaxation); (5)
+      test_athlete_activity_index_columns unchanged in logic, only
+      updated to look up the new index name. Module docstring and class
+      docstring updated to document the new contract and the rationale
+      for moving uniqueness to the service layer. validation.executable
+      and validation.passed set to false on phase-1-2c-twin-state-schema
+      so DevOps re-verifies the fix in the next execution cycle. No
+      production code changes. The original Phase-1.2c migration
+      79dc97d4e433 still emits the unique index at the time of its
+      upgrade (it has not been retroactively edited), and the
+      phase-1-2c-migration feature's protects field is unchanged — the
+      later drop lives in a follow-up migration.
   - date: "2026-06-25"
     plan: "phase-1-2c-p1-twin-fitness-coaching-workouts"
     tests_added: 0

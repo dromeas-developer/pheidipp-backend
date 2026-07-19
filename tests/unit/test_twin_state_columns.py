@@ -3,7 +3,7 @@
 Phase-1.2c introduces the ``TwinState`` schema-only foundation for
 the digital twin. These tests pin column presence, nullability, the
 append-only contract, the inline-snapshot shape, the JSONB
-``metric_confidence`` default, and the partial unique index on
+``metric_confidence`` default, and the partial lookup index on
 ``(athlete_id, activity_id) WHERE activity_id IS NOT NULL``.
 
 Invariants pinned here:
@@ -15,8 +15,11 @@ Invariants pinned here:
 * ``activity_id`` is nullable (non-activity triggers: questionnaire,
   physiology_input, wellness_update).
 * ``metric_confidence`` defaults to ``{}`` JSONB object.
-* Index ``uq_twin_states_athlete_activity`` is UNIQUE WHERE
-  ``activity_id IS NOT NULL`` — non-activity triggers are exempt.
+* Index ``ix_twin_states_athlete_activity`` is a NON-UNIQUE partial
+  index on ``(athlete_id, activity_id) WHERE activity_id IS NOT NULL``
+  — supports per-activity lookups; the per-athlete/per-activity
+  uniqueness contract is enforced at the service layer (the DB-level
+  unique was dropped in Phase 2.3 P3).
 * Index ``idx_twin_states_latest`` on ``(athlete_id, created_at)``
   supports ``get_latest`` for the home view.
 
@@ -235,55 +238,66 @@ class TestTwinStateMetricConfidenceJsonb:
 
 
 # ---------------------------------------------------------------------------
-# Partial unique index on (athlete_id, activity_id) WHERE activity_id IS NOT NULL.
+# Partial lookup index on (athlete_id, activity_id) WHERE activity_id IS NOT NULL.
 # ---------------------------------------------------------------------------
 
 
-class TestTwinStatePartialUniqueIndex:
-    """The deduplication contract: one TwinState per
-    ``(athlete_id, activity_id)`` for activity-linked triggers
-    (``activity_sync``, ``calibration``). Non-activity triggers
-    (``questionnaire``, ``physiology_input``, ``wellness_update``)
-    bypass the partial predicate via NULL ``activity_id``."""
+class TestTwinStateAthleteActivityPartialIndex:
+    """Partial lookup index on ``(athlete_id, activity_id) WHERE
+    ``activity_id IS NOT NULL`` — supports per-activity TwinState
+    lookups for activity-linked triggers (``activity_sync``,
+    ``calibration``). Non-activity triggers (``questionnaire``,
+    ``physiology_input``, ``wellness_update``) bypass the partial
+    predicate via NULL ``activity_id``.
 
-    def test_athlete_activity_partial_unique_index_present(self) -> None:
+    The per-athlete/per-activity uniqueness contract is enforced at
+    the service layer — the DB-level UNIQUE was dropped in Phase 2.3
+    P3 to support dedup short-circuit and per-trigger re-entry. The
+    schema still provides the partial index so the lookup is
+    index-served, not sequential-scanned."""
+
+    def test_athlete_activity_partial_index_present(self) -> None:
         indexes = get_indexes(TwinState)
-        assert "uq_twin_states_athlete_activity" in indexes, (
-            "TwinState must declare `uq_twin_states_athlete_activity` "
-            "to enforce one TwinState per (athlete_id, activity_id) "
-            "for activity-linked triggers."
+        assert "ix_twin_states_athlete_activity" in indexes, (
+            "TwinState must declare `ix_twin_states_athlete_activity` "
+            "to support per-activity lookups for activity-linked triggers."
         )
 
-    def test_athlete_activity_index_is_unique(self) -> None:
-        idx = get_indexes(TwinState)["uq_twin_states_athlete_activity"]
-        assert idx.unique is True
+    def test_athlete_activity_index_is_not_unique(self) -> None:
+        idx = get_indexes(TwinState)["ix_twin_states_athlete_activity"]
+        assert idx.unique is False, (
+            "ix_twin_states_athlete_activity must be non-unique — "
+            "the per-athlete/per-activity uniqueness contract moved to "
+            "the service layer in Phase 2.3 P3."
+        )
 
     def test_athlete_activity_partial_predicate_present(self) -> None:
-        """Without the partial predicate the index would block
-        multiple non-activity triggers (questionnaire,
-        physiology_input, wellness_update) per athlete."""
-        idx = get_indexes(TwinState)["uq_twin_states_athlete_activity"]
+        """Without the partial predicate the index would carry rows
+        for non-activity triggers (questionnaire, physiology_input,
+        wellness_update), bloating the index without serving any
+        per-activity lookup."""
+        idx = get_indexes(TwinState)["ix_twin_states_athlete_activity"]
         dialect_opts: Any = idx.dialect_options
         predicate: Any = dialect_opts.get("postgresql", {}).get("where")
         assert predicate is not None, (
-            "uq_twin_states_athlete_activity must declare a "
+            "ix_twin_states_athlete_activity must declare a "
             "postgresql_where predicate — without it the index would "
-            "block multiple TwinStates per athlete for non-activity triggers."
+            "include non-activity triggers and bloat the lookup."
         )
 
     def test_athlete_activity_partial_predicate_is_activity_not_null(self) -> None:
-        idx = get_indexes(TwinState)["uq_twin_states_athlete_activity"]
+        idx = get_indexes(TwinState)["ix_twin_states_athlete_activity"]
         dialect_opts: Any = idx.dialect_options
         predicate: Any = dialect_opts.get("postgresql", {}).get("where")
         rendered = str(predicate).lower()
         assert "activity_id" in rendered and "is not null" in rendered, (
-            "uq_twin_states_athlete_activity partial predicate must "
+            "ix_twin_states_athlete_activity partial predicate must "
             "constrain `activity_id IS NOT NULL`. "
             f"Got: {predicate!r}"
         )
 
     def test_athlete_activity_index_columns(self) -> None:
-        idx = get_indexes(TwinState)["uq_twin_states_athlete_activity"]
+        idx = get_indexes(TwinState)["ix_twin_states_athlete_activity"]
         columns = {c.key for c in idx.columns}
         assert columns == {"athlete_id", "activity_id"}
 

@@ -1,7 +1,7 @@
 version: "1.0"
 plan_id: "phase-1-2a-p1-profile-preferences-activity"
 generated_at: "2026-06-19T00:00:00+00:00"
-last_reviewed_at: "2026-06-21T13:00:00+00:00"
+last_reviewed_at: "2026-07-18T00:00:00+00:00"
 
 # Plan covered by this sub-phase file:
 #   docs/implementation/phase-1/phase-1-2a-p1-profile-preferences-activity.md
@@ -355,6 +355,32 @@ coverage:
       - "Data tier inference at the activity boundary (not wired in Phase-1.2a)"
 
 history:
+  - date: "2026-07-18"
+    plan: "phase-1-2a-p1-profile-preferences-activity"
+    tests_added: 0
+    tests_modified: 2
+    tests_removed: 0
+    result: "FIXED-PENDING-REVERIFY"
+    coverage_delta: >
+      DevOps one-off unitary validation report (reports/oneoff_unitary_validation_20260718.md,
+      RC2 — Test Suite category) flagged 2 schema/contract drift failures
+      in tests/unit/test_activity_columns.py and tests/unit/test_enum_values.py
+      that originated from intentional model/enum changes during the
+      doctype cleanup. Fixes: (1) tests/unit/test_activity_columns.py::
+      TestActivityLeanSchemaFields::test_versioning_fields_present_and_nullable
+      — Activity.cleaning_pipeline_version was widened from
+      String(length=16) to String(length=32) (ingestion_pipeline_version
+      unchanged at 16); test now asserts per-field length via a
+      field->length map. (2) tests/unit/test_enum_values.py::
+      TestSportBackgroundContract::test_sport_background_count + new
+      TestSportBackgroundContract::test_sport_background_values — the
+      SportBackground enum grew from 7 to 9 members (added TEAM_SPORT and
+      GYM_FITNESS); the count assertion was updated and a values-set
+      assertion was added to make the test a real contract test instead
+      of a count-only tripwire. validation.executable and validation.passed
+      set to false on phase-1-2a-activity-schema and phase-1-2a-enums so
+      DevOps re-verifies the fix in the next execution cycle. No
+      production code changes.
   - date: "2026-06-20"
     plan: "phase-1-2a-p1-profile-preferences-activity"
     tests_added: 0

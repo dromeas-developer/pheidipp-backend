@@ -221,7 +221,9 @@ class TwinRecalibrationService:
         # this activity. If one exists and the incoming trigger is not
         # calibration, this is a duplicate non-calibration trigger and
         # must be skipped.
-        existing = await self.twin_states.get_by_activity(activity_id)
+        existing = await self.twin_states.get_by_activity(
+            activity_id=activity_id
+        )
         if existing is not None and trigger != TwinTrigger.CALIBRATION:
             return existing
 
@@ -402,6 +404,16 @@ class TwinRecalibrationService:
             new_state=new_state,
         )
 
+        # Deduplication short-circuit: when the gate returned an
+        # existing record (not the one we just built), no new
+        # TwinState was appended and no events fire. The existing
+        # record is the authoritative snapshot for the activity.
+        if inserted is not new_state:
+            return CalibrationRecalibrationResult(
+                twin_state=inserted,
+                confidence_upgraded=False,
+            )
+
         # -------------------------------------------------------------
         # 5. Fire ``twin_recalibrated`` — every new calibration
         #    TwinState fires this event (no threshold gate, unlike
@@ -427,16 +439,20 @@ class TwinRecalibrationService:
         )
 
         # -------------------------------------------------------------
-        # 6. Fire ``twin_confidence_upgraded`` only when the new
-        #    TwinState's ``confidence_level`` is strictly higher
-        #    than the previous TwinState's. Fires in addition to
-        #    ``twin_recalibrated`` (not instead of). Same
+        # 6. Fire ``twin_confidence_upgraded`` only when there is
+        #    a prior TwinState AND the new ``confidence_level`` is
+        #    strictly higher than the previous. The first snapshot
+        #    has no prior level to upgrade from, so the event
+        #    never fires on a first snapshot. Fires in addition
+        #    to ``twin_recalibrated`` (not instead of). Same
         #    transaction; outbox insertion order is
         #    ``twin_recalibrated`` → ``twin_confidence_upgraded``.
         # -------------------------------------------------------------
-        confidence_upgraded = confidence_rank(
-            inserted.confidence_level
-        ) > confidence_rank(old_level)
+        confidence_upgraded = (
+            previous is not None
+            and confidence_rank(inserted.confidence_level)
+            > confidence_rank(old_level)
+        )
         if confidence_upgraded:
             await self.events.publish(
                 event_type="twin_confidence_upgraded",

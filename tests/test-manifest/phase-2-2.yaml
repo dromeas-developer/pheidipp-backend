@@ -1,7 +1,7 @@
 version: '1.0'
 plan_id: phase-2-2-p1-signal-cleaning
 generated_at: '2026-07-08T00:00:00Z'
-last_reviewed_at: '2026-07-10T14:00:00Z'
+last_reviewed_at: '2026-07-18T00:00:00Z'
 features:
   signal_cleaning_pipeline:
     status: promoted
@@ -490,3 +490,34 @@ history:
       app/worker/app.py. Behaviour test sport_type assertion corrected. Phase 2.2
       is complete — the signal cleaning pipeline, RR deviation filter, and end-to-end
       user journey are all verified at unit, integration, and behaviour layers.
+  - date: '2026-07-18'
+    plan: phase-2-2-p1-signal-cleaning
+    tests_added: 0
+    tests_modified: 1
+    tests_removed: 0
+    result: PENDING
+    coverage_delta: >-
+      Fix-mode cycle for DevOps report RC5a (reports/oneoff_unitary_validation_20260718.md).
+      Root cause: SignalCleaningService renamed `self.object_storage` to
+      `self._object_storage` (private convention) in the service body; the
+      constructor parameter name `object_storage` is unchanged and remains
+      keyword-only. 32 unit tests in tests/unit/test_signal_cleaning_service.py
+      failed at execution with `AttributeError: 'SignalCleaningService' object
+      has no attribute 'object_storage'` because they read/replaced methods on
+      the constructed service via the old public-attribute name.
+      Fix applied: mechanical rename `service.object_storage` → `service._object_storage`
+      across 14 attribute-access lines in tests/unit/test_signal_cleaning_service.py
+      (lines 157, 161, 164, 242, 274, 306, 416, 418, 421, 589, 671, 673, 676, 1445).
+      Constructor keyword arguments `object_storage=AsyncMock()` were deliberately
+      left unchanged (the parameter name is still public). One-off infrastructure
+      mismatch — the same test file already has `assert hasattr(service, "_object_storage")`
+      at line 1562 in TestSessionDeadFieldRemoved, so the new private name was
+      already anticipated by the test pack; only the read/replace sites were
+      stale. validation.implemented stays true; validation.executable and
+      validation.passed downgraded to false on both signal_cleaning_pipeline
+      and rr_deviation_filter_remediation features (the only two features
+      owning this test path). Awaiting DevOps re-execution to confirm the
+      32-failure count drops to zero. No new reusable failure class — this is
+      a one-off coupling between production encapsulation choices and test
+      coupling depth, not a pattern that recurs across the suite. No README
+      or MOCKING_CONTRACT update needed.

@@ -184,7 +184,19 @@ def _make_service(
     mock_twin_states.get_latest = AsyncMock(return_value=previous)
     mock_twin_states.get_by_activity_and_trigger = AsyncMock(return_value=None)
     mock_twin_states.get_by_activity = AsyncMock(return_value=None)
-    mock_twin_states.insert = AsyncMock(return_value=inserted_state)
+    # The repository's real ``insert`` returns the same object that
+    # was passed in (after flush + refresh), preserving identity.
+    # Mirroring that here so the dedup short-circuit's identity
+    # check sees ``inserted is new_state`` → True and event firing
+    # proceeds normally. The DB also assigns ``state.id`` via
+    # ``flush() + refresh()``; the mock must simulate that for any
+    # caller that reads ``inserted.id`` (e.g. event payloads that
+    # include ``twin_state_id``).
+    def _return_inserted(state: Any) -> Any:
+        state.id = uuid.uuid4()
+        return state
+
+    mock_twin_states.insert = AsyncMock(side_effect=_return_inserted)
 
     if event_publisher is None:
         event_publisher = AsyncMock(spec=EventPublisher)
@@ -355,9 +367,12 @@ class TestRecalibrateForCalibrationFirstSnapshot:
         )
 
         # First snapshot: confidence_upgraded is False (no prior
-        # to compare against).
+        # to compare against). The returned TwinState is the
+        # real ``new_state`` built by the service, not the mock
+        # placeholder — the mock's ``side_effect`` returns the
+        # passed-in argument by identity.
         assert result.confidence_upgraded is False
-        assert result.twin_state is result_state
+        assert result.twin_state.confidence_level == TwinConfidenceLevel.MEDIUM
 
     @pytest.mark.asyncio
     async def test_first_snapshot_uses_data_tier_3_when_no_previous(self) -> None:

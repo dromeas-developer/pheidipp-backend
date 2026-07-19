@@ -136,11 +136,15 @@ class TestActivityLeanSchemaFields:
 
     def test_versioning_fields_present_and_nullable(self) -> None:
         cols = get_columns(Activity)
-        for field in ("ingestion_pipeline_version", "cleaning_pipeline_version"):
+        expected_lengths = {
+            "ingestion_pipeline_version": 16,
+            "cleaning_pipeline_version": 32,
+        }
+        for field, length in expected_lengths.items():
             col = cols[field]
             assert col.nullable is True
             assert isinstance(col.type, String)
-            assert col.type.length == 16
+            assert col.type.length == length
 
     def test_notes_is_text_nullable(self) -> None:
         cols = get_columns(Activity)

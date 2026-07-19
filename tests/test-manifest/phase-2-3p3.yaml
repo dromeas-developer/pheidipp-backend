@@ -1,7 +1,7 @@
 version: '1.0'
 plan_id: phase-2-3-p3-twin-recalibration-pipeline
 generated_at: '2026-07-15T16:00:00Z'
-last_reviewed_at: '2026-07-15T16:00:00Z'
+last_reviewed_at: '2026-07-19T00:00:00Z'
 features:
   # ---------------------------------------------------------------------------
   # Confidence derivation pure helpers.

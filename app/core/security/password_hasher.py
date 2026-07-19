@@ -14,6 +14,8 @@ class PasswordHasher:
     @staticmethod
     def hash(password: str) -> str:
         """Hash *password* with bcrypt at the configured cost factor."""
+        if not isinstance(password, str):  # type: ignore[unnecessary-isinstance] — runtime guard against non-str callers
+            raise TypeError("password must be a string")
         if not password:
             raise ValueError("password must be a non-empty string")
         # Bcrypt has a 72-byte input cap; truncate to that length to avoid
@@ -25,6 +27,8 @@ class PasswordHasher:
     @staticmethod
     def verify(password: str, hashed: str) -> bool:
         """Constant-time verification of *password* against the stored bcrypt hash."""
+        if not isinstance(password, str):  # type: ignore[unnecessary-isinstance] — runtime guard against non-str callers
+            return False
         if not password or not hashed:
             return False
         try:

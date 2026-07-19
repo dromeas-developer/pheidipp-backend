@@ -40,10 +40,19 @@ class TestPasswordHasherHash:
         b = PasswordHasher.hash("ValidPass123?")
         assert a != b
 
-    @pytest.mark.parametrize("value", ["", None, 123, 45.6, []])  # type: ignore[list-item]
-    def test_hash_rejects_invalid_input(self, value: Any) -> None:
-        with pytest.raises(ValueError):
+    @pytest.mark.parametrize("value", [None, 123, 45.6, []])  # type: ignore[list-item]
+    def test_hash_rejects_non_string_types(self, value: Any) -> None:
+        """Non-str inputs are a caller type error — bcrypt cannot
+        encode non-strings and the guard rejects them before any
+        value check runs."""
+        with pytest.raises(TypeError):
             PasswordHasher.hash(value)  # type: ignore[arg-type]
+
+    def test_hash_rejects_empty_string(self) -> None:
+        """An empty string is a valid type but an invalid value —
+        the value check rejects it with ``ValueError``."""
+        with pytest.raises(ValueError):
+            PasswordHasher.hash("")
 
 
 class TestPasswordHasherVerify:

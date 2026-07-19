@@ -8,6 +8,10 @@ from alembic import context
 from app.db.base import Base
 from app.config import get_postgres_url, settings
 
+# Import all model modules so their tables register with Base.metadata.
+# Without this, Alembic autogenerate sees an empty metadata and
+# generates false-positive "remove all tables" every time.
+import app.models  # noqa: F401 — side-effect import for metadata registration
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

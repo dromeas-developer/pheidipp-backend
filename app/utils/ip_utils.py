@@ -36,7 +36,7 @@ def truncate_ip(ip: Optional[str]) -> Optional[str]:
     truncation auditable in downstream log/event aggregates and is the
     canonical form mandated by ADR-005's compliance examples.
     """
-    if ip is None:
+    if ip is None or not isinstance(ip, str):  # type: ignore[unnecessary-isinstance] — runtime guard against non-str callers
         return None
     if not ip.strip():
         return None

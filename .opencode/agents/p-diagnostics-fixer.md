@@ -183,6 +183,23 @@ All other diagnostics in files the caller did not provide are
 pre-existing — skip them. Count how many were discarded and note the
 discard count in the final report.
 
+### 2c. Zero-diagnostics short-circuit
+
+If the filtered diagnostics count is zero — the caller's file(s) have
+no type errors — return a terse confirmation and STOP. Do not proceed
+to clustering, the fix loop, the final gate, or report writing. The
+caller needs a status signal, not a file:
+
+```
+✅ PASS — <file>: zero diagnostics
+```
+
+For single-file mode: one line per file. For multi-file mode: one line
+per file, then a summary count. No report file. No final gate. STOP.
+
+If any diagnostics remain after filtering → proceed to Step 2b (or
+Step 3 in single-file mode, where 2b is skipped).
+
 ### 2b. Batching gate — Tier 2 (after typecheck, NON-NEGOTIABLE)
 
 Skip this step in single-file mode.
@@ -296,18 +313,17 @@ bash scripts/typecheck.sh
 ```
 
 If the final gate surfaces diagnostics in files not in the caller's
-`files` list, treat them as pre-existing — note the count in the
-report, do NOT loop back to fix them. Only loop back for diagnostics
+`files` list, treat them as pre-existing — note the count in your
+response, do NOT loop back to fix them. Only loop back for diagnostics
 in the caller's files or direct cascades.
 
 (NOTE: This step is never reached in full-repo mode — Tier 2 gate
 always stops before the fix loop.)
 
-### 8. Write report
+### 8. Return summary
 
-Save the report at `reports/<plan_id>_diagnostics.md` (plan-based mode
-only). Full-repo mode never reaches this step — its only output is the
-batching plan response.
+Return a text response — do NOT write a file. The caller reads your
+response directly and decides next steps.
 
 Include:
 * Operation mode (plan-based)
@@ -378,8 +394,9 @@ grep -c "error:" /tmp/typecheck_output.txt
 ## Output
 
 * Modified source files via tools only — never in response text
-* Final report at `reports/<plan_id>_diagnostics.md` (plan-based mode only)
+* Plan-based mode: return a text summary (Step 8) — zero-diagnostics
+  confirmation, fix summary, or batching plan. Never write a report file.
 * Full-repo mode: only output is the batching plan response (text, no file)
-* Completion confirmation: report path + pass/fail status + unfixed count
-  (plan-based); or batching plan with per-file invocation instructions
-  (full-repo)
+* Completion confirmation: pass/fail status + unfixed count + any
+  pre-existing diagnostics noted (plan-based); or batching plan with
+  per-file invocation instructions (full-repo)

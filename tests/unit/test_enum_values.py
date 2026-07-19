@@ -184,7 +184,20 @@ class TestSportBackgroundContract:
 
     def test_sport_background_count(self) -> None:
         """Closed ontology: sensible coverage without bloat."""
-        assert len(list(SportBackground)) == 7
+        assert len(list(SportBackground)) == 9
+
+    def test_sport_background_values(self) -> None:
+        assert {member.value for member in SportBackground} == {
+            "running_primary",
+            "cycling_primary",
+            "swimming_primary",
+            "cycling",
+            "swimming",
+            "triathlon",
+            "team_sport",
+            "gym_fitness",
+            "none",
+        }
 
 
 class TestTrainingTimeOfDayContract:

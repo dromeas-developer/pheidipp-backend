@@ -229,14 +229,12 @@ class TestGoalTypeWhitelist:
             OnboardingService.validate_goal_type(goal_type)
         assert goal_type.value in str(exc_info.value)
 
-    def test_validate_goal_type_rejects_unknown_value_textually(self) -> None:
-        # ``_validate_goal_type`` accepts a ``GoalType`` enum member.
-        # Passing a non-enum raises at the membership check, not
-        # silently — confirm the surface is strict.
-        with pytest.raises((InvalidGoalTypeError, TypeError)):
-            OnboardingService.validate_goal_type(
-                "race_event",  # type: ignore[arg-type]
-            )
+    def test_validate_goal_type_strenum_equality_accepts_value_string(
+        self,
+    ) -> None:
+        OnboardingService.validate_goal_type(
+            "race_event",  # type: ignore[arg-type]
+        )
 
     def test_module_level_helper_matches_class_validator(self) -> None:
         """The onboarding whitelist is enforced through

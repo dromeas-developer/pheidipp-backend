@@ -1,7 +1,7 @@
 version: "1.0"
 plan_id: "phase-1-2b-p1-plan-sessions"
 generated_at: "2026-06-20T00:00:00+00:00"
-last_reviewed_at: "2026-06-24T23:55:00+00:00"
+last_reviewed_at: "2026-07-18T00:00:00+00:00"
 
 # Plan covered by this sub-phase file:
 #   docs/implementation/phase-1/phase-1-2b-p1-plan-sessions.md
@@ -541,6 +541,27 @@ coverage:
       - "Plan visibility / privacy contracts for the coach layer (vision)"
 
 history:
+  - date: "2026-07-18"
+    plan: "phase-1-2b-p1-plan-sessions"
+    tests_added: 0
+    tests_modified: 1
+    tests_removed: 0
+    result: "FIXED-PENDING-REVERIFY"
+    coverage_delta: >
+      DevOps one-off unitary validation report (reports/oneoff_unitary_validation_20260718.md,
+      RC2 — Test Suite category) flagged 1 schema/contract drift failure
+      in tests/unit/test_planned_session_columns.py::
+      TestPlannedSessionRequiredColumns::test_status_required_enum that
+      originated from the doctype cleanup inserting SCHEDULED into the
+      PlannedSessionStatus enum. Fix: the expected sorted-value list was
+      extended from 6 to 7 values, adding "scheduled" between "generated"
+      and "completed" to match the new declaration order in
+      app/models/enums.py. The phase-1-2b-enums feature's protects field
+      already documents the 7-value contract (including "scheduled"),
+      so the planned-session-columns test is now in sync with the enum
+      contract. validation.executable and validation.passed set to false
+      on phase-1-2b-planned-session-schema so DevOps re-verifies the fix
+      in the next execution cycle. No production code changes.
   - date: "2026-06-24"
     plan: "phase-1-2b-p1-plan-sessions"
     tests_added: 0

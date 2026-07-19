@@ -242,8 +242,8 @@ features:
       external_services: []
     validation:
       implemented: true
-      executable: false
-      passed: false
+      executable: true
+      passed: true
     tests:
       integration:
         - path: "tests/integration/test_activity_endpoints.py"
@@ -265,8 +265,8 @@ features:
       external_services: []
     validation:
       implemented: true
-      executable: false
-      passed: false
+      executable: true
+      passed: true
     tests:
       integration:
         - path: "tests/integration/test_activity_schema.py"

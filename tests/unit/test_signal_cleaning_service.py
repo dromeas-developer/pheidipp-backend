@@ -154,14 +154,14 @@ async def _run_clean_and_return_result(
     service.raw_streams.exists_for_activity = AsyncMock(
         return_value=raw_stream_exists
     )
-    service.object_storage.download_fit = AsyncMock(
+    service._object_storage.download_fit = AsyncMock(  # type: ignore[reportPrivateUsage]
         return_value=b"fake-fit-bytes"
     )
     service.fit_parser.parse = AsyncMock(return_value=mock_parsed)
-    service.object_storage.build_cleaned_stream_key = MagicMock(
+    service._object_storage.build_cleaned_stream_key = MagicMock(  # type: ignore[reportPrivateUsage]
         return_value=f"cleaned-streams/{mock_activity.athlete_id}/{mock_activity.id}/stream.gz"
     )
-    service.object_storage.upload_cleaned_stream = AsyncMock(
+    service._object_storage.upload_cleaned_stream = AsyncMock(  # type: ignore[reportPrivateUsage]
         return_value=MagicMock()
     )
 
@@ -239,7 +239,7 @@ class TestCleanManualEntry:
         assert result.created is False
         assert result.reason == "manual_entry"
         # No pipeline or persistence calls
-        cast(AsyncMock, service.object_storage.download_fit).assert_not_called()
+        cast(AsyncMock, service._object_storage.download_fit).assert_not_called()  # type: ignore[reportPrivateUsage]
         cast(AsyncMock, service.raw_streams.insert).assert_not_called()
 
 
@@ -271,7 +271,7 @@ class TestCleanIdempotency:
 
         assert result.created is False
         assert result.reason == "already_cleaned"
-        cast(AsyncMock, service.object_storage.download_fit).assert_not_called()
+        cast(AsyncMock, service._object_storage.download_fit).assert_not_called()  # type: ignore[reportPrivateUsage]
         cast(AsyncMock, service.fit_parser.parse).assert_not_called()
         cast(AsyncMock, service.raw_streams.insert).assert_not_called()
 
@@ -303,7 +303,7 @@ class TestCleanIneligibleGate:
             await service.clean(activity_id)
 
         # Nothing was cleaned or written.
-        cast(AsyncMock, service.object_storage.download_fit).assert_not_called()
+        cast(AsyncMock, service._object_storage.download_fit).assert_not_called()  # type: ignore[reportPrivateUsage]
         cast(AsyncMock, service.raw_streams.insert).assert_not_called()
 
     @pytest.mark.asyncio
@@ -413,12 +413,12 @@ class TestCleanHrStreamCreated:
 
         service.activities.get_by_id = AsyncMock(return_value=mock)
         service.raw_streams.exists_for_activity = AsyncMock(return_value=False)
-        service.object_storage.download_fit = AsyncMock(return_value=b"fit")
+        service._object_storage.download_fit = AsyncMock(return_value=b"fit")  # type: ignore[reportPrivateUsage]
         service.fit_parser.parse = AsyncMock(return_value=parsed)
-        service.object_storage.build_cleaned_stream_key = MagicMock(
+        service._object_storage.build_cleaned_stream_key = MagicMock(  # type: ignore[reportPrivateUsage]
             return_value=f"cleaned-streams/{mock.athlete_id}/{mock.id}/stream.gz"
         )
-        service.object_storage.upload_cleaned_stream = AsyncMock(
+        service._object_storage.upload_cleaned_stream = AsyncMock(  # type: ignore[reportPrivateUsage]
             return_value=MagicMock()
         )
         service.raw_streams.insert = _insert
@@ -586,7 +586,7 @@ class TestCleanShortStream:
         captured_inserts: list[Any] = []
         service.activities.get_by_id = AsyncMock(return_value=mock)
         service.raw_streams.exists_for_activity = AsyncMock(return_value=False)
-        service.object_storage.download_fit = AsyncMock(return_value=b"fit")
+        service._object_storage.download_fit = AsyncMock(return_value=b"fit")  # type: ignore[reportPrivateUsage]
         service.fit_parser.parse = AsyncMock(return_value=parsed)
         service.raw_streams.insert = AsyncMock(
             side_effect=lambda s: captured_inserts.append(s)  # type: ignore[reportUnknownLambdaType]
@@ -668,12 +668,12 @@ class TestCleanRetryIdempotency:
         )
         service.activities.get_by_id = AsyncMock(return_value=mock)
         service.raw_streams.exists_for_activity = AsyncMock(return_value=False)
-        service.object_storage.download_fit = AsyncMock(return_value=b"fit")
+        service._object_storage.download_fit = AsyncMock(return_value=b"fit")  # type: ignore[reportPrivateUsage]
         service.fit_parser.parse = AsyncMock(return_value=parsed)
-        service.object_storage.build_cleaned_stream_key = MagicMock(
+        service._object_storage.build_cleaned_stream_key = MagicMock(  # type: ignore[reportPrivateUsage]
             return_value=f"cleaned-streams/{mock.athlete_id}/{mock.id}/stream.gz"
         )
-        service.object_storage.upload_cleaned_stream = _upload_with_conflict_once
+        service._object_storage.upload_cleaned_stream = _upload_with_conflict_once  # type: ignore[reportPrivateUsage]
         service.raw_streams.insert = AsyncMock(
             side_effect=lambda s: setattr(s, "id", uuid.uuid4()) or s  # type: ignore[reportUnknownLambdaType, reportUnknownArgumentType]
         )
@@ -1442,7 +1442,7 @@ class TestRrDeviationFilterRegression:
         # called inside ``clean`` only after the idempotency
         # guard passes; its absence proves the guard short-
         # circuited before the new deviation pass.
-        cast(AsyncMock, service.object_storage.download_fit).assert_not_called()
+        cast(AsyncMock, service._object_storage.download_fit).assert_not_called()  # type: ignore[reportPrivateUsage]
         cast(AsyncMock, service.fit_parser.parse).assert_not_called()
         cast(AsyncMock, service.raw_streams.insert).assert_not_called()
 
@@ -1558,8 +1558,11 @@ class TestSessionDeadFieldRemoved:
             "is held by the injected repositories"
         )
         # The constructor still stores the other dependencies
-        # under their declared names.
+        # under their declared names. ``object_storage`` is the
+        # one dependency stored with a private-name convention
+        # (``self._object_storage``); the others are stored under
+        # their public names.
         assert hasattr(service, "_object_storage")
-        assert hasattr(service, "_raw_streams")
-        assert hasattr(service, "_activities")
-        assert hasattr(service, "_fit_parser")
+        assert hasattr(service, "raw_streams")
+        assert hasattr(service, "activities")
+        assert hasattr(service, "fit_parser")

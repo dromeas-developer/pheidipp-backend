@@ -160,6 +160,7 @@ class TestPlannedSessionRequiredColumns:
             [
                 "pending",
                 "generated",
+                "scheduled",
                 "completed",
                 "skipped",
                 "missed",

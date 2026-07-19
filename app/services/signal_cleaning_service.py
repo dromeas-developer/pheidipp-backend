@@ -308,7 +308,7 @@ class SignalCleaningService:
         # the repositories hold the session internally. The service
         # does not store a direct reference to the session — the
         # validation report flagged `self._session` as dead.
-        self.object_storage = object_storage
+        self._object_storage = object_storage
         self.raw_streams = raw_stream_repository
         self.activities = activity_repository
         self.fit_parser = fit_parser
@@ -410,7 +410,7 @@ class SignalCleaningService:
                 f"activity {activity_id} has no fit_file_key"
             )
 
-        fit_bytes = await self.object_storage.download_fit(fit_key)
+        fit_bytes = await self._object_storage.download_fit(fit_key)
         parsed: ParsedFitData = await self.fit_parser.parse(fit_bytes)
 
         # Pipeline order is fixed — see the method docstring and
@@ -455,12 +455,12 @@ class SignalCleaningService:
         # retry after a partial-then-committed upload hits
         # ``ObjectStorageConflictError`` — that conflict is the
         # idempotency outcome.
-        key = self.object_storage.build_cleaned_stream_key(
+        key = self._object_storage.build_cleaned_stream_key(
             activity.athlete_id, activity.id
         )
         payload = gzip.compress(stream.to_json_bytes())
         try:
-            await self.object_storage.upload_cleaned_stream(
+            await self._object_storage.upload_cleaned_stream(
                 athlete_id=activity.athlete_id,
                 activity_id=activity.id,
                 payload_bytes=payload,

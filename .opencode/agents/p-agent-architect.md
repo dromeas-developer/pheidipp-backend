@@ -13,7 +13,7 @@ permission:
   edit:       allow
   write:      allow
   bash:       deny
-  webfetch:   deny
+  webfetch:   allow
   todowrite:  deny
 ---
 

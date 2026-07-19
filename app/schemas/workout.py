@@ -1,25 +1,4 @@
-"""Workout response schemas (Phase-1.5b).
-
-Wire-format contracts for the workout endpoints:
-
-* ``GET /athletes/{id}/today``                              → ``TodayResponse``
-* ``POST /athletes/{id}/sessions/{sid}/generate-workout``   → ``GenerateWorkoutResponse``
-
-The two-column target display (``theoretical_targets`` /
-``adjusted_targets``) on ``GeneratedWorkout`` is always populated;
-Phase 1.5b ships them byte-equal because modifier services
-(``WellnessModifierService``, ``WeatherAdjustmentService``,
-``CyclePhaseService``) land in Phase 1.6 / later. The schema
-preserves the field shape so the home-view render does not require
-a data-shape migration when those services arrive.
-
-ORM-to-response mapping is delegated to Pydantic's
-``model_validate`` (with ``from_attributes=True`` on the response
-schemas) so the conversion lives in one place. JSONB columns
-(``theoretical_targets``, ``adjusted_targets``, ``target`` on each
-step) are declared as ``dict`` since their shape is enforced by the
-service layer's ``WorkoutGenerationAgent`` validator.
-"""
+"""Workout response schemas (Phase-1.5b)."""
 
 from __future__ import annotations
 
@@ -40,20 +19,8 @@ from app.models.enums import (
 from app.schemas.plan import PlannedSessionResponse
 
 
-# ---------------------------------------------------------------------------
-# WorkoutTarget — sub-shape on every WorkoutStep + the aggregate
-# GeneratedWorkout.theoretical_targets / adjusted_targets.
-# ---------------------------------------------------------------------------
-
-
 class WorkoutTargetPrimaryResponse(BaseModel):
-    """The ``primary`` block of a ``WorkoutTarget`` JSONB payload.
-
-    Holds the numeric range. ``min`` and ``max`` are null when the
-    step is signal-type ``description`` (Tier 5-6 athletes). The
-    ``unit`` string identifies the channel
-    (``"watts" | "sec_per_km" | "bpm"``).
-    """
+    """The ``primary`` block of a ``WorkoutTarget`` JSONB payload."""
 
     min: Optional[int]
     max: Optional[int]
@@ -61,13 +28,7 @@ class WorkoutTargetPrimaryResponse(BaseModel):
 
 
 class WorkoutTargetResponse(BaseModel):
-    """One ``WorkoutTarget`` — the per-step target JSONB shape.
-
-    Mirrors ``docs/architecture/01-entities/workout-step.md`` →
-    ``WorkoutTarget``. ``fallback`` is ``null`` at this phase; Phase
-    1.6's ``ExecutionAnalysisService`` will populate an alternative
-    signal channel from raw sensor data.
-    """
+    """One ``WorkoutTarget`` — the per-step target JSONB shape."""
 
     signal_type: str  # 'power' | 'gap' | 'hr' | 'description'
     primary: Optional[WorkoutTargetPrimaryResponse]
@@ -80,38 +41,15 @@ class WorkoutTargetResponse(BaseModel):
 WorkoutTargetResponse.model_rebuild()
 
 
-# ---------------------------------------------------------------------------
-# TargetSet — the ``theoretical_targets`` / ``adjusted_targets`` JSONB shape.
-# ---------------------------------------------------------------------------
-
-
 class TargetSetResponse(BaseModel):
-    """The ``TargetSet`` shape on ``GeneratedWorkout``.
-
-    ``targets`` is the per-step target array; ``description`` is a
-    plain-English summary. At Phase 1.5b
-    ``theoretical_targets`` is byte-equal to ``adjusted_targets`` —
-    modifier services are not yet wired up.
-    """
+    """The ``TargetSet`` shape on ``GeneratedWorkout``."""
 
     targets: List[WorkoutTargetResponse]
     description: str
 
 
-# ---------------------------------------------------------------------------
-# WorkoutStep — one segment of a generated workout.
-# ---------------------------------------------------------------------------
-
-
 class WorkoutStepResponse(BaseModel):
-    """One ``WorkoutStep`` row.
-
-    Mirrors ``docs/architecture/01-entities/workout-step.md``. The
-    three-layer hierarchy (``session_type``,
-    ``physiological_intent``, ``session_purpose``) is preserved so
-    downstream consumers can render the same shape used in
-    segmentation and execution analysis.
-    """
+    """One ``WorkoutStep`` row."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -136,19 +74,8 @@ class WorkoutStepResponse(BaseModel):
     description: str
 
 
-# ---------------------------------------------------------------------------
-# GeneratedWorkout — the day-of workout header.
-# ---------------------------------------------------------------------------
-
-
 class GeneratedWorkoutResponse(BaseModel):
-    """One ``GeneratedWorkout`` row plus its ``WorkoutStep[]``.
-
-    The two-column target structure (``theoretical_targets`` /
-    ``adjusted_targets``) is always populated. The
-    ``recovery_modifier_reason`` is ``null`` at Phase 1.5b —
-    ``WellnessModifierService`` lands in Phase 1.6.
-    """
+    """One ``GeneratedWorkout`` row plus its ``WorkoutStep[]``."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -163,19 +90,8 @@ class GeneratedWorkoutResponse(BaseModel):
     generated_at: datetime
 
 
-# ---------------------------------------------------------------------------
-# Wire-format response wrappers.
-# ---------------------------------------------------------------------------
-
-
 class TodayResponse(BaseModel):
-    """Response for ``GET /athletes/{athlete_id}/today``.
-
-    Returns the today's ``PlannedSession`` (per the active plan),
-    the ``GeneratedWorkout`` (which the endpoint triggers when
-    missing) and its ``WorkoutStep[]``. 404 when no session is
-    scheduled for today on the active plan.
-    """
+    """Response for ``GET /athletes/{athlete_id}/today``."""
 
     planned_session: PlannedSessionResponse
     generated_workout: GeneratedWorkoutResponse
@@ -183,25 +99,14 @@ class TodayResponse(BaseModel):
 
 
 class GenerateWorkoutResponse(BaseModel):
-    """Response for ``POST /athletes/{athlete_id}/sessions/{sid}/generate-workout``.
-
-    The explicit generate endpoint returns the freshly created
-    ``GeneratedWorkout`` and its ``WorkoutStep[]`` on 201. On 409
-    (workout already generated) the API layer surfaces a
-    :class:`WorkoutAlreadyGeneratedConflictResponse` instead.
-    """
+    """Response for ``POST /athletes/{athlete_id}/sessions/{sid}/generate-workout``."""
 
     generated_workout: GeneratedWorkoutResponse
     steps: List[WorkoutStepResponse]
 
 
 class WorkoutAlreadyGeneratedConflictResponse(BaseModel):
-    """Response body when the explicit generate endpoint finds a workout
-    already exists for ``(planned_session_id, generation_date)``.
-
-    Surfaced as HTTP 409; the consumer may choose to call
-    ``GET /athletes/{id}/today`` to fetch the existing workout.
-    """
+    """Response body when the explicit generate endpoint finds a workout already exists for ``(planned_session_id, generation_date)``."""
 
     existing_workout_id: UUID
     planned_session_id: UUID

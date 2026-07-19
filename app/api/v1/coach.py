@@ -1,12 +1,4 @@
-"""Coach endpoints — first message and message list.
-
-Implements Phase-1.5a contracts:
-- POST /athletes/{athlete_id}/coach/first-message
-- GET /athletes/{athlete_id}/coach/messages
-
-All endpoints live under /athletes/{athlete_id} and depend on
-require_self so the JWT's athlete_id must equal the path parameter.
-"""
+"""Coach endpoints — first message and message list."""
 
 from __future__ import annotations
 
@@ -53,14 +45,12 @@ coach_router = APIRouter(prefix="/athletes", tags=["coach"])
 def build_coaching_message_repository(
     session: AsyncSession = Depends(get_db),
 ) -> CoachingMessageRepository:
-    """Construct a CoachingMessageRepository for the current request."""
     return CoachingMessageRepository(session=session)
 
 
 def build_first_message_agent(
     session: AsyncSession = Depends(get_db),
 ) -> FirstMessageAgent:
-    """Construct a FirstMessageAgent with all required dependencies."""
     coaching_messages = CoachingMessageRepository(session)
     generation_events = GenerationEventRepository(session)
     twin_states = TwinStateRepository(session)
@@ -96,19 +86,6 @@ async def post_first_message(
     agent: FirstMessageAgent = Depends(build_first_message_agent),
     session: AsyncSession = Depends(get_db),
 ) -> CoachingMessageResponse:
-    """Generate the first coach message for the athlete.
-
-    201 on success.
-    409 if a first_message already exists (existing message_id in response).
-    503 if the LLM service is unavailable.
-
-    Transaction ownership: ``FirstMessageAgent`` does not commit the
-    session (see its docstring — Pattern B). The route handler owns the
-    commit boundary so all flushed writes (``GenerationEvent``,
-    ``CoachingMessage``, outbox rows) become durable before the response
-    is returned. Without this commit, ``get_db`` would close the session
-    on context exit and silently roll back the entire generation.
-    """
     try:
         result = await agent.generate(athlete_id)
     except FirstMessageAlreadyExistsError as exc:
@@ -142,11 +119,6 @@ async def get_coach_messages(
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
 ) -> MessagesListResponse:
-    """Return all coaching messages for the athlete.
-
-    Ordered by generated_at DESC (newest first).
-    Optional filter by message_type.
-    """
     mt: Optional[MessageType] = None
     if message_type:
         try:
@@ -161,7 +133,6 @@ async def get_coach_messages(
         athlete_id, message_type=mt, limit=limit, offset=offset
     )
 
-    # Compute total count.
     count_stmt = select(func.count()).where(
         CoachingMessage.athlete_id == athlete_id
     )

@@ -70,7 +70,6 @@ class CheckpointRepository:
     async def get_by_id(
         self, checkpoint_id: uuid.UUID
     ) -> Optional[Checkpoint]:
-        """Return the Checkpoint by id, or ``None``."""
         result = await self.session.execute(
             select(Checkpoint).where(Checkpoint.id == checkpoint_id)
         )

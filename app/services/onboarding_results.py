@@ -15,11 +15,7 @@ from app.models.twin_state import TwinState
 
 @dataclass(frozen=True)
 class OnboardingResult:
-    """Value object returned by ``OnboardingService.complete_onboarding``.
-
-    Carries the freshly created twin state and active training goal so the
-    API layer can build the response without re-querying the session.
-    """
+    """Returned by OnboardingService.complete_onboarding."""
 
     twin_state: TwinState
     training_goal: TrainingGoal
@@ -30,12 +26,7 @@ class OnboardingResult:
 
 @dataclass(frozen=True)
 class OnboardingStatus:
-    """Snapshot of post-onboarding state used by ``GET /onboarding``.
-
-    Each flag is the result of a single targeted repository lookup; the
-    service keeps them together so the API layer can render a single
-    status response.
-    """
+    """Snapshot of post-onboarding state for GET /onboarding."""
 
     onboarding_complete: bool
     has_profile: bool
@@ -46,13 +37,7 @@ class OnboardingStatus:
 
 @dataclass(frozen=True)
 class ProfileSnapshot:
-    """Frozen read view of ``AthleteProfile`` for internal use and tests.
-
-    The service layer's public ``get_profile`` method returns the
-    ``AthleteProfile`` ORM row directly so the API layer can map it to
-    the public response via ``model_validate``; this dataclass remains
-    available for in-process callers that need a detached value object.
-    """
+    """Frozen read view of AthleteProfile for internal use and tests."""
 
     athlete_id: UUID
     date_of_birth: date
@@ -67,14 +52,7 @@ class ProfileSnapshot:
 
 @dataclass(frozen=True)
 class PreferencesSnapshot:
-    """Frozen read view of ``AthletePreferences`` for internal use and tests.
-
-    The service layer's public ``get_preferences`` method returns the
-    ``AthletePreferences`` ORM row directly so the API layer can map it
-    to the public response via ``model_validate``; this dataclass
-    remains available for in-process callers that need a detached value
-    object.
-    """
+    """Frozen read view of AthletePreferences for internal use and tests."""
 
     athlete_id: UUID
     sport_background: str

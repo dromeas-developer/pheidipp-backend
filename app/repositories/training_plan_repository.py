@@ -87,7 +87,6 @@ class TrainingPlanRepository:
     async def get_by_id(
         self, plan_id: uuid.UUID
     ) -> Optional[TrainingPlan]:
-        """Return the TrainingPlan row by id, or ``None``."""
         result = await self.session.execute(
             select(TrainingPlan).where(TrainingPlan.id == plan_id)
         )

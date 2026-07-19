@@ -1,28 +1,4 @@
-"""Workout API surface — two endpoints behind ``require_self``.
-
-Implements the Phase-1.5b contract from
-``docs/implementation/phase-1/phase-1-5b-p1-workout-generation.md``:
-
-* ``GET /athletes/{athlete_id}/today`` — return today's
-  ``PlannedSession`` plus its ``GeneratedWorkout`` (auto-triggered
-  on first view) and ``WorkoutStep[]``.
-* ``POST /athletes/{athlete_id}/sessions/{session_id}/generate-workout`` —
-  explicit generation trigger. Idempotent at the
-  ``(planned_session_id, generation_date)`` key — second call returns
-  HTTP 409 with the existing workout id.
-
-All endpoints depend on ``require_self`` so the JWT's ``athlete_id``
-must equal the path parameter — mismatches surface as HTTP 403, never
-404, so authentication and authorization failures remain
-distinguishable.
-
-Transaction ownership mirrors the first-message-agent pattern
-(``Pattern B`` from the FirstMessageAgent docstring): the agent does
-not commit. Each route handler calls ``session.commit()`` after the
-agent returns so all flushed writes (``GeneratedWorkout``,
-``WorkoutStep[]``, ``GenerationEvent``, ``SystemEvent``,
-``SystemEventOutbox``) become durable atomically.
-"""
+"""Workout API surface — two endpoints behind ``require_self``."""
 
 from __future__ import annotations
 
@@ -71,21 +47,9 @@ from app.services.workout_generation_errors import (
 workout_router = APIRouter(prefix="/athletes", tags=["workout"])
 
 
-# ---------------------------------------------------------------------------
-# Dependency factories — kept module-level so each endpoint stays a thin
-# wrapper around the agent + repositories.
-# ---------------------------------------------------------------------------
-
-
 def build_workout_generation_agent(
     session: AsyncSession = Depends(get_db),
 ) -> WorkoutGenerationAgent:
-    """Construct a :class:`WorkoutGenerationAgent` for the current request.
-
-    Mirrors :func:`build_first_message_agent` — every request gets its
-    own ``AsyncSession`` so the generation transaction is isolated from
-    concurrent requests and the underlying connection pool.
-    """
     generated_workouts = GeneratedWorkoutRepository(session)
     workout_steps = WorkoutStepRepository(session)
     generation_events = GenerationEventRepository(session)
@@ -114,11 +78,6 @@ def build_workout_generation_agent(
     )
 
 
-# ---------------------------------------------------------------------------
-# Endpoints.
-# ---------------------------------------------------------------------------
-
-
 @workout_router.get(
     "/{athlete_id}/today",
     response_model=TodayResponse,
@@ -129,22 +88,6 @@ async def get_today(
     agent: WorkoutGenerationAgent = Depends(build_workout_generation_agent),
     session: AsyncSession = Depends(get_db),
 ) -> TodayResponse:
-    """Return today's ``PlannedSession`` plus its ``GeneratedWorkout``.
-
-    Behaviour (per plan step 9):
-
-    * 404 when the athlete has no ``PlannedSession`` scheduled for today
-      on their active plan.
-    * 200 + existing workout when ``GeneratedWorkout`` already exists
-      for the day — no LLM call.
-    * 200 + freshly generated workout when no workout exists yet — the
-      LLM is invoked inline and the session is committed before the
-      response is returned.
-
-    Cross-athlete access surfaces as 403 via ``require_self``. The
-    twin-state pre-condition is enforced inside the agent; missing
-    twin state surfaces as 502.
-    """
     today = datetime.now(timezone.utc).date()
     planned_sessions = PlannedSessionRepository(session)
     sessions = await planned_sessions.get_today_for_athlete(
@@ -196,26 +139,6 @@ async def post_generate_workout(
     agent: WorkoutGenerationAgent = Depends(build_workout_generation_agent),
     session: AsyncSession = Depends(get_db),
 ) -> GenerateWorkoutResponse:
-    """Explicit workout-generation trigger.
-
-    Behaviour (per plan step 10):
-
-    * 201 + new workout on first call.
-    * 409 + ``WorkoutAlreadyGeneratedConflictResponse`` when a
-      ``GeneratedWorkout`` already exists for
-      ``(planned_session_id, generation_date)``.
-    * 502 when the LLM service is unavailable. The architecture
-      doc surfaces this as 502 (Bad Gateway upstream) to distinguish
-      from the first-message agent's 503.
-    * 404 when the ``PlannedSession`` does not exist.
-    * 403 when the JWT athlete_id does not match the path athlete.
-
-    The session ownership rule: the agent flushes inside the
-    caller's transaction; this handler calls ``session.commit()``
-    after the agent returns. On 409 / 502 we do NOT commit because
-    no writes were made (the agent's idempotency gate returns
-    before any insert).
-    """
     today = datetime.now(timezone.utc).date()
 
     # Validate the planned session exists before invoking the agent

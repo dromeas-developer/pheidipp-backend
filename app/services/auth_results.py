@@ -9,11 +9,7 @@ from uuid import UUID
 
 @dataclass(frozen=True)
 class IssuedTokens:
-    """Raw tokens returned to the caller exactly once.
-
-    Note: ``refresh_token`` is the plaintext. It must never be persisted or
-    logged — only the SHA-256 hash is stored on ``RefreshToken.token_hash``.
-    """
+    """Raw tokens returned to the caller exactly once."""
 
     access_token: str
     refresh_token: str

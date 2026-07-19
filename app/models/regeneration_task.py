@@ -80,7 +80,6 @@ class RegenerationTask(Base):
     # trajectory_ahead | trajectory_at_risk | coach_conversation.
     trigger: Mapped[str] = mapped_column(Text, nullable=False)
 
-    # Status lifecycle — checked allowed-values list.
     status: Mapped[str] = mapped_column(Text, nullable=False)
 
     proposed_at: Mapped[datetime] = mapped_column(
@@ -97,7 +96,6 @@ class RegenerationTask(Base):
     )
 
     __table_args__ = (
-        # Status must be one of the four canonical values.
         CheckConstraint(
             "status IN ('pending_confirmation', 'confirmed', 'declined', 'expired')",
             name="ck_regeneration_tasks_status_valid",

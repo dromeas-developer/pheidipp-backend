@@ -124,14 +124,11 @@ class PhysiologyMeasurement(Base):
     )
 
     __table_args__ = (
-        # History queries — newest first per athlete.
         Index(
             "ix_physiology_measurements_athlete_date",
             "athlete_id",
             "measurement_date",
         ),
-        # Dedup lookup — find prior observations for the same
-        # (athlete, parameter, source) tuple.
         Index(
             "ix_physiology_measurements_athlete_parameter_source",
             "athlete_id",

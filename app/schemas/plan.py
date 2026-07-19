@@ -1,19 +1,4 @@
-"""Plan response schemas (Phase-1.4).
-
-Wire-format contracts for the four read-only plan endpoints:
-
-* ``GET /athletes/{id}/plan``          → ``TrainingPlanResponse``
-* ``GET /athletes/{id}/plan/sessions`` → ``list[PlannedSessionResponse]``
-* ``GET /athletes/{id}/plan/upcoming`` → ``list[PlannedSessionResponse]``
-  (capped at the next five)
-* ``GET /athletes/{id}/plan/checkpoints`` → ``list[CheckpointResponse]``
-
-All ORM rows feed directly into Pydantic via ``model_validate`` /
-``from_attributes=True`` so the conversion lives in one place. JSONB
-columns (phase_definitions, weekly_distributions, checkpoint_schedule,
-strategic_rationale, secondary_metrics) are declared as ``dict`` /
-``list`` since their shape is enforced at the service layer.
-"""
+"""Plan response schemas (Phase-1.4)."""
 
 from __future__ import annotations
 
@@ -34,20 +19,8 @@ from app.models.enums import (
 )
 
 
-# ---------------------------------------------------------------------------
-# Phase descriptor — used both as a sub-shape of TrainingPlanResponse.phases
-# and as the explicit ``phases_summary`` view on a TrainingPlan row.
-# ---------------------------------------------------------------------------
-
-
 class PhaseDescriptorResponse(BaseModel):
-    """Per-phase summary — label, date range, weeks, focus, session count.
-
-    Mirrors the ``PhaseDescriptor`` shape in
-    ``docs/architecture/01-entities/training-plan.md``. The
-    ``weekly_session_count`` is the static plan-time value and does
-    NOT reflect per-week adjustments from pre-week review.
-    """
+    """Per-phase summary — label, date range, weeks, focus, session count."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -59,20 +32,8 @@ class PhaseDescriptorResponse(BaseModel):
     weekly_session_count: int
 
 
-# ---------------------------------------------------------------------------
-# TrainingPlan — top-level plan view.
-# ---------------------------------------------------------------------------
-
-
 class TrainingPlanResponse(BaseModel):
-    """Top-level response for ``GET /athletes/{id}/plan``.
-
-    Carries the periodised structure: ordered phases,
-    adaptation-strategy phase definitions, per-week distributions,
-    lifecycle status, optional strategic rationale (set only for
-    ``race_event`` / ``target_performance`` modes), and the scheduled
-    checkpoint descriptors.
-    """
+    """Top-level response for ``GET /athletes/{id}/plan``."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -101,19 +62,8 @@ class TrainingPlanResponse(BaseModel):
     created_at: datetime
 
 
-# ---------------------------------------------------------------------------
-# PlannedSession — one session on the calendar.
-# ---------------------------------------------------------------------------
-
-
 class PlannedSessionResponse(BaseModel):
-    """One PlannedSession record — operability surface for a workout.
-
-    Denormalised ``training_plan_id`` is read-only here; the API
-    consumer joins through ``WeeklyPlan.training_plan_id`` to find
-    the current plan's sessions. Per the architecture, this column
-    can be stale after plan supersession.
-    """
+    """One PlannedSession record — operability surface for a workout."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -134,20 +84,8 @@ class PlannedSessionResponse(BaseModel):
     is_suggested: bool
 
 
-# ---------------------------------------------------------------------------
-# Checkpoint — one planned assessment point.
-# ---------------------------------------------------------------------------
-
-
 class CheckpointResponse(BaseModel):
-    """One Checkpoint record attached to the PlannedSession that IS
-    the checkpoint.
-
-    ``trajectory_status`` and ``proposal`` are populated only when
-    the plan was generated for a ``target_performance`` goal; for
-    ``race_event`` plans they remain ``None`` until a coach trajectory
-    review runs in a later phase.
-    """
+    """One Checkpoint record attached to the PlannedSession that IS the checkpoint."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -164,18 +102,7 @@ class CheckpointResponse(BaseModel):
     created_at: datetime
 
 
-# ---------------------------------------------------------------------------
-# Convenience wrapper for the upcoming-sessions endpoint — kept here so the
-# router has a single import path. The schema is just a list of
-# ``PlannedSessionResponse`` capped at the next five from today.
-# ---------------------------------------------------------------------------
-
-
 class UpcomingSessionsResponse(BaseModel):
-    """Wrapper for ``GET /plan/upcoming`` — ``sessions`` is the next five
-    ``PlannedSession`` records from today (inclusive), ordered by
-    ``target_date ASC`` then ``session_slot ASC``. The list is empty
-    rather than null when no upcoming sessions exist.
-    """
+    """Wrapper for ``GET /plan/upcoming`` — next five ``PlannedSession`` records from today."""
 
     sessions: List[PlannedSessionResponse]

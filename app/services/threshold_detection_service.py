@@ -1,46 +1,4 @@
-"""ThresholdDetectionService — compute threshold observations from cleaned streams.
-
-Implements Phase-2.3-P1 of the implementation plan
-``docs/implementation/phase-2/phase-2-3-p1-threshold-detection.md``.
-
-This service is the single owner of the three threshold detection
-algorithms (HR deflection, RR inflection, power-to-HR ratio) and the
-signal-selection logic that routes a session to the applicable
-algorithms. It produces :class:`ThresholdObservation` data structures
-that :class:`PhysiologyUpdateService` (Phase 2.3-P2) consumes to
-update the per-athlete ``AthletePhysiology`` posterior state.
-
-Public surface:
-
-* :meth:`ThresholdDetectionService.detect` — single async entry
-  point. Returns ``list[ThresholdObservation]``.
-
-Invariants codified here, copied from the architecture corpus:
-
-* Threshold detection only runs for ``calibration_eligible = true``
-  activities. Non-eligible activities return an empty list
-  silently — the worker surfaces the no-op to procrastinate.
-* Threshold detection only runs for ``sport_type = RUNNING``.
-  Non-running activities return an empty list silently.
-* Missing ``RawSensorStream`` returns an empty list (signal
-  cleaning not yet complete). Per ADR-009, downstream consumers
-  handle "not yet ready" by skipping.
-* The service does NOT write to ``PhysiologyMeasurement`` — that
-  is ``PhysiologyUpdateService``'s responsibility (Plan P2).
-* The service does NOT mutate ``AthletePhysiology``.
-* Observation weights are fixed constants from
-  ``evidence-mapping.md``: ``training_hr_deflection`` = 1.0,
-  ``training_rr_inflection`` = 2.5, ``training_power_hr_ratio`` =
-  1.5. These are the same values used by ``PhysiologyUpdateService``
-  for the Bayesian update.
-* ``confidence_weight`` on ``ThresholdObservation`` is
-  algorithm-specific (0.0–1.0) and is distinct from the evidence
-  ``weight`` (which is source-specific). The ``confidence_weight``
-  reflects signal quality (e.g., R² for HR deflection, RMSSD
-  signal quality for RR inflection). It is stored on
-  ``PhysiologyMeasurement`` for audit but does NOT affect the
-  Bayesian update — the evidence ``weight`` does.
-"""
+"""Compute threshold observations from cleaned streams."""
 
 from __future__ import annotations
 

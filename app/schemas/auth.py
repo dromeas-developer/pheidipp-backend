@@ -1,12 +1,4 @@
-"""Authentication request and response schemas (Phase 1.1).
-
-These schemas are the wire-format contract for the public auth surface:
-``POST /auth/register``, ``POST /auth/login``, ``POST /auth/refresh``.
-
-Secrets stored on the server (``hashed_password``, ``provider_tokens``,
-``provider_user_id``, refresh-token hashes, refresh-token raw values) are
-never exposed in any response.
-"""
+"""Authentication request and response schemas (Phase 1.1)."""
 
 from __future__ import annotations
 
@@ -17,9 +9,6 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from app.models.enums import Sex
-
-
-# ----- Request schemas -----
 
 
 class RegisterProfileIn(BaseModel):
@@ -43,9 +32,6 @@ class LoginRequest(BaseModel):
 
 class RefreshRequest(BaseModel):
     refresh_token: str = Field(min_length=1, max_length=512)
-
-
-# ----- Response schemas -----
 
 
 class AthleteResponse(BaseModel):

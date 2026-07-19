@@ -1,44 +1,4 @@
-"""TwinRecalibrationService — Banister update + append-only TwinState.
-
-Implements the Phase-1.6 contract from
-``docs/architecture/02-computations/banister-update.md` and the
-``TwinState`` append-only invariant from
-``docs/architecture/01-entities/twin-state.md`.
-
-Atomicity guarantees:
-
-* The service runs every write through the per-entity repositories
-  on a single shared ``AsyncSession`` and never commits; the caller
-  (``ActivityIngestionService``) owns the commit boundary. Raising
-  any exception rolls back the session automatically — partial
-  state is never visible to other readers.
-
-* ``TwinState`` is append-only: ``TwinStateRepository`` exposes no
-  ``update()`` / ``delete()`` methods. The recalibration service
-  inserts a fresh ``TwinState`` row with ``trigger = activity_sync``
-  every time. Existing snapshots stay immutable for audit.
-
-* ``AthleteFitness`` is mutable — the Banister update writes
-  fitness / fatigue / form in place. The ``form = fitness - fatigue``
-  invariant is enforced at the DB layer by ``CheckConstraint``
-  (``ck_athlete_fitness_*_form_invariant``) — every dimensional
-  block plus the aggregate block has its own constraint.
-
-Phase-1.6 simplification:
-
-* Only the aggregate ``DimensionalScores`` block is populated by
-  this service. The per-dimension blocks (``aerobic``, ``neuromuscular``,
-  ``structural``) stay ``null`` until Phase 2b wires up
-  per-dimension Banister updates with their own load scores.
-* Threshold / physiology updates are NOT recomputed at this phase
-  (``calibration_eligible = false`` everywhere per the
-  Phase-1.6 invariants). ``ThresholdDetectionService` lands in
-  Phase 2.
-* Calibration eligibility is therefore irrelevant for the
-  recalibration path in this phase — but the service still produces
-  a new ``TwinState`` so the home view can reflect updated
-  fitness / fatigue from the heuristic load.
-"""
+"""Banister update + append-only TwinState."""
 
 from __future__ import annotations
 
@@ -73,11 +33,6 @@ from app.services.event_publisher import EventPublisher
 from app.services.physiology_update_service import PhysiologyUpdateResult
 
 
-# ---------------------------------------------------------------------------
-# Population defaults — Banister time constants.
-# Source: ``docs/architecture/02-computations/banister-update.md``.
-# ---------------------------------------------------------------------------
-
 POPULATION_TIME_CONSTANTS: Dict[str, int | str] = {
     "fitness_tau_days": 42,
     "fatigue_tau_days": 7,
@@ -85,18 +40,9 @@ POPULATION_TIME_CONSTANTS: Dict[str, int | str] = {
 }
 
 
-# ---------------------------------------------------------------------------
-# Output dataclasses.
-# ---------------------------------------------------------------------------
-
-
 @dataclass(frozen=True)
 class BanisterUpdateResult:
-    """Result of one Banister update step.
-
-    Carries the new fitness / fatigue / form so callers can serialise
-    them into the new ``TwinState`` inline snapshot.
-    """
+    """Result of one Banister update step."""
 
     fitness: float
     fatigue: float
@@ -105,12 +51,7 @@ class BanisterUpdateResult:
 
 @dataclass(frozen=True)
 class RecalibrationResult:
-    """Return value of :meth:`TwinRecalibrationService.recalibrate`.
-
-    Carries the freshly created ``TwinState`` so the caller can
-    pass it to the post-workout agent (the ``CoachingMessage``
-    FKs back to the ``TwinState`` at generation time).
-    """
+    """Return value of TwinRecalibrationService.recalibrate."""
 
     twin_state: TwinState
     fitness: AthleteFitness
@@ -119,21 +60,10 @@ class RecalibrationResult:
 
 @dataclass(frozen=True)
 class CalibrationRecalibrationResult:
-    """Return value of :meth:`TwinRecalibrationService.recalibrate_for_calibration`.
-
-    Carries the freshly created calibration ``TwinState`` and a
-    flag indicating whether the global ``confidence_level``
-    increased relative to the previous TwinState — the latter
-    drives the ``twin_confidence_upgraded`` event firing.
-    """
+    """Return value of TwinRecalibrationService.recalibrate_for_calibration."""
 
     twin_state: TwinState
     confidence_upgraded: bool
-
-
-# ---------------------------------------------------------------------------
-# Errors.
-# ---------------------------------------------------------------------------
 
 
 class TwinRecalibrationError(Exception):
@@ -141,37 +71,18 @@ class TwinRecalibrationError(Exception):
 
 
 class MissingTrainingGoalError(TwinRecalibrationError):
-    """The athlete has no active ``TrainingGoal`` — twin state cannot
-    be appended because the FK is non-null."""
+    """No active TrainingGoal for the athlete."""
 
 
 class MissingAthleteFitnessError(TwinRecalibrationError):
-    """The athlete has no ``AthleteFitness`` row — Banister update
-    has no anchor. The onboarding bootstrap always creates one;
-    this is a data-integrity failure rather than a user error.
-    """
-
-
-# ---------------------------------------------------------------------------
-# Service.
-# ---------------------------------------------------------------------------
+    """No AthleteFitness row for the athlete."""
 
 
 class TwinRecalibrationService:
-    """Apply a Banister update to ``AthleteFitness`` and append a
-    new ``TwinState`` snapshot.
-
-    The service is constructed with the per-request
-    ``AsyncSession`` so all writes participate in the caller's
-    transaction. The session is NOT committed here — the
-    ingestion pipeline owns the commit boundary.
-    """
+    """Apply Banister update to AthleteFitness and append TwinState."""
 
     MODEL_VERSION = "v1-activity-sync"
-    #: Model version stamped on calibration-triggered TwinStates.
-    #: Distinct from :data:`MODEL_VERSION` so the home view and
-    #: downstream consumers can distinguish Banister-only updates
-    #: from threshold-detection-driven recalibrations.
+    #: Model version for calibration-triggered TwinStates.
     MODEL_VERSION_CALIBRATION = "v2-threshold-detection"
 
     def __init__(
@@ -205,27 +116,7 @@ class TwinRecalibrationService:
         activity_id: uuid.UUID,
         aerobic_load: Optional[float],
     ) -> RecalibrationResult:
-        """Apply the Banister update and append a ``TwinState``.
-
-        Parameters
-        ----------
-        athlete_id:
-            Path athlete.
-        activity_id:
-            ``Activity.id`` driving the recalibration. The new
-            ``TwinState`` records this on its ``activity_id`` FK so
-            the partial unique index
-            ``uq_twin_states_athlete_activity`` enforces one
-            snapshot per activity.
-        aerobic_load:
-            ``Activity.aerobic_load`` value. ``None`` is treated as
-            zero load — the Banister update still runs (decay-only)
-            so the snapshot timestamp stays accurate.
-
-        Raises:
-            MissingTrainingGoalError: no active ``TrainingGoal``.
-            MissingAthleteFitnessError: no ``AthleteFitness`` row.
-        """
+        """Apply Banister update and append TwinState."""
         goal_row = await self.training_goals.get_active(athlete_id)
         if goal_row is None:
             raise MissingTrainingGoalError(
@@ -242,17 +133,11 @@ class TwinRecalibrationService:
             athlete_id
         )
 
-        # -------------------------------------------------------------
-        # 1. Banister update — applied in place to AthleteFitness.
-        # -------------------------------------------------------------
         updated = self.apply_banister_update(
             fitness_row=fitness_row,
             aerobic_load=aerobic_load or 0.0,
         )
 
-        # -------------------------------------------------------------
-        # 2. Append a new TwinState with the inline snapshot.
-        # -------------------------------------------------------------
         latest = await self.twin_states.get_latest(athlete_id)
         inline_snapshot = _build_inline_snapshot(
             updated=updated,
@@ -321,37 +206,7 @@ class TwinRecalibrationService:
         trigger: TwinTrigger,
         new_state: TwinState,
     ) -> TwinState:
-        """Append *new_state* unless a TwinState already covers the activity.
-
-        Implements the application-level deduplication described in
-        ``docs/architecture/01-entities/twin-state.md`` (Concurrency &
-        Coordination). The DB-level unique index
-        ``uq_twin_states_athlete_activity`` was dropped in Phase 2.3-P3
-        so a calibration TwinState can coexist with a prior
-        ``activity_sync`` TwinState for the same activity — this method
-        is the authoritative deduplication mechanism.
-
-        Decision matrix:
-
-        * Existing record with ``trigger == 'calibration'`` → return
-          the existing record. Calibration is the most complete
-          snapshot; any subsequent trigger for the same activity is
-          skipped.
-        * Existing record with a non-calibration trigger and the new
-          trigger is ``'calibration'`` → fall through and insert the
-          calibration record. The fitness-only record remains as
-          history.
-        * Existing record with a non-calibration trigger and the new
-          trigger is also non-calibration → return the existing
-          record. Duplicate non-calibration triggers are skipped.
-        * No existing record → insert.
-
-        The lookup uses ``get_by_activity_and_trigger`` for the
-        calibration check so a prior ``activity_sync`` record does not
-        mask a calibration record (and vice versa). The
-        ``get_by_activity`` fallback covers the duplicate
-        non-calibration case.
-        """
+        """Append new_state unless a TwinState already covers the activity."""
         # Calibration supersedes everything — if a calibration record
         # already exists for this activity, skip the insert regardless
         # of the incoming trigger.
@@ -599,34 +454,15 @@ class TwinRecalibrationService:
             confidence_upgraded=confidence_upgraded,
         )
 
-    # ------------------------------------------------------------------
-    # Pure compute — exposed as a static method for unit-test access.
-    # ------------------------------------------------------------------
-
     @staticmethod
     def _build_default_publisher(
         session: AsyncSession,
     ) -> EventPublisher:
-        """Build the default :class:`EventPublisher` for the session.
-
-        Mirrors the pattern in
-        :meth:`ActivityIngestionService._build_default_publisher`
-        and
-        :meth:`PhysiologyUpdateService._build_default_publisher` —
-        the publisher writes ``SystemEvent`` + ``SystemEventOutbox``
-        rows in the caller's transaction (transactional outbox,
-        ADR-004). Returns a publisher bound to the same session
-        as the service so the surrounding transaction commits
-        everything atomically.
-        """
+        """Build the default EventPublisher for the session."""
         return EventPublisher(
             SystemEventRepository(session),
             SystemEventOutboxRepository(session),
         )
-
-    # ------------------------------------------------------------------
-    # Pure compute — exposed as a static method for unit-test access.
-    # ------------------------------------------------------------------
 
     @staticmethod
     def apply_banister_update(
@@ -680,9 +516,7 @@ class TwinRecalibrationService:
         )
 
 
-# ---------------------------------------------------------------------------
-# Helpers.
-# ---------------------------------------------------------------------------
+
 
 
 def read_time_constants(fitness_row: AthleteFitness) -> Dict[str, Any]:

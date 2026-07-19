@@ -1,15 +1,4 @@
-"""Token service: JWT access tokens and opaque refresh tokens.
-
-Two distinct primitives:
-
-* **Access tokens** are short-lived (default 15 minutes) HS256 JWTs
-  carrying ``athlete_id`` and an informational ``auth_provider`` claim.
-  These are signed, not stored; verification is stateless and uses the
-  configured ``JWT_SECRET_KEY``.
-* **Refresh tokens** are opaque, single-use, 30-day tokens. The raw value
-  is generated via ``secrets.token_urlsafe``. Only the SHA-256 hash is
-  persisted; the raw value is returned to the caller exactly once.
-"""
+"""Token service: JWT access tokens and opaque refresh tokens."""
 
 from __future__ import annotations
 
@@ -24,10 +13,8 @@ from jose import JWTError, jwt
 
 from app.config import settings
 
-
 class TokenVerificationError(Exception):
     """Raised when a JWT is missing, malformed, expired, or unverifiable."""
-
 
 @dataclass(frozen=True)
 class AccessTokenClaims:
@@ -37,7 +24,6 @@ class AccessTokenClaims:
     auth_provider: str | None
     issued_at: datetime
     expires_at: datetime
-
 
 class TokenService:
     """Issue and verify JWT access tokens and opaque refresh tokens."""
@@ -65,22 +51,19 @@ class TokenService:
         )
 
     # ---------- JWT access token ----------
-
     def issue_access_token(
         self,
         athlete_id: UUID,
         auth_provider: str | None = None,
     ) -> tuple[str, datetime]:
-        """Sign and return a JWT access token plus its expiry instant.
-
-        Every issuance embeds a fresh random ``jti`` (UUID4) so that
-        two tokens issued for the same athlete within the same second
-        still produce distinct JWT strings. ``jti`` is informational:
-        verification does not consult any replay ledger and tokens
-        issued before this patch (without ``jti``) remain valid until
-        their existing expiry (see
-        ``docs/architecture/01-entities/athlete-auth.md``).
-        """
+        """Sign and return a JWT access token plus its expiry instant."""
+        # Every issuance embeds a fresh random ``jti`` (UUID4) so that
+        # two tokens issued for the same athlete within the same second
+        # still produce distinct JWT strings. ``jti`` is informational:
+        # verification does not consult any replay ledger and tokens
+        # issued before this patch (without ``jti``) remain valid until
+        # their existing expiry (see
+        # ``docs/architecture/01-entities/athlete-auth.md``).
         now = datetime.now(timezone.utc)
         exp = now + self._access_ttl
         claims: dict[str, Any] = {
@@ -156,15 +139,12 @@ class TokenService:
         return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
     def refresh_expiry(self, now: datetime | None = None) -> datetime:
-        """30-day expiry for a refresh token issued *now* (or supplied now).
-
-        INVARIANT (ADR-005 ``docs/adr/005-ip-address-and-token-hash-security.md``):
-        refresh tokens live for exactly ``JWT_REFRESH_TOKEN_EXPIRE_DAYS``
-        (default 30) from issuance. Expired tokens are rejected by
-        :meth:`RefreshTokenRepository.is_active` even if not yet
-        revoked, so the rotation/revocation ledger and this TTL form
-        two independent expiry mechanisms on the same row.
-        """
+        """30-day expiry for a refresh token issued *now* (or supplied now)."""
+        # INVARIANT (ADR-005): refresh tokens live for exactly
+        # ``JWT_REFRESH_TOKEN_EXPIRE_DAYS`` (default 30) from issuance.
+        # Expired tokens are rejected by :meth:`RefreshTokenRepository.is_active`
+        # even if not yet revoked, so the rotation/revocation ledger and this
+        # TTL form two independent expiry mechanisms on the same row.
         anchor = now or datetime.now(timezone.utc)
         return anchor + self._refresh_ttl
 

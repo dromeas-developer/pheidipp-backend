@@ -1,32 +1,4 @@
-"""ComplianceService — compare actual session to prescribed session.
-
-Implements the Phase-1.6 contract from
-``docs/architecture/03-agents/post-workout-agent.md` →
-``compliance`` sub-shape.
-
-Phase-1.6 simplification:
-
-* Only ``duration_delta_pct`` and ``session_type_match`` are
-  computed at this phase. ``effort_delta`` and ``athlete_notes``
-  surface as ``None`` (RPE capture and athlete notes are deferred
-  to a later phase; the prompt handles both nulls gracefully per
-  the architecture's "null handling rules").
-* Pre-computed compliance findings are the input the
-  :class:`PostWorkoutAgent` consumes. The agent never derives
-  these from raw data — that is the Python layer's job per the
-  architecture invariant.
-* Output is plain-language so the LLM prompt receives a coaching-
-  ready bundle rather than a numeric delta. The numeric value
-  is preserved alongside for tests and downstream consumers.
-
-Inputs:
-
-* ``Activity`` row (the freshly ingested session) — carries
-  ``duration_seconds`` and ``planned_session_id``.
-* Optional ``PlannedSession`` (looked up via ``Activity.planned_session_id``).
-  When the FK is ``None`` (unplanned / manual activity) the
-  compliance payload reflects "no prescribed session".
-"""
+"""Compare actual session to prescribed session."""
 
 from __future__ import annotations
 
@@ -38,20 +10,9 @@ from app.models.activity import Activity
 from app.models.planned_session import PlannedSession
 
 
-# ---------------------------------------------------------------------------
-# Output dataclasses.
-# ---------------------------------------------------------------------------
-
-
 @dataclass(frozen=True)
 class ComplianceFindings:
-    """Structured compliance payload consumed by ``PostWorkoutAgent``.
-
-    Mirrors the ``compliance`` sub-shape from
-    ``docs/architecture/03-agents/post-workout-agent.md``. Every
-    field is plain-language so the prompt renders cleanly without
-    numeric formatting.
-    """
+    """Structured compliance payload consumed by PostWorkoutAgent."""
 
     duration_delta_pct: float
     duration_delta_descriptor: str
@@ -80,27 +41,12 @@ class ComplianceFindings:
         }
 
 
-# ---------------------------------------------------------------------------
-# Errors.
-# ---------------------------------------------------------------------------
-
-
 class ComplianceError(Exception):
     """Base class for compliance-comparison failures."""
 
 
-# ---------------------------------------------------------------------------
-# Service.
-# ---------------------------------------------------------------------------
-
-
 class ComplianceService:
-    """Compute compliance findings between an actual and prescribed session.
-
-    Stateless per-request. The service is constructed without
-    repositories because compliance is a pure-function over the two
-    input rows — no DB I/O required.
-    """
+    """Compute compliance findings between actual and prescribed session."""
 
     DURATION_MATCH_TOLERANCE_PCT = 15.0
 
@@ -110,13 +56,7 @@ class ComplianceService:
         activity: Activity,
         planned_session: Optional[PlannedSession],
     ) -> ComplianceFindings:
-        """Return the :class:`ComplianceFindings` for ``activity``.
-
-        When ``planned_session`` is ``None`` (manual activity,
-        unplanned session, or unknown FK) the duration delta is
-        reported as ``0.0`` (no comparison) and the session type
-        match is ``True`` (no prescribed session to match against).
-        """
+        """Return ComplianceFindings for activity."""
         if planned_session is None:
             return ComplianceFindings(
                 duration_delta_pct=0.0,
@@ -133,7 +73,6 @@ class ComplianceService:
                 prescribed_session_id=None,
             )
 
-        # Duration delta — actual vs prescribed (in minutes).
         actual_minutes = activity.duration_seconds / 60.0
         prescribed_minutes = planned_session.approximate_duration_minutes
         if prescribed_minutes <= 0:
@@ -145,11 +84,7 @@ class ComplianceService:
 
         duration_descriptor = _describe_duration_delta(duration_delta_pct)
 
-        # Session-type match.
         session_type_match = activity.source.value != "manual_entry" or (
-            # For manual_entry the session_type is not in the FIT
-            # trace; treat as matching only when the prescribed
-            # session type is null or "rest".
             planned_session.session_type.value in {"rest"}
         )
         session_type_descriptor = (
@@ -170,17 +105,8 @@ class ComplianceService:
         )
 
 
-# ---------------------------------------------------------------------------
-# Helpers.
-# ---------------------------------------------------------------------------
-
-
 def _describe_duration_delta(delta_pct: float) -> str:
-    """Return a plain-language descriptor for a duration delta.
-
-    Buckets match the coaching voice: the post-workout agent uses
-    ``duration_delta_descriptor`` verbatim when narrating paragraph 1.
-    """
+    """Return plain-language descriptor for a duration delta."""
     if abs(delta_pct) <= ComplianceService.DURATION_MATCH_TOLERANCE_PCT:
         return "duration matched the prescription"
     if delta_pct > 0:

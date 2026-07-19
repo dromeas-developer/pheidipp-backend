@@ -29,10 +29,6 @@ class RawSensorStreamRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    # ------------------------------------------------------------------
-    # Writes.
-    # ------------------------------------------------------------------
-
     async def insert(self, stream: RawSensorStream) -> RawSensorStream:
         """Add a RawSensorStream to the session without committing.
 
@@ -45,10 +41,6 @@ class RawSensorStreamRepository:
         await self.session.flush()
         await self.session.refresh(stream)
         return stream
-
-    # ------------------------------------------------------------------
-    # Reads.
-    # ------------------------------------------------------------------
 
     async def get_by_activity_id(
         self, activity_id: uuid.UUID

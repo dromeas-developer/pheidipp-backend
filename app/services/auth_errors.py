@@ -1,8 +1,4 @@
-"""Domain exceptions for the auth surface.
-
-These map to HTTP status codes at the API layer; the service layer raises
-them as plain Python exceptions so the surface stays transport-agnostic.
-"""
+"""Domain exceptions for the auth surface."""
 
 from __future__ import annotations
 
@@ -16,11 +12,7 @@ class DuplicateEmailError(AuthError):
 
 
 class InvalidCredentialsError(AuthError):
-    """Login failed (missing account, wrong password, or disabled credential).
-
-    Always raised with a generic message — never leaks which condition
-    failed (architecture: no credential/timing leakage).
-    """
+    """Always raised with a generic message — never leaks which condition failed."""
 
 
 class InvalidRefreshTokenError(AuthError):

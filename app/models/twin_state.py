@@ -134,9 +134,6 @@ class TwinState(Base):
         default=lambda: datetime.now(timezone.utc),
     )
 
-    # ------------------------------------------------------------------
-    # Inline snapshot — fitness / fatigue / form.
-    # ------------------------------------------------------------------
     fitness: Mapped[float] = mapped_column(Float, nullable=False)
     fatigue: Mapped[float] = mapped_column(Float, nullable=False)
     # ``form`` is stored for query convenience — application code
@@ -161,9 +158,6 @@ class TwinState(Base):
     lt2_hr_bpm: Mapped[float | None] = mapped_column(Float, nullable=True)
     cp_watts: Mapped[float | None] = mapped_column(Float, nullable=True)
 
-    # ------------------------------------------------------------------
-    # Readiness context.
-    # ------------------------------------------------------------------
     readiness_level: Mapped[RecoveryModifierLevel] = mapped_column(
         SAEnum(
             RecoveryModifierLevel,

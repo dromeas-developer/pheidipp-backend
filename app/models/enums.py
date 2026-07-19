@@ -244,36 +244,29 @@ class PhaseLabel(str, Enum):
     New plans should use canonical labels directly.
     """
 
-    # Aerobic development — canonical.
     AEROBIC_BASE = "aerobic_base"
     AEROBIC_FOUNDATION = "aerobic_foundation"
     AEROBIC_ACCUMULATION = "aerobic_accumulation"
     AEROBIC_BUILD = "aerobic_build"
 
-    # Structural — canonical.
     HILL_PHASE = "hill_phase"
     STRUCTURAL_TOLERANCE = "structural_tolerance"
 
-    # Threshold — canonical.
     THRESHOLD_BUILD = "threshold_build"
     THRESHOLD_PEAK = "threshold_peak"
     THRESHOLD_CONSOLIDATION = "threshold_consolidation"
 
-    # VO2max — canonical.
     VO2MAX_DEVELOPMENT = "vo2max_development"
     VO2MAX_SHARPENING = "vo2max_sharpening"
 
-    # Race-specific — canonical.
     SPECIAL_ENDURANCE = "special_endurance"
     SPECIFIC_ENDURANCE = "specific_endurance"
     RACE_REHEARSAL = "race_rehearsal"
 
-    # Integration — canonical.
     SHARPENING = "sharpening"
     TAPER = "taper"
     RACE_WEEK = "race_week"
 
-    # Recovery / maintenance — canonical.
     RECOVERY = "recovery"
     TRANSITION = "transition"
     ROLLING_BLOCK = "rolling_block"

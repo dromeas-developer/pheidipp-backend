@@ -117,9 +117,6 @@ class TrainingGoal(Base):
     custom_distance_km: Mapped[float | None] = mapped_column(nullable=True)
     goal_description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    # ------------------------------------------------------------------
-    # Self-reported context — immutable after creation.
-    # ------------------------------------------------------------------
     weekly_volume_hours: Mapped[float] = mapped_column(nullable=False)
     weekly_volume_km: Mapped[float] = mapped_column(nullable=False)
     fitness_level: Mapped[int] = mapped_column(nullable=False)

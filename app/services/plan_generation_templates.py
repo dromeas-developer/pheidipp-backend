@@ -1,23 +1,4 @@
-"""Deterministic plan-generation templates — Phase-1.4.
-
-The plan's Coder Handoff is explicit: ``PlanGenerationService`` is
-pure Python. This module houses the fixed templates (phase
-proportions, training-length-gate thresholds, session-distribution /
-quality-session classification, checkpoint scheduling) drawn from
-``docs/architecture/02-computations/plan-generation-race.md`` and
-``plan-generation-target-performance.md``.
-
-Templates are deliberately kept separate from the service so they can
-be exercised in isolation by unit tests (the Test Architect owns the
-test manifest, but keeping templates pure-Python makes them easily
-importable).
-
-Per-week session synthesis (the structural-rule engine) lives in
-``app.services.plan_generation_service`` because it's tightly coupled
-to date arithmetic and the persistence layer. The rule sets
-(``QUALITY_SESSION_TYPES``, ``SANDWICHED_SESSION_TYPES``, etc.) and
-the deterministic schedule-builder helpers live here.
-"""
+"""Deterministic plan-generation templates for Phase-1.4."""
 
 from __future__ import annotations
 
@@ -31,23 +12,6 @@ from app.models.enums import (
     SessionType,
 )
 
-
-# ---------------------------------------------------------------------------
-# Race-event proportion constants (per architecture plan-generation-race.md).
-#
-#   Base: 40%
-#   Threshold build: 30%
-#   Race specific: 15%
-#   Taper: 2 weeks (fixed)
-#   Race week: 1 week (fixed)
-#
-# RACE_EVENT_PROPORTIONS carries weights, not absolute weeks. The
-# absolute allocation is computed against ``weeks_until_goal -
-# RACE_EVENT_FIXED_TAIL_WEEKS`` so the final two fixed-duration phases
-# always fit. The flexible portion sums to 85% of total flexible
-# weeks; the remaining 15% is implicit recovery / warmup absorbed by
-# per-week session distributions.
-# ---------------------------------------------------------------------------
 
 #: Minimum weeks reserved for the fixed-length taper + race week phases.
 RACE_EVENT_FIXED_TAIL_WEEKS: int = 3  # 2 weeks taper + 1 week race week
@@ -63,8 +27,6 @@ RACE_EVENT_PROPORTIONS: Dict[str, float] = {
 TRAINING_LENGTH_GATE_DEFAULT_WEEKS: int = 24
 
 #: Per-(goal_event_type, experience_level) gate thresholds.
-#: Experience level is derived from ``AthletePreferences -
-#: years_structured_training``.
 GATE_THRESHOLDS: Dict[str, Dict[str, int]] = {
     "marathon":      {"novice": 20, "intermediate": 24, "experienced": 30},
     "half_marathon": {"novice": 16, "intermediate": 20, "experienced": 24},
@@ -74,13 +36,6 @@ GATE_THRESHOLDS: Dict[str, Dict[str, int]] = {
     "trail_race":    {"novice": 20, "intermediate": 24, "experienced": 30},
     "custom":        {"novice": 20, "intermediate": 24, "experienced": 30},
 }
-
-
-# ---------------------------------------------------------------------------
-# Session-type / Day rules — shared between race_event and
-# target_performance synthesis. The distribution engine treats them as
-# hard constraints (architecture invariants).
-# ---------------------------------------------------------------------------
 
 #: ``SessionType`` values considered "quality" — never consecutive dates
 #: in a generated week unless they share a ``block_id``.
@@ -105,19 +60,9 @@ SANDWICHED_SESSION_TYPES: frozenset[SessionType] = frozenset(
 )
 
 
-# ---------------------------------------------------------------------------
-# Phase allocation result.
-# ---------------------------------------------------------------------------
-
-
 @dataclass(frozen=True)
 class PhaseAllocation:
-    """One resolved phase in a plan — label, weeks, and weekly policies.
-
-    The deterministic expansion layer uses ``distribution`` and
-    ``specificity`` from the architecture schema. ``objectives`` is the
-    subset of ``ObjectiveCategory`` the phase targets.
-    """
+    """One resolved phase in a plan."""
 
     label: PhaseLabel
     weeks: int
@@ -130,12 +75,7 @@ class PhaseAllocation:
 
 @dataclass(frozen=True)
 class PhaseDefinitionRecord:
-    """The deterministic-expansion shape persisted in
-    ``TrainingPlan.phase_definitions`` — mirrors the architecture's
-    ``PhaseDefinition`` schema, minus the LLM-driven ``trait_vector``
-    that lives in the selector agent layer; Phase 1.4 stores the
-    adaptation-strategy fields only.
-    """
+    """Deterministic-expansion shape for TrainingPlan.phase_definitions."""
 
     phase: str
     objectives: List[str]
@@ -148,10 +88,7 @@ class PhaseDefinitionRecord:
 
 @dataclass(frozen=True)
 class CheckpointRecord:
-    """One scheduled checkpoint — used by the service to populate both
-    ``TrainingPlan.checkpoint_schedule`` and the per-week
-    ``WeeklySession.is_checkpoint`` flag.
-    """
+    """One scheduled checkpoint."""
 
     type: CheckpointType
     week_number: int
@@ -172,16 +109,7 @@ class TrainingLengthGateResult:
 
 
 def derive_experience_level(years_structured_training: int) -> str:
-    """Map training-years to an experience bucket.
-
-    Mirrors the architecture's three-bucket model — novice /
-    intermediate / experienced — used by the training-length-gate
-    thresholds:
-
-    * ``< 2`` years → ``novice``
-    * ``2..5`` years → ``intermediate``
-    * ``> 5`` years → ``experienced``
-    """
+    """Map training-years to novice / intermediate / experienced."""
     if years_structured_training < 2:
         return "novice"
     if years_structured_training <= 5:
@@ -196,16 +124,7 @@ def evaluate_training_length_gate(
     goal_event_type: str,
     experience_level: str,
 ) -> TrainingLengthGateResult:
-    """Apply the race-event training-length gate.
-
-    Implements the logic from
-    ``docs/architecture/02-computations/plan-generation-race.md`` →
-    Phase 0 — "goal_too_far" and "fitness_insufficient_for_distance"
-    outcomes. The function is pure (no DB, no LLM); the service maps
-    ``propose_intermediate`` / ``propose_shorter_goal`` actions to a
-    ``TrainingLengthGateError`` so the API layer can surface the
-    human-readable message.
-    """
+    """Apply the race-event training-length gate."""
     threshold = GATE_THRESHOLDS.get(
         goal_event_type, {}
     ).get(experience_level, TRAINING_LENGTH_GATE_DEFAULT_WEEKS)
@@ -250,26 +169,10 @@ def evaluate_training_length_gate(
     )
 
 
-# ---------------------------------------------------------------------------
-# Phase allocation — race event template.
-# ---------------------------------------------------------------------------
-
-
 def allocate_race_event_phases(
     *, total_weeks: int
 ) -> List[PhaseAllocation]:
-    """Allocate the five-phase race_event template against ``total_weeks``.
-
-    The template reserves the last ``RACE_EVENT_FIXED_TAIL_WEEKS``
-    weeks (taper + race week). The remaining weeks are split across
-    ``base`` (40 %), ``threshold`` (30 %), and ``race_specific``
-    (15 %) of the *flexible portion*. Rounding is performed so the
-    phase weeks sum exactly to ``total_weeks``.
-
-    Returns:
-        A list of :class:`PhaseAllocation` in plan order (base →
-        threshold → race-specific → taper → race-week).
-    """
+    """Allocate the five-phase race_event template against total_weeks."""
     if total_weeks <= 0:
         raise ValueError("total_weeks must be positive")
     if total_weeks <= RACE_EVENT_FIXED_TAIL_WEEKS:
@@ -365,11 +268,6 @@ def allocate_race_event_phases(
 
 
 def _phase_distribution(phase: str) -> Dict[str, float]:
-    """Return the per-zone distribution for the named template phase.
-
-    The distribution sums to <= 1.0 (remaining budget is implicit
-    warmup/cooldown/transitions per the architecture).
-    """
     return {
         "base":         {"low_aerobic": 0.75, "high_aerobic": 0.10,
                          "threshold": 0.05,   "vo2max": 0.03,
@@ -412,9 +310,7 @@ def _race_week_sessions() -> int:
 def to_phase_definition_record(
     allocation: PhaseAllocation,
 ) -> PhaseDefinitionRecord:
-    """Convert a :class:`PhaseAllocation` to the JSON-shape persisted in
-    ``TrainingPlan.phase_definitions``.
-    """
+    """Convert PhaseAllocation to a JSON-shape for TrainingPlan.phase_definitions."""
     label_str = allocation.label.value
     if allocation.label in {PhaseLabel.TAPER, PhaseLabel.RACE_WEEK}:
         approach = "linear"
@@ -433,11 +329,6 @@ def to_phase_definition_record(
     )
 
 
-# ---------------------------------------------------------------------------
-# Checkpoint scheduling.
-# ---------------------------------------------------------------------------
-
-
 def schedule_checkpoints(
     *,
     allocations: List[PhaseAllocation],
@@ -445,21 +336,7 @@ def schedule_checkpoints(
     twin_metric_confidence: Optional[Dict[str, Optional[str]]],
     goal_event_type: str,
 ) -> List[CheckpointRecord]:
-    """Schedule checkpoints across the plan.
-
-    Implements the architecture's checkpoint-scheduling algorithm —
-    "calibration at phase transitions", "benchmark at the 4-week
-    mark", "progress review every 3-4 weeks", and the
-    "race simulation in the race-specific phase, 2-3 weeks before
-    the goal event" rules.
-
-    Hard constraints:
-      * No two checkpoints in the same week.
-      * No checkpoint on the first or last day of a phase
-        (2-day buffer honored by ``target_date``).
-
-    The function is pure: same inputs always produce the same output.
-    """
+    """Schedule checkpoints across the plan."""
     records: List[CheckpointRecord] = []
     already_scheduled_weeks: set[int] = set()
 
@@ -582,7 +459,6 @@ def _has_low_metric_confidence(
 def _phase_starting_week(
     allocations: List[PhaseAllocation], phase_index: int
 ) -> int:
-    """Return the 1-indexed week number at which *phase_index* begins."""
     return 1 + sum(a.weeks for a in allocations[:phase_index])
 
 
@@ -608,7 +484,6 @@ def _date_for_week(
 
 
 def _round_to_int(value: float) -> int:
-    """Round-to-int helper mirroring Python's built-in ``round``."""
     return int(round(value))
 
 

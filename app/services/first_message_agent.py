@@ -1,18 +1,4 @@
-"""FirstMessageAgent — generate the first coach message.
-
-Implements the ``docs/architecture/03-agents/first-message-agent.md`` contract:
-- One per athlete per active goal
-- Four natural paragraphs (~300-500 words)
-- References sport_background and structural_risk_flag in paragraph 2
-- Context budget enforced before LLM call
-- Every LLM call writes a GenerationEvent (success or failure)
-- LiteLLM proxy access via OpenAI-compatible client (ADR-007)
-
-Invariants:
-- Pre-condition check: no existing CoachingMessage with message_type='first_message'
-- Idempotent: second call returns existing message (409 at API layer)
-- Every LLM call writes GenerationEvent; on failure, no CoachingMessage created
-"""
+"""Generate the first coach message for an athlete."""
 
 from __future__ import annotations
 
@@ -54,11 +40,7 @@ if TYPE_CHECKING:
 
 
 class FirstMessageAlreadyExistsError(Exception):
-    """A first message already exists for this athlete.
-
-    The API layer maps this to HTTP 409 with the existing message_id
-    in the response body.
-    """
+    """First message already exists for this athlete (HTTP 409)."""
 
     def __init__(self, existing_message_id: uuid.UUID) -> None:
         super().__init__("first message already exists")
@@ -66,30 +48,11 @@ class FirstMessageAlreadyExistsError(Exception):
 
 
 class LLMServiceUnavailableError(Exception):
-    """The LLM call failed (proxy unavailable, rate limit, timeout, etc.).
-
-    The API layer maps this to HTTP 503.
-    """
-
-
-# ---------------------------------------------------------------------------
-# FirstMessageAgent implementation.
-# ---------------------------------------------------------------------------
+    """LLM call failed (HTTP 503)."""
 
 
 class FirstMessageAgent:
-    """Generate the first coach message for an athlete.
-
-    Idempotent by design: :meth:`generate` checks for an existing
-    ``first_message`` record before calling the LLM. Duplicate calls
-    raise ``FirstMessageAlreadyExistsError`` so the API layer can
-    return HTTP 409 without re-invoking the proxy.
-
-    Transaction ownership: The agent does NOT commit the session. All
-    writes (`GenerationEvent`, `CoachingMessage`, outbox rows) are
-    flushed inside the caller's transaction; the caller owns the
-    commit boundary.
-    """
+    """Generate the first coach message for an athlete."""
 
     PROMPT_VERSION = "v1"
 

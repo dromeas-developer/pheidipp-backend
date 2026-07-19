@@ -29,7 +29,6 @@ class TrainingGoalRepository:
     async def get_active(
         self, athlete_id: uuid.UUID
     ) -> Optional[TrainingGoal]:
-        """Return the currently active goal for *athlete_id*, or ``None``."""
         result = await self.session.execute(
             select(TrainingGoal).where(
                 TrainingGoal.athlete_id == athlete_id,

@@ -1,14 +1,3 @@
-"""Cron-driver entry point for the refresh-token IP discard task.
-
-Invoked by ``scripts/discard-refresh-token-ips.sh`` and any future
-orchestrator that wants to run the task as a one-shot CLI process.
-
-The module-level ``main()`` parses a single optional ``--retention-days``
-flag, runs the async task, prints the affected row count to stdout, and
-exits with code 0 on success or 1 on any exception. The exit code is
-the contract cron uses to detect failure.
-"""
-
 from __future__ import annotations
 
 import argparse

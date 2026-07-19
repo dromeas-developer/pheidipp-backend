@@ -1,13 +1,4 @@
-"""Password hashing for the email auth provider.
-
-Bcrypt with cost factor 12 (the architecture's hard minimum). Plain
-passwords are never stored, logged, or returned to callers.
-
-The hash itself never leaves the system except via the AthleteAuth column
-hashed_password; it is excluded from every API response serializer
-(``AthleteResponse``, ``AthleteAuthResponse``) and from every logger call
-that touches authentication state.
-"""
+"""Password hashing for the email auth provider."""
 
 from __future__ import annotations
 
@@ -22,10 +13,7 @@ class PasswordHasher:
 
     @staticmethod
     def hash(password: str) -> str:
-        """Hash *password* with bcrypt at the configured cost factor.
-
-        Returns the bcrypt hash string (utf-8 decoded) for persistence.
-        """
+        """Hash *password* with bcrypt at the configured cost factor."""
         if not password:
             raise ValueError("password must be a non-empty string")
         # Bcrypt has a 72-byte input cap; truncate to that length to avoid
@@ -36,11 +24,7 @@ class PasswordHasher:
 
     @staticmethod
     def verify(password: str, hashed: str) -> bool:
-        """Constant-time verification of *password* against the stored bcrypt hash.
-
-        Returns False on any failure — including malformed hashes — without
-        leaking which condition failed (timing-safe by construction).
-        """
+        """Constant-time verification of *password* against the stored bcrypt hash."""
         if not password or not hashed:
             return False
         try:

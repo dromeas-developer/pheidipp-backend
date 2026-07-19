@@ -79,9 +79,6 @@ class WeeklyPlan(Base):
     )
     week_number: Mapped[int] = mapped_column(Integer, nullable=False)
 
-    # ------------------------------------------------------------------
-    # Intent (post pre-week review).
-    # ------------------------------------------------------------------
     adjusted_intent: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
 
     status: Mapped[WeeklyPlanStatus] = mapped_column(
@@ -189,9 +186,6 @@ class WeeklySession(Base):
         Integer, nullable=False
     )
 
-    # ------------------------------------------------------------------
-    # Checkpoint annotation.
-    # ------------------------------------------------------------------
     is_checkpoint: Mapped[bool] = mapped_column(
         nullable=False, default=False, server_default="false"
     )
@@ -223,9 +217,6 @@ class WeeklySession(Base):
         PG_UUID(as_uuid=True), nullable=True, unique=True
     )
 
-    # ------------------------------------------------------------------
-    # Block membership.
-    # ------------------------------------------------------------------
     block_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     # 'first' | 'middle' | 'last' — inline union; CHECK constraint
     # enforces membership.

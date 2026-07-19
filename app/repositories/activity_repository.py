@@ -44,12 +44,10 @@ class ActivityRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    # ------------------------------------------------------------------
     # Writes — append-only at the row level; mutation of load scores
     # is permitted but the ingestion pipeline performs a single
     # ``insert`` + ``update`` cycle per activity rather than mutating
     # columns piecemeal.
-    # ------------------------------------------------------------------
 
     async def add(self, activity: Activity) -> Activity:
         """Add an Activity to the session without committing.
@@ -132,12 +130,7 @@ class ActivityRepository:
         await self.session.refresh(activity)
         return activity
 
-    # ------------------------------------------------------------------
-    # Reads.
-    # ------------------------------------------------------------------
-
     async def get_by_id(self, activity_id: uuid.UUID) -> Optional[Activity]:
-        """Return the activity by id, or ``None``."""
         result = await self.session.execute(
             select(Activity).where(Activity.id == activity_id)
         )
@@ -180,7 +173,6 @@ class ActivityRepository:
         from_date: Optional[date] = None,
         to_date: Optional[date] = None,
     ) -> int:
-        """Return the total count of activities for the athlete."""
         stmt = select(func.count()).where(Activity.athlete_id == athlete_id)
         if from_date is not None:
             stmt = stmt.where(Activity.activity_date >= from_date)

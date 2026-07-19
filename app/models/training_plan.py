@@ -91,9 +91,6 @@ class TrainingPlan(Base):
         JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb")
     )
 
-    # ------------------------------------------------------------------
-    # Lifecycle.
-    # ------------------------------------------------------------------
     status: Mapped[TrainingPlanStatus] = mapped_column(
         SAEnum(
             TrainingPlanStatus,

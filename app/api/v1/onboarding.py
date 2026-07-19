@@ -1,24 +1,4 @@
-"""Onboarding API surface — eight endpoints behind ``require_self``.
-
-Implements the Phase-1.3 contract from
-docs/implementation/phase-1/phase-1-3-p1-onboarding-twin-bootstrap.md.
-
-All endpoints live under ``/athletes/{athlete_id}`` and depend on
-``require_self`` so the JWT's ``athlete_id`` must equal the path
-parameter — mismatches surface as HTTP 403, never 404, so
-authentication and authorization failures remain distinguishable.
-
-ORM-to-response mapping is delegated to Pydantic's
-``model_validate(row)`` (with ``from_attributes=True`` on the response
-schemas) so the conversion lives in one place. The service layer
-returns ORM rows directly; the snapshot dataclasses are kept for
-internal use and downstream tests.
-
-Error mapping follows the ``auth_router`` pattern: catch the
-service-layer domain exceptions in the per-endpoint body and
-translate them to ``HTTPException`` with a stable, user-facing
-detail string. Internal cause / traceback never leaves the service.
-"""
+"""Onboarding API surface — eight endpoints behind ``require_self``."""
 
 from __future__ import annotations
 
@@ -63,11 +43,6 @@ from app.services.plan_generation_errors import (
 onboarding_router = APIRouter(prefix="/athletes", tags=["onboarding"])
 
 
-# ---------------------------------------------------------------------------
-# Endpoints.
-# ---------------------------------------------------------------------------
-
-
 @onboarding_router.post(
     "/{athlete_id}/onboarding",
     response_model=OnboardingResponse,
@@ -79,19 +54,6 @@ async def complete_onboarding(
     auth_athlete_id: uuid.UUID = Depends(require_self),
     service: OnboardingService = Depends(build_onboarding_service_with_plan),
 ) -> OnboardingResponse:
-    """Run the atomic onboarding transaction for the path athlete.
-
-    Phase-1.4: the onboarding service is built with a
-    :class:`PlanGenerationService` so ``complete_onboarding`` invokes
-    plan generation atomically at the end of the transaction. The plan
-    service owns the commit; any plan-generation failure rolls the
-    transaction back so ``onboarding_complete`` stays ``False``.
-
-    201 on success; 409 when the athlete is already onboarded or when
-    the partial unique index fires on a duplicate active goal; 422
-    for invalid input (handled by Pydantic upstream of this handler);
-    403 when the JWT does not match the path athlete.
-    """
     profile_input = ProfileInput(
         timezone=payload.profile.timezone,
         training_window=payload.profile.training_window,
@@ -209,12 +171,6 @@ async def get_profile(
     athlete_id_dep: uuid.UUID = Depends(require_self),
     service: OnboardingService = Depends(build_onboarding_service),
 ) -> AthleteProfileResponse:
-    """Return the public ``AthleteProfile`` view for the path athlete.
-
-    The profile row always exists post-registration; a missing row
-    surfaces as 404 here for completeness (the cross-athlete guard
-    prevents the missing-row case for an authenticated owner).
-    """
     row = await service.get_profile(athlete_id)
     if row is None:
         raise HTTPException(
@@ -234,12 +190,6 @@ async def patch_profile(
     athlete_id_dep: uuid.UUID = Depends(require_self),
     service: OnboardingService = Depends(build_onboarding_service),
 ) -> AthleteProfileResponse:
-    """PATCH mutable profile fields. Immutable fields are rejected with 422.
-
-    The ``AthleteProfilePatchIn`` schema enforces the rejection at the
-    Pydantic boundary; this handler trusts its input and forwards to
-    the service.
-    """
     try:
         row = await service.update_profile(
             athlete_id,
@@ -265,11 +215,6 @@ async def get_preferences(
     athlete_id_dep: uuid.UUID = Depends(require_self),
     service: OnboardingService = Depends(build_onboarding_service),
 ) -> AthletePreferencesResponse:
-    """Return the public ``AthletePreferences`` view for the path athlete.
-
-    404 when preferences have not yet been created (i.e. onboarding
-    has not run).
-    """
     row = await service.get_preferences(athlete_id)
     if row is None:
         raise HTTPException(
@@ -292,10 +237,6 @@ async def patch_preferences(
     athlete_id_dep: uuid.UUID = Depends(require_self),
     service: OnboardingService = Depends(build_onboarding_service),
 ) -> AthletePreferencesResponse:
-    """PATCH ``AthletePreferences`` — partial merge per the architecture note.
-
-    ``weekly_schedule`` merges at the day level inside the service.
-    """
     patch_dict = payload.model_dump(exclude_unset=True)
     try:
         row = await service.update_preferences(athlete_id, patch=patch_dict)
@@ -319,10 +260,6 @@ async def get_twin_state(
     athlete_id_dep: uuid.UUID = Depends(require_self),
     service: OnboardingService = Depends(build_onboarding_service),
 ) -> TwinStateResponse:
-    """Return the latest ``TwinState`` snapshot for the path athlete.
-
-    404 when no TwinState has been appended yet.
-    """
     twin = await service.get_twin_state(athlete_id)
     if twin is None:
         raise HTTPException(

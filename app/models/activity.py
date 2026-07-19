@@ -86,8 +86,6 @@ class Activity(Base):
     )
 
     # ------------------------------------------------------------------
-    # Source and deduplication.
-    #
     # ``external_id`` is the source-platform identifier; for
     # ``manual_entry`` it is always NULL so the partial unique index
     # does not apply.
@@ -105,9 +103,6 @@ class Activity(Base):
     external_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     activity_date: Mapped[date] = mapped_column(Date, nullable=False)
 
-    # ------------------------------------------------------------------
-    # Timing / duration.
-    # ------------------------------------------------------------------
     start_time: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )
@@ -158,9 +153,6 @@ class Activity(Base):
         Boolean, nullable=False, default=False, server_default="false"
     )
 
-    # ------------------------------------------------------------------
-    # Calibration and quality.
-    # ------------------------------------------------------------------
     calibration_eligible: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"
     )
@@ -168,9 +160,6 @@ class Activity(Base):
         JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb")
     )
 
-    # ------------------------------------------------------------------
-    # Reprocessing anchor + versioning.
-    # ------------------------------------------------------------------
     fit_file_key: Mapped[str | None] = mapped_column(String(512), nullable=True)
     ingestion_pipeline_version: Mapped[str | None] = mapped_column(
         String(16), nullable=True

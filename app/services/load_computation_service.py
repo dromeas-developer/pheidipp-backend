@@ -1,49 +1,4 @@
-"""LoadComputationService — heuristic load scores from raw HR data.
-
-Implements the Phase-1.6 contract from
-``docs/architecture/02-computations/load-computation.md``.
-
-Phase-1.6 simplification:
-
-* HR-only heuristic formula (no threshold-referenced variant).
-  Per the architecture contract, ``LoadComputationService`` MUST
-  receive raw HR records (``FitParserService.ParsedFitData``),
-  not summary statistics — the architecture-invariant "no
-  ``avg_hr`` on Activity" flows from this. The formula is the
-  HR-reserve integration
-  ``weight = exp(1.92 * hrr_pct) - 1``, normalised so that one
-  hour at LT1 produces ~100 units of aerobic load.
-
-* Only ``aerobic_load`` is computed in this phase.
-  ``neuromuscular_load`` and ``structural_load`` are always ``None``
-  on the returned :class:`LoadScores`. Tier-1/2 power-based load
-  computation, Tier-5 GAP-based load, and structural-load
-  density-penalty logic are deferred to Phase 2 / Phase 2b per
-  the architecture doc.
-
-* Calibration eligibility is delegated to
-  :class:`CalibrationEligibilityService`. ``LoadComputationService``
-  is responsible for computing the score; the eligibility flag is
-  set by the ingestion pipeline after this service returns.
-
-Population defaults:
-
-* ``max_hr_estimate`` comes from the ``TwinState`` LT1 / max_hr
-  snapshot when available, falling back to ``220 - age`` from the
-  ``AthleteProfile.date_of_birth``.
-* ``resting_hr`` is the population default ``60 bpm`` per
-  ``settings.POPULATION_RESTING_HR_BPM``. Phase 2 replaces this
-  with ``AthleteWellness.min_sleeping_hr_bpm`` once wellness data
-  is available.
-
-Phase-2 expansion:
-
-* Tier-based load computation (power-based for Tier 1-2, HR-based
-  fallback for Tier 3-4, null for Tier 5-6).
-* Neuromuscular load (variability index + time above VO2max).
-* Structural load (distance + elevation + density penalty).
-* Full three-dimension :class:`LoadScores` returned for all tiers.
-"""
+"""Heuristic load scores from raw HR data."""
 
 from __future__ import annotations
 
@@ -58,33 +13,13 @@ from app.models.enums import DataTier, SportType
 from app.services.fit_parser_service import ParsedFitData
 
 
-# ---------------------------------------------------------------------------
-# Output dataclass.
-# ---------------------------------------------------------------------------
-
-
 @dataclass(frozen=True)
 class LoadScores:
-    """Three load dimensions — all populated for Phase-2.
-
-    Phase-1.6 returned only ``aerobic_load``. Phase-2 populates all
-    three dimensions according to the athlete's data tier and signal
-    availability.
-
-    Null semantics:
-    - Tier 5-6 activities have null load scores (no qualifying data).
-    - Tier 3-4 activities have null neuromuscular_load (no power/GAP).
-    - Activities without GPS have null structural_load.
-    """
+    """Three load dimensions."""
 
     aerobic_load: Optional[float]
     neuromuscular_load: Optional[float]
     structural_load: Optional[float]
-
-
-# ---------------------------------------------------------------------------
-# Errors.
-# ---------------------------------------------------------------------------
 
 
 class LoadComputationError(Exception):
@@ -92,51 +27,26 @@ class LoadComputationError(Exception):
 
 
 class MissingHeartRateError(LoadComputationError):
-    """The :class:`ParsedFitData` has no HR samples — load cannot be
-    computed for a session without a heart-rate trace.
-
-    Treated separately so the ingestion pipeline can surface a
-    deterministic 422 to the API consumer.
-    """
+    """ParsedFitData has no HR samples."""
 
 
 class MissingCriticalPowerError(LoadComputationError):
-    """Power-based load requires CP, but none is available.
-
-    For Phase 2.1, we fall back to a population estimate when
-    ``AthletePhysiology.cp`` is null.
-    """
-
-
-# ---------------------------------------------------------------------------
-# Inputs dataclass.
-# ---------------------------------------------------------------------------
+    """Power-based load requires CP, but none is available."""
 
 
 @dataclass(frozen=True)
 class LoadComputationInputs:
-    """Inputs to :meth:`LoadComputationService.compute_aerobic_load`.
-
-    Phase-2 extends Phase-1.6 inputs with tier information, GPS
-    totals, recent structural load for density penalty, and signal
-    records needed for multi-dimensional load computation.
-
-    Phase-2.1-P3 adds sport_type and sport_type_detection_version
-    for future phases that may need the full pipeline context.
-    The load formulas do not consume sport_type directly (data_tier
-    already encodes the non-running override as Tier 6).
-    """
+    """Inputs to LoadComputationService.compute_aerobic_load."""
 
     parsed_fit: ParsedFitData
     max_hr_estimate: int
-    data_tier: DataTier = DataTier.TIER_4  # Default to Tier 4 (HR-based)
+    data_tier: DataTier = DataTier.TIER_4
     resting_hr: int = settings.POPULATION_RESTING_HR_BPM
-    cp_estimate: Optional[int] = None  # watts, falls back to population default
+    cp_estimate: Optional[int] = None
     total_distance_m: Optional[float] = None
     total_ascent_m: Optional[float] = None
     recent_structural_load_72h: float = 0.0
-    structural_risk_flag: bool = False  # crossover athlete coefficient
-    # Sport type context (Phase-2.1-P3 — for future phases):
+    structural_risk_flag: bool = False
     sport_type: SportType = SportType.UNKNOWN
     sport_type_detection_version: Optional[str] = None
 
@@ -146,17 +56,8 @@ class LoadComputationInputs:
         return self.parsed_fit.has_gps
 
 
-# ---------------------------------------------------------------------------
-# Service.
-# ---------------------------------------------------------------------------
-
-
 class LoadComputationService:
-    """Pure compute — no LLM, no DB.
-
-    Constructed per-request. The service is stateless apart from the
-    configurable constants which come from :mod:`app.config`.
-    """
+    """Pure compute — no LLM, no DB."""
 
     HR_RESERVE_EXPONENT = 1.92
     # Banister TRIMP-style normalisation. Derived so that "1 hour of
@@ -173,26 +74,7 @@ class LoadComputationService:
     def compute_aerobic_load(
         self, inputs: LoadComputationInputs
     ) -> LoadScores:
-        """Return the three-dimension :class:`LoadScores`.
-
-        Phase-2 computes all three dimensions based on data tier:
-
-        - Tier 1-2: Power-based aerobic load if power data available,
-          else HR-based fallback.
-        - Tier 3-4: HR-based aerobic load only.
-        - Tier 5-6: null aerobic load (no qualifying data).
-
-        Neuromuscular load:
-        - Tier 1-4: variability index + time above VO2max.
-        - Tier 5-6: null.
-
-        Structural load:
-        - If GPS data available: distance + elevation + density penalty.
-        - If no GPS: null.
-
-        Raises:
-            MissingHeartRateError: the parsed FIT has no HR samples.
-        """
+        """Return three-dimension LoadScores."""
         if not inputs.parsed_fit.hr_records:
             raise MissingHeartRateError(
                 "cannot compute aerobic load: parsed FIT has no HR records"
@@ -206,28 +88,10 @@ class LoadComputationService:
             structural_load=structural,
         )
 
-    # ------------------------------------------------------------------
-    # Pure compute — exposed at module level for unit-test convenience.
-    # ------------------------------------------------------------------
-
     def _compute_aerobic_load(
         self, inputs: LoadComputationInputs
     ) -> float:
-        """HR-reserve integration with exponential weighting.
-
-        Phase-2: For Tier 1-2 athletes with power data, compute power-based
-        aerobic load using the fourth-power intensity factor formula.
-        Fall back to HR-based formula otherwise.
-
-        Each second of HR data contributes ``exp(1.92 * hrr_pct) - 1``
-        where ``hrr_pct = (hr - resting_hr) / (max_hr - resting_hr)``.
-        The summed value is normalised to "1 hour at LT1 ≈ 100 units"
-        by dividing by :attr:`BANISTER_NORMALISATION` (``148.0``).
-        The TypeScript reference in
-        ``docs/architecture/02-computations/load-computation.md``
-        targets the same calibration point.
-        """
-        # Power-based formula for Tier 1-2 with power data
+        """HR-reserve integration with exponential weighting."""
         if (
             inputs.data_tier in [DataTier.TIER_1, DataTier.TIER_2]
             and inputs.parsed_fit.has_power
@@ -262,18 +126,7 @@ class LoadComputationService:
     def _compute_power_aerobic_load(
         self, power_records: Sequence[Optional[float]], cp: int
     ) -> float:
-        """Power-based aerobic load: fourth-power intensity factor.
-
-        Formula per architecture doc: ``acc += (watts / cp)^4`` for each
-        second, then normalised to "1 hour at CP ≈ 100 units".
-
-        This is the power equivalent of the HR-reserve integration,
-        calibrated so that one hour at CP produces approximately
-        100 units of aerobic load.
-
-        Raises:
-            MissingCriticalPowerError: CP estimate is required.
-        """
+        """Power-based aerobic load: fourth-power intensity factor."""
         if cp <= 0:
             raise MissingCriticalPowerError(
                 "cp_estimate must be positive for power-based load"
@@ -291,16 +144,7 @@ class LoadComputationService:
     def _compute_neuromuscular_load(
         self, inputs: LoadComputationInputs
     ) -> Optional[float]:
-        """Neuromuscular load for Tier 1-4 athletes.
-
-        Computed as: variability index * duration_hours + time_above_vo2_hours * 2.5
-
-        - Variability index: coefficient of variation of power (Tier 1-2)
-          or GAP (Tier 3-4) over the session.
-        - Time above VO2max: seconds with power/GAP >= 95% of LT2 intensity.
-
-        Returns null for Tier 5-6 (no qualifying signal).
-        """
+        """Neuromuscular load for Tier 1-4 athletes."""
         if inputs.data_tier in [DataTier.TIER_5, DataTier.TIER_6]:
             return None
 
@@ -352,16 +196,7 @@ class LoadComputationService:
     def _compute_structural_load(
         self, inputs: LoadComputationInputs
     ) -> Optional[float]:
-        """Structural load for activities with GPS data.
-
-        Formula: base + gradient_cost + density_penalty
-
-        - Base: distance_km * surface_modifier (default 1.0 for unknown)
-        - Gradient cost: (elevation_gain_m / 100) * 0.18 * distance_km
-        - Density penalty: min(recent_structural_load_72h * coefficient, 15)
-
-        Returns null if no GPS data or total_distance_m <= 0.
-        """
+        """Structural load for activities with GPS data."""
         if not inputs.has_gps or not inputs.total_distance_m or inputs.total_distance_m <= 0:
             return None
 
@@ -387,33 +222,16 @@ class LoadComputationService:
     def _estimate_cp_from_population(
         self, inputs: LoadComputationInputs
     ) -> int:
-        """Estimate critical power from population defaults.
-
-        Phase 2.1 falls back to population estimates when
-        ``AthletePhysiology.cp`` is null.
-
-        Returns watts.
-        """
+        """Estimate critical power from population defaults."""
         # Simple sex-based defaults (compatible with existing pattern)
         # This matches the existing max HR population estimation pattern
         return 200  # conservative default for Phase 2.1
 
 
-# ---------------------------------------------------------------------------
-# Module-level helpers — kept here so other services can compute
-# bootstrap thresholds without instantiating the service.
-# ---------------------------------------------------------------------------
-
-
 def estimate_max_hr_from_age(
     date_of_birth: date, today: Optional[date] = None
 ) -> int:
-    """Return the population ``220 - age`` max-HR estimate.
-
-    Used as the fallback when the ``TwinState`` does not yet have a
-    calibrated max-HR. ``today`` defaults to ``date.today()`` so
-    callers pass nothing in production.
-    """
+    """Return population 220 - age max-HR estimate."""
     today = today or date.today()
     age = today.year - date_of_birth.year - (
         (today.month, today.day) < (date_of_birth.month, date_of_birth.day)

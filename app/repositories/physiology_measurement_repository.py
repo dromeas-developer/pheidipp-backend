@@ -28,10 +28,6 @@ class PhysiologyMeasurementRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    # ------------------------------------------------------------------
-    # Writes.
-    # ------------------------------------------------------------------
-
     async def insert(
         self, measurement: PhysiologyMeasurement
     ) -> PhysiologyMeasurement:
@@ -46,10 +42,6 @@ class PhysiologyMeasurementRepository:
         await self.session.flush()
         await self.session.refresh(measurement)
         return measurement
-
-    # ------------------------------------------------------------------
-    # Reads.
-    # ------------------------------------------------------------------
 
     async def get_by_athlete(
         self, athlete_id: uuid.UUID, limit: int

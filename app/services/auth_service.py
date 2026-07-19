@@ -1,38 +1,4 @@
-"""AuthService — register/login/refresh for the email auth provider.
-
-Implements the Phase-1.1 contract from
-docs/architecture/01-entities/athlete-auth.md and the transactional
-outbox requirement from docs/adr/004-transactional-outbox-for-event-persistence.md.
-
-Atomicity guarantees:
-
-* ``register`` creates ``Athlete`` + ``AthleteAuth`` + ``AthleteProfile``
-  + the first ``RefreshToken`` AND the matching ``SystemEvent`` +
-  ``SystemEventOutbox`` rows in a single database transaction. If any
-  step raises, the transaction rolls back. Caller sees 409 (for
-  duplicate email) or 500 (for unexpected failure).
-* ``refresh`` revokes the supplied token and inserts its successor in
-  the same transaction; either both ``RefreshToken`` rows and the
-  ``athlete_logged_in`` event/outbox land atomically, or none of them do.
-* ``login`` updates ``last_login_at``, inserts a new ``RefreshToken``,
-  and writes the ``athlete_logged_in`` event/outbox in one transaction.
-
-Event emission:
-
-* ``athlete_registered`` and ``athlete_logged_in`` are persisted via
-  the outbox pattern: the ``SystemEvent`` row and a paired
-  ``SystemEventOutbox`` row (status='pending') land in the SAME
-  transaction as the producing domain state. Publication to the
-  message bus is owned by the platform publisher worker and runs only
-  after this transaction commits.
-
-Failure semantics:
-
-* Login does not differentiate missing-account from wrong-password in the
-  exception type — both raise ``InvalidCredentialsError`` (HTTP 401).
-* The bcrypt verification path runs in constant time; failure leaks
-  neither the failing condition nor any timing oracle.
-"""
+"""Register/login/refresh for the email auth provider."""
 
 from __future__ import annotations
 
@@ -93,8 +59,6 @@ class AuthService:
             SystemEventOutboxRepository(session),
         )
 
-    # ---------------- Registration ----------------
-
     async def register(
         self,
         *,
@@ -106,14 +70,7 @@ class AuthService:
         ip_address: Optional[str] = None,
         user_agent: Optional[str] = None,
     ) -> AuthResult:
-        """Create Athlete + AthleteAuth + AthleteProfile + first RefreshToken,
-        emit ``athlete_registered`` after commit, and return the new
-        credential bundle.
-
-        Raises ``DuplicateEmailError`` when the email (case-insensitive)
-        already exists; the entire transaction is rolled back so no
-        partial state remains.
-        """
+        """Create athlete + auth + profile + first refresh token atomically."""
         normalized_email = normalize_email(email)
         athlete = Athlete(email=normalized_email, onboarding_complete=False)
         password_hash = self.password_hasher.hash(password)
@@ -200,8 +157,6 @@ class AuthService:
             issued=issued,
         )
 
-    # ---------------- Login ----------------
-
     async def login(
         self,
         *,
@@ -210,13 +165,7 @@ class AuthService:
         ip_address: Optional[str] = None,
         user_agent: Optional[str] = None,
     ) -> AuthResult:
-        """Validate email/password and mint a fresh token pair.
-
-        Raises ``InvalidCredentialsError`` (401) for any failure mode —
-        missing account, wrong password, or disabled credential; the
-        exception type is the same in every case so the API cannot leak
-        which condition failed.
-        """
+        """Validate email/password and mint a fresh token pair."""
         normalized_email = normalize_email(email)
         auth_record = await self.auths.get_email_auth_by_normalized_email(
             normalized_email
@@ -305,8 +254,6 @@ class AuthService:
             issued=issued,
         )
 
-    # ---------------- Refresh rotation ----------------
-
     async def rotate_refresh_token(
         self,
         *,
@@ -314,13 +261,7 @@ class AuthService:
         ip_address: Optional[str] = None,
         user_agent: Optional[str] = None,
     ) -> IssuedTokens:
-        """Atomically revoke the old refresh token and insert a successor,
-        then emit ``athlete_logged_in`` (token_type=refresh).
-
-        Raises ``InvalidRefreshTokenError`` when the submitted token is
-        missing, malformed, revoked, or expired. The DB lookup itself is
-        constant-cost once we hash the input.
-        """
+        """Atomically revoke old token and insert successor."""
         token_hash = TokenService.hash_refresh_token(raw_refresh_token)
         existing = await self.refresh_tokens.get_by_token_hash(token_hash)
         if existing is None:
@@ -402,8 +343,6 @@ class AuthService:
             refresh_expires_at=new_expires,
         )
 
-    # ---------------- Helpers ----------------
-
     def _mint_tokens(
         self,
         *,
@@ -456,12 +395,6 @@ class AuthService:
         )
 
     def _password_hasher_constant_time_dummy(self) -> None:
-        """Run a bcrypt verify against a throwaway hash to defend the
-        "no such account" path against timing oracles. The hash is the
-        well-known bcrypt cost-12 zero-prefixed digest; verification
-        always returns False, so this branch is unreachable from
-        production code paths.
-        """
         try:
             self.password_hasher.verify(
                 "timing-defence-no-such-account",

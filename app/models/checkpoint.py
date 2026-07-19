@@ -79,9 +79,6 @@ class Checkpoint(Base):
         unique=True,
     )
 
-    # ------------------------------------------------------------------
-    # Checkpoint definition.
-    # ------------------------------------------------------------------
     type: Mapped[CheckpointType] = mapped_column(
         SAEnum(
             CheckpointType,
@@ -104,9 +101,6 @@ class Checkpoint(Base):
         Boolean, nullable=False, default=False, server_default="false"
     )
 
-    # ------------------------------------------------------------------
-    # Lifecycle.
-    # ------------------------------------------------------------------
     status: Mapped[CheckpointStatus] = mapped_column(
         SAEnum(
             CheckpointStatus,

@@ -96,12 +96,6 @@ class WorkoutStep(Base):
         nullable=False,
     )
 
-    # ------------------------------------------------------------------
-    # Three-layer hierarchy.
-    # ``physiological_intent`` is the primary intent signal and is
-    # NEVER null.
-    # ``session_purpose`` defaults to ``general``.
-    # ------------------------------------------------------------------
     session_type: Mapped[SessionType] = mapped_column(
         SAEnum(
             SessionType,

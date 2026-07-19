@@ -97,9 +97,6 @@ class GeneratedWorkout(Base):
     theoretical_targets: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
     adjusted_targets: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
 
-    # ------------------------------------------------------------------
-    # Modifier annotation — defaults to ``green`` per architecture.
-    # ------------------------------------------------------------------
     recovery_modifier_level: Mapped[RecoveryModifierLevel] = mapped_column(
         SAEnum(
             RecoveryModifierLevel,

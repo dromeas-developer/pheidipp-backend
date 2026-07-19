@@ -1,22 +1,4 @@
-"""ContextBudgetService — token-budget enforcement for LLM agents.
-
-Per the architecture contract (``docs/architecture/03-agents/context-budget-service.md``),
-this service assembles structured context for each agent type and enforces
-a hard token limit before the LLM API call. Priority-weighted truncation
-removes lowest-weight sections first; errors are never thrown — degraded
-context is always returned.
-
-Context assembly (per agent):
-
-* ``FirstMessageAgent`` — 5000 tokens max. Context includes twin summary,
-  computed observations, goal summary, profile summary, plan overview, and
-  first-block preview.
-* ``WorkoutGenerationAgent`` — 3000 tokens max. (Phase 1.5b)
-* ``PostWorkoutAgent`` — 6000 tokens max. (Phase 1.6)
-
-The service is stateless per-request and constructed with only repositories;
-no ORM session coupling remains after ``assemble`` returns.
-"""
+"""Token-budget enforcement for LLM agents."""
 
 from __future__ import annotations
 
@@ -43,10 +25,6 @@ if TYPE_CHECKING:
 
 _logger = logging.getLogger("pheidipp.context_budget")
 
-# ---------------------------------------------------------------------------
-# Token-budget thresholds.
-# ---------------------------------------------------------------------------
-
 MAX_TOKENS = {
     "first_message": 5000,
     "workout_generation": 3000,
@@ -54,10 +32,7 @@ MAX_TOKENS = {
 }
 
 
-# ---------------------------------------------------------------------------
-# Priority profiles.
-# Weights 1-100; 100 = highest priority (removed last).
-# ---------------------------------------------------------------------------
+
 
 
 @dataclass(frozen=True)
@@ -91,9 +66,7 @@ FIRST_MESSAGE_PRIORITY_PROFILE: tuple[ContextSection, ...] = (
 )
 
 
-# ---------------------------------------------------------------------------
-# Output contracts.
-# ---------------------------------------------------------------------------
+
 
 
 @dataclass(frozen=True)
@@ -353,9 +326,7 @@ class FirstMessageContext:
         }
 
 
-# ---------------------------------------------------------------------------
-# ContextBudgetService implementation.
-# ---------------------------------------------------------------------------
+
 
 
 class ContextBudgetService:
@@ -396,17 +367,12 @@ class ContextBudgetService:
         self, athlete_id: uuid.UUID
     ) -> FirstMessageContext:
         """Assemble and enforce budget for ``FirstMessageAgent``."""
-        # -----------------------------------------------------------------
-        # 1. Fetch data.
-        # -----------------------------------------------------------------
         twin_state = await self.twin_states.get_latest(athlete_id)
         active_goal = await self.training_goals.get_active(athlete_id)
         active_plan = await self.plans.get_active_for_athlete(athlete_id)
         preferences = await self._preferences.get_by_athlete_id(athlete_id)
 
-        # -----------------------------------------------------------------
-        # 2. Build context sections.
-        # -----------------------------------------------------------------
+
         computed_observations: dict[str, Any] | None = None
         if twin_state and preferences:
             # Assembly is the caller's responsibility, but we inline
@@ -475,9 +441,6 @@ class ContextBudgetService:
                 total_weeks=len(active_plan.weekly_distributions or []),
             )
 
-            # TODO: derive first-block preview from weekly_distributions
-            # Phase 1.5a: placeholder values so the prompt receives
-            # something; Phase 2 refines this with session-type iteration.
             if active_plan.weekly_distributions:
                 week1: dict[str, Any] = active_plan.weekly_distributions[0] if len(active_plan.weekly_distributions) > 0 else {}
                 week2: dict[str, Any] = active_plan.weekly_distributions[1] if len(active_plan.weekly_distributions) > 1 else {}
@@ -509,9 +472,6 @@ class ContextBudgetService:
 first_block_preview=first_block_preview,
         )
 
-        # -----------------------------------------------------------------
-        # 3. Enforce budget. (Per architecture: log warning if exceeded.)
-        # -----------------------------------------------------------------
         context_dict = context.to_dict()
         estimated = self.estimate_tokens(context_dict)
         if estimated > MAX_TOKENS["first_message"]:
@@ -523,19 +483,8 @@ first_block_preview=first_block_preview,
                     "max_tokens": MAX_TOKENS["first_message"],
                 },
             )
-        # TODO (DEV-001): Implement priority-weighted truncation per architecture
-        # contract (04-platform/context-budget-service.md). Truncation was deferred
-        # from Phase 1.5a because onboarding context (LOW confidence, sparse data)
-        # is highly unlikely to exceed 5000 tokens. MUST be implemented before
-        # Phase 1.6 (PostWorkoutAgent) ships, as its context budget (6000 tokens)
-        # is more likely to be exceeded.
-        #
-        # Acceptance: Architect (2026-06-28)
-        # Tracking: See docs/implementation/phase-1/phase-1-5a-P1-remediation.md
-        # Deviation: docs/implementation/phase-1/phase-1-5a-P1_validation.md
         if estimated > MAX_TOKENS["first_message"]:
             _logger.warning(...)
-        # MVP: return full context without truncation (see TODO above)
         return context
 
     async def build_workout_context(
@@ -543,48 +492,16 @@ first_block_preview=first_block_preview,
         athlete_id: uuid.UUID,
         planned_session_id: uuid.UUID,
     ) -> WorkoutGenerationContext:
-        """Assemble and budget-enforce the context for ``WorkoutGenerationAgent``.
-
-        Implements the Phase-1.5b contract for the workout-generation
-        prompt's input. Fetches:
-
-        * the latest :class:`TwinState` for the athlete (via the
-          injected :class:`TwinStateRepository`),
-        * the target :class:`PlannedSession` (via the injected
-          :class:`PlannedSessionRepository`),
-        * the athlete's :class:`AthletePreferences` and
-          :class:`AthleteProfile` for the readiness digest.
-
-        The readiness payload is composed via the in-service
-        ``_compose_readiness_digest`` helper so the agent receives
-        a coaching-language bundle (``fitness_form_descriptor``
-        phrasing, threshold-confidence precision) rather than raw
-        twin column values. ``target_type`` is resolved from
-        :data:`DATA_TIER_TARGET_TYPE` in
-        :mod:`app.services.workout_target_types`.
-
-        Budget enforcement: matches :meth:`build_first_message_context`
-        — logs a warning if the estimated token count exceeds the
-        3000-token budget but returns the full context anyway.
-        Priority-weighted truncation remains deferred per the
-        Phase-1.5a tracking TODO in :meth:`build_first_message_context`
-        and is shared by both agents in this phase.
-        """
+        """Assemble and budget-enforce context for WorkoutGenerationAgent."""
         if self.planned_sessions is None:
             raise RuntimeError(
                 "build_workout_context requires a PlannedSessionRepository; "
                 "construct ContextBudgetService with planned_sessions=..."
             )
 
-        # -----------------------------------------------------------------
-        # 1. Fetch data.
-        # -----------------------------------------------------------------
         twin_state = await self.twin_states.get_latest(athlete_id)
         session = await self.planned_sessions.get_by_id(planned_session_id)
 
-        # -----------------------------------------------------------------
-        # 2. Build context sections.
-        # -----------------------------------------------------------------
         session_summary: WorkoutSessionSummary | None = None
         if session is not None:
             session_summary = WorkoutSessionSummary(
@@ -629,9 +546,6 @@ first_block_preview=first_block_preview,
             relevant_objectives=relevant_objectives,
         )
 
-        # -----------------------------------------------------------------
-        # 3. Enforce budget (warn-only).
-        # -----------------------------------------------------------------
         context_dict = context.to_dict()
         estimated = self.estimate_tokens(context_dict)
         if estimated > MAX_TOKENS["workout_generation"]:
@@ -643,27 +557,12 @@ first_block_preview=first_block_preview,
                     "max_tokens": MAX_TOKENS["workout_generation"],
                 },
             )
-        # TODO (DEV-001): Implement priority-weighted truncation per
-        # architecture contract (matches the TODO in
-        # build_first_message_context). Truncation deferred per
-        # Phase-1.5a tracking; returns the full context here.
         return context
 
     def _compose_readiness_digest(
         self, twin_state: TwinState
     ) -> WorkoutReadinessDigest:
-        """Translate a TwinState into the workout-context readiness shape.
-
-        Mirrors the readiness sub-shape from
-        ``docs/architecture/03-agents/workout-generation-agent.md``.
-        ``threshold_target_description`` reflects the architecture's
-        confidence-appropriate precision rule (LOW → effort
-        descriptions, MEDIUM → ranges, HIGH → point estimates). The
-        exact phrasing maps onto the descriptors already published by
-        :class:`TwinContextAssembler`; the value here is derived
-        from ``confidence_level`` plus ``lt2_pace_sec_per_km`` so the
-        numeric field stays null when LOW.
-        """
+        """Translate TwinState into workout-context readiness shape."""
         from app.services.twin_context_assembler import (
             TwinContextAssembler,
         )
@@ -671,10 +570,7 @@ first_block_preview=first_block_preview,
         assembler = TwinContextAssembler()
         twin_summary = assembler.assemble_twin_context(twin_state)
 
-        # Confidence-appropriate threshold language. The phrasing
-        # below intentionally mirrors ``twin-context-assembler.md``
-        # so the workout prompt receives vocabulary aligned with the
-        # first-message prompt's voice rule.
+
         if twin_state.confidence_level.value == "low":
             threshold_desc = (
                 "easy aerobic effort and comfortably hard intervals — "

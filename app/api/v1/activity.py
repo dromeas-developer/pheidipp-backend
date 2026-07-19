@@ -1,35 +1,4 @@
-"""Activity API surface — five endpoints behind ``require_self``.
-
-Implements the Phase-1.6 + Phase-1.8 contract from
-``docs/implementation/phase-1/phase-1-6-p1-simple-fit-import.md`` and
-``docs/implementation/phase-1/phase-1-8-p1-fix-event-ordering-and-async-processing.md``:
-
-* ``POST /athletes/{athlete_id}/activities/upload`` — accept FIT
-  file, stage to object storage + persist an empty ``Activity``
-  row, enqueue the ``fit_ingest`` procrastinate task, and return
-  ``202 Accepted`` with the worker's ``task_id``.
-* ``GET  /athletes/{athlete_id}/activities`` — paginated list.
-* ``GET  /athletes/{athlete_id}/activities/{activity_id}`` — single
-  activity (404 when missing or cross-athlete).
-* ``POST /athletes/{athlete_id}/activities/{activity_id}/analyse`` —
-  trigger ``PostWorkoutAgent``. Idempotent — second call returns
-  the existing message without re-invoking the LLM.
-* ``GET  /athletes/{athlete_id}/activities/{activity_id}/analysis`` —
-  fetch the existing analysis + coaching message (404 when none).
-
-All endpoints depend on ``require_self`` so the JWT's
-``athlete_id`` must equal the path parameter — mismatches surface
-as HTTP 403, never 404, so authentication and authorization
-failures remain distinguishable.
-
-Transaction ownership mirrors the first-message-agent and
-workout-generation-agent patterns: the agent / ingestion service
-does NOT commit. The upload handler commits once after the
-``stage_upload`` returns so the empty Activity row is durable
-before the worker task is enqueued; the worker commits once
-after ``ingest_async`` returns so the populated Activity,
-``TwinState``, and outbox row land atomically.
-"""
+"""Activity API surface — five endpoints behind ``require_self``."""
 
 from __future__ import annotations
 
@@ -90,23 +59,15 @@ MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 activity_router = APIRouter(prefix="/athletes", tags=["activity"])
 
 
-# ---------------------------------------------------------------------------
-# Dependency factories — kept module-level so each endpoint stays a thin
-# wrapper around the agent / service / repositories.
-# ---------------------------------------------------------------------------
-
-
 def build_activity_ingestion_service(
     session: AsyncSession = Depends(get_db),
 ) -> ActivityIngestionService:
-    """Construct an :class:`ActivityIngestionService` for the current request."""
     return ActivityIngestionService(session=session)
 
 
 def build_post_workout_agent(
     session: AsyncSession = Depends(get_db),
 ) -> PostWorkoutAgent:
-    """Construct a :class:`PostWorkoutAgent` for the current request."""
     return PostWorkoutAgent(
         session=session,
         coaching_messages=CoachingMessageRepository(session),
@@ -122,31 +83,21 @@ def build_post_workout_agent(
 def build_activity_repository(
     session: AsyncSession = Depends(get_db),
 ) -> ActivityRepository:
-    """Construct an :class:`ActivityRepository` for the current request."""
     return ActivityRepository(session=session)
 
 
 def build_coaching_message_repository(
     session: AsyncSession = Depends(get_db),
 ) -> CoachingMessageRepository:
-    """Construct a :class:`CoachingMessageRepository` for the current request."""
     return CoachingMessageRepository(session=session)
 
 
 def _shared_prompt_registry():
-    """Return the process-wide prompt registry singleton.
-
-    Lazy import to avoid a top-level cycle between the activity
-    router and the agent module.
-    """
+    # Lazy import to avoid a top-level cycle between the activity
+    # router and the agent module.
     from app.core.prompt_registry import get_default_prompt_registry
 
     return get_default_prompt_registry()
-
-
-# ---------------------------------------------------------------------------
-# Endpoints.
-# ---------------------------------------------------------------------------
 
 
 @activity_router.post(
@@ -165,39 +116,6 @@ async def post_upload_activity(
     ),
     session: AsyncSession = Depends(get_db),
 ) -> ActivityUploadResponse:
-    """Stage a FIT file upload and enqueue async ingestion.
-
-    The endpoint performs only the cheap, synchronous staging work
-    required by the architecture invariant "object-storage upload
-    happens BEFORE Activity creation":
-
-        1. Read the upload bytes (size-checked).
-        2. Upload the raw FIT to object storage.
-        3. Persist an empty ``Activity`` row (``fit_file_key`` set,
-           load scores ``null``) — no parsing, no load computation,
-           no twin recalibration. This row is the durable reprocessing
-           anchor.
-        4. Commit the staging transaction so the empty Activity is
-           visible to the worker.
-        5. Enqueue the ``fit_ingest`` procrastinate task carrying
-           ``activity_id`` and ``athlete_id`` so the worker can pick
-           up the heavy parse / load / twin / event-publish pipeline.
-        6. Return ``202 Accepted`` with ``task_id`` (the procrastinate
-           job id) and the staged ``Activity``.
-
-    The API response never blocks on FIT parsing, load computation,
-    or twin recalibration — those run in the ``fit_ingest`` worker
-    task per ``04-platform/async-pipeline.md``.
-
-    Errors:
-
-    * 503 — object storage upload failed (architecture invariant:
-      no ``Activity`` row is created when storage fails).
-    * 422 — uploaded file is empty / too large / activity creation
-      failed.
-    * 403 — JWT athlete_id mismatch with the path parameter.
-    * 413 — uploaded file exceeds the size limit.
-    """
     file_bytes = await _read_upload_bytes(file)
     try:
         activity = await service.stage_upload(
@@ -314,16 +232,6 @@ async def post_analyse_activity(
     ),
     session: AsyncSession = Depends(get_db),
 ) -> PostWorkoutAnalysisResponse:
-    """Trigger the ``PostWorkoutAgent`` for the activity.
-
-    Idempotent — second call returns the existing
-    ``CoachingMessage`` without invoking the LLM. Errors:
-
-    * 404 — activity not found or cross-athlete.
-    * 503 — LLM service unavailable.
-    * 422 — activity has no TwinState (athlete has not completed
-      onboarding).
-    """
     try:
         coaching_message = await agent.generate(
             athlete_id=athlete_id,
@@ -370,11 +278,6 @@ async def get_activity_analysis(
         build_coaching_message_repository
     ),
 ) -> PostWorkoutAnalysisResponse:
-    """Return the existing post-workout analysis + coaching message.
-
-    404 when no ``post_workout`` ``CoachingMessage`` exists yet —
-    callers should use ``POST /analyse`` to trigger generation.
-    """
     activity = await activities.get_by_id(activity_id)
     if activity is None or activity.athlete_id != athlete_id:
         raise HTTPException(
@@ -402,20 +305,7 @@ async def get_activity_analysis(
     )
 
 
-# ---------------------------------------------------------------------------
-# Helpers.
-# ---------------------------------------------------------------------------
-
-
 async def _read_upload_bytes(file: UploadFile) -> bytes:
-    """Read the full upload body and enforce the size limit.
-
-    Returns the raw bytes that ``stage_upload`` ships to object
-    storage and that the ``fit_ingest`` worker later passes to
-    ``FitParserService``. The size check protects the parser from
-    pathological uploads (the 10MB cap is well above any 4-hour
-    HR-only FIT).
-    """
     payload = await file.read()
     if len(payload) > MAX_UPLOAD_BYTES:
         raise HTTPException(

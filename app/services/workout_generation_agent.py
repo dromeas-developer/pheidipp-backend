@@ -1,29 +1,4 @@
-"""WorkoutGenerationAgent — generate day-of workout for a PlannedSession.
-
-Implements ``docs/architecture/03-agents/workout-generation-agent.md``:
-
-* One ``GeneratedWorkout`` per ``(planned_session_id, generation_date)``
-  via the ``uq_generated_workouts_planned_session_generation_date``
-  unique constraint. Idempotent by design — second call returns the
-  existing row (or raises ``WorkoutAlreadyGeneratedError`` at the
-  explicit endpoint).
-* Every LLM call writes a ``GenerationEvent`` (success or failure).
-* LiteLLM proxy access via the OpenAI-compatible client (ADR-007).
-* Atomic transaction ownership: the agent does NOT commit. All writes
-  (``GeneratedWorkout``, ``WorkoutStep[]``, ``GenerationEvent``,
-  ``SystemEvent``, ``SystemEventOutbox``) are flushed inside the
-  caller's transaction; the route handler calls ``session.commit()``
-  after :meth:`generate` returns.
-
-Phase 1.5b simplification:
-
-* ``adjusted_targets`` is byte-for-byte equal to ``theoretical_targets``
-  — ``WellnessModifierService``, ``CyclePhaseService``, and
-  ``WeatherAdjustmentService`` are not yet wired up. The two-column
-  schema is preserved so the home-view rendering does not need a
-  data-shape migration when those services land. ``recovery_modifier_level``
-  defaults to ``green`` and ``recovery_modifier_reason`` is null.
-"""
+"""Generate day-of workout for a PlannedSession."""
 
 from __future__ import annotations
 

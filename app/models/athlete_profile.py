@@ -83,8 +83,6 @@ class AthleteProfile(Base):
     cycle_personal_model: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
     # ------------------------------------------------------------------
-    # Location and scheduling.
-    #
     # ``timezone`` is validated at onboarding against the IANA tz
     # database and immutable thereafter — changing it requires a
     # support process. All scheduled tasks (MissedSessionSweepTask,

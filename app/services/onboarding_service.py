@@ -1,43 +1,4 @@
-"""OnboardingService — atomic onboarding transaction and twin-bootstrap reads.
-
-Implements the Phase-1.3 contract from
-docs/implementation/phase-1/phase-1-3-p1-onboarding-twin-bootstrap.md
-and the architecture contracts in
-``docs/architecture/01-entities/{athlete-profile,athlete-preferences,
-training-goal,athlete-physiology,athlete-fitness,twin-state}.md``.
-
-Atomicity guarantees:
-
-* ``complete_onboarding`` is the sole owner of the onboarding
-  transaction. It runs every write through the per-entity repositories
-  on a single shared ``AsyncSession`` and commits exactly once at the
-  end of the method. Raising any exception before the commit causes
-  SQLAlchemy to roll back the session automatically — partial state is
-  never visible to other readers and ``onboarding_complete`` stays
-  ``False``.
-* The ``onboarding_completed`` event is persisted via the transactional
-  outbox (``SystemEvent`` + ``SystemEventOutbox`` rows) inside the SAME
-  transaction as the producing domain state, per ADR-004. Publication
-  to the message bus belongs to the platform publisher worker and
-  runs strictly after this transaction commits.
-
-Bootstrap rules enforced here:
-
-* Only ``race_event`` and ``target_performance`` are accepted at
-  onboarding; other ``GoalType`` values raise ``InvalidGoalTypeError``
-  (HTTP 422).
-* The IANA ``timezone`` identifier is validated at the Pydantic schema
-  layer (``OnboardingProfileIn``) using ``zoneinfo`` so an invalid
-  identifier is rejected with HTTP 422 before this service runs.
-* Threshold estimates (``lt1.hr``, ``lt2.hr``, ``max_hr``) are
-  bootstrapped from age-graded population norms using
-  ``AthleteProfile.date_of_birth`` (220-age; 0.75× and 0.875× factors).
-* ``cp`` and ``vo2max`` are NEVER estimated from the questionnaire;
-  they remain ``null`` at bootstrap.
-* ``TwinState`` is append-only — created via ``TwinStateRepository.insert``
-  and never updated afterwards (the repository exposes no
-  ``update``/``delete`` methods).
-"""
+"""Atomic onboarding transaction and twin-bootstrap reads."""
 
 from __future__ import annotations
 

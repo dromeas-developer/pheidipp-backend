@@ -1,13 +1,4 @@
-"""Coaching message response schemas (Phase 1.5a).
-
-Wire-format contracts for the coach endpoints:
-
-- ``GET /athletes/{id}/coach/messages`` → ``MessagesListResponse``
-- ``POST /athletes/{id}/coach/first-message`` → ``CoachingMessageResponse``
-
-All ORM rows feed directly into Pydantic via ``model_validate`` /
-``from_attributes=True`` so the conversion lives in one place.
-"""
+"""Coaching message response schemas (Phase 1.5a)."""
 
 from __future__ import annotations
 

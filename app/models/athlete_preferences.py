@@ -76,8 +76,6 @@ class AthletePreferences(Base):
     )
 
     # ------------------------------------------------------------------
-    # Sport background.
-    #
     # ``running_primary`` is the canonical running-only path; any other
     # value marks a crossover athlete and triggers the structural
     # capacity ramp in plan generation.
@@ -97,8 +95,6 @@ class AthletePreferences(Base):
     )
 
     # ------------------------------------------------------------------
-    # Scheduling.
-    #
     # ``training_time_of_day`` feeds the time-of-day modifier in
     # ``WellnessModifierService``.
     # ``weekly_schedule`` is structured JSONB; each day carries
@@ -118,8 +114,6 @@ class AthletePreferences(Base):
     weekly_schedule: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
 
     # ------------------------------------------------------------------
-    # Hardware / platform.
-    #
     # Hardware fields drive data-tier inference (see architecture doc).
     # ``primary_training_platform`` is the source of truth for the
     # integration team — when the athlete's primary platform changes,

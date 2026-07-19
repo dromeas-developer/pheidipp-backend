@@ -1,45 +1,4 @@
-"""FitParserService — extract raw HR data from a FIT file.
-
-Implements the Phase-1.6 contract from
-``docs/architecture/01-entities/activity.md`` →
-``LoadComputationService`` invariant ``must receive raw records from
-``FitParserService``, not summary stats``.
-
-Scope at this phase:
-
-* HR data only (bpm per second). Power, GPS, RR intervals and lap
-  data are parsed when present and exposed on the result so future
-  phases can extend the contract, but the load formula in this phase
-  consumes HR only.
-* Heuristic load computation — the parser does NOT compute averages
-  (``avg_hr``, ``avg_pace``) per the architecture invariant; those
-  values are deliberately absent from the ``Activity`` row.
-* Common FIT file structures from Garmin, Coros, Wahoo, Polar etc.
-  Unreadable / corrupt / unsupported files raise
-  :class:`FitParseError` and the API layer surfaces that as 422.
-
-Parser library:
-
-* ``fitparse`` (1.2+) is the de-facto Python FIT SDK. It supports
-  the common subset robustly across device vendors and reads the
-  raw record stream synchronously; the sync parse runs inside a
-  thread-pool executor so the async event loop is never blocked.
-
-Output:
-
-* :class:`ParsedFitData` carries the raw HR sample array, the
-  session start time, total duration, the moving duration, and
-  signal-availability flags. Power samples are exposed but
-  ``has_power`` / ``has_rr_intervals`` flag tracks whether the
-  Phase-1.6 load formula can consume them.
-
-Phase-2 expansion:
-
-* GPS records (distance, elevation, speed/pace) and RR interval
-  time-series for full signal processing.
-* Lap data and session-level totals.
-* Artifact detection (GPS spikes > 25 m/s speed).
-"""
+"""Extract raw HR data from a FIT file."""
 
 from __future__ import annotations
 
@@ -54,40 +13,17 @@ from app.core.logging_utils import log_event
 from app.models.enums import SportType
 
 
-# ---------------------------------------------------------------------------
-# Errors.
-# ---------------------------------------------------------------------------
-
-
 class FitParseError(Exception):
-    """The FIT file is unreadable, corrupt, or unsupported.
-
-    The API layer maps this to HTTP 422 with a plain-language detail
-    message; the ingestion pipeline MUST NOT create an ``Activity``
-    record when parsing fails (architecture invariant).
-    """
+    """FIT file is unreadable, corrupt, or unsupported (HTTP 422)."""
 
 
 class FitParseEmptyError(FitParseError):
-    """The FIT file parsed successfully but produced no HR records.
-
-    Treated separately so the caller can distinguish "this is not a
-    runnable session" from "the file is corrupt". Both cases return
-    422 to the API consumer.
-    """
-
-
-# ---------------------------------------------------------------------------
-# Helper dataclass for GPS records.
-# ---------------------------------------------------------------------------
+    """FIT file parsed successfully but produced no HR records."""
 
 
 @dataclass(frozen=True)
 class GpsRecord:
-    """Single GPS point from a FIT file's record message.
-
-    All fields are in SI units (meters, meters/second) or radians.
-    """
+    """Single GPS point from a FIT file's record message."""
 
     timestamp: datetime
     position_lat: Optional[float] = None
@@ -97,30 +33,9 @@ class GpsRecord:
     speed: Optional[float] = None
 
 
-# ---------------------------------------------------------------------------
-# Output dataclass.
-# ---------------------------------------------------------------------------
-
-
 @dataclass(frozen=True)
 class ParsedFitData:
-    """One parsed FIT file's worth of raw signals.
-
-    The contract intentionally preserves raw records (HR per second)
-    rather than summary statistics so :class:`LoadComputationService`
-    can apply the HR-reserve integration formula against the
-    original signal — the architecture invariant on raw-records-only
-    consumption.
-
-    Phase-2 expansion:
-
-    * GPS records (distance, elevation, speed/pace) for structural
-      load computation and GPS artifact detection.
-    * RR interval time-series for HRV analysis.
-    * Session-level totals (total distance, total ascent).
-    * Flags for data availability and quality issues.
-    * Sport type detection result from FIT sport message.
-    """
+    """One parsed FIT file's worth of raw signals."""
 
     start_time: datetime
     duration_seconds: int
@@ -129,30 +44,19 @@ class ParsedFitData:
     has_hr: bool = False
     has_power: bool = False
     has_rr_intervals: bool = False
-    # Phase-2 additions:
     gps_records: list[GpsRecord] = field(default_factory=lambda: [])
     rr_records: list[Optional[float]] = field(default_factory=lambda: [])
     total_distance_m: Optional[float] = None
     total_ascent_m: Optional[float] = None
     has_gps: bool = False
     moving_duration_seconds: int = 0
-    # Sport type detection (Phase-2.1-P3):
     sport_type: SportType = SportType.UNKNOWN
     detection_confidence: str = "unknown"
     detection_version: str = "v1"
 
 
-# ---------------------------------------------------------------------------
-# Parser.
-# ---------------------------------------------------------------------------
-
-
 class FitParserService:
-    """Parse FIT files into :class:`ParsedFitData`.
-
-    Stateless — every ``parse`` call returns a fresh dataclass. The
-    service is safe to instantiate per-request.
-    """
+    """Parse FIT files into ParsedFitData."""
 
     HR_FIELD = "heart_rate"
     POWER_FIELD = "power"
@@ -168,17 +72,7 @@ class FitParserService:
     GPS_SPEED_SPIKE_THRESHOLD_M_S = 25.0
 
     async def parse(self, file_bytes: bytes) -> ParsedFitData:
-        """Parse FIT bytes into raw-record :class:`ParsedFitData`.
-
-        The blocking parser call runs inside a thread-pool executor
-        so the async event loop is never blocked on CPU work.
-
-        Raises:
-            FitParseError: the file is unreadable / corrupt / from
-                an unsupported producer.
-            FitParseEmptyError: parsing succeeded but no HR records
-                were found (the session is not runnable at this phase).
-        """
+        """Parse FIT bytes into raw-record ParsedFitData."""
         loop = asyncio.get_running_loop()
         try:
             parsed = await loop.run_in_executor(None, self._parse_sync, file_bytes)
@@ -201,10 +95,6 @@ class FitParserService:
         )
         return parsed
 
-    # ------------------------------------------------------------------
-    # Sync implementation — runs in the executor.
-    # ------------------------------------------------------------------
-
     def _parse_sync(self, file_bytes: bytes) -> ParsedFitData:
         fit = FitFile(BytesReader(file_bytes))
         # ``parse`` is a generator that yields definition + data
@@ -223,7 +113,6 @@ class FitParserService:
         total_ascent_m: Optional[float] = None
         has_gps: bool = False
 
-        # Sport type detection variables (Phase-2.1-P3)
         sport_int: Optional[int] = None
         sub_sport_int: Optional[int] = None
         sport_type = SportType.UNKNOWN
@@ -241,7 +130,6 @@ class FitParserService:
                 ))
                 if isinstance(raw_val, (int, float)):
                     duration_seconds = coerce_duration_seconds(raw_val)
-                # Session-level totals
                 raw_dist = message.get_value(self.SESSION_TOTAL_DISTANCE_FIELD)  # type: ignore[attr-defined]
                 if isinstance(raw_dist, (int, float)):
                     # FIT distance is typically in mm (1000x scale)
@@ -251,7 +139,6 @@ class FitParserService:
                     # FIT elevation is typically in m (sometimes 10x for older files)
                     total_ascent_m = float(raw_elev)
 
-                # Extract sport type from FIT sport message (Phase-2.1-P3)
                 sport_int_raw = message.get_value("sport")  # type: ignore[attr-defined]
                 sub_sport_int_raw = message.get_value("sub_sport")  # type: ignore[attr-defined]
                 sport_int = sport_int_raw if isinstance(sport_int_raw, int) else None
@@ -270,7 +157,6 @@ class FitParserService:
             if isinstance(raw_power, int) and 0 <= raw_power <= 2500:
                 power_records.append(raw_power)
 
-            # RR-interval values (milliseconds)
             raw_rr = message.get_value("rr_interval")  # type: ignore[attr-defined]
             if isinstance(raw_rr, (int, float)):
                 # rr_interval can be a single float (gap to next beat)
@@ -280,7 +166,6 @@ class FitParserService:
                 else:
                     rr_records.append(float(raw_rr))
 
-            # GPS records: position_lat, position_long, distance, altitude, speed
             raw_lat: Optional[float] = cast(Optional[float], message.get_value("position_lat"))  # type: ignore[attr-defined]
             raw_long: Optional[float] = cast(Optional[float], message.get_value("position_long"))  # type: ignore[attr-defined]
             raw_dist: Optional[float] = cast(Optional[float], message.get_value("distance"))  # type: ignore[attr-defined]
@@ -288,7 +173,6 @@ class FitParserService:
             raw_speed: Optional[float] = cast(Optional[float], message.get_value("speed"))  # type: ignore[attr-defined]
 
             if raw_lat is not None or raw_long is not None:
-                # We have GPS data on this record
                 has_gps = True
                 if isinstance(raw_lat, int):
                     raw_lat = raw_lat / 11930465.0  # Convert to degrees
@@ -349,19 +233,8 @@ class FitParserService:
         )
 
 
-# ---------------------------------------------------------------------------
-# Helpers.
-# ---------------------------------------------------------------------------
-
-
 class BytesReader:
-    """Lightweight ``file-like`` wrapper that ``fitparse`` accepts.
-
-    ``fitparse.FitFile`` accepts anything that exposes ``read`` /
-    ``seek`` / ``tell``. Wrapping ``bytes`` in :class:`io.BytesIO`
-    would also work, but a tiny wrapper keeps the parser
-    implementation dependency-light.
-    """
+    """Lightweight file-like wrapper that fitparse accepts."""
 
     __slots__ = ("_buffer", "_pos")
 

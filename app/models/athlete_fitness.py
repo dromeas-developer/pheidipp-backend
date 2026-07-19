@@ -87,9 +87,6 @@ class AthleteFitness(Base):
         nullable=False,
     )
 
-    # ------------------------------------------------------------------
-    # Aggregate score — always populated, ``form`` derived.
-    # ------------------------------------------------------------------
     aggregate: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
 
     # ------------------------------------------------------------------
@@ -108,9 +105,6 @@ class AthleteFitness(Base):
     # ------------------------------------------------------------------
     time_constants: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
 
-    # ------------------------------------------------------------------
-    # Anchoring reference — last activity that wrote this row.
-    # ------------------------------------------------------------------
     last_activity_id: Mapped[uuid.UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("activities.id", ondelete="SET NULL"),

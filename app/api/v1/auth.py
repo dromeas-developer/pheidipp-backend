@@ -1,10 +1,4 @@
-"""Auth API surface: register, login, refresh-token rotation.
-
-All endpoints follow the brand-philosophy rule: user-facing errors are
-plain and non-technical. Internals never leak distinguishing detail —
-login failure looks the same whether the account is missing or the
-password is wrong.
-"""
+"""Auth API surface: register, login, refresh-token rotation."""
 
 from __future__ import annotations
 
@@ -32,17 +26,10 @@ from app.services.auth_service import AuthService
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-# --------- token TTL helpers ---------
-
-
 def _seconds_until(when: datetime) -> int:
-    """Return whole-second TTL for an absolute UTC timestamp."""
-    delta = (when - datetime.now(timezone.utc)).total_seconds()
     # Clamp to a minimum of 1 so clients never see a non-positive TTL.
+    delta = (when - datetime.now(timezone.utc)).total_seconds()
     return max(1, int(delta))
-
-
-# --------- response builders ---------
 
 
 def _auth_response(result: AuthResult) -> AuthResponse:
@@ -69,18 +56,12 @@ def _refresh_response(issued: IssuedTokens) -> RefreshResponse:
     )
 
 
-# --------- request-context extraction ---------
-
-
 def _client_ip(request: Request) -> str | None:
     return request.client.host if request.client is not None else None
 
 
 def _user_agent(request: Request) -> str | None:
     return request.headers.get("user-agent")
-
-
-# --------- endpoints ---------
 
 
 @auth_router.post(

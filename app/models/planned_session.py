@@ -97,9 +97,6 @@ class PlannedSession(Base):
         nullable=False,
     )
 
-    # ------------------------------------------------------------------
-    # Schedule.
-    # ------------------------------------------------------------------
     target_date: Mapped[date] = mapped_column(Date, nullable=False)
     week_number: Mapped[int] = mapped_column(Integer, nullable=False)
     phase_label: Mapped[PhaseLabel] = mapped_column(
@@ -144,9 +141,6 @@ class PlannedSession(Base):
     )
     checkpoint_metric: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
-    # ------------------------------------------------------------------
-    # Status lifecycle.
-    # ------------------------------------------------------------------
     status: Mapped[PlannedSessionStatus] = mapped_column(
         SAEnum(
             PlannedSessionStatus,
@@ -170,9 +164,6 @@ class PlannedSession(Base):
         PG_UUID(as_uuid=True), nullable=True
     )
 
-    # ------------------------------------------------------------------
-    # Slot and priority.
-    # ------------------------------------------------------------------
     # ``session_slot`` is nullable for single-session days; ``'am' |
     # 'pm'`` for double-session days.
     session_slot: Mapped[SessionSlot | None] = mapped_column(
@@ -196,9 +187,6 @@ class PlannedSession(Base):
         nullable=False,
     )
 
-    # ------------------------------------------------------------------
-    # Block membership.
-    # ------------------------------------------------------------------
     block_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     block_position: Mapped[str | None] = mapped_column(String(16), nullable=True)
     block_session_count: Mapped[int | None] = mapped_column(Integer, nullable=True)

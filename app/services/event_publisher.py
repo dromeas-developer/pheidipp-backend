@@ -1,14 +1,4 @@
-"""Event publisher — atomically write SystemEvent + outbox row.
-
-Implements ADR-004 rule "Event Persistence Atomicity". The helper
-inserts the event row and its companion outbox row in the caller's
-transaction; the producer commits the whole transaction — domain
-state plus event plus outbox — exactly once.
-
-External publication (message bus delivery) is owned by the platform
-publisher worker and runs strictly after the producing transaction
-commits. This module never publishes externally.
-"""
+"""Atomically write SystemEvent + outbox row per ADR-004."""
 
 from __future__ import annotations
 

@@ -1,18 +1,4 @@
-"""Activity response schemas (Phase-1.6).
-
-Wire-format contracts for the activity endpoints:
-
-* ``POST /athletes/{id}/activities/upload``                  → ``ActivityUploadResponse``
-* ``GET  /athletes/{id}/activities``                          → ``ActivityListResponse``
-* ``GET  /athletes/{id}/activities/{aid}``                    → ``ActivityResponse``
-* ``POST /athletes/{id}/activities/{aid}/analyse``            → ``PostWorkoutAnalysisResponse``
-* ``GET  /athletes/{id}/activities/{aid}/analysis``           → ``PostWorkoutAnalysisResponse``
-
-ORM-to-response mapping is delegated to Pydantic's
-``model_validate`` (with ``from_attributes=True``) so the
-conversion lives in one place. JSONB columns
-(``quality_flags``) are declared as ``dict``.
-"""
+"""Activity response schemas (Phase-1.6)."""
 
 from __future__ import annotations
 
@@ -25,21 +11,8 @@ from pydantic import BaseModel, ConfigDict
 from app.models.enums import ActivitySource, SportType
 
 
-# ---------------------------------------------------------------------------
-# ActivityResponse — single activity wire shape.
-# ---------------------------------------------------------------------------
-
-
 class ActivityResponse(BaseModel):
-    """One ``Activity`` row returned by the API.
-
-    Mirrors the schema from
-    ``docs/architecture/01-entities/activity.md``. Load scores
-    remain ``null`` for ``source = manual_entry``; signal flags
-    (``has_hr``, ``has_power``) reflect what the FIT trace
-    actually carried (HR is the only signal consumed at
-    Phase-1.6).
-    """
+    """One ``Activity`` row returned by the API."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -70,15 +43,7 @@ class ActivityResponse(BaseModel):
 
 
 class ActivityUploadResponse(BaseModel):
-    """Response for ``POST /athletes/{id}/activities/upload``.
-
-    Returns the freshly staged ``Activity`` (with null load
-    scores — the heavy pipeline runs async in the worker) plus
-    the ``task_id`` of the ingestion worker so the client can
-    poll for completion. ``ingestion_status`` indicates the
-    initial state — ``pending`` until the worker picks the task
-    up, then ``running``, then ``completed`` or ``failed``.
-    """
+    """Response for ``POST /athletes/{id}/activities/upload``."""
 
     activity: ActivityResponse
     task_id: UUID
@@ -92,19 +57,8 @@ class ActivityListResponse(BaseModel):
     total: int
 
 
-# ---------------------------------------------------------------------------
-# Post-workout analysis response — analysis + coaching message bundle.
-# ---------------------------------------------------------------------------
-
-
 class CoachingMessageSummary(BaseModel):
-    """Subset of the ``CoachingMessage`` shape returned alongside
-    the activity analysis.
-
-    Avoids depending on the larger ``CoachingMessageResponse``
-    schema (which carries fields only relevant to first-message
-    listing).
-    """
+    """Subset of the ``CoachingMessage`` shape returned alongside the activity analysis."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -117,20 +71,10 @@ class CoachingMessageSummary(BaseModel):
 
 
 class PostWorkoutAnalysisResponse(BaseModel):
-    """Response for ``POST /analyse`` and ``GET /analysis``.
-
-    Returns the activity summary plus the generated (or
-    pre-existing) post-workout coach message. The two endpoints
-    return the same shape so the consumer can poll either path.
-    """
+    """Response for ``POST /analyse`` and ``GET /analysis``."""
 
     activity: ActivityResponse
     coaching_message: CoachingMessageSummary
-
-
-# ---------------------------------------------------------------------------
-# Error envelopes.
-# ---------------------------------------------------------------------------
 
 
 class ActivityNotFoundResponse(BaseModel):

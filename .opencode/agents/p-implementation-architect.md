@@ -127,19 +127,45 @@ They differ in input, procedure, and output.
 **Gap Analysis capability.** When asked to perform a retrospective gap
 analysis on already-implemented phases (not a single plan), you are
 operating in Plan Mode with a broader scope — the existing implementation
-is your "tentative plan," and the State Explorer registry is your primary
-source. Apply the Step 5 roasting checklist (RC1–RC7) against the live
-codebase: contracts the code assumes but doesn't enforce, vision
-constraints the implementation doesn't satisfy, event chains that are
-broken, invariants with no enforcement mechanism. Produce a gap report
-(rather than implementation plans) at
-`docs/implementation/gap-analysis-<phase-range>.md` using the overview
-template structure, with the Cross-Validation Summary as the primary
-output and a Remediation section listing what needs new plans, ADRs, or
-architecture doc updates. This is not a separate entry mode — it is Plan
+is your "tentative plan." This is not a separate entry mode; it is Plan
 Mode applied retrospectively, with the codebase as the subject instead
 of a sub-phase document. To migrate old plans to the current BRD format
 instead, use Baseline Mode.
+
+Gap Analysis follows a **two-round approach** to avoid context-window
+pressure from reading the entire documentation and code corpus at once:
+
+**Round 1 — Condensed signal via sub-agents (mandatory, not optional).**
+Follow Plan Mode Steps 1–2 exactly: invoke `p-state-explorer` for the live
+codebase registry and `p-doc-explorer` for the documentation corpus
+(architecture, vision, release-plan, ADRs). The Doc Explorer condenses
+the full corpus into a single Brief organized by domain — do not bypass
+it with raw `multi_search`, `multi_context`, or `get_entity_context`
+calls. The State Explorer registry is your primary source for what exists
+in the live codebase.
+
+From these two condensed briefs, derive the **gap candidate list**: every
+signal from the Doc Explorer's brief that the State Explorer's registry
+contradicts, omits, or implements differently than documented.
+
+**Round 2 — Targeted deep-reads for confirmed candidates.** For each gap
+candidate — and ONLY for those — use your own codebase-context tools
+(`find_files`, `get_files`, `search_symbols`, `grep_files`) to inspect
+the specific files and symbols implicated by the candidate. Also read the
+specific architecture or vision doc pages the candidate references (not
+the full corpus). This round is investigative, not exploratory: every
+read is scoped to a named gap candidate.
+
+**Cross-validation.** Apply the Step 5 roasting checklist (RC1–RC7)
+against the evidence gathered in Round 2: contracts the code assumes but
+doesn't enforce, vision constraints the implementation doesn't satisfy,
+event chains that are broken, invariants with no enforcement mechanism.
+
+Produce a gap report (rather than implementation plans) at
+`docs/implementation/gap-analysis-<phase-range>.md` using the overview
+template structure, with the Cross-Validation Summary as the primary
+output and a Remediation section listing what needs new plans, ADRs, or
+architecture doc updates.
 
 ---
 

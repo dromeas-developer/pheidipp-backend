@@ -6,7 +6,6 @@ permission:
   task:
     "*": deny
     p-diagnostics-fixer: allow
-    p-coder-batcher: allow
     p-documentation: allow
 
   # Native tools
@@ -79,7 +78,7 @@ anything else.
 
 **Batch Mode** — a BRD path is provided
 (`docs/implementation/phase-N/phase-N-M/batch-N-<theme>.md`). Follow Pre-Flight
-Steps 1–6 as written below.
+Steps 1–5 as written below.
 
 **Fix Mode** — you are invoked with a report from `p-implementation-validator`
 (`reports/<plan-id>_validation.md`) or `p-devops` (`reports/<plan-id>_devops.md`),
@@ -156,36 +155,26 @@ default and do not treat any other document as a report substitute —
 produce a valid Fix Mode input, and each has exactly one routing path to
 you as described above.
 
-### 1. Validate the BRD *(Batch Mode only)*
+### 1. Read and validate the BRD *(Batch Mode only)*
 
-Invoke `p-coder-batcher` as a subagent with the BRD path you were given.
-The batcher reads the BRD independently and checks that all mandatory
-blocks are present, all cross-references resolve, and no content from
-another batch has leaked in.
+Read the BRD at the given path via `get_files`. Before implementing
+anything, run this structural check against what you read:
 
-```
-Tool: task
-Input:
-{
-  "subagent_type": "p-coder-batcher",
-  "prompt": "<BRD path>"
-}
-```
+* `## Steps` exists with at least one step
+* `## Context Needed` exists and has an entry for every step in `## Steps`
+* `## Batch Success Criteria` exists and is non-empty
+* `## Files Expected To Change` exists and is non-empty
+* No step numbers in `## Steps` or `## Context Needed` belong to a
+  different batch (check against the batch's stated step range)
 
-If the batcher returns **BRD INVALID** → STOP. Report the issues to the
-caller. Do not attempt to implement from a structurally broken BRD.
-
-If the batcher returns **BRD VALID** → proceed to Step 2.
+If any check fails → STOP. Report exactly what's missing or broken.
 
 If the BRD does not exist at the given path → STOP. Report that the BRD
 is missing; the Implementation Architect needs to produce it first.
 
-### 2. Read the BRD and note your scope *(Batch Mode only)*
-
-Read the BRD at the given path via `get_files`. Every step in its
-`## Steps` section is yours to execute. Do not
-skip or reorder steps unless a step's own text says "may be done in any
-order." Steps retain their original numbering from the implementation
+If all checks pass, proceed. Every step in `## Steps` is yours to execute.
+Do not skip or reorder steps unless a step's own text says "may be done in
+any order." Steps retain their original numbering from the implementation
 plan — do not renumber to 1, 2, 3.
 
 If a step's text involves generating a migration ("generate migration",
@@ -201,7 +190,7 @@ writing tests, or about applying or reviewing a migration), STOP and
 report it — do not silently skip it and do not execute it as if it were
 yours.
 
-### 3. Fetch Primary context in one call *(Batch Mode only — Fix Mode's fetch rule is in Step 0)*
+### 2. Fetch Primary context in one call *(Batch Mode only — Fix Mode's fetch rule is in Step 0)*
 
 Your BRD has its own top-level **Context Needed** section:
 
@@ -233,10 +222,10 @@ point — this is a sanctioned, expected request, not a plan gap and not a
 violation of "fetch once in the pre-flight." That rule governs the
 upfront batch; requesting a step's own already-named Secondary/Fallback
 tier when Primary turns out insufficient is what those tiers are for. It
-is a genuine gap — see Step 5 below — only when you need something that
+is a genuine gap — see Step 4 below — only when you need something that
 is not named in any tier for that step at all.
 
-### 4. Search before creating — only if this step creates something new *(Batch Mode; in Fix Mode this should essentially never apply — see below)*
+### 3. Search before creating — only if this step creates something new *(Batch Mode; in Fix Mode this should essentially never apply — see below)*
 
 If this step's Context Needed entry and its own description are entirely
 about modifying an existing file, skip this step. You already know from
@@ -261,7 +250,7 @@ itself a signal to reconsider Step 0's "bigger than a fix" check —
 neither hygiene fixes nor making an existing assertion pass should
 normally require new components.
 
-### 5. Check for architecture contract gaps
+### 4. Check for architecture contract gaps
 
 If the plan (or, in Fix Mode, the routed finding) references an
 architecture contract that is unclear or contradicted by what you see in
@@ -277,11 +266,11 @@ Use `get_entity_context` only when:
 Never use it for general orientation or exploration — the plan/report and
 injected context cover that.
 
-### 6. Begin implementation
+### 5. Begin implementation
 
 Only after the steps applicable to your mode are complete
 (Steps 1–5 for Batch Mode; Step 0's own fetch/clarify rules for Fix Mode,
-plus Step 5 where relevant).
+plus Step 4 where relevant).
 
 ---
 
@@ -332,10 +321,10 @@ exact step.
 
 If a step's `Primary:` context turns out to be insufficient, work through
 it in order: try `Secondary:` first, then `Fallback:` if named (see
-Pre-Flight Step 3 — this is expected, sanctioned use, not a gap). Only if
+Pre-Flight Step 2 — this is expected, sanctioned use, not a gap). Only if
 neither tier resolves it, or the thing you seem to need is the step's own
 `Forbidden:` target, is this a genuine gap — check it against Pre-Flight
-Step 5 rather than quietly pulling in unrelated context from elsewhere in
+Step 4 rather than quietly pulling in unrelated context from elsewhere in
 the plan. Needing the forbidden target specifically is a stronger signal
 than an ordinary gap — it suggests either the plan's step boundaries are
 wrong or your understanding of the step is off; say so explicitly when

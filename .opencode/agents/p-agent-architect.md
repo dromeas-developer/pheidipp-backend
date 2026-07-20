@@ -93,8 +93,8 @@ You do NOT own:
 ### Optional
 
 - **Peer agent paths** — 2-3 agents in the same pipeline stage for
-  comparison (e.g., when reviewing p-coder, also read p-coder-batcher
-  and p-test-architect for boundary analysis).
+  comparison (e.g., when reviewing p-coder, also read p-test-architect
+  and p-implementation-validator for boundary analysis).
 - **Specific review focus** — a narrowed scope (e.g., "token efficiency
   only," "responsibility boundaries only").
 

@@ -44,7 +44,7 @@ from app.repositories.athlete_profile_repository import AthleteProfileRepository
 from app.repositories.athlete_preferences_repository import AthletePreferencesRepository
 from app.repositories.twin_state_repository import TwinStateRepository
 from app.services.context_budget_service import ContextBudgetService
-from app.services.first_message_agent import FirstMessageAgent
+from app.agents.first_message_agent import FirstMessageAgent
 from app.core.prompt_registry import PromptRegistry
 
 
@@ -192,7 +192,7 @@ class TestPostFirstMessage:
         db_session.add(existing_message)
         await db_session.flush()
 
-        from app.services.first_message_agent import FirstMessageAlreadyExistsError
+        from app.agents.first_message_agent import FirstMessageAlreadyExistsError
 
         with patch("app.api.v1.coach.FirstMessageAgent") as MockAgent:
             mock_instance = AsyncMock()
@@ -221,7 +221,7 @@ class TestPostFirstMessage:
         athlete, *_ = await _create_athlete_with_onboarding(db_session)
         await db_session.flush()
 
-        from app.services.first_message_agent import LLMServiceUnavailableError
+        from app.agents.first_message_agent import LLMServiceUnavailableError
 
         with patch("app.api.v1.coach.FirstMessageAgent") as MockAgent:
             mock_instance = AsyncMock()
@@ -540,7 +540,7 @@ class TestGenerationEventIntegrity:
         prompt_registry = PromptRegistry()
 
         with patch(
-            "app.services.first_message_agent.FirstMessageAgent._build_llm_client"
+            "app.agents.first_message_agent.FirstMessageAgent._build_llm_client"
         ) as mock_build_llm:
             mock_client = AsyncMock()
             mock_client.chat.completions.create = AsyncMock(

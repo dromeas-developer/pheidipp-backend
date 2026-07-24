@@ -1,459 +1,465 @@
 version: "1.0"
 plan_id: "phase-1-2b-p1-plan-sessions"
-generated_at: "2026-06-20T00:00:00+00:00"
-last_reviewed_at: "2026-07-18T00:00:00+00:00"
+generated_at: "2026-06-25T00:00:00Z"
+last_reviewed_at: "2026-06-25T00:00:00Z"
 
-# Plan covered by this sub-phase file:
-#   docs/implementation/phase-1/phase-1-2b-p1-plan-sessions.md
-# Delivered migration:
-#   alembic/versions/1b9e9026db1e_phase_1_2b_plans_sessions_checkpoints.py
-#   (down_revision=e7ffc8764335)
-# DevOps report: pending first run
+prerequisites:
+  migrations: false
 
-features:
-  phase-1-2b-enums:
+files:
+  test_checkpoint_schema.py:
+    type: integration
     status: promoted
-    plan: "docs/implementation/phase-1/phase-1-2b-p1-plan-sessions.md"
-    owned_by_plan:
-      - "phase-1-2b-p1-plan-sessions"
-    description: "Plan / session / checkpoint enum contracts — GoalType, GoalEventType, TrainingGoalStatus, InjurySeverity, SecondaryEventPriority, TrainingPlanStatus, PhaseLabel, SessionType, SessionSlot, SessionPriority, PlannedSessionStatus, WeeklyPlanStatus, CheckpointType, CheckpointStatus, ObjectiveCategory."
-    protects:
-      - "GoalType values are exactly race_event, target_performance, fitness_improvement, maintenance, recovery"
-      - "GoalEventType values are exactly marathon, half_marathon, 10k, 5k, ultra, trail_race, custom"
-      - "TrainingGoalStatus values are exactly active, completed, abandoned"
-      - "InjurySeverity values are exactly minor, moderate, major"
-      - "SecondaryEventPriority values are exactly B, C"
-      - "TrainingPlanStatus values are exactly active, superseded, completed"
-      - "PhaseLabel carries 20 canonical labels plus 3 legacy aliases (base_building, threshold_development, race_specific)"
-      - "SessionType has exactly 16 values; race_specific is NOT a SessionType"
-      - "SessionSlot values are exactly am, pm"
-      - "SessionPriority values are exactly primary, secondary"
-      - "PlannedSessionStatus values are exactly pending, generated, completed, skipped, missed, redistributed, scheduled"
-      - "WeeklyPlanStatus values are exactly synthesised, active, completed"
-      - "CheckpointType values are exactly calibration, benchmark, race_simulation, secondary_race, progress_review"
-      - "CheckpointStatus values are exactly scheduled, completed, skipped"
-      - "ObjectiveCategory values are exactly the 9 closed ontology members"
-      - "All Phase-1.2b enums are re-exported from app.models.__init__ for Alembic autogen"
-    impacts:
-      - "phase-1-2b-training-goal-schema"
-      - "phase-1-2b-training-plan-schema"
-      - "phase-1-2b-weekly-plan-schema"
-      - "phase-1-2b-planned-session-schema"
-      - "phase-1-2b-checkpoint-schema"
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-        - path: "tests/unit/test_enum_values.py"
-          owner: "phase-1-2b-p1-plan-sessions"
-      integration: []
-      api: []
-      behaviour: []
-      release: []
-
-  phase-1-2b-training-goal-schema:
+    functions:
+      test_cascade_delete_with_planned_session: {implemented: true, executable: true, passed: true}
+      test_default_status_is_scheduled: {implemented: true, executable: true, passed: true}
+      test_fk_ondelete_cascade_in_pg_catalog: {implemented: true, executable: true, passed: true}
+      test_full_checkpoint_persists_and_round_trips: {implemented: true, executable: true, passed: true}
+      test_invalid_status_value_rejected: {implemented: true, executable: true, passed: true}
+      test_no_training_plan_id_column: {implemented: true, executable: true, passed: true}
+      test_one_checkpoint_per_planned_session_unique: {implemented: true, executable: true, passed: true}
+      test_planned_session_id_fk_to_planned_sessions_cascade: {implemented: true, executable: true, passed: true}
+      test_planned_session_id_is_not_null_in_schema: {implemented: true, executable: true, passed: true}
+      test_planned_session_id_unique_constraint: {implemented: true, executable: true, passed: true}
+      test_required_column_present: {implemented: true, executable: true, passed: true}
+      test_secondary_metrics_persist_as_array: {implemented: true, executable: true, passed: true}
+      test_status_inline_union_check: {implemented: true, executable: true, passed: true}
+      test_trajectory_status_inline_union_check: {implemented: true, executable: true, passed: true}
+      test_type_status_index_present: {implemented: true, executable: true, passed: true}
+  test_migration_phase_1_2b.py:
+    type: integration
     status: promoted
-    plan: "docs/implementation/phase-1/phase-1-2b-p1-plan-sessions.md"
-    owned_by_plan:
-      - "phase-1-2b-p1-plan-sessions"
-    description: "New TrainingGoal table — one active per athlete, immutable semantic fields, mutable status/closure fields, supporting CHECKs (volume non-negative, fitness level 1..5, positive target/custom distance/time)."
-    protects:
-      - "training_goals carries the documented column set"
-      - "Partial unique index ix_training_goals_athlete_active present with WHERE status = 'active'"
-      - "Two ACTIVE goals for the same athlete raise IntegrityError"
-      - "ACTIVE + COMPLETED coexist"
-      - "ACTIVE + ABANDONED coexist"
-      - "CHECK constraint weekly_volume_hours >= 0 enforced"
-      - "CHECK constraint weekly_volume_km >= 0 enforced"
-      - "CHECK constraint fitness_level between 1 and 5 enforced"
-      - "CHECK constraint custom_distance_km IS NULL OR > 0 enforced"
-      - "CHECK constraints target_distance_km and target_time_minutes IS NULL OR > 0 enforced"
-      - "athlete_id FK CASCADES on athlete deletion"
-      - "Goal rows cascade-delete with parent Athlete"
-      - "Recovery goal with InjurySeverity MODERATE round-trips"
-      - "Minimal fitness_improvement goal persists with all goal_event_* and injury fields null"
-    impacts:
-      - "phase-1-2b-secondary-event-schema"
-      - "phase-1-2b-regeneration-task-schema"
-      - "phase-1-2b-training-plan-schema"
-      - "phase-1-2b-migration"
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-        - path: "tests/unit/test_training_goal_columns.py"
-          owner: "phase-1-2b-p1-plan-sessions"
-      integration:
-        - path: "tests/integration/test_training_goal_schema.py"
-          owner: "phase-1-2b-p1-plan-sessions"
-      api: []
-      behaviour: []
-      release: []
-
-  phase-1-2b-secondary-event-schema:
+    functions:
+      test_activities_planned_session_fk_in_pg_catalog: {implemented: true, executable: true, passed: true}
+      test_alembic_upgrade_to_phase_1_2b_revision_succeeds_on_fresh_schema: {implemented: true, executable: true, passed: true}
+      test_checkpoints_planned_session_unique_constraint: {implemented: true, executable: true, passed: true}
+      test_down_revision_chains_from_phase_1_2a_head: {implemented: true, executable: true, passed: true}
+      test_downgrade_drops_new_objects_only: {implemented: true, executable: true, passed: true}
+      test_downgrade_returns_schema_to_phase_1_2a_baseline: {implemented: true, executable: true, passed: true}
+      test_migration_creates_eight_phase_12b_tables: {implemented: true, executable: true, passed: true}
+      test_migration_declares_revision_and_down_revision: {implemented: true, executable: true, passed: true}
+      test_migration_emits_planned_session_slot_date_unique: {implemented: true, executable: true, passed: true}
+      test_migration_emits_regeneration_pending_partial_index: {implemented: true, executable: true, passed: true}
+      test_migration_emits_trainer_goal_partial_unique_index: {implemented: true, executable: true, passed: true}
+      test_migration_emits_weekly_plan_week_unique_constraint: {implemented: true, executable: true, passed: true}
+      test_migration_file_present: {implemented: true, executable: true, passed: true}
+      test_migration_never_drops_existing_tables: {implemented: true, executable: true, passed: true}
+      test_migration_no_fk_to_twin_states: {implemented: true, executable: true, passed: true}
+      test_migration_wires_activities_planned_session_fk: {implemented: true, executable: true, passed: true}
+      test_phase_1_1_and_phase_1_2a_tables_preserved: {implemented: true, executable: true, passed: true}
+      test_phase_1_2b_tables_exist: {implemented: true, executable: true, passed: true}
+      test_phase_1_2b_tables_have_cascade_fks: {implemented: true, executable: true, passed: true}
+      test_planned_sessions_slot_date_unique_constraint: {implemented: true, executable: true, passed: true}
+      test_regeneration_pending_partial_index_in_pg_catalog: {implemented: true, executable: true, passed: true}
+      test_training_goals_partial_unique_index_in_pg_catalog: {implemented: true, executable: true, passed: true}
+      test_training_plans_twin_state_id_column_exists_no_fk: {implemented: true, executable: true, passed: true}
+      test_weekly_plans_plan_week_unique_constraint: {implemented: true, executable: true, passed: true}
+  test_planned_session_schema.py:
+    type: integration
     status: promoted
-    plan: "docs/implementation/phase-1/phase-1-2b-p1-plan-sessions.md"
-    owned_by_plan:
-      - "phase-1-2b-p1-plan-sessions"
-    description: "SecondaryEvent supporting storage — B/C-races against a TrainingGoal."
-    protects:
-      - "secondary_events carries the documented column set"
-      - "training_goal_id FK CASCADES on goal deletion"
-      - "event_type is GoalEventType (shared enum)"
-      - "priority is SecondaryEventPriority (B or C)"
-      - "event_date is required"
-      - "event_name is nullable"
-      - "Indexes on (training_goal_id) and (training_goal_id, event_date) exist"
-      - "Minimal {type, date, priority} row persists without event_name"
-    impacts:
-      - "phase-1-2b-training-goal-schema"
-      - "phase-1-2b-migration"
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-        - path: "tests/unit/test_secondary_event_columns.py"
-          owner: "phase-1-2b-p1-plan-sessions"
-      integration:
-        - path: "tests/integration/test_secondary_event_schema.py"
-          owner: "phase-1-2b-p1-plan-sessions"
-      api: []
-      behaviour: []
-      release: []
-
-  phase-1-2b-regeneration-task-schema:
+    functions:
+      test_block_position_inline_union_check: {implemented: true, executable: true, passed: true}
+      test_cascade_delete_with_weekly_plan: {implemented: true, executable: true, passed: true}
+      test_double_day_am_pm_both_persist: {implemented: true, executable: true, passed: true}
+      test_duplicate_am_rejected: {implemented: true, executable: true, passed: true}
+      test_duration_positive_check: {implemented: true, executable: true, passed: true}
+      test_full_session_persists_and_round_trips: {implemented: true, executable: true, passed: true}
+      test_is_suggested_defaults_to_false: {implemented: true, executable: true, passed: true}
+      test_no_fk_to_activities_on_activity_id: {implemented: true, executable: true, passed: true}
+      test_plan_date_slot_unique_constraint_present: {implemented: true, executable: true, passed: true}
+      test_random_activity_id_persists_with_no_fk_violation: {implemented: true, executable: true, passed: true}
+      test_required_column_present: {implemented: true, executable: true, passed: true}
+      test_session_with_null_slot_persists: {implemented: true, executable: true, passed: true}
+      test_skip_reason_persists: {implemented: true, executable: true, passed: true}
+      test_training_plan_id_fk_to_training_plans: {implemented: true, executable: true, passed: true}
+      test_week_number_positive_check: {implemented: true, executable: true, passed: true}
+      test_week_number_zero_rejected: {implemented: true, executable: true, passed: true}
+      test_weekly_plan_id_fk_to_weekly_plans: {implemented: true, executable: true, passed: true}
+      test_zero_duration_rejected: {implemented: true, executable: true, passed: true}
+  test_regeneration_task_schema.py:
+    type: integration
     status: promoted
-    plan: "docs/implementation/phase-1/phase-1-2b-p1-plan-sessions.md"
-    owned_by_plan:
-      - "phase-1-2b-p1-plan-sessions"
-    description: "RegenerationTask supporting storage — coach-proposed date change against a TrainingGoal. training_plan_id FK SET NULL on plan deletion; partial pending-proposal index."
-    protects:
-      - "regeneration_tasks carries the documented column set"
-      - "training_goal_id FK CASCADES on goal deletion"
-      - "training_plan_id FK SET NULLs on plan deletion (task itself survives)"
-      - "Inline-union CHECK status IN ('pending_confirmation','confirmed','declined','expired') enforced"
-      - "Invalid status values raise IntegrityError"
-      - "Partial index ix_regeneration_tasks_pending present with WHERE status = 'pending_confirmation'"
-      - "Pending row carries NULL training_plan_id; confirmed row links to its new plan"
-      - "decided_at nullable; set on confirmation"
-    impacts:
-      - "phase-1-2b-training-goal-schema"
-      - "phase-1-2b-training-plan-schema"
-      - "phase-1-2b-migration"
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-        - path: "tests/unit/test_regeneration_task_columns.py"
-          owner: "phase-1-2b-p1-plan-sessions"
-      integration:
-        - path: "tests/integration/test_regeneration_task_schema.py"
-          owner: "phase-1-2b-p1-plan-sessions"
-      api: []
-      behaviour: []
-      release: []
-
-  phase-1-2b-training-plan-schema:
+    functions:
+      test_cascade_delete_with_goal: {implemented: true, executable: true, passed: true}
+      test_confirmed_task_links_to_new_plan: {implemented: true, executable: true, passed: true}
+      test_invalid_status_rejected: {implemented: true, executable: true, passed: true}
+      test_pending_index_column_set: {implemented: true, executable: true, passed: true}
+      test_pending_partial_index_in_pg_catalog: {implemented: true, executable: true, passed: true}
+      test_pending_task_persists_with_null_plan_id: {implemented: true, executable: true, passed: true}
+      test_required_column_present: {implemented: true, executable: true, passed: true}
+      test_set_null_on_plan_deletion: {implemented: true, executable: true, passed: true}
+      test_status_inline_union_check: {implemented: true, executable: true, passed: true}
+      test_training_goal_id_fk_to_training_goals: {implemented: true, executable: true, passed: true}
+      test_training_plan_id_fk_to_training_plans_nullable: {implemented: true, executable: true, passed: true}
+      test_training_plan_id_ondelete_set_null_in_pg_catalog: {implemented: true, executable: true, passed: true}
+  test_secondary_event_schema.py:
+    type: integration
     status: promoted
-    plan: "docs/implementation/phase-1/phase-1-2b-p1-plan-sessions.md"
-    owned_by_plan:
-      - "phase-1-2b-p1-plan-sessions"
-    description: "TrainingPlan table — goal linkage, twin_state placeholder, non-destructive supersession, nullable training_goal_id."
-    protects:
-      - "training_plans carries the documented column set"
-      - "training_goal_id FK CASCADES on goal deletion"
-      - "twin_state_id is nullable UUID WITHOUT FK (delayed to Phase-1.2c)"
-      - "JSONB columns default to empty arrays"
-      - "Superseded row survives (no deleted_at column)"
-      - "Minimal plan persists with NULL twin_state_id"
-    impacts:
-      - "phase-1-2b-migration"
-      - "phase-1-2b-weekly-plan-schema"
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-        - path: "tests/unit/test_training_plan_columns.py"
-          owner: "phase-1-2b-p1-plan-sessions"
-      integration:
-        - path: "tests/integration/test_training_plan_schema.py"
-          owner: "phase-1-2b-p1-plan-sessions"
-      api: []
-      behaviour: []
-      release: []
-
-  phase-1-2b-weekly-plan-schema:
+    functions:
+      test_cascade_delete_with_goal: {implemented: true, executable: true, passed: true}
+      test_fk_ondelete_cascade_in_pg_catalog: {implemented: true, executable: true, passed: true}
+      test_full_secondary_event_persists: {implemented: true, executable: true, passed: true}
+      test_goal_date_index_present: {implemented: true, executable: true, passed: true}
+      test_goal_index_present: {implemented: true, executable: true, passed: true}
+      test_minimal_secondary_event_persists: {implemented: true, executable: true, passed: true}
+      test_required_column_present: {implemented: true, executable: true, passed: true}
+      test_training_goal_id_fk_to_training_goals: {implemented: true, executable: true, passed: true}
+  test_training_goal_schema.py:
+    type: integration
     status: promoted
-    plan: "docs/implementation/phase-1/phase-1-2b-p1-plan-sessions.md"
-    owned_by_plan:
-      - "phase-1-2b-p1-plan-sessions"
-    description: "WeeklyPlan table — plan linkage, week_number uniqueness, FK cascade, week_number >= 1."
-    protects:
-      - "weekly_plans carries the documented column set"
-      - "UNIQUE (training_plan_id, week_number) enforced"
-      - "FK to training_plans CASCADES on plan deletion"
-      - "week_number >= 1 enforced at DB layer"
-      - "Minimal plan persists with week_number=1"
-    impacts:
-      - "phase-1-2b-training-plan-schema"
-      - "phase-1-2b-planned-session-schema"
-      - "phase-1-2b-migration"
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-        - path: "tests/unit/test_weekly_plan_columns.py"
-          owner: "phase-1-2b-p1-plan-sessions"
-      integration:
-        - path: "tests/integration/test_weekly_plan_schema.py"
-          owner: "phase-1-2b-p1-plan-sessions"
-      api: []
-      behaviour: []
-      release: []
-
-  phase-1-2b-planned-session-schema:
+    functions:
+      test_active_partial_unique_index_present: {implemented: true, executable: true, passed: true}
+      test_athlete_id_fk_to_athletes_table: {implemented: true, executable: true, passed: true}
+      test_custom_distance_negative_rejected: {implemented: true, executable: true, passed: true}
+      test_custom_distance_null_accepted: {implemented: true, executable: true, passed: true}
+      test_custom_distance_positive_check_present: {implemented: true, executable: true, passed: true}
+      test_custom_distance_zero_rejected: {implemented: true, executable: true, passed: true}
+      test_fitness_level_boundaries_accepted: {implemented: true, executable: true, passed: true}
+      test_fitness_level_range_check_present: {implemented: true, executable: true, passed: true}
+      test_fitness_level_six_rejected: {implemented: true, executable: true, passed: true}
+      test_fitness_level_zero_rejected: {implemented: true, executable: true, passed: true}
+      test_full_goal_persists_and_round_trips: {implemented: true, executable: true, passed: true}
+      test_goal_rows_cascade_with_athlete: {implemented: true, executable: true, passed: true}
+      test_minimal_goal_without_event_details: {implemented: true, executable: true, passed: true}
+      test_negative_weekly_volume_hours_rejected: {implemented: true, executable: true, passed: true}
+      test_one_active_one_abandoned_coexist: {implemented: true, executable: true, passed: true}
+      test_one_active_one_completed_coexist: {implemented: true, executable: true, passed: true}
+      test_partial_predicate_is_status_active: {implemented: true, executable: true, passed: true}
+      test_recovery_goal_with_injury_severity: {implemented: true, executable: true, passed: true}
+      test_required_column_present: {implemented: true, executable: true, passed: true}
+      test_target_distance_positive_check_present: {implemented: true, executable: true, passed: true}
+      test_target_distance_zero_rejected: {implemented: true, executable: true, passed: true}
+      test_target_time_negative_rejected: {implemented: true, executable: true, passed: true}
+      test_target_time_positive_check_present: {implemented: true, executable: true, passed: true}
+      test_two_active_goals_same_athlete_rejected: {implemented: true, executable: true, passed: true}
+      test_weekly_volume_hours_non_negative_check_present: {implemented: true, executable: true, passed: true}
+      test_weekly_volume_km_non_negative_check_present: {implemented: true, executable: true, passed: true}
+      test_zero_weekly_volume_hours_accepted: {implemented: true, executable: true, passed: true}
+  test_training_plan_schema.py:
+    type: integration
     status: promoted
-    plan: "docs/implementation/phase-1/phase-1-2b-p1-plan-sessions.md"
-    owned_by_plan:
-      - "phase-1-2b-p1-plan-sessions"
-    description: "PlannedSession table — weekly_plan linkage, date/slot uniqueness, CASCADE FKs, OPTIONAL planned_session_id."
-    protects:
-      - "planned_sessions carries the documented column set"
-      - "UNIQUE (weekly_plan_id, target_date, session_slot) enforced"
-      - "FK to weekly_plans CASCADES on parent deletion"
-      - "FK to training_plans CASCADES on parent deletion"
-      - "approximate_duration_minutes > 0 enforced"
-      - "week_number >= 1 enforced"
-      - "block_position bounded to {first, middle, last}"
-    impacts:
-      - "phase-1-2b-weekly-plan-schema"
-      - "phase-1-2b-migration"
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-        - path: "tests/unit/test_planned_session_columns.py"
-          owner: "phase-1-2b-p1-plan-sessions"
-      integration:
-        - path: "tests/integration/test_planned_session_schema.py"
-          owner: "phase-1-2b-p1-plan-sessions"
-      api: []
-      behaviour: []
-      release: []
-
-  phase-1-2b-checkpoint-schema:
+    functions:
+      test_cascade_delete_with_training_goal: {implemented: true, executable: true, passed: true}
+      test_fk_to_twin_states_present: {implemented: true, executable: true, passed: true}
+      test_goal_status_index_present: {implemented: true, executable: true, passed: true}
+      test_no_deleted_at_column: {implemented: true, executable: true, passed: true}
+      test_null_twin_state_id_persists: {implemented: true, executable: true, passed: true}
+      test_plan_persists_with_empty_jsonb_defaults: {implemented: true, executable: true, passed: true}
+      test_plan_persists_with_populated_jsonb: {implemented: true, executable: true, passed: true}
+      test_random_uuid_in_twin_state_id_rejected: {implemented: true, executable: true, passed: true}
+      test_required_column_present: {implemented: true, executable: true, passed: true}
+      test_supersede_path_zero_or_no_delete: {implemented: true, executable: true, passed: true}
+      test_training_goal_id_fk_cascade_in_pg_catalog: {implemented: true, executable: true, passed: true}
+      test_training_goal_id_fk_to_training_goals: {implemented: true, executable: true, passed: true}
+      test_twin_state_fk_ondelete_in_pg_catalog: {implemented: true, executable: true, passed: true}
+      test_twin_state_id_is_uuid_nullable: {implemented: true, executable: true, passed: true}
+      test_twin_state_index_present: {implemented: true, executable: true, passed: true}
+  test_weekly_plan_schema.py:
+    type: integration
     status: promoted
-    plan: "docs/implementation/phase-1/phase-1-2b-p1-plan-sessions.md"
-    owned_by_plan:
-      - "phase-1-2b-p1-plan-sessions"
-    description: "Checkpoint table — strict 1:1 PlannedSession linkage, inline-union CHECKs, ARRAY secondary_metrics."
-    protects:
-      - "checkpoints carries the documented column set"
-      - "UNIQUE NOT NULL planned_session_id enforced (strict 1:1)"
-      - "NO training_plan_id column — derived via PlannedSession"
-      - "FK to planned_sessions CASCADES on parent deletion"
-      - "status bounded to {scheduled, completed, skipped}"
-      - "trajectory_status bounded to {ahead, on_track, behind, at_risk}"
-      - "secondary_metrics ARRAY(String) round-trips"
-    impacts:
-      - "phase-1-2b-planned-session-schema"
-      - "phase-1-2b-migration"
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-        - path: "tests/unit/test_checkpoint_columns.py"
-          owner: "phase-1-2b-p1-plan-sessions"
-      integration:
-        - path: "tests/integration/test_checkpoint_schema.py"
-          owner: "phase-1-2b-p1-plan-sessions"
-      api: []
-      behaviour: []
-      release: []
-
-  phase-1-2b-activity-schema-extension:
+    functions:
+      test_block_position_inline_union_check: {implemented: true, executable: true, passed: true}
+      test_cascade_delete_with_plan: {implemented: true, executable: true, passed: true}
+      test_checkpoint_session_persists: {implemented: true, executable: true, passed: true}
+      test_doubles_days_count_non_negative_check: {implemented: true, executable: true, passed: true}
+      test_duplicate_week_for_same_plan_rejected: {implemented: true, executable: true, passed: true}
+      test_duration_positive_check: {implemented: true, executable: true, passed: true}
+      test_full_weekly_plan_persists: {implemented: true, executable: true, passed: true}
+      test_invalid_status_value_rejected: {implemented: true, executable: true, passed: true}
+      test_jsonb_round_trip_preserves_shape: {implemented: true, executable: true, passed: true}
+      test_negative_duration_rejected: {implemented: true, executable: true, passed: true}
+      test_negative_session_completed_rejected: {implemented: true, executable: true, passed: true}
+      test_negative_week_number_rejected: {implemented: true, executable: true, passed: true}
+      test_plan_week_unique_constraint_present: {implemented: true, executable: true, passed: true}
+      test_planned_session_id_unique_constraint_present: {implemented: true, executable: true, passed: true}
+      test_required_column_present: {implemented: true, executable: true, passed: true}
+      test_required_column_present: {implemented: true, executable: true, passed: true}
+      test_same_week_different_plans_both_persist: {implemented: true, executable: true, passed: true}
+      test_session_counters_non_negative_check: {implemented: true, executable: true, passed: true}
+      test_session_persists_with_block_metadata: {implemented: true, executable: true, passed: true}
+      test_status_inline_union_check: {implemented: true, executable: true, passed: true}
+      test_training_plan_id_fk_cascade_in_pg_catalog: {implemented: true, executable: true, passed: true}
+      test_training_plan_id_fk_to_training_plans: {implemented: true, executable: true, passed: true}
+      test_two_sessions_cannot_share_same_planned_session_id: {implemented: true, executable: true, passed: true}
+      test_two_sessions_share_null_planned_session_id: {implemented: true, executable: true, passed: true}
+      test_week_number_positive_check: {implemented: true, executable: true, passed: true}
+      test_week_number_zero_rejected: {implemented: true, executable: true, passed: true}
+      test_zero_duration_rejected: {implemented: true, executable: true, passed: true}
+      test_zero_session_counters_accepted: {implemented: true, executable: true, passed: true}
+  test_checkpoint_columns.py:
+    type: unit
     status: promoted
-    plan: "docs/implementation/phase-1/phase-1-2b-p1-plan-sessions.md"
-    owned_by_plan:
-      - "phase-1-2b-p1-plan-sessions"
-    description: "Activity.planned_session_id column now references planned_sessions.id with ondelete=SET NULL (Phase-1.2b wires the FK)."
-    protects:
-      - "activities.planned_session_id FK to planned_sessions with ondelete=SET NULL"
-      - "FK constraint appears in pg_constraint"
-      - "FK uses confdeltype='n' (SET NULL)"
-      - "FK trigger fires on planned_session deletion"
-      - "Activity row survives planned_session deletion"
-    impacts:
-      - "phase-1-2a-migration"
-      - "phase-1-2b-migration"
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit: []
-      integration:
-        - path: "tests/integration/test_activity_schema.py"
-          owner: "phase-1-2b-p1-plan-sessions"
-      api: []
-      behaviour: []
-      release: []
-
-  phase-1-2b-migration:
+    functions:
+      test_completed_at_nullable_datetime: {implemented: true, executable: true, passed: true}
+      test_confidence_changed_nullable_bool: {implemented: true, executable: true, passed: true}
+      test_created_at_required_datetime: {implemented: true, executable: true, passed: true}
+      test_forbidden_columns_are_absent: {implemented: true, executable: true, passed: true}
+      test_id_column_uuid_primary_key: {implemented: true, executable: true, passed: true}
+      test_metric_updated_nullable_bool: {implemented: true, executable: true, passed: true}
+      test_planned_session_id_has_fk_to_planned_sessions: {implemented: true, executable: true, passed: true}
+      test_planned_session_id_required_unique_uuid: {implemented: true, executable: true, passed: true}
+      test_planned_session_id_unique_constraint_named: {implemented: true, executable: true, passed: true}
+      test_planned_session_index_present: {implemented: true, executable: true, passed: true}
+      test_proposal_nullable_text: {implemented: true, executable: true, passed: true}
+      test_replan_trigger_required_bool_default_false: {implemented: true, executable: true, passed: true}
+      test_replan_triggered_nullable_bool: {implemented: true, executable: true, passed: true}
+      test_secondary_metrics_required_array_default_empty: {implemented: true, executable: true, passed: true}
+      test_status_inline_union_check: {implemented: true, executable: true, passed: true}
+      test_status_required_enum: {implemented: true, executable: true, passed: true}
+      test_target_metric_required_string: {implemented: true, executable: true, passed: true}
+      test_trajectory_status_inline_union_check: {implemented: true, executable: true, passed: true}
+      test_trajectory_status_nullable_string: {implemented: true, executable: true, passed: true}
+      test_twin_update_expected_required_bool_default_false: {implemented: true, executable: true, passed: true}
+      test_type_required_enum: {implemented: true, executable: true, passed: true}
+      test_type_status_index_present: {implemented: true, executable: true, passed: true}
+  test_enum_values.py:
+    type: unit
     status: promoted
-    plan: "docs/implementation/phase-1/phase-1-2b-p1-plan-sessions.md"
-    owned_by_plan:
-      - "phase-1-2b-p1-plan-sessions"
-    description: "Alembic migration 1b9e9026db1e from Phase-1.2a head (e7ffc8764335) — creates 8 tables, wires FK, partial indexes."
-    protects:
-      - "alembic upgrade head on a fresh database succeeds (rc=0)"
-      - "alembic downgrade -1 returns schema to Phase-1.2a baseline"
-      - "Delivered revision equals 1b9e9026db1e"
-      - "Migration down_revision chains from Phase-1.2a head"
-      - "Migration never drops Phase-1.1 / Phase-1.2a tables"
-      - "All 8 Phase-1.2b tables created"
-      - "ix_training_goals_athlete_active emitted with predicate"
-      - "ix_regeneration_tasks_pending emitted with predicate"
-      - "uq_weekly_plans_plan_week UNIQUE emitted"
-      - "uq_planned_sessions_plan_date_slot UNIQUE emitted"
-      - "checkpoints UNIQUE on planned_session_id emitted"
-      - "fk_activities_planned_session FK with ondelete=SET NULL"
-      - "training_plans.twin_state_id WITHOUT FK (delayed to Phase-1.2c)"
-    impacts:
-      - "phase-1-2b-training-goal-schema"
-      - "phase-1-2b-secondary-event-schema"
-      - "phase-1-2b-training-plan-schema"
-      - "phase-1-2b-regeneration-task-schema"
-      - "phase-1-2b-weekly-plan-schema"
-      - "phase-1-2b-planned-session-schema"
-      - "phase-1-2b-checkpoint-schema"
-      - "phase-1-2b-activity-schema-extension"
-      - "phase-1-2a-migration"
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: ["postgres"]
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit: []
-      integration:
-        - path: "tests/integration/test_migration_phase_1_2b.py"
-          owner: "phase-1-2b-p1-plan-sessions"
-      api: []
-      behaviour: []
-      release: []
-
-execution_groups:
-  p1-2b-p1-unit:
-    scope: smoke
-    phase: 1
-    tests:
-      - "tests/unit/test_enum_values.py"
-      - "tests/unit/test_training_goal_columns.py"
-      - "tests/unit/test_secondary_event_columns.py"
-      - "tests/unit/test_regeneration_task_columns.py"
-      - "tests/unit/test_training_plan_columns.py"
-      - "tests/unit/test_weekly_plan_columns.py"
-      - "tests/unit/test_planned_session_columns.py"
-      - "tests/unit/test_checkpoint_columns.py"
-    depends_on: []
-  p1-2b-p1-integration:
-    scope: feature
-    phase: 1
-    tests:
-      - "tests/integration/test_training_goal_schema.py"
-      - "tests/integration/test_secondary_event_schema.py"
-      - "tests/integration/test_regeneration_task_schema.py"
-      - "tests/integration/test_training_plan_schema.py"
-      - "tests/integration/test_weekly_plan_schema.py"
-      - "tests/integration/test_planned_session_schema.py"
-      - "tests/integration/test_checkpoint_schema.py"
-      - "tests/integration/test_activity_schema.py"
-    depends_on:
-      - "p1-2b-p1-unit"
-  p1-2b-p1-migration:
-    scope: feature
-    phase: 1
-    tests:
-      - "tests/integration/test_migration_phase_1_2b.py"
-    depends_on:
-      - "p1-2b-p1-unit"
-      - "p1-2b-p1-integration"
-      - "p1-2a-p1-migration"
+    functions:
+      test_activity_source_excludes_multi_sport_sources: {implemented: true, executable: true, passed: true}
+      test_activity_source_has_exactly_four_values: {implemented: true, executable: true, passed: true}
+      test_activity_source_includes_manual_entry: {implemented: true, executable: true, passed: true}
+      test_activity_source_values_are_lowercase_strings: {implemented: true, executable: true, passed: true}
+      test_checkpoint_status_values: {implemented: true, executable: true, passed: true}
+      test_checkpoint_type_values: {implemented: true, executable: true, passed: true}
+      test_data_tier_has_exactly_six_values: {implemented: true, executable: true, passed: true}
+      test_data_tier_ordered_low_to_high: {implemented: true, executable: true, passed: true}
+      test_data_tier_values_are_integers: {implemented: true, executable: true, passed: true}
+      test_enum_is_exported_from_models_package: {implemented: true, executable: true, passed: true}
+      test_goal_event_type_has_expected_values: {implemented: true, executable: true, passed: true}
+      test_goal_event_type_includes_custom: {implemented: true, executable: true, passed: true}
+      test_goal_event_type_values_are_lowercase_or_alphanumeric: {implemented: true, executable: true, passed: true}
+      test_goal_type_has_exactly_five_values: {implemented: true, executable: true, passed: true}
+      test_goal_type_includes_recovery: {implemented: true, executable: true, passed: true}
+      test_goal_type_values_are_lowercase_strings: {implemented: true, executable: true, passed: true}
+      test_gps_source_values: {implemented: true, executable: true, passed: true}
+      test_hr_source_includes_chest_strap_rr: {implemented: true, executable: true, passed: true}
+      test_hr_source_includes_none: {implemented: true, executable: true, passed: true}
+      test_hr_source_value_count: {implemented: true, executable: true, passed: true}
+      test_injury_severity_count: {implemented: true, executable: true, passed: true}
+      test_injury_severity_values: {implemented: true, executable: true, passed: true}
+      test_measurement_source_count: {implemented: true, executable: true, passed: true}
+      test_measurement_source_has_exactly_six_values: {implemented: true, executable: true, passed: true}
+      test_measurement_source_values_are_lowercase: {implemented: true, executable: true, passed: true}
+      test_message_type_count: {implemented: true, executable: true, passed: true}
+      test_message_type_first_message_value: {implemented: true, executable: true, passed: true}
+      test_message_type_has_exactly_eight_values: {implemented: true, executable: true, passed: true}
+      test_message_type_post_workout_value: {implemented: true, executable: true, passed: true}
+      test_message_type_values_are_lowercase_strings: {implemented: true, executable: true, passed: true}
+      test_objective_category_values: {implemented: true, executable: true, passed: true}
+      test_only_two_priority_levels: {implemented: true, executable: true, passed: true}
+      test_pending_status_exists: {implemented: true, executable: true, passed: true}
+      test_phase_label_includes_canonical_labels: {implemented: true, executable: true, passed: true}
+      test_phase_label_includes_legacy_aliases: {implemented: true, executable: true, passed: true}
+      test_phase_label_value_count: {implemented: true, executable: true, passed: true}
+      test_physiological_intent_count: {implemented: true, executable: true, passed: true}
+      test_physiological_intent_has_exactly_six_values: {implemented: true, executable: true, passed: true}
+      test_physiological_intent_values_are_lowercase: {implemented: true, executable: true, passed: true}
+      test_planned_session_status_values: {implemented: true, executable: true, passed: true}
+      test_power_source_values: {implemented: true, executable: true, passed: true}
+      test_primary_training_platform_values: {implemented: true, executable: true, passed: true}
+      test_race_specific_is_session_purpose_not_session_type: {implemented: true, executable: true, passed: true}
+      test_recovery_modifier_level_count: {implemented: true, executable: true, passed: true}
+      test_recovery_modifier_level_has_exactly_three_values: {implemented: true, executable: true, passed: true}
+      test_recovery_modifier_level_values_are_lowercase: {implemented: true, executable: true, passed: true}
+      test_secondary_event_priority_values: {implemented: true, executable: true, passed: true}
+      test_session_priority_values: {implemented: true, executable: true, passed: true}
+      test_session_purpose_general_default_value: {implemented: true, executable: true, passed: true}
+      test_session_purpose_has_exactly_three_values: {implemented: true, executable: true, passed: true}
+      test_session_purpose_values_are_lowercase: {implemented: true, executable: true, passed: true}
+      test_session_slot_count: {implemented: true, executable: true, passed: true}
+      test_session_slot_values: {implemented: true, executable: true, passed: true}
+      test_session_type_excludes_race_specific: {implemented: true, executable: true, passed: true}
+      test_session_type_has_exactly_sixteen_values: {implemented: true, executable: true, passed: true}
+      test_sex_has_exactly_three_values: {implemented: true, executable: true, passed: true}
+      test_sex_values_are_lowercase_strings: {implemented: true, executable: true, passed: true}
+      test_signal_type_count: {implemented: true, executable: true, passed: true}
+      test_signal_type_has_exactly_four_values: {implemented: true, executable: true, passed: true}
+      test_signal_type_values_are_lowercase: {implemented: true, executable: true, passed: true}
+      test_sport_background_count: {implemented: true, executable: true, passed: true}
+      test_sport_background_includes_running_primary: {implemented: true, executable: true, passed: true}
+      test_sport_background_values: {implemented: true, executable: true, passed: true}
+      test_sport_background_values_are_lowercase_strings_or_none: {implemented: true, executable: true, passed: true}
+      test_step_type_count: {implemented: true, executable: true, passed: true}
+      test_step_type_has_exactly_four_values: {implemented: true, executable: true, passed: true}
+      test_step_type_values_are_lowercase_strings: {implemented: true, executable: true, passed: true}
+      test_training_goal_status_active_value: {implemented: true, executable: true, passed: true}
+      test_training_goal_status_values: {implemented: true, executable: true, passed: true}
+      test_training_plan_status_has_exactly_three_values: {implemented: true, executable: true, passed: true}
+      test_training_plan_status_values: {implemented: true, executable: true, passed: true}
+      test_training_time_of_day_values: {implemented: true, executable: true, passed: true}
+      test_twin_confidence_level_count: {implemented: true, executable: true, passed: true}
+      test_twin_confidence_level_has_exactly_three_values: {implemented: true, executable: true, passed: true}
+      test_twin_confidence_level_values_are_lowercase: {implemented: true, executable: true, passed: true}
+      test_twin_trigger_has_exactly_five_values: {implemented: true, executable: true, passed: true}
+      test_twin_trigger_includes_activity_sync: {implemented: true, executable: true, passed: true}
+      test_twin_trigger_values_are_lowercase_strings: {implemented: true, executable: true, passed: true}
+      test_weekly_plan_status_values: {implemented: true, executable: true, passed: true}
+      test_wellness_trend_count: {implemented: true, executable: true, passed: true}
+      test_wellness_trend_has_exactly_three_values: {implemented: true, executable: true, passed: true}
+      test_wellness_trend_values_are_lowercase: {implemented: true, executable: true, passed: true}
+  test_planned_session_columns.py:
+    type: unit
+    status: promoted
+    functions:
+      test_activity_id_nullable_uuid_no_fk: {implemented: true, executable: true, passed: true}
+      test_approximate_duration_minutes_required_integer: {implemented: true, executable: true, passed: true}
+      test_block_id_nullable_string: {implemented: true, executable: true, passed: true}
+      test_block_position_inline_union_check: {implemented: true, executable: true, passed: true}
+      test_block_position_nullable_string: {implemented: true, executable: true, passed: true}
+      test_block_session_count_nullable_integer: {implemented: true, executable: true, passed: true}
+      test_checkpoint_metric_nullable_string: {implemented: true, executable: true, passed: true}
+      test_checkpoint_type_nullable_enum: {implemented: true, executable: true, passed: true}
+      test_created_at_required_datetime: {implemented: true, executable: true, passed: true}
+      test_duration_positive_check: {implemented: true, executable: true, passed: true}
+      test_forbidden_columns_are_absent: {implemented: true, executable: true, passed: true}
+      test_id_column_uuid_primary_key: {implemented: true, executable: true, passed: true}
+      test_intent_description_required_string: {implemented: true, executable: true, passed: true}
+      test_is_suggested_required_bool_default_false: {implemented: true, executable: true, passed: true}
+      test_phase_label_required_enum: {implemented: true, executable: true, passed: true}
+      test_plan_date_index_present: {implemented: true, executable: true, passed: true}
+      test_plan_date_slot_unique_constraint_present: {implemented: true, executable: true, passed: true}
+      test_redistributed_to_date_nullable_date: {implemented: true, executable: true, passed: true}
+      test_session_priority_required_enum: {implemented: true, executable: true, passed: true}
+      test_session_slot_nullable_enum: {implemented: true, executable: true, passed: true}
+      test_session_type_required_enum: {implemented: true, executable: true, passed: true}
+      test_skip_reason_nullable_text: {implemented: true, executable: true, passed: true}
+      test_status_date_index_present: {implemented: true, executable: true, passed: true}
+      test_status_required_enum: {implemented: true, executable: true, passed: true}
+      test_target_date_required_date: {implemented: true, executable: true, passed: true}
+      test_training_plan_date_slot_index_present: {implemented: true, executable: true, passed: true}
+      test_training_plan_id_required_uuid_denormalized: {implemented: true, executable: true, passed: true}
+      test_week_number_positive_check: {implemented: true, executable: true, passed: true}
+      test_week_number_required_integer: {implemented: true, executable: true, passed: true}
+      test_weekly_plan_id_required_uuid: {implemented: true, executable: true, passed: true}
+  test_regeneration_task_columns.py:
+    type: unit
+    status: promoted
+    functions:
+      test_decided_at_nullable_datetime: {implemented: true, executable: true, passed: true}
+      test_expires_at_required_datetime: {implemented: true, executable: true, passed: true}
+      test_forbidden_columns_are_absent: {implemented: true, executable: true, passed: true}
+      test_id_column_uuid_primary_key: {implemented: true, executable: true, passed: true}
+      test_pending_partial_index_present: {implemented: true, executable: true, passed: true}
+      test_pending_partial_predicate_is_status_pending_confirmation: {implemented: true, executable: true, passed: true}
+      test_proposed_at_required_datetime: {implemented: true, executable: true, passed: true}
+      test_proposed_date_required_date: {implemented: true, executable: true, passed: true}
+      test_rationale_required_text: {implemented: true, executable: true, passed: true}
+      test_status_inline_union_check: {implemented: true, executable: true, passed: true}
+      test_status_required_text_with_check: {implemented: true, executable: true, passed: true}
+      test_training_goal_id_has_fk_to_training_goals: {implemented: true, executable: true, passed: true}
+      test_training_goal_id_required_uuid: {implemented: true, executable: true, passed: true}
+      test_training_plan_id_has_fk_to_training_plans: {implemented: true, executable: true, passed: true}
+      test_training_plan_id_nullable_uuid: {implemented: true, executable: true, passed: true}
+      test_trigger_required_text: {implemented: true, executable: true, passed: true}
+  test_secondary_event_columns.py:
+    type: unit
+    status: promoted
+    functions:
+      test_event_date_required_date: {implemented: true, executable: true, passed: true}
+      test_event_name_nullable_string: {implemented: true, executable: true, passed: true}
+      test_event_type_required_enum: {implemented: true, executable: true, passed: true}
+      test_forbidden_columns_are_absent: {implemented: true, executable: true, passed: true}
+      test_goal_date_index_present: {implemented: true, executable: true, passed: true}
+      test_goal_index_present: {implemented: true, executable: true, passed: true}
+      test_id_column_uuid_primary_key: {implemented: true, executable: true, passed: true}
+      test_priority_required_enum: {implemented: true, executable: true, passed: true}
+      test_training_goal_id_has_fk_to_training_goals: {implemented: true, executable: true, passed: true}
+      test_training_goal_id_required_uuid: {implemented: true, executable: true, passed: true}
+  test_training_goal_columns.py:
+    type: unit
+    status: promoted
+    functions:
+      test_active_goal_index_is_unique: {implemented: true, executable: true, passed: true}
+      test_active_goal_partial_predicate_is_status_active: {implemented: true, executable: true, passed: true}
+      test_active_goal_partial_unique_index_present: {implemented: true, executable: true, passed: true}
+      test_athlete_created_at_index_present: {implemented: true, executable: true, passed: true}
+      test_athlete_id_is_required_uuid: {implemented: true, executable: true, passed: true}
+      test_closed_at_nullable_datetime: {implemented: true, executable: true, passed: true}
+      test_created_at_required_datetime: {implemented: true, executable: true, passed: true}
+      test_custom_distance_km_nullable_float: {implemented: true, executable: true, passed: true}
+      test_custom_distance_positive_check: {implemented: true, executable: true, passed: true}
+      test_fitness_level_range_check: {implemented: true, executable: true, passed: true}
+      test_fitness_level_required_integer: {implemented: true, executable: true, passed: true}
+      test_forbidden_columns_are_absent: {implemented: true, executable: true, passed: true}
+      test_goal_description_nullable_text: {implemented: true, executable: true, passed: true}
+      test_goal_event_date_nullable_date: {implemented: true, executable: true, passed: true}
+      test_goal_event_name_nullable_string: {implemented: true, executable: true, passed: true}
+      test_goal_event_type_nullable_enum: {implemented: true, executable: true, passed: true}
+      test_goal_type_is_enum_backed_required: {implemented: true, executable: true, passed: true}
+      test_id_column_uuid_primary_key: {implemented: true, executable: true, passed: true}
+      test_injury_severity_nullable_enum: {implemented: true, executable: true, passed: true}
+      test_recent_injury_nullable_text: {implemented: true, executable: true, passed: true}
+      test_status_required_enum: {implemented: true, executable: true, passed: true}
+      test_target_distance_km_nullable_float: {implemented: true, executable: true, passed: true}
+      test_target_distance_positive_check: {implemented: true, executable: true, passed: true}
+      test_target_time_minutes_nullable_integer: {implemented: true, executable: true, passed: true}
+      test_target_time_positive_check: {implemented: true, executable: true, passed: true}
+      test_weekly_volume_hours_non_negative_check: {implemented: true, executable: true, passed: true}
+      test_weekly_volume_hours_required_float: {implemented: true, executable: true, passed: true}
+      test_weekly_volume_km_non_negative_check: {implemented: true, executable: true, passed: true}
+      test_weekly_volume_km_required_float: {implemented: true, executable: true, passed: true}
+  test_training_plan_columns.py:
+    type: unit
+    status: promoted
+    functions:
+      test_checkpoint_schedule_required_jsonb: {implemented: true, executable: true, passed: true}
+      test_created_at_required_datetime: {implemented: true, executable: true, passed: true}
+      test_forbidden_columns_are_absent: {implemented: true, executable: true, passed: true}
+      test_goal_status_index_present: {implemented: true, executable: true, passed: true}
+      test_id_column_uuid_primary_key: {implemented: true, executable: true, passed: true}
+      test_phase_definitions_required_jsonb_with_default: {implemented: true, executable: true, passed: true}
+      test_phases_summary_required_jsonb_with_default: {implemented: true, executable: true, passed: true}
+      test_status_required_enum: {implemented: true, executable: true, passed: true}
+      test_strategic_rationale_nullable_jsonb: {implemented: true, executable: true, passed: true}
+      test_superseded_at_nullable_datetime: {implemented: true, executable: true, passed: true}
+      test_training_goal_id_required_uuid: {implemented: true, executable: true, passed: true}
+      test_twin_state_id_nullable_uuid_with_set_null_fk: {implemented: true, executable: true, passed: true}
+      test_twin_state_index_present: {implemented: true, executable: true, passed: true}
+      test_weekly_distributions_required_jsonb_with_default: {implemented: true, executable: true, passed: true}
+  test_weekly_plan_columns.py:
+    type: unit
+    status: promoted
+    functions:
+      test_accumulated_fatigue_delta_required_with_zero_default: {implemented: true, executable: true, passed: true}
+      test_adjusted_intent_required_jsonb: {implemented: true, executable: true, passed: true}
+      test_approximate_duration_minutes_required_integer: {implemented: true, executable: true, passed: true}
+      test_block_id_nullable_string: {implemented: true, executable: true, passed: true}
+      test_block_position_inline_union_check: {implemented: true, executable: true, passed: true}
+      test_block_position_nullable_string: {implemented: true, executable: true, passed: true}
+      test_block_session_count_nullable_integer: {implemented: true, executable: true, passed: true}
+      test_checkpoint_metric_nullable_string: {implemented: true, executable: true, passed: true}
+      test_checkpoint_type_nullable_enum: {implemented: true, executable: true, passed: true}
+      test_created_at_required_datetime: {implemented: true, executable: true, passed: true}
+      test_doubles_days_count_non_negative_check: {implemented: true, executable: true, passed: true}
+      test_duration_positive_check: {implemented: true, executable: true, passed: true}
+      test_execution_counter_required_with_zero_default: {implemented: true, executable: true, passed: true}
+      test_forbidden_columns_are_absent: {implemented: true, executable: true, passed: true}
+      test_forbidden_columns_are_absent: {implemented: true, executable: true, passed: true}
+      test_id_column_uuid_primary_key: {implemented: true, executable: true, passed: true}
+      test_id_column_uuid_primary_key: {implemented: true, executable: true, passed: true}
+      test_intent_description_required_string: {implemented: true, executable: true, passed: true}
+      test_is_checkpoint_required_bool_default_false: {implemented: true, executable: true, passed: true}
+      test_plan_status_index_present: {implemented: true, executable: true, passed: true}
+      test_plan_week_unique_constraint_present: {implemented: true, executable: true, passed: true}
+      test_planned_session_id_nullable_uuid_unique_when_set: {implemented: true, executable: true, passed: true}
+      test_planned_session_id_unique_constraint_present: {implemented: true, executable: true, passed: true}
+      test_session_counters_non_negative_check: {implemented: true, executable: true, passed: true}
+      test_session_type_required_enum: {implemented: true, executable: true, passed: true}
+      test_status_inline_union_check: {implemented: true, executable: true, passed: true}
+      test_status_required_enum: {implemented: true, executable: true, passed: true}
+      test_status_required_inline_union: {implemented: true, executable: true, passed: true}
+      test_target_date_required_date: {implemented: true, executable: true, passed: true}
+      test_training_plan_id_required_uuid: {implemented: true, executable: true, passed: true}
+      test_week_ends_at_required_date: {implemented: true, executable: true, passed: true}
+      test_week_number_positive_check: {implemented: true, executable: true, passed: true}
+      test_week_number_required_integer: {implemented: true, executable: true, passed: true}
+      test_week_starts_at_required_date: {implemented: true, executable: true, passed: true}
+      test_weekly_plan_id_required_uuid: {implemented: true, executable: true, passed: true}
 
 coverage:
-  routes:
-    covered: []
-    partial: []
-    missing:
-      - "Training goal / plan / session API endpoints (not in Phase-1.2b scope)"
   events:
     covered: []
-    partial: []
-    missing:
-      - "training_plan_generated (not in Phase-1.2b scope)"
-      - "planned_session_generated (not in Phase-1.2b scope)"
-      - "session_completed (not in Phase-1.2b scope)"
-      - "session_skipped (not in Phase-1.2b scope)"
-      - "session_missed (not in Phase-1.2b scope)"
-      - "weekly_plan_created (not in Phase-1.2b scope)"
-      - "week_completed (not in Phase-1.2b scope)"
-      - "checkpoint_completed (not in Phase-1.2b scope)"
   invariants:
     covered:
       - "GoalType values are exactly race_event, target_performance, fitness_improvement, maintenance, recovery"
@@ -521,144 +527,3 @@ coverage:
       - "checkpoints UNIQUE constraint on planned_session_id emitted (strict 1:1 invariant)"
       - "fk_activities_planned_session FK emitted with ondelete=SET NULL"
       - "training_plans.twin_state_id column emitted WITHOUT a FK (deliberate — deferred to Phase-1.2c)"
-    partial: []
-    missing:
-      - "Goal status immutability of semantic fields (deferred to service layer)"
-      - "Recovery mode <-> injury_severity IS NOT NULL pairing (deferred to service layer)"
-      - "SecondaryEvent maximum-3-per-goal (application-layer invariant)"
-      - "SecondaryEvent conflict-with-taper (application-layer invariant)"
-      - "TrainingPlan supersession replaces (no double-active invariants enforced at DB layer)"
-      - "TrainingGoal closure writes closed_at atomically (service layer)"
-      - "RegenerationTask 14-day TTL enforcement (service layer)"
-      - "RegenerationTask approval/decline flow (service layer — Phase-1.4)"
-      - "WeeklyPlan session immutability once status=active (service layer)"
-      - "WeeklySession→PlannedSession transition (workout generation — Phase-1.5b)"
-      - "PlannedSession completion linkage (activity_id FK added in later sub-phase; service layer owns that invariant for now)"
-      - "PlannedSession redistribution cascade logic (service layer)"
-      - "PlannedSession skip / miss sweep (service layer — Phase 4)"
-      - "Checkpoint atomic completion (metric_updated, confidence_changed, replan_triggered, completed_at set together — service layer)"
-      - "Checkpoint trajectory_validation proposals (service layer — later phase)"
-      - "Plan visibility / privacy contracts for the coach layer (vision)"
-
-history:
-  - date: "2026-07-18"
-    plan: "phase-1-2b-p1-plan-sessions"
-    tests_added: 0
-    tests_modified: 1
-    tests_removed: 0
-    result: "FIXED-PENDING-REVERIFY"
-    coverage_delta: >
-      DevOps one-off unitary validation report (reports/oneoff_unitary_validation_20260718.md,
-      RC2 — Test Suite category) flagged 1 schema/contract drift failure
-      in tests/unit/test_planned_session_columns.py::
-      TestPlannedSessionRequiredColumns::test_status_required_enum that
-      originated from the doctype cleanup inserting SCHEDULED into the
-      PlannedSessionStatus enum. Fix: the expected sorted-value list was
-      extended from 6 to 7 values, adding "scheduled" between "generated"
-      and "completed" to match the new declaration order in
-      app/models/enums.py. The phase-1-2b-enums feature's protects field
-      already documents the 7-value contract (including "scheduled"),
-      so the planned-session-columns test is now in sync with the enum
-      contract. validation.executable and validation.passed set to false
-      on phase-1-2b-planned-session-schema so DevOps re-verifies the fix
-      in the next execution cycle. No production code changes.
-  - date: "2026-06-24"
-    plan: "phase-1-2b-p1-plan-sessions"
-    tests_added: 0
-    tests_modified: 1
-    tests_removed: 0
-    result: "PARTIAL"
-    coverage_delta: >
-      Phase-1.2c DevOps round-4 report flagged 1 remaining failure in
-      Phase-1.2b test file (cross-schema pg_constraint leak). Fix:
-      tests/integration/test_migration_phase_1_2b.py::test_training_plans_twin_state_id_column_exists_no_fk
-      — added pg_namespace JOIN + :schema parameter to both the column
-      query and the FK count query, so both inspect only the isolated
-      Phase-1.2b test schema (phase_1_2b_test_<uuid>) and never pick up
-      the fk_training_plans_twin_state constraint that Phase-1.2c
-      correctly applied in the public schema. The fixture already
-      pinned `alembic upgrade PHASE_1_2B_REVISION` so the FK is not
-      created inside the isolated schema; the schema scoping on the
-      query is a belt-and-suspenders safeguard against the same
-      failure mode re-occurring if any future sub-phase adds an
-      identically-named FK. Production code unchanged.
-  - date: "2026-06-24"
-    plan: "phase-1-2b-p1-plan-sessions"
-    tests_added: 0
-    tests_modified: 2
-    tests_removed: 0
-    result: "PARTIAL"
-    coverage_delta: >
-      Phase-1.2c DevOps round-3 report flagged 2 prior-phase failures in
-      Phase-1.2b test files (reports/phase-1-2c-P1_devops.md). Fixes:
-      (1) tests/unit/test_training_plan_columns.py::test_twin_state_id_nullable_uuid_no_fk
-      -> test_twin_state_id_nullable_uuid_with_set_null_fk — Phase-1.2c now
-      wires the FK with ON DELETE SET NULL, so the test asserts the FK is
-      present and declared SET NULL rather than asserting its absence. The
-      column-side invariants (nullable UUID) remain unchanged.
-      (2) tests/integration/test_migration_phase_1_2b.py::phase_1_2b_schema
-      fixture upgraded from `alembic upgrade head` to `alembic upgrade
-      PHASE_1_2B_REVISION` (1b9e9026db1e) — pins Phase-1.2b assertions
-      to that revision so the Phase-1.2c FK follow-up does not bleed in.
-      Added PHASE_1_2B_REVISION alias at module bottom to fix the
-      NameError previously flagged in test_downgrade_returns_schema_to_phase_1_2a_baseline.
-      Production code unchanged.
-  - date: "2026-06-24"
-    plan: "phase-1-2b-p1-plan-sessions"
-    tests_added: 0
-    tests_modified: 1
-    tests_removed: 0
-    result: "PARTIAL"
-    coverage_delta: >
-      Phase-1.2c DevOps run flagged 1 prior-phase failure in
-      test_migration_phase_1_2b.py::test_downgrade_returns_schema_to_phase_1_2a_baseline
-      (downgrade -1 from Phase-1.2c head lands on Phase-1.2b, not Phase-1.2a).
-      Fixed by upgrading to PHASE_1_2B_REVISION explicitly instead of head so
-      the Phase-1.2b -> Phase-1.2a downgrade contract is tested in isolation.
-      The 3 test_training_plan_schema.py failures (FK wiring) remain pending
-      the Coder/Architect amendment of migration 79dc97d4e433 — Test
-      Architect does not modify production migration files.
-  - date: "2026-06-23"
-    plan: "phase-1-2b-p1-plan-sessions"
-    tests_added: 0
-    tests_modified: 2
-    tests_removed: 0
-    result: "PASS"
-    coverage_delta: >
-      Promotion (status generated -> promoted) for all 10 Phase-1.2b features
-      after the clean DevOps pass (880/880 in 127s,
-      reports/phase-1-2b_devops.md). Fixed two PlannedSession enum issues:
-      SCHEDULED -> PENDING and added required session_priority=SessionPriority.PRIMARY.
-      selection.regression and selection.release now include all 45 tests from
-      Phase-1.1, Phase-1.2a, and Phase-1.2b. The platform now has complete
-      schema coverage for auth, athlete profile/preferences, activity tracking,
-      and training plan infrastructure (goals, plans, weekly plans, sessions,
-      checkpoints). 
-  - date: "2026-06-21"
-    plan: "phase-1-2b-test-bug-fixes-round-3"
-    tests_added: 0
-    tests_modified: 3
-    tests_removed: 0
-    result: "PARTIAL"
-    coverage_delta: "DevOps retry report flagged 3 test-file bugs (EASY_RUN enum, Alembic caret syntax, missing pytest import). All fixes localised to test files; validation fields remain owned by DevOps."
-  - date: "2026-06-21"
-    plan: "phase-1-2b-test-bug-fixes-round-2"
-    tests_added: 0
-    tests_modified: 1
-    tests_removed: 0
-    result: "PARTIAL"
-    coverage_delta: "Fixed SET NULL identity-map issue in test_regeneration_task_schema.py by adding refresh() call. Decision documented: fix test not conftest."
-  - date: "2026-06-21"
-    plan: "phase-1-2b-test-bug-fixes-round-1"
-    tests_added: 0
-    tests_modified: 4
-    tests_removed: 0
-    result: "PARTIAL"
-    coverage_delta: "Fixed 4 test bugs: confdeltype assertion, status validation string length, factory signature, unique goal constraint workaround. No production changes."
-  - date: "2026-06-20"
-    plan: "phase-1-2b-p1-plan-sessions"
-    tests_added: 16
-    tests_modified: 1
-    tests_removed: 0
-    result: "PARTIAL"
-    coverage_delta: "Phase-1.2b test pack delivered with 15 new test files. Manifest wired with 9 features. Migration 1b9e9026db1e validated structurally + functionally."

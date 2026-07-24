@@ -6,8 +6,16 @@ Mirrors the plan's exit-gate scenario in the **Implementation Steps**:
 > phases"
 
 The journey exercises the full HTTP surface for the Phase-1.4 closing
-the loop: authentication, onboarding (which now triggers plan
-generation atomically), and the four read-only plan endpoints.
+the loop: authentication, onboarding, the deferred ``generate_plan``
+worker task (Phase-2.7 Batch 3, closing G-03), and the four read-only
+plan endpoints.
+
+The Phase-2.7 Batch 3 plan decouples plan generation from the
+onboarding transaction — ``POST /onboarding`` returns 201 before the
+``generate_plan`` procrastinate task runs. To assert the public plan
+endpoints, the test invokes the worker task in-process via the
+standard ``AsyncSessionLocal`` monkey-patch (the same pattern as
+``test_outbox_publisher_task_integration.py``).
 
 Reference plan:
 docs/implementation/phase-1/phase-1-4-p1-plan-generation.md
@@ -21,6 +29,8 @@ from typing import Any
 import pytest
 from httpx import AsyncClient
 
+import app.worker.app as worker_module
+from app.db.session import AsyncSessionLocal as _production_session_local
 from tests.payloads import weekly_schedule_payload
 from tests.utils.http_helpers import bearer_header, http_register
 
@@ -82,12 +92,29 @@ async def onboarding_payload() -> dict[str, Any]:
 
 
 class TestOnboardingToPlanJourney:
-    """End-to-end journey — register, complete onboarding, exercise the
-    plan endpoints, and assert the documented contract."""
+    """End-to-end journey — register, complete onboarding, run the
+    deferred ``generate_plan`` worker task, exercise the plan
+    endpoints, and assert the documented contract."""
+
+    async def _run_generate_plan(
+        self,
+        athlete_id: uuid.UUID,
+        test_session_local: Any,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(worker_module, "AsyncSessionLocal", test_session_local)
+        try:
+            await worker_module.generate_plan(athlete_id=str(athlete_id))
+        finally:
+            monkeypatch.setattr(
+                worker_module, "AsyncSessionLocal", _production_session_local
+            )
 
     async def test_full_journey_produces_a_valid_plan(
         self,
         client: AsyncClient,
+        test_session_local: Any,
+        monkeypatch: pytest.MonkeyPatch,
         register_payload: dict[str, Any],
         onboarding_payload: dict[str, Any],
     ) -> None:
@@ -100,7 +127,9 @@ class TestOnboardingToPlanJourney:
         aid = body["athlete"]["id"]
         access_token = body["access_token"]
 
-        # 2. Complete onboarding (triggers plan generation atomically).
+        # 2. Complete onboarding (returns 201; plan generation is now
+        #    deferred to the generate_plan worker task — Phase-2.7
+        #    Batch 3, G-03).
         ob_response = await client.post(
             f"/api/v1/athletes/{aid}/onboarding",
             json=onboarding_payload,
@@ -111,6 +140,10 @@ class TestOnboardingToPlanJourney:
         assert ob_body["onboarding_complete"] is True
         assert ob_body["twin_state_id"]
         assert ob_body["training_goal_id"]
+
+        # 2a. Run the deferred generate_plan task in-process so the
+        #     plan is available for the read endpoints.
+        await self._run_generate_plan(aid, test_session_local, monkeypatch)
 
         # 3. GET /plan must now return a valid TrainingPlanResponse.
         plan_response = await client.get(
@@ -169,6 +202,8 @@ class TestOnboardingToPlanJourney:
     async def test_cross_athlete_cannot_access_other_athletes_plan(
         self,
         client: AsyncClient,
+        test_session_local: Any,
+        monkeypatch: pytest.MonkeyPatch,
         onboarding_payload: dict[str, Any],
     ) -> None:
         # First athlete — onboards + gets a plan.
@@ -193,6 +228,8 @@ class TestOnboardingToPlanJourney:
             headers=bearer_header(first_token),
         )
         assert ob.status_code == 201
+
+        await self._run_generate_plan(first_id, test_session_local, monkeypatch)
 
         # Second athlete — separate JWT.
         second_register = {
@@ -244,4 +281,45 @@ class TestOnboardingToPlanJourney:
             )
             assert response.status_code == 404, (
                 f"GET {path}: expected 404, got {response.status_code}"
+            )
+
+    async def test_plan_endpoints_return_404_between_onboarding_and_worker_task(
+        self,
+        client: AsyncClient,
+        register_payload: dict[str, Any],
+        onboarding_payload: dict[str, Any],
+    ) -> None:
+        """The Phase-2.7 Batch 3 plan decouples plan generation from
+        the onboarding transaction. After POST /onboarding returns 201,
+        GET /plan must return 404 until the ``generate_plan`` worker
+        task runs. This is the new contract — pre-Batch-3 the plan
+        was generated synchronously and 404 was impossible here."""
+        register_response = await client.post(
+            "/api/v1/auth/register", json=register_payload
+        )
+        body = register_response.json()
+        aid = body["athlete"]["id"]
+        access_token = body["access_token"]
+
+        ob_response = await client.post(
+            f"/api/v1/athletes/{aid}/onboarding",
+            json=onboarding_payload,
+            headers=bearer_header(access_token),
+        )
+        assert ob_response.status_code == 201, ob_response.text
+        assert ob_response.json()["onboarding_complete"] is True
+
+        for path in (
+            "/plan",
+            "/plan/sessions",
+            "/plan/upcoming",
+            "/plan/checkpoints",
+        ):
+            response = await client.get(
+                f"/api/v1/athletes/{aid}{path}",
+                headers=bearer_header(access_token),
+            )
+            assert response.status_code == 404, (
+                f"GET {path}: expected 404 before generate_plan runs, "
+                f"got {response.status_code}: {response.text}"
             )

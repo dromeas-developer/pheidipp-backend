@@ -72,5 +72,8 @@ logs/
 .roo/
 .continue/
 .roomodes
+
+# Archives
 .plans_implemented/
 .reports_backup/
+.archive/

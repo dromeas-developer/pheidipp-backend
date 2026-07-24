@@ -1,971 +1,187 @@
-version: '1.0'
-plan_id: phase-2-3-p1-threshold-detection
-generated_at: '2026-07-10T15:00:00Z'
-last_reviewed_at: '2026-07-11T22:30:00Z'
-features:
-  physiology_parameter_enum:
-    status: generated
-    test_type: unit
-    file_scope:
-    - app/models/enums.py
-    - app/models/__init__.py
-    plan: docs/implementation/phase-2/phase-2-3-p1-threshold-detection.md
-    owned_by_plan:
-    - phase-2-3-p1-threshold-detection
-    description: PhysiologyParameter enum has all 10 values and is registered in app/models/__init__.py
-    protects:
-    - Closed ontology of physiological parameters tracked per athlete
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_physiology_parameter_enum.py
-        owner: phase-2-3-p1-threshold-detection
-  physiology_measurement_model:
-    status: generated
-    test_type: unit
-    file_scope:
-    - app/models/physiology_measurement.py
-    - app/models/__init__.py
-    plan: docs/implementation/phase-2/phase-2-3-p1-threshold-detection.md
-    owned_by_plan:
-    - phase-2-3-p1-threshold-detection
-    description: PhysiologyMeasurement model — append-only observation history table
-      with all columns and indexes
-    protects:
-    - PhysiologyMeasurement is append-only
-    - activity_id nullable with ON DELETE SET NULL
-    - parameter and source stored as non-native String enums
-    - algorithm_used and confidence_weight nullable for manual entries
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_physiology_measurement_model.py
-        owner: phase-2-3-p1-threshold-detection
-  physiology_measurement_repository:
-    status: generated
-    test_type: unit
-    file_scope:
-    - app/repositories/physiology_measurement_repository.py
-    - app/repositories/__init__.py
-    plan: docs/implementation/phase-2/phase-2-3-p1-threshold-detection.md
-    owned_by_plan:
-    - phase-2-3-p1-threshold-detection
-    description: PhysiologyMeasurementRepository — insert and range/parameter queries;
-      no update/delete methods
-    protects:
-    - Repository exposes only insert and read methods, no UPDATE or DELETE
-    - insert flushes without committing
-    - get_by_athlete returns newest first
-    - get_by_athlete_and_parameter filters by parameter
-    - get_recent_for_parameter filters by source and from_date
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_physiology_measurement_repository.py
-        owner: phase-2-3-p1-threshold-detection
-  threshold_observation_dataclass:
-    status: generated
-    test_type: unit
-    file_scope:
-    - app/services/threshold_detection_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p1-threshold-detection.md
-    owned_by_plan:
-    - phase-2-3-p1-threshold-detection
-    description: ThresholdObservation dataclass — data contract between ThresholdDetectionService
-      and PhysiologyUpdateService
-    protects:
-    - Carries parameter, observed_value, source, weight, activity_id, measurement_date,
-      algorithm_used, confidence_weight
-    - Frozen dataclass
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_threshold_detection_service.py
-        owner: phase-2-3-p1-threshold-detection
-  threshold_detection_service_gates:
-    status: generated
-    test_type: unit
-    file_scope:
-    - app/services/threshold_detection_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p1-threshold-detection.md
-    owned_by_plan:
-    - phase-2-3-p1-threshold-detection
-    description: ThresholdDetectionService.detect() guards — calibration eligibility,
-      sport type, missing RawSensorStream
-    protects:
-    - Threshold detection only runs for calibration_eligible = true activities
-    - Threshold detection only runs for sport_type = RUNNING
-    - Missing RawSensorStream returns empty list (signal cleaning not yet complete)
-    - Missing activity returns empty list
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_threshold_detection_service.py
-        owner: phase-2-3-p1-threshold-detection
-  hr_deflection_algorithm:
-    status: generated
-    test_type: unit
-    file_scope:
-    - app/services/threshold_detection_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p1-threshold-detection.md
-    owned_by_plan:
-    - phase-2-3-p1-threshold-detection
-    description: HR deflection algorithm — produces LT1_HR and LT2_HR observations
-      with source TRAINING_HR_DEFLECTION and weight 1.0
-    protects:
-    - ≥3 distinct intensity steps and R² ≥ 0.80 → produces LT1_HR and LT2_HR observations
-    - <3 intensity steps → no observations
-    - R² < 0.80 → no observations
-    - Bins with >80% null HR values are skipped
-    - confidence_weight derived from R²
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_threshold_detection_service.py
-        owner: phase-2-3-p1-threshold-detection
-  rr_inflection_algorithm:
-    status: generated
-    test_type: unit
-    file_scope:
-    - app/services/threshold_detection_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p1-threshold-detection.md
-    owned_by_plan:
-    - phase-2-3-p1-threshold-detection
-    description: RR inflection algorithm — produces LT1_HR and LT2_HR observations
-      with source TRAINING_RR_INFLECTION and weight 2.5
-    protects:
-    - RR data and ≥8 min per intensity level → produces LT1_HR and LT2_HR observations
-    - <8 min per intensity level → no observations
-    - No RR data → no observations
-    - RMSSD drop > 15% below baseline defines LT1 inflection
-    - confidence_weight reflects RMSSD signal quality
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_threshold_detection_service.py
-        owner: phase-2-3-p1-threshold-detection
-  power_hr_ratio_algorithm:
-    status: generated
-    test_type: unit
-    file_scope:
-    - app/services/threshold_detection_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p1-threshold-detection.md
-    owned_by_plan:
-    - phase-2-3-p1-threshold-detection
-    description: Power-to-HR ratio algorithm — produces CP observation with source
-      TRAINING_POWER_HR_RATIO and weight 1.5
-    protects:
-    - Clear ratio breakpoint → produces CP observation
-    - No clear breakpoint → no observations
-    - Only runs when has_power = true
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_threshold_detection_service.py
-        owner: phase-2-3-p1-threshold-detection
-  signal_selection_logic:
-    status: generated
-    test_type: unit
-    file_scope:
-    - app/services/threshold_detection_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p1-threshold-detection.md
-    owned_by_plan:
-    - phase-2-3-p1-threshold-detection
-    description: Signal selection logic — routes to applicable algorithms based on
-      has_rr_intervals, has_hr, has_power
-    protects:
-    - has_rr_intervals → run RR inflection
-    - has_hr + has_power → run HR deflection + power-to-HR ratio
-    - has_hr only → run HR deflection
-    - RR inflection takes priority over HR deflection when both available
-    - Power-to-HR ratio always runs alongside HR-based detection when power available
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_threshold_detection_service.py
-        owner: phase-2-3-p1-threshold-detection
-  natural_training_analysis:
-    status: generated
-    test_type: unit
-    file_scope:
-    - app/services/threshold_detection_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p1-threshold-detection.md
-    owned_by_plan:
-    - phase-2-3-p1-threshold-detection
-    description: LT1 natural training analysis — cross-session, ≥3 easy runs with
-      consistent HR (±5 bpm)
-    protects:
-    - ≥3 easy runs with consistent HR (±5 bpm) → produces LT1_HR observation with
-      weight 0.5
-    - <3 easy runs → no observations
-    - HR spread > 5 bpm → no observations
-    - Skips silently when PlannedSessionRepository not provided
-    - Filters by session_type EASY_RUN or RECOVERY_RUN on PlannedSession
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_threshold_detection_service.py
-        owner: phase-2-3-p1-threshold-detection
-  hr_drift_method:
-    status: generated
-    test_type: unit
-    file_scope:
-    - app/services/threshold_detection_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p1-threshold-detection.md
-    owned_by_plan:
-    - phase-2-3-p1-threshold-detection
-    description: LT1 HR drift method — steady-state segments ≥20 min, drift > 5 bpm
-      or < 2 bpm
-    protects:
-    - Steady-state segment ≥20 min with drift > 5 bpm → produces LT1_HR observation
-      with weight 1.0
-    - Steady-state segment ≥20 min with drift < 2 bpm → produces LT1_HR observation
-      with weight 1.0
-    - Drift between 2 and 5 bpm → no observations (ambiguous)
-    - No steady-state segment → no observations
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_threshold_detection_service.py
-        owner: phase-2-3-p1-threshold-detection
-  hr_recovery_method:
-    status: generated
-    test_type: unit
-    file_scope:
-    - app/services/threshold_detection_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p1-threshold-detection.md
-    owned_by_plan:
-    - phase-2-3-p1-threshold-detection
-    description: LT1 HR recovery method — hard effort + ≥2 min recovery, fast (>30
-      bpm) or slow (<20 bpm)
-    protects:
-    - Hard effort + fast recovery (>30 bpm in 2 min) → produces LT1_HR observation
-      with weight 0.5
-    - Hard effort + slow recovery (<20 bpm in 2 min) → produces LT1_HR observation
-      with weight 0.5
-    - Ambiguous recovery (20-30 bpm) → no observations
-    - No hard effort → no observations
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_threshold_detection_service.py
-        owner: phase-2-3-p1-threshold-detection
-  physiology_measurement_repository_persistence:
-    status: generated
-    test_type: integration
-    file_scope:
-    - app/repositories/physiology_measurement_repository.py
-    - app/models/physiology_measurement.py
-    plan: docs/implementation/phase-2/phase-2-3-p1-threshold-detection.md
-    owned_by_plan:
-    - phase-2-3-p1-threshold-detection
-    description: PhysiologyMeasurementRepository CRUD against the real test database
-      — insert round-trip, get_by_athlete ordering, get_by_athlete_and_parameter filtering,
-      get_recent_for_parameter source/date filtering, ON DELETE SET NULL cascade on
-      activity_id
-    protects:
-    - insert() persists a row with all columns populated; id, created_at, parameter,
-      source all reflected in DB
-    - get_by_athlete returns rows in measurement_date DESC order
-    - get_by_athlete_and_parameter filters to the requested parameter only
-    - get_recent_for_parameter filters by source AND from_date AND limit
-    - activity_id ON DELETE SET NULL preserves the historical row when an Activity
-      is deleted
-    - athlete_id ON DELETE CASCADE removes measurements when the Athlete is deleted
-    - Append-only at the repository layer — no update/delete methods
-    impacts: []
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      integration:
-      - path: tests/integration/test_physiology_measurement_repository_integration.py
-        owner: phase-2-3-p1-threshold-detection
-  threshold_detection_service_end_to_end:
-    status: generated
-    test_type: integration
-    file_scope:
-    - app/services/threshold_detection_service.py
-    - app/repositories/activity_repository.py
-    - app/repositories/raw_sensor_stream_repository.py
-    - app/repositories/athlete_physiology_repository.py
-    - app/repositories/physiology_measurement_repository.py
-    - app/repositories/planned_session_repository.py
-    - app/services/object_storage_client.py
-    - app/models/activity.py
-    - app/models/raw_sensor_stream.py
-    - app/models/physiology_measurement.py
-    plan: docs/implementation/phase-2/phase-2-3-p1-threshold-detection.md
-    owned_by_plan:
-    - phase-2-3-p1-threshold-detection
-    description: ThresholdDetectionService.detect() end-to-end — real DB + real local-fallback
-      object storage + real cleaned streams. Verifies the correct observations are
-      produced for each signal combination, gates are honoured at the persistence
-      boundary, and the service does NOT write to PhysiologyMeasurement
-    protects:
-    - 'End-to-end: HR-only stream produces TRAINING_HR_DEFLECTION observations (LT1_HR
-      + LT2_HR) with weight 1.0'
-    - 'End-to-end: RR + HR stream produces TRAINING_RR_INFLECTION observations with
-      weight 2.5'
-    - 'End-to-end: power + HR stream also runs the power-to-HR ratio algorithm'
-    - 'End-to-end: calibration_eligible=false activity persists no observations and
-      the service does not call the cleaned-stream download path'
-    - 'End-to-end: sport_type != RUNNING persists no observations'
-    - 'End-to-end: missing RawSensorStream persists no observations and does not touch
-      object storage'
-    - 'End-to-end: natural training analysis queries historical easy / recovery runs
-      and produces an LT1_HR observation with weight 0.5 when ≥3 consistent runs exist'
-    - 'End-to-end: measurement_date on observations is activity.activity_date (not
-      detection runtime date)'
-    - 'Service boundary: detect() does NOT write to PhysiologyMeasurement — that is
-      Plan P2''s responsibility'
-    impacts:
-    - signal_cleaning_pipeline
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      integration:
-      - path: tests/integration/test_threshold_detection_service_integration.py
-        owner: phase-2-3-p1-threshold-detection
-execution_groups:
-  threshold_detection_unit:
-    scope: feature
-    phase: 2
-    tests:
-    - tests/unit/test_physiology_parameter_enum.py
-    - tests/unit/test_physiology_measurement_model.py
-    - tests/unit/test_physiology_measurement_repository.py
-    - tests/unit/test_threshold_detection_service.py
-    depends_on: []
-  threshold_detection_integration:
-    scope: feature
-    phase: 2
-    tests:
-    - tests/integration/test_physiology_measurement_repository_integration.py
-    - tests/integration/test_threshold_detection_service_integration.py
-    depends_on: []
-  threshold_detection_behaviour:
-    scope: feature
-    phase: 2
-    tests:
-    - tests/behaviour/test_threshold_detection_user_journey.py
-    depends_on: []
-  threshold_detection_user_journey_hr_deflection:
-    status: generated
-    test_type: behaviour
-    file_scope:
-    - app/services/threshold_detection_service.py
-    - app/repositories/activity_repository.py
-    - app/repositories/raw_sensor_stream_repository.py
-    - app/repositories/athlete_physiology_repository.py
-    - app/repositories/physiology_measurement_repository.py
-    - app/repositories/planned_session_repository.py
-    - app/services/object_storage_client.py
-    - app/services/signal_cleaning_service.py
-    - app/models/activity.py
-    - app/models/raw_sensor_stream.py
-    - app/models/physiology_measurement.py
-    - app/models/athlete.py
-    plan: docs/implementation/phase-2/phase-2-3-p1-threshold-detection.md
-    owned_by_plan:
-    - phase-2-3-p1-threshold-detection
-    description: Full user journey — register → onboard → upload running activity
-      → signal_clean worker → ThresholdDetectionService.detect() → HR deflection observations
-      with TRAINING_HR_DEFLECTION and weight 1.0
-    protects:
-    - 'End-to-end journey: a calibration-eligible running activity with HR-only signal
-      produces TRAINING_HR_DEFLECTION observations (LT1_HR + LT2_HR) with weight 1.0'
-    - 'The observation contract is honoured at the service boundary: parameter, source,
-      weight, algorithm_used, activity_id, measurement_date, confidence_weight all
-      populated correctly'
-    - measurement_date on observations equals activity.activity_date, not the detection
-      runtime date
-    - The service does NOT write to PhysiologyMeasurement — that is Plan P2's responsibility
-    - 'The athlete-scoped journey is complete: a second athlete cannot trigger detection
-      on the first athlete''s activity'
-    impacts: []
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      behaviour:
-      - path: tests/behaviour/test_threshold_detection_user_journey.py
-        owner: phase-2-3-p1-threshold-detection
-  threshold_detection_user_journey_rr_inflection:
-    status: generated
-    test_type: behaviour
-    file_scope:
-    - app/services/threshold_detection_service.py
-    - app/repositories/activity_repository.py
-    - app/repositories/raw_sensor_stream_repository.py
-    - app/repositories/athlete_physiology_repository.py
-    - app/repositories/physiology_measurement_repository.py
-    - app/repositories/planned_session_repository.py
-    - app/services/object_storage_client.py
-    - app/services/signal_cleaning_service.py
-    - app/models/activity.py
-    - app/models/raw_sensor_stream.py
-    plan: docs/implementation/phase-2/phase-2-3-p1-threshold-detection.md
-    owned_by_plan:
-    - phase-2-3-p1-threshold-detection
-    description: Full user journey — RR + HR activity → signal_clean → ThresholdDetectionService.detect()
-      → RR inflection observations with TRAINING_RR_INFLECTION and weight 2.5
-    protects:
-    - 'End-to-end: an RR + HR activity produces TRAINING_RR_INFLECTION observations
-      with weight 2.5 (the documented higher weight for the richer RR signal)'
-    - RR inflection takes priority over HR deflection when both signals are available
-      — the richer signal's higher-weight observations are produced
-    - Both algorithms may run and produce supplementary observations when both signals
-      are available
-    - 'The behaviour journey exercises the full stack: athlete creation → onboarding
-      → activity → signal cleaning → threshold detection → observation contract'
-    impacts: []
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      behaviour:
-      - path: tests/behaviour/test_threshold_detection_user_journey.py
-        owner: phase-2-3-p1-threshold-detection
-  threshold_detection_user_journey_gates:
-    status: generated
-    test_type: behaviour
-    file_scope:
-    - app/services/threshold_detection_service.py
-    - app/repositories/activity_repository.py
-    - app/repositories/raw_sensor_stream_repository.py
-    - app/repositories/athlete_physiology_repository.py
-    - app/repositories/physiology_measurement_repository.py
-    - app/repositories/planned_session_repository.py
-    - app/services/object_storage_client.py
-    - app/models/activity.py
-    - app/models/raw_sensor_stream.py
-    plan: docs/implementation/phase-2/phase-2-3-p1-threshold-detection.md
-    owned_by_plan:
-    - phase-2-3-p1-threshold-detection
-    description: Behaviour journey for detect() gates — calibration eligibility, sport
-      type, missing RawSensorStream, and cross-athlete guard at the full user-journey
-      boundary
-    protects:
-    - calibration_eligible=false activity → no observations, no object-storage download
-    - sport_type != RUNNING activity → no observations, no object-storage download
-    - Missing RawSensorStream (signal cleaning not yet complete) → no observations,
-      no object-storage download
-    - 'Cross-athlete guard: athlete A''s detect() call against athlete B''s activity
-      returns no observations (athlete-scoped boundary at the full journey boundary)'
-    - 'The service boundary is preserved end-to-end: detect() never writes to PhysiologyMeasurement,
-      even after a full user journey'
-    impacts: []
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      behaviour:
-      - path: tests/behaviour/test_threshold_detection_user_journey.py
-        owner: phase-2-3-p1-threshold-detection
-  threshold_detection_user_journey_natural_training:
-    status: generated
-    test_type: behaviour
-    file_scope:
-    - app/services/threshold_detection_service.py
-    - app/repositories/activity_repository.py
-    - app/repositories/raw_sensor_stream_repository.py
-    - app/repositories/planned_session_repository.py
-    - app/repositories/athlete_physiology_repository.py
-    - app/repositories/physiology_measurement_repository.py
-    - app/services/object_storage_client.py
-    - app/services/signal_cleaning_service.py
-    - app/models/activity.py
-    - app/models/planned_session.py
-    - app/models/raw_sensor_stream.py
-    plan: docs/implementation/phase-2/phase-2-3-p1-threshold-detection.md
-    owned_by_plan:
-    - phase-2-3-p1-threshold-detection
-    description: Behaviour journey for natural training analysis (LT1 method 3) —
-      cross-session, ≥3 easy runs with consistent HR (±5 bpm) produce a single LT1_HR
-      observation with weight 0.5
-    protects:
-    - 'End-to-end: an athlete with ≥3 historical easy/recovery runs (consistent mean
-      HR ±5 bpm) gets a natural-training-analysis LT1_HR observation with weight 0.5'
-    - The cross-session method queries historical activities through real ActivityRepository.get_recent_activities_for_athlete
-      and loads each linked PlannedSession to check session_type
-    - Inconsistent easy runs (spread > 5 bpm) produce no natural-training observation
-    - Fewer than 3 easy runs produce no natural-training observation
-    - The natural-training observation's measurement_date is the current activity's
-      activity_date, not the historical run dates
-    impacts: []
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      behaviour:
-      - path: tests/behaviour/test_threshold_detection_user_journey.py
-        owner: phase-2-3-p1-threshold-detection
+version: "1.0"
+plan_id: "phase-2-3-p1-threshold-detection"
+generated_at: "2026-07-11T00:00:00Z"
+last_reviewed_at: "2026-07-11T00:00:00Z"
+
+prerequisites:
+  migrations: false
+
+files:
+  test_threshold_detection_user_journey.py:
+    type: behaviour
+    status: promoted
+    functions:
+      test_journey_calibration_ineligible_returns_empty: {implemented: true, executable: true, passed: true}
+      test_journey_cross_athlete_guard_returns_empty: {implemented: true, executable: true, passed: true}
+      test_journey_hr_deflection_observation_contract: {implemented: true, executable: true, passed: true}
+      test_journey_http_register_issues_real_token: {implemented: true, executable: true, passed: true}
+      test_journey_inconsistent_easy_runs_produce_no_natural: {implemented: true, executable: true, passed: true}
+      test_journey_missing_raw_sensor_stream_returns_empty: {implemented: true, executable: true, passed: true}
+      test_journey_non_running_sport_returns_empty: {implemented: true, executable: true, passed: true}
+      test_journey_rr_inflection_with_weight_2_5: {implemented: true, executable: true, passed: true}
+      test_journey_service_does_not_write_to_physiology_measurement: {implemented: true, executable: true, passed: true}
+      test_journey_three_consistent_easy_runs_produce_lt1: {implemented: true, executable: true, passed: true}
+  test_physiology_measurement_repository_integration.py:
+    type: integration
+    status: promoted
+    functions:
+      test_deleting_activity_nullifies_measurement_activity_id: {implemented: true, executable: true, passed: true}
+      test_deleting_athlete_removes_measurement: {implemented: true, executable: true, passed: true}
+      test_filters_by_athlete_id_too: {implemented: true, executable: true, passed: true}
+      test_filters_by_from_date_excludes_earlier_rows: {implemented: true, executable: true, passed: true}
+      test_filters_by_parameter_only_returns_matching_rows: {implemented: true, executable: true, passed: true}
+      test_filters_by_source: {implemented: true, executable: true, passed: true}
+      test_from_date_inclusive: {implemented: true, executable: true, passed: true}
+      test_get_by_athlete_filters_by_athlete_id: {implemented: true, executable: true, passed: true}
+      test_get_by_athlete_respects_limit: {implemented: true, executable: true, passed: true}
+      test_get_by_athlete_returns_empty_when_no_rows: {implemented: true, executable: true, passed: true}
+      test_get_by_athlete_returns_rows_newest_first: {implemented: true, executable: true, passed: true}
+      test_insert_is_flush_only_does_not_implicitly_commit: {implemented: true, executable: true, passed: true}
+      test_insert_persists_nullable_fields_as_null: {implemented: true, executable: true, passed: true}
+      test_insert_persists_row_with_all_columns: {implemented: true, executable: true, passed: true}
+      test_insert_populates_id_and_created_at_defaults: {implemented: true, executable: true, passed: true}
+      test_orders_by_measurement_date_desc_and_respects_limit: {implemented: true, executable: true, passed: true}
+      test_repository_has_no_delete_method: {implemented: true, executable: true, passed: true}
+      test_repository_has_no_remove_method: {implemented: true, executable: true, passed: true}
+      test_repository_has_no_update_method: {implemented: true, executable: true, passed: true}
+      test_repository_has_no_upsert_method: {implemented: true, executable: true, passed: true}
+      test_respects_limit: {implemented: true, executable: true, passed: true}
+  test_threshold_detection_service_integration.py:
+    type: integration
+    status: promoted
+    functions:
+      test_calibration_ineligible_activity_returns_empty: {implemented: true, executable: true, passed: true}
+      test_cleaned_stream_round_trips_through_object_storage: {implemented: true, executable: true, passed: true}
+      test_corrupt_cleaned_bytes_raise_threshold_detection_error: {implemented: true, executable: true, passed: true}
+      test_detect_does_not_write_to_physiology_measurement: {implemented: true, executable: true, passed: true}
+      test_hr_only_running_activity_produces_hr_deflection: {implemented: true, executable: true, passed: true}
+      test_inconsistent_easy_run_hrs_produce_no_natural_observation: {implemented: true, executable: true, passed: true}
+      test_missing_activity_returns_empty: {implemented: true, executable: true, passed: true}
+      test_missing_raw_sensor_stream_returns_empty: {implemented: true, executable: true, passed: true}
+      test_non_running_sport_returns_empty: {implemented: true, executable: true, passed: true}
+      test_rr_and_hr_produces_rr_inflection_with_weight_2_5: {implemented: true, executable: true, passed: true}
+      test_three_consistent_easy_runs_produce_lt1_observation: {implemented: true, executable: true, passed: true}
+  test_physiology_measurement_model.py:
+    type: unit
+    status: promoted
+    functions:
+      test_activity_id_nullable_uuid: {implemented: true, executable: true, passed: true}
+      test_activity_id_set_null_fk_to_activities: {implemented: true, executable: true, passed: true}
+      test_algorithm_used_nullable_string: {implemented: true, executable: true, passed: true}
+      test_athlete_date_index_columns: {implemented: true, executable: true, passed: true}
+      test_athlete_date_index_present: {implemented: true, executable: true, passed: true}
+      test_athlete_id_cascade_fk_to_athletes: {implemented: true, executable: true, passed: true}
+      test_athlete_id_required_uuid: {implemented: true, executable: true, passed: true}
+      test_athlete_parameter_source_index_columns: {implemented: true, executable: true, passed: true}
+      test_athlete_parameter_source_index_present: {implemented: true, executable: true, passed: true}
+      test_confidence_weight_nullable_float: {implemented: true, executable: true, passed: true}
+      test_created_at_has_server_default_now: {implemented: true, executable: true, passed: true}
+      test_created_at_required_datetime: {implemented: true, executable: true, passed: true}
+      test_forbidden_columns_are_absent: {implemented: true, executable: true, passed: true}
+      test_id_column_uuid_primary_key: {implemented: true, executable: true, passed: true}
+      test_measurement_date_required_date: {implemented: true, executable: true, passed: true}
+      test_notes_nullable_text: {implemented: true, executable: true, passed: true}
+      test_observed_value_required_float: {implemented: true, executable: true, passed: true}
+      test_parameter_required_string_enum: {implemented: true, executable: true, passed: true}
+      test_raw_data_reference_nullable_string: {implemented: true, executable: true, passed: true}
+      test_source_required_string_enum: {implemented: true, executable: true, passed: true}
+      test_tablename_is_physiology_measurements: {implemented: true, executable: true, passed: true}
+  test_physiology_measurement_repository.py:
+    type: unit
+    status: promoted
+    functions:
+      test_get_by_athlete_and_parameter_filters_by_parameter: {implemented: true, executable: true, passed: true}
+      test_get_by_athlete_and_parameter_returns_scalars: {implemented: true, executable: true, passed: true}
+      test_get_by_athlete_applies_limit: {implemented: true, executable: true, passed: true}
+      test_get_by_athlete_filters_by_athlete_id: {implemented: true, executable: true, passed: true}
+      test_get_by_athlete_orders_by_measurement_date_desc: {implemented: true, executable: true, passed: true}
+      test_get_by_athlete_returns_scalars: {implemented: true, executable: true, passed: true}
+      test_get_recent_for_parameter_filters_by_from_date: {implemented: true, executable: true, passed: true}
+      test_get_recent_for_parameter_filters_by_source: {implemented: true, executable: true, passed: true}
+      test_get_recent_for_parameter_returns_scalars: {implemented: true, executable: true, passed: true}
+      test_insert_adds_to_session: {implemented: true, executable: true, passed: true}
+      test_insert_does_not_commit: {implemented: true, executable: true, passed: true}
+      test_insert_flushes_session: {implemented: true, executable: true, passed: true}
+      test_insert_refreshes_measurement: {implemented: true, executable: true, passed: true}
+      test_insert_returns_measurement: {implemented: true, executable: true, passed: true}
+      test_repository_has_no_delete_method: {implemented: true, executable: true, passed: true}
+      test_repository_has_no_remove_method: {implemented: true, executable: true, passed: true}
+      test_repository_has_no_update_method: {implemented: true, executable: true, passed: true}
+      test_repository_has_no_upsert_method: {implemented: true, executable: true, passed: true}
+  test_physiology_parameter_enum.py:
+    type: unit
+    status: promoted
+    functions:
+      test_physiology_parameter_has_exactly_ten_values: {implemented: true, executable: true, passed: true}
+      test_physiology_parameter_includes_cp: {implemented: true, executable: true, passed: true}
+      test_physiology_parameter_includes_lt1_hr: {implemented: true, executable: true, passed: true}
+      test_physiology_parameter_includes_lt1_power_and_lt1_pace: {implemented: true, executable: true, passed: true}
+      test_physiology_parameter_includes_lt2_hr: {implemented: true, executable: true, passed: true}
+      test_physiology_parameter_includes_lt2_power_and_lt2_pace: {implemented: true, executable: true, passed: true}
+      test_physiology_parameter_includes_max_hr: {implemented: true, executable: true, passed: true}
+      test_physiology_parameter_includes_vo2max_variants: {implemented: true, executable: true, passed: true}
+      test_physiology_parameter_is_exported_from_models_package: {implemented: true, executable: true, passed: true}
+      test_physiology_parameter_values_are_lowercase_strings: {implemented: true, executable: true, passed: true}
+  test_threshold_detection_service.py:
+    type: unit
+    status: promoted
+    functions:
+      test_detect_cycling_returns_empty: {implemented: true, executable: true, passed: true}
+      test_detect_does_not_call_measurement_insert: {implemented: true, executable: true, passed: true}
+      test_detect_missing_activity_returns_empty_list: {implemented: true, executable: true, passed: true}
+      test_detect_missing_raw_sensor_stream_returns_empty: {implemented: true, executable: true, passed: true}
+      test_detect_not_calibration_eligible_returns_empty: {implemented: true, executable: true, passed: true}
+      test_detect_swimming_returns_empty: {implemented: true, executable: true, passed: true}
+      test_detect_with_hr_only_runs_hr_deflection: {implemented: true, executable: true, passed: true}
+      test_detect_with_no_hr_returns_only_natural_training: {implemented: true, executable: true, passed: true}
+      test_detect_with_power_runs_power_hr_ratio: {implemented: true, executable: true, passed: true}
+      test_detect_with_rr_intervals_runs_rr_inflection: {implemented: true, executable: true, passed: true}
+      test_hr_deflection_produces_lt1_and_lt2_observations: {implemented: true, executable: true, passed: true}
+      test_hr_deflection_skips_bins_with_high_null_fraction: {implemented: true, executable: true, passed: true}
+      test_hr_deflection_weight_is_1_0: {implemented: true, executable: true, passed: true}
+      test_hr_drift_with_steady_state_above_lt1: {implemented: true, executable: true, passed: true}
+      test_hr_recovery_produces_lt1_observation: {implemented: true, executable: true, passed: true}
+      test_lt1_hr_drift_weight_is_1_0: {implemented: true, executable: true, passed: true}
+      test_lt1_hr_recovery_weight_is_0_5: {implemented: true, executable: true, passed: true}
+      test_lt1_natural_training_weight_is_0_5: {implemented: true, executable: true, passed: true}
+      test_min_intensity_steps_is_3: {implemented: true, executable: true, passed: true}
+      test_natural_training_requires_three_easy_runs: {implemented: true, executable: true, passed: true}
+      test_natural_training_skipped_without_planned_session_repo: {implemented: true, executable: true, passed: true}
+      test_observation_carries_all_fields: {implemented: true, executable: true, passed: true}
+      test_observation_confidence_weight_can_be_none: {implemented: true, executable: true, passed: true}
+      test_observation_is_frozen: {implemented: true, executable: true, passed: true}
+      test_power_hr_ratio_weight_is_1_5: {implemented: true, executable: true, passed: true}
+      test_power_hr_ratio_weight_is_1_5: {implemented: true, executable: true, passed: true}
+      test_r2_min_threshold_is_0_80: {implemented: true, executable: true, passed: true}
+      test_rr_inflection_skips_short_intensity_levels: {implemented: true, executable: true, passed: true}
+      test_rr_inflection_weight_is_2_5: {implemented: true, executable: true, passed: true}
+      test_rr_inflection_weight_is_2_5: {implemented: true, executable: true, passed: true}
+
 coverage:
-  routes: []
-  events: []
+  events:
+    covered: []
   invariants:
     covered:
-    - PhysiologyMeasurement is append-only
-    - Threshold detection only runs for calibration_eligible = true activities
-    - Threshold detection only runs for sport_type = RUNNING
-    - Missing RawSensorStream returns empty list (signal cleaning not yet complete)
-    - For athletes with RR intervals, training_rr_inflection observations have higher
-      weight (2.5 vs 1.0)
-    - For athletes with power, training_power_hr_ratio observations contribute to
-      CP estimate
-    - PhysiologyParameter closed ontology (10 values)
-    - parameter and source stored as non-native String enums
-    - algorithm_used and confidence_weight nullable for manual entries
-    - 'Indexes: (athlete_id, measurement_date) and (athlete_id, parameter, source)'
-    - activity_id ON DELETE SET NULL preserves the historical row when an Activity
-      is deleted
-    - athlete_id ON DELETE CASCADE removes measurements when the Athlete is deleted
-    - Service does NOT write to PhysiologyMeasurement — that is Plan P2's responsibility
-    - measurement_date on observations is activity.activity_date, not the detection
-      runtime date
-    - 'Natural training analysis: ≥3 consistent easy runs (±5 bpm) produce LT1_HR
-      observation with weight 0.5'
-    - Cleaned stream wire format round-trips through real object storage
-    - 'End-to-end user journey: register → onboard → upload → signal_clean → threshold
-      detection produces the documented observation contract'
-    - 'Behaviour journey gates: calibration eligibility, sport type, missing RawSensorStream,
-      cross-athlete guard'
-    - 'Service boundary preserved end-to-end: detect() never writes to PhysiologyMeasurement
-      across a full user journey'
-    partial:
-    - Easy runs are calibration-eligible for load computation but do NOT provide threshold
-      detection evidence
-    - Confidence is per-metric
-    - Evidence weight thresholds (4.0 for MEDIUM, 8.0 for HIGH)
-    - Per-metric evidence accumulation
-    missing: []
-history:
-- date: '2026-07-10'
-  plan: phase-2-3-p1-threshold-detection
-  tests_added: 0
-  tests_modified: 0
-  tests_removed: 0
-  result: PENDING
-  coverage_delta: 'Initial capability inventory built from plan. No tests generated
-    yet.
-
-    '
-- date: '2026-07-10'
-  plan: phase-2-3-p1-threshold-detection
-  tests_added: 84
-  tests_modified: 0
-  tests_removed: 0
-  result: PASS
-  coverage_delta: 'Unit test generation complete. 84 tests across 4 test files: test_physiology_parameter_enum.py
-    (10 tests), test_physiology_measurement_model.py (25 tests), test_physiology_measurement_repository.py
-    (16 tests), test_threshold_detection_service.py (33 tests). All 12 capabilities
-    tagged as ''unit'' in the inventory have been generated and promoted to status=generated.
-    No integration, api, or behaviour tests generated in this session (Test Mode:
-    unit).
-
-    '
-- date: '2026-07-11'
-  plan: phase-2-3-p1-threshold-detection
-  tests_added: 32
-  tests_modified: 0
-  tests_removed: 0
-  result: PENDING
-  coverage_delta: 'Integration test generation complete. 32 tests across 2 test files:
-    test_physiology_measurement_repository_integration.py (21 tests) and test_threshold_detection_service_integration.py
-    (11 tests). Two new integration capabilities added to the inventory (physiology_measurement_repository_persistence
-    and threshold_detection_service_end_to_end) and promoted to status=generated.
-    Cross-cutting invariants pinned at the persistence boundary: activity_id ON DELETE
-    SET NULL, athlete_id ON DELETE CASCADE, service boundary (detect() does NOT write
-    to PhysiologyMeasurement), measurement_date source, and the natural training analysis
-    cross-session path. No new devops report for this plan yet; no recurring infrastructure
-    risk flagged.
-
-    '
-- date: '2026-07-11'
-  plan: phase-2-3-p1-threshold-detection
-  tests_added: 0
-  tests_modified: 0
-  tests_removed: 0
-  result: N/A
-  coverage_delta: 'API Test Mode session. Zero api capabilities identified — the plan
-    explicitly defers HTTP endpoints for physiology/measurements ("API endpoints for
-    physiology/measurements — deferred" in Out Of Scope), no physiology or threshold
-    routes exist in app/api/v1/, and the plan''s Testing Requirements contain no HTTP-asserting
-    tests. No test files generated. An api_inspection_note block was added to the
-    manifest documenting the three independent signals that confirm this is correct
-    scope rather than an oversight, so a future reviewer can see the api stage was
-    checked and intentionally produced no deliverables for P1. No new devops report
-    for this plan yet; no recurring infrastructure risk flagged.
-
-    '
-- date: '2026-07-11'
-  plan: phase-2-3-p1-threshold-detection
-  tests_added: 0
-  tests_modified: 0
-  tests_removed: 0
-  result: N/A
-  coverage_delta: 'Behaviour Test Mode session. Four behaviour capabilities added
-    to the inventory (threshold_detection_user_journey_hr_deflection, threshold_detection_user_journey_rr_inflection,
-    threshold_detection_user_journey_gates, threshold_detection_user_journey_natural_training)
-    and promoted to status=generated. The tests live in tests/behaviour/test_threshold_detection_user_journey.py
-    and exercise the full user journey: HTTP register → onboarding → POST /upload
-    (HTTP) → fit_ingest worker body → signal_clean worker body → ThresholdDetectionService.detect()
-    direct call → observation contract assertions at the DB boundary. Since Plan P1
-    defers the threshold_detection worker task (P3 pipeline wiring), the behaviour
-    test invokes detect() directly after the signal_clean task commits — this simulates
-    what the P3 procrastinate task will do in production and pins the observation
-    contract at the full user-journey boundary. Cross- cutting invariants pinned at
-    the behaviour layer: the measurement_date=activity.activity_date contract, the
-    service-boundary contract (detect() does NOT write to PhysiologyMeasurement),
-    and the cross-athlete guard at the full journey boundary. No new devops report
-    for this plan yet; no recurring infrastructure risk flagged.
-
-    '
-- date: '2026-07-11'
-  plan: phase-2-3-p1-threshold-detection
-  tests_added: 0
-  tests_modified: 15
-  tests_removed: 0
-  result: PARTIAL
-  coverage_delta: 'Test Architect remediation cycle driven by the DevOps report (reports/phase-2-3-p1-threshold-detection_devops.md).
-    The DevOps report identified 15 test failures split into 5 categories; this cycle
-    owns Categories 2-5 (test-side bugs) and refers Category 1 (HR deflection algorithm
-    returns 0 observations) back to the Coder. Four test files modified, no new test
-    files generated, no capabilities added or removed.
-
-    Category 2 (4 tests, 2 files): fixture helper _create_planned_session() was passing
-    athlete_id= to WeeklyPlan and PlannedSession constructors, but neither model has
-    an athlete_id column (the athlete is reached through training_plan_id → TrainingPlan
-    → athlete_id and weekly_plan_id → WeeklyPlan → training_plan_id → ..., respectively).
-    Fix: removed the bogus athlete_id constructor args from both calls in tests/integration/test_threshold_detection_service_integration.py
-    and tests/behaviour/test_threshold_detection_user_journey.py with explanatory
-    comments. Affects threshold_detection_service_end_to_end and threshold_detection_user_journey_natural_training.
-
-    Category 3 (2 tests, 1 file): test_get_by_athlete_filters_by_athlete_id and test_get_by_athlete_and_parameter_filters_by_parameter
-    in tests/unit/test_physiology_measurement_repository.py asserted `str(athlete_id)
-    in compiled` (the dashed UUID form) but the PG_UUID(as_uuid=True) bind processor
-    renders the literal in the undashed hex form. Fix: assert that EITHER the dashed
-    OR undashed form is present in the compiled SQL — the only property being tested
-    is that this specific athlete''s UUID is the one bound. Affects physiology_measurement_repository.
-
-    Category 4 (1 test, 1 file): test_deleting_activity_nullifies_measurement_activity_id
-    in tests/integration/test_physiology_measurement_repository_integration.py failed
-    with `assert surviving.activity_id is None` after deleting the parent Activity.
-    The DB-level ON DELETE SET NULL cascade worked correctly (the migration 8413e6547a40_phase_2_3_p1_physiology_measurement.py
-    declares `ondelete=''SET NULL''`); the test''s bug was a SQLAlchemy identity-map
-    staleness — the same session that performed the delete returned a cached PhysiologyMeasurement
-    instance with the pre-cascade activity_id. Fix: call db_session.expire_all() between
-    the cascade commit and the post-cascade SELECT so the next query reloads fresh
-    instances from the DB. Affects physiology_measurement_repository_persistence.
-
-    Category 5 (1 test, 1 file): test_journey_http_register_issues_real_token in tests/behaviour/test_threshold_detection_user_journey.py
-    called GET /api/v1/athletes/{id}/whoami and asserted response.json()["id"], but
-    no /whoami route exists on the production app (the conftest-mounted /_protected/.../whoami
-    is test infrastructure only). Fix: replaced the call with GET /api/v1/athletes/{id}/profile
-    (a real production endpoint behind the require_self guard) and the corresponding
-    response field `athlete_id` (the AthleteProfileResponse schema uses athlete_id,
-    not id). Affects threshold_detection_user_journey_hr_deflection.
-
-    Reusable failure classes recorded: tests/README.md gained three dated lessons
-    (2026-07-11) on fixture FK-chain matches, post-cascade expire_all, and NullPool
-    in conftest; tests/MOCKING_CONTRACT.md gained the corresponding anti-pattern rows.
-    The NullPool rule came from the DevOps Infrastructure Fixes section (the conftest
-    already incorporates the fix — the lesson is that any new conftest variant must
-    copy it).
-
-    No new devops report for the four test-side fixes yet — DevOps will rerun the
-    suite and report back; on the next cycle the relevant validation.passed flags
-    can be flipped to true. Category 1 (HR deflection) remains unfixed and is Coder
-    scope; threshold_detection_user_journey_hr_deflection, hr_deflection_algorithm,
-    and signal_selection_logic stay at passed=false until the Coder addresses it.
-    No recurring infrastructure risk flagged beyond the three lessons already recorded.
-
-    '
-- date: '2026-07-11'
-  plan: phase-2-3-p1-threshold-detection
-  tests_added: 0
-  tests_modified: 5
-  tests_removed: 0
-  result: PARTIAL
-  coverage_delta: 'Test Architect remediation cycle (round 2) driven by the second
-    DevOps report (reports/phase-2-3-p1-threshold-detection_devops.md). Compared
-    to the first round (15 failures), this round starts with 5 failures — Categories
-    1, 2, 3, and 5 are now passing after the prior remediation and the Coder''s fix
-    to the HR deflection algorithm. This cycle owns the 5 remaining test-side failures,
-    all in test_*.py files (DevOps could not fix them per the Boundaries policy).
-
-    Category 4 second pass (1 test, 1 file): test_deleting_activity_nullifies_measurement_activity_id
-    in tests/integration/test_physiology_measurement_repository_integration.py still
-    failed after the prior expire_all() fix — under async SQLAlchemy + NullPool, accessing
-    measurement.id in the WHERE clause AFTER expire_all() triggers an async lazy load
-    outside the greenlet context (MissingGreenlet). Fix: capture measurement_id =
-    measurement.id BEFORE expire_all() and use the captured scalar in the WHERE clause.
-    The id is already populated by the DB default after the first commit, so the
-    capture is safe and avoids the lazy load entirely. Affects physiology_measurement_repository_persistence.
-
-    Category 4 second pass (4 tests, 2 files): the two natural-training integration
-    tests and the two natural-training behaviour tests (TestDetectNaturalTrainingAnalysisEndToEnd
-    and TestThresholdDetectionNaturalTrainingJourney) failed with IntegrityError on
-    ix_training_goals_athlete_active. The _create_planned_session() helper built a
-    fresh TrainingGoal(status=''active'') per call inside a 3-iteration loop, but
-    the partial unique index allows only ONE active goal per athlete. Fix: refactored
-    _create_planned_session() in both files to accept an optional parent_chain tuple
-    and reuse the existing TrainingGoal / TrainingPlan / WeeklyPlan on subsequent
-    calls. The helper now returns (goal, plan, weekly_plan, planned) so the caller
-    can thread the chain through the loop. Backward-compatible — single-call usage
-    still works (parent_chain=None creates the chain). Affects threshold_detection_service_end_to_end
-    and threshold_detection_user_journey_natural_training.
-
-    Reusable failure classes recorded: tests/README.md gained two new dated lessons
-    (2026-07-11, second batch) on capture-scalar-before-expire_all and multi-call
-    _create_planned_session() parent-chain reuse; tests/MOCKING_CONTRACT.md gained
-    the corresponding anti-pattern rows. The ON DELETE SET NULL entry from the prior
-    cycle is now superseded by the more precise "capture scalars BEFORE expire_all()"
-    rule — the prior entry''s expire_all() recommendation was correct in isolation
-    but missed the async lazy-load hazard on the captured instance. No new devops
-    report for these 5 fixes yet — DevOps will rerun the suite and report back; on
-    the next cycle the relevant validation.passed flags can be flipped to true.
-
-    Recurring infrastructure risk assessment: the capture-scalar-before-expire_all
-    rule and the multi-call parent-chain rule are both per-test patterns (not conftest
-    concerns), so they stay in the README + contract rather than moving to a shared
-    fixture. The next test file that needs to expire_all() between a commit and a
-    SELECT referencing in-memory attributes should follow the capture-scalar pattern.
-    The next test file that calls a parent-chain helper multiple times for the same
-    athlete should follow the parent_chain reuse pattern. If a third such test file
-    appears, the parent-chain helper should be extracted to tests/utils/factories.py
-    to prevent the same bug from recurring in a fourth place.
-    '
-- date: '2026-07-11'
-  plan: phase-2-3-p1-threshold-detection
-  tests_added: 0
-  tests_modified: 3
-  tests_removed: 0
-  result: PARTIAL
-  coverage_delta: 'Test Architect remediation cycle (round 3) driven by the third
-    DevOps report (reports/phase-2-3-p1-threshold-detection_devops.md). Compared to
-    round 2 (5 failures), this round starts with 3 failures — all in test_*.py files
-    (DevOps could not fix them per the Boundaries policy). The 123 tests that passed
-    in round 2 remain passing; the 3 remaining failures are all test-side issues,
-    not application defects.
-
-    Category 1 (1 test, 1 file): test_deleting_activity_nullifies_measurement_activity_id
-    in tests/integration/test_physiology_measurement_repository_integration.py still
-    failed after the round-2 capture-scalar fix. Under async SQLAlchemy + NullPool,
-    the SELECT itself returns the same row that was just expired — SQLAlchemy''s
-    identity map serves the expired PhysiologyMeasurement instance from the cache,
-    and accessing surviving.athlete_id triggers an async lazy load outside the greenlet
-    context (MissingGreenlet). Fix: add .execution_options(populate_existing=True)
-    to the SELECT so SQLAlchemy bypasses the identity map and rebuilds the instance
-    from the result row. The capture-scalar pattern (round 2) protects the WHERE clause;
-    populate_existing=True protects attribute access on the returned row. The two
-    fixes compose. Affects physiology_measurement_repository_persistence.
-
-    Category 2 (1 test, 1 file): test_inconsistent_easy_run_hrs_produce_no_natural_observation
-    in tests/integration/test_threshold_detection_service_integration.py failed
-    with AssertionError — the algorithm produced an LT1_HR observation with observed_value=145.0
-    for HR values [140, 145, 150]. The natural-training consistency check in app/services/threshold_detection_service.py
-    is any(abs(hr - median_hr) > EASY_RUN_HR_TOLERANCE_BPM for hr in sorted_hrs)
-    where EASY_RUN_HR_TOLERANCE_BPM = 5.0 — a STRICT greater-than. With median 145,
-    max deviation abs(150 - 145) = 5.0 is NOT > 5.0, so the values pass the consistency
-    check. Fix: widen the spread to [130, 145, 165] (median 145, max deviation 20
-    bpm — unambiguously above the 5 bpm threshold). Affects threshold_detection_service_end_to_end.
-
-    Category 3 (1 test, 1 file): test_journey_inconsistent_easy_runs_produce_no_natural
-    in tests/behaviour/test_threshold_detection_user_journey.py failed with the same
-    assertion as Category 2 — identical test data pattern [140, 145, 150]. Same
-    fix: widen the spread to [130, 145, 165]. Affects threshold_detection_user_journey_natural_training.
-
-    Reusable failure classes recorded: tests/README.md gained two new dated lessons
-    (2026-07-11, third batch) on populate_existing=True post-cascade SELECT and strict-greater-than
-    threshold test-data design; tests/MOCKING_CONTRACT.md gained the corresponding
-    anti-pattern rows. The capture-scalar-before-expire_all entry from round 2 is
-    now superseded by the more precise populate_existing=True rule — the capture-scalar
-    pattern is necessary but not sufficient when the SELECT returns the same row
-    that was just expired.
-
-    Recurring infrastructure risk assessment: the populate_existing=True rule is
-    the THIRD entry in the expire_all() family (round 1: expire_all() between cascade
-    commit and post-cascade SELECT; round 2: capture scalars BEFORE expire_all();
-    round 3: add populate_existing=True to the post-cascade SELECT). This is a recurring
-    infrastructure risk — three rounds of fixes for the same family of failures indicates
-    the pattern is subtle enough that per-test memory is not sufficient. The fix
-    should move into a shared conftest helper (e.g. db_session.refresh_after_cascade(obj))
-    that encapsulates the capture-scalar + expire_all + populate_existing sequence
-    so test authors do not need to remember the three-step recipe. Flagged for the
-    next conftest refactor cycle. The strict-greater-than threshold rule is a per-test
-    data-design pattern and stays in the README + contract.
-
-    No new devops report for these 3 fixes yet — DevOps will rerun the suite and
-    report back; on the next cycle the relevant validation.passed flags can be flipped
-    to true. The 3 affected features (physiology_measurement_repository_persistence,
-    threshold_detection_service_end_to_end, threshold_detection_user_journey_natural_training)
-    stay at passed=false until DevOps confirms the fix works.
-    '
-- date: '2026-07-11'
-  plan: phase-2-3-p1-threshold-detection
-  tests_added: 0
-  tests_modified: 0
-  tests_removed: 0
-  result: PASS
-  coverage_delta: 'DevOps re-run after round-3 fixes: 126 passed, 0 failed (reports/test_history/latest.md,
-    2026-07-11T22:30:00Z). All 3 round-3 fixes verified at the real-DB boundary.
-    Test Architect promotion cycle: validation.passed flipped from false to true
-    for physiology_measurement_repository_persistence, threshold_detection_service_end_to_end,
-    and threshold_detection_user_journey_natural_training. index.yaml selection.regression
-    and selection.regression updated to include the 3 newly promoted test files
-    (tests/integration/test_physiology_measurement_repository_integration.py,
-    tests/integration/test_threshold_detection_service_integration.py,
-    tests/behaviour/test_threshold_detection_user_journey.py). index.yaml coverage.invariants
-    extended with 11 new entries covering the now-passing end-to-end contracts:
-    PhysiologyMeasurement append-only at repository layer, activity_id ON DELETE
-    SET NULL, athlete_id ON DELETE CASCADE, calibration eligibility gate (end-to-end),
-    sport type gate (end-to-end), missing RawSensorStream gate (end-to-end), detect()
-    service boundary (does NOT write to PhysiologyMeasurement), natural training
-    analysis consistency check (±5 bpm), natural training analysis inconsistency
-    check (spread > 5 bpm), natural training analysis minimum-runs check (<3 runs),
-    and natural training analysis measurement_date source.
-
-    DevOps Infrastructure Fixes from this run (recorded in reports/test_history/latest.md):
-    conftest.py added _SafeAsyncSession class that overrides expire_all() to use
-    expunge() instead of marking instances as expired — avoids MissingGreenlet on
-    post-expire SELECT with populate_existing=True in async SQLAlchemy 2.0.51.
-    This is a conftest-level fix that complements the per-test populate_existing=True
-    pattern: the conftest now provides a safe default for all sessions, and the
-    per-test pattern remains as a belt-and-braces measure for tests that explicitly
-    need to bypass the identity map. Also fixed client fixture mount path from
-    "/_protected" to "/api/v1/_protected" to align with base_url="http://testserver/api/v1".
-
-    Phase-2.3-P1 is now fully promoted: all 13 features at validation.passed=true,
-    all 7 test files in selection.regression and selection.release. The plan is
-    ready for the next phase (Phase-2.3-P2 — PhysiologyUpdateService) to build on
-    the now-stable threshold detection + physiology measurement foundation.
-    '
+      - "PhysiologyMeasurement is append-only"
+      - "Threshold detection only runs for calibration_eligible = true activities"
+      - "Threshold detection only runs for sport_type = RUNNING"
+      - "Missing RawSensorStream returns empty list (signal cleaning not yet complete)"
+      - "For athletes with RR intervals, training_rr_inflection observations have higher"
+      - "For athletes with power, training_power_hr_ratio observations contribute to"
+      - "PhysiologyParameter closed ontology (10 values)"
+      - "parameter and source stored as non-native String enums"
+      - "algorithm_used and confidence_weight nullable for manual entries"
+      - "Indexes: (athlete_id, measurement_date) and (athlete_id, parameter, source)"
+      - "activity_id ON DELETE SET NULL preserves the historical row when an Activity"
+      - "athlete_id ON DELETE CASCADE removes measurements when the Athlete is deleted"
+      - "Service does NOT write to PhysiologyMeasurement — that is Plan P2's responsibility"
+      - "measurement_date on observations is activity.activity_date, not the detection"
+      - "Natural training analysis: ≥3 consistent easy runs (±5 bpm) produce LT1_HR"
+      - "Cleaned stream wire format round-trips through real object storage"
+      - "End-to-end user journey: register → onboard → upload → signal_clean → threshold"
+      - "Behaviour journey gates: calibration eligibility, sport type, missing RawSensorStream,"
+      - "Service boundary preserved end-to-end: detect() never writes to PhysiologyMeasurement"
+      - "Easy runs are calibration-eligible for load computation but do NOT provide threshold"
+      - "Confidence is per-metric"
+      - "Evidence weight thresholds (4.0 for MEDIUM, 8.0 for HIGH)"
+      - "Per-metric evidence accumulation"

@@ -60,4 +60,5 @@ publish_event(event)  # If this crashes, event is lost forever
 
 ## Cross-References
 - [ADR-002: Async-First Database Access](./002-async-first-database-access.md) — transactions and async processing.
+- [ADR-013: Outbox Publisher Service Ownership](./013-outbox-publisher-service-ownership.md) — publish-side service ownership for outbox status transitions.
 - [SystemEvent entity](./../docs/architecture/04-platform/system-event.md) — full contract and schema.

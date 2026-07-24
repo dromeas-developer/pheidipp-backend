@@ -38,6 +38,7 @@
       "name": "Poolside AI",
       "whitelist": [
         "poolside/laguna-m.1",
+        "poolside/laguna-s-2.1",
         "poolside/laguna-xs-2.1"
       ]
     },
@@ -62,13 +63,13 @@
 
   // LSP — enable basedpyright for Python type checking diagnostics.
   // LSP is disabled by default; this enables it with strict type checking.
-  "lsp": {
-    "python": {
-      "enabled": true,
-      "command": ["basedpyright-langserver", "--stdio"],
-      "extensions": [".py"]
-    }
-  },
+  //"lsp": {
+  //  "python": {
+  //    "enabled": true,
+  //    "command": ["basedpyright-langserver", "--stdio"],
+  //    "extensions": [".py"]
+  //  }
+  //},
 
   // MCP server — semantic codebase search, symbol lookup, and architectural context.
   // PROJECT_PATH tells the server which directory to index.

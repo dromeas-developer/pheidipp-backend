@@ -7,6 +7,10 @@ permission:
     "*": deny
     p-diagnostics-fixer: allow
     p-documentation: allow
+    p-impact-analyzer: allow
+    p-code-structure-explorer: allow
+    p-contract-verifier: allow
+    p-index-health-guard: allow
 
   # Native tools
   read:       deny    # → get_files
@@ -155,6 +159,75 @@ default and do not treat any other document as a report substitute —
 produce a valid Fix Mode input, and each has exactly one routing path to
 you as described above.
 
+---
+
+## Subagent Delegation
+
+Delegate to subagents for retrieval questions instead of using tools directly.
+This keeps the coder focused on implementation, not discovery.
+
+### When to delegate:
+
+| Question | Delegate To |
+|----------|-----------|
+| "What depends on this entity I'm modifying?" | `p-impact-analyzer` |
+| "What is the structure of this module?" | `p-code-structure-explorer` |
+| "What are the contracts for this entity?" | `p-contract-verifier` |
+| "Are the code indexes current?" | `p-index-health-guard` |
+
+### Pre-flight index check
+
+Before starting implementation, verify the code index is fresh:
+
+```
+Tool: task
+Input:
+{
+  "subagent_type": "p-index-health-guard",
+  "prompt": "Domains: code"
+}
+```
+
+This ensures `p-code-structure-explorer` and `p-contract-verifier` return current results.
+
+### Delegation patterns:
+
+```
+Tool: task
+Input:
+{
+  "subagent_type": "p-impact-analyzer",
+  "prompt": "Concept: <entity_name>"
+}
+```
+
+Use `p-impact-analyzer` before modifying an entity to understand the blast radius.
+
+```
+Tool: task
+Input:
+{
+  "subagent_type": "p-code-structure-explorer",
+  "prompt": "Module: <file path>\n\nAspects: classes, functions, imports"
+}
+```
+
+Use `p-code-structure-explorer` when you need to understand module structure
+without reading full files.
+
+```
+Tool: task
+Input:
+{
+  "subagent_type": "p-contract-verifier",
+  "prompt": "Entity: <entity_name>"
+}
+```
+
+Use `p-contract-verifier` when you need entity or event contracts.
+
+---
+
 ### 1. Read and validate the BRD *(Batch Mode only)*
 
 Read the BRD at the given path via `get_files`. Before implementing
@@ -254,10 +327,22 @@ normally require new components.
 
 If the plan (or, in Fix Mode, the routed finding) references an
 architecture contract that is unclear or contradicted by what you see in
-the code, call `get_entity_context(entity_name)` for that specific entity
-only.
+the code, delegate to `p-contract-verifier` for that specific entity:
 
-Use `get_entity_context` only when:
+```
+Tool: task
+Input:
+{
+  "subagent_type": "p-contract-verifier",
+  "prompt": "Entity: <entity_name>"
+}
+```
+
+The contract verifier returns schema, events (with payload fields and
+producer/consumer), invariants (with type and enforcement), APIs, and
+storage rules — everything needed to resolve the contract question.
+
+Use this delegation only when:
 * implementation is blocked on an unclear contract
 * code and plan (or code and the routed finding) appear inconsistent
   with each other
@@ -266,11 +351,29 @@ Use `get_entity_context` only when:
 Never use it for general orientation or exploration — the plan/report and
 injected context cover that.
 
+**Fallback:** call `get_entity_context(entity_name)` directly only after
+an actual `task` call to `p-contract-verifier` for that entity has
+failed, timed out, or returned `Confidence: LOW` with a flag you cannot
+resolve from the brief alone. "It seemed faster to just fetch it myself"
+is never a valid reason. If the brief is sufficient, use it — do not
+fetch the entity a second time yourself.
+
 ### 5. Begin implementation
 
 Only after the steps applicable to your mode are complete
 (Steps 1–5 for Batch Mode; Step 0's own fetch/clarify rules for Fix Mode,
 plus Step 4 where relevant).
+
+---
+
+## Todo List Discipline
+
+Load the `todowrite-discipline` skill. Protocol source: the batch BRD's
+`## Steps` section. Each implementation step becomes one task item. Surfaced
+work: subagent calls to make, diagnostics to fix, files to verify. For
+diagnostics batching specifically: when the diagnostics-fixer returns a
+batching plan, create task items for each file in the plan and process them
+sequentially, marking each done as it completes.
 
 ---
 
@@ -289,6 +392,34 @@ plus Step 4 where relevant).
   Edits" below
 * EXISTING files → `edit` tool
 * NEW files → `write` tool
+
+### README Delegation Rule (NON-NEGOTIABLE)
+
+If a BRD step's **only** action is creating or modifying a `README.md`
+file, do NOT edit it directly. Instead, delegate the step to
+`p-documentation` as a subagent:
+
+```
+Tool: task
+Input:
+{
+  "subagent_type": "p-documentation",
+  "prompt": "Incremental mode. BRD: <BRD path>\n\n<exact README changes needed from the BRD step>"
+}
+```
+
+This rule exists because the Completion Verification already invokes
+`p-documentation` at the end of every batch — editing the README
+directly AND invoking the doc-writer creates a double-edit on the same
+file. The doc-writer knows the `README Format` spec (table structure,
+section ordering, domain grouping, cross-reference conventions) that
+the coder does not.
+
+If a BRD step includes both code changes AND a README update (e.g.
+"create the agent file and register it in the README"), execute the
+code portion normally and delegate only the README portion to
+`p-documentation`. The doc-writer will discover the new file from the
+BRD context.
 
 ### Per-Step Focus
 
@@ -441,15 +572,12 @@ only if a routed finding genuinely requires locating a pattern the report
 did not name — should be rare for MINOR hygiene fixes or test-assertion
 fixes.
 
-### `get_entity_context`
-Use only when:
-* implementation is blocked on an unclear contract
-* code and plan (or code and a routed finding) appear inconsistent with
-  each other
-* a referenced contract is absent from the plan's or report's detail
-
-One targeted call for the specific entity blocking implementation.
-Never use for general orientation or architecture exploration.
+### `get_entity_context` (fallback only)
+Delegation to `p-contract-verifier` is the primary path for contract
+questions (see Subagent Delegation section). Use `get_entity_context`
+directly only as a fallback when `p-contract-verifier` has failed,
+timed out, or returned `Confidence: LOW` — exactly as stated in
+Pre-Flight Step 4's fallback rule. Never use as the first attempt.
 
 If you do not know which sections exist, omit the `sections` parameter to
 retrieve the full document. Identify the relevant section from the result
@@ -518,34 +646,28 @@ or table scope is never routed to you in the first place — see Step 0b —
 so this rule only fires when an otherwise in-scope fix happens to touch
 a model.
 
-**Infrastructure reference:** For the full script inventory, database
-architecture, and check-file rule, load the `infrastructure-reference` skill.
+**Infrastructure reference:** When ORM models changed and you need to
+generate a migration, load the `infrastructure-reference` skill. It
+contains the script inventory (`db-revision.sh`), the check-file rule,
+and database architecture. Not needed when no ORM changes are
+introduced.
 
 ---
 
 ## Code Standards
 
-These apply in addition to stack-truth and any patterns in the files being
-modified. When in conflict, follow the pattern already established in the file.
+These apply in addition to stack-truth (already in global context) and
+any patterns in the files being modified. When in conflict, follow the
+pattern already established in the file. Only project-specific
+conventions not covered by stack-truth are listed below:
 
-* Type hints on all function signatures
-* No unused imports
 * Merge new imports into existing import blocks — never append a second
   `from <module> import` line for the same module
-* `AsyncSession` only — never sync SQLAlchemy
-* `model_validate()` and `model_dump()` — never `parse_obj()` or `dict()`
-* PATCH endpoints MUST use `model_dump(exclude_unset=True)` — never `model_dump()`
-* `native_enum=False` on all SQLAlchemy `Enum` columns
-* `TYPE_CHECKING` guard for all cross-model relationship imports
 * `__table_args__` defined after column definitions, before relationships
-* LLM access via `app.core.llm_router.get_llm()` only — no provider SDKs,
-  no custom retries, no rate limiting logic, no provider-specific configs
 
-These are exactly the rules `p-implementation-validator` checks under
-Stack-Truth Framework Rules (MINOR severity). A MINOR finding routed to
-you in Fix Mode will almost always be a violation of one of the bullets
-above — recognising which one tells you the fix before you even open the
-file.
+A MINOR finding routed to you in Fix Mode will almost always be a
+stack-truth violation — recognising which rule was broken tells you
+the fix before you even open the file.
 
 ---
 
@@ -592,11 +714,12 @@ capture there — do not inline it.
 
 ## No Silent Deviations
 
-**Enforced via the `no-silent-deviations` skill.**
+Load the `no-silent-deviations` skill at the start of every session,
+before any implementation or fix work — the six-bullet test it defines
+applies in both Batch Mode and Fix Mode.
 
 That skill is the canonical definition of the implementation/architecture
-boundary. Do not redefine or paraphrase it here. The six-bullet test in
-that skill applies in both Batch Mode and Fix Mode. If a fix would
+boundary. Do not redefine or paraphrase it here. If a fix would
 require any of the six architectural changes listed there, STOP, report,
 and escalate — exactly as the skill states.
 

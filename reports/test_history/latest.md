@@ -1,9 +1,9 @@
-date: 2026-07-15T08:15:00Z
-plan: phase-2-3-p2
+date: 2026-07-24T12:00:00Z
+plan: phase-2-7
 execution_group: feature
-total: 193
-passed: 193
+total: 9
+passed: 9
 failed: 0
 skipped: 0
-duration_seconds: 25.70
+duration_seconds: 4
 failures: []

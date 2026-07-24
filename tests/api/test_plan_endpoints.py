@@ -23,6 +23,8 @@ from typing import Any
 import pytest
 from httpx import AsyncClient
 
+import app.worker.app as worker_module
+from app.db.session import AsyncSessionLocal as _production_session_local
 from tests.payloads import weekly_schedule_payload
 from tests.utils.http_helpers import bearer_header, http_register
 
@@ -35,13 +37,20 @@ from tests.utils.http_helpers import bearer_header, http_register
 @pytest.fixture
 async def onboarded_with_plan(
     client: AsyncClient,
+    test_session_local: Any,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> tuple[uuid.UUID, str]:
-    """Register + complete onboarding for a fresh athlete. Returns
-    ``(athlete_id, access_token)``.
+    """Register + complete onboarding, then run the ``generate_plan``
+    procrastinate task in-process so the athlete ends up with an
+    active plan.
 
-    Onboarding wires a PlanGenerationService into the transaction, so
-    completing it is the canonical way to land an active plan for the
-    HTTP surface test.
+    The Phase-2.7 Batch 3 plan (closing G-03) decouples plan
+    generation from the onboarding transaction: ``POST /onboarding``
+    returns 201 before the worker task runs. The HTTP surface tests
+    still need an active plan to exercise the read endpoints, so the
+    fixture invokes the task body directly via the standard
+    ``AsyncSessionLocal`` monkey-patch — the same pattern as
+    ``test_outbox_publisher_task_integration.py``.
 
     The goal event date is set 16 weeks out — below the
     ``marathon + intermediate`` training-length-gate threshold (24
@@ -92,6 +101,15 @@ async def onboarded_with_plan(
         headers=bearer_header(tok),
     )
     assert response.status_code == 201, response.text
+
+    monkeypatch.setattr(worker_module, "AsyncSessionLocal", test_session_local)
+    try:
+        await worker_module.generate_plan(athlete_id=str(aid))
+    finally:
+        monkeypatch.setattr(
+            worker_module, "AsyncSessionLocal", _production_session_local
+        )
+
     return aid, tok
 
 

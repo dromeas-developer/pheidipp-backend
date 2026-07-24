@@ -2,7 +2,9 @@
 ## Sub-Phase ID: Phase-1.5a
 
 ## Objective
-Deliver the athlete's first meaningful interaction with the coach: a four-paragraph first message triggered after onboarding completes. This message must demonstrate that the coach has read and understood the athlete's specific data. At LOW confidence, the language tier is Tier 3: "Based on what you've described..." The trigger is the `onboarding_completed` event, and the message is created exactly once per active goal.
+Deliver the athlete's first meaningful interaction with the coach: a four-paragraph first message triggered after the twin model is ready. This message must demonstrate that the coach has read and understood the athlete's specific data. At LOW confidence, the language tier is Tier 3: "Based on what you've described..." The trigger is the `twin_model_ready` event (which fires after onboarding completes), and the message is created exactly once per active goal.
+
+> **Post-Implementation Note (added during Phase 2.7 retrospective) — RESOLVED via ADR-012:** The `twin_model_ready` event's original catalogue contract named `TwinRecalibrationService` as the producer with the trigger "fires once after onboarding when twin has sufficient data" — explicitly NOT the bootstrap TwinState (`confidence_level='low'`). The Phase 2.7 retrospective and TA review surfaced that this objective's phrasing ("which fires after onboarding completes") and the Phase 2.7 Batch 3 implementation (which fires the event from `OnboardingService` at bootstrap) both drifted from the original catalogue's producer/trigger contract. The Vision & Architecture Author chose **Path B** — amend the catalogue to match the implemented behaviour. The decision is recorded in **ADR-012** (`docs/adr/012-twin-model-ready-producer-amendment.md`, status: `accepted`). The catalogue's `twin_model_ready` producer is now `OnboardingService`, the trigger fires immediately after the bootstrap TwinState insert for all tiers, and the Tier-1 historical-ingestion language has been removed. This objective's phrasing ("which fires after onboarding completes") is now consistent with the amended catalogue. The Architecture Author also amended this file's trigger reference for consistency.
 
 ## Challenge Notes
 The first coach message sets the tone for the entire coaching relationship. If it feels generic or templated, the athlete will never fully trust the coach. If it feels genuinely personal — referencing specific background, goal, and structural risk — the athlete will engage. Vision reference: `coach/first-message.md` emphaseses that this is not about data dumping but about forming a coaching relationship.
@@ -35,7 +37,7 @@ The architect must be aware that `FirstMessageAgent` is an LLM agent, not a temp
 ## Upstream Dependencies
 - Phase-1.3 (Onboarding) — `AthleteProfile`, `AthletePreferences`, `TrainingGoal`, `TwinState` must exist.
 - Phase-1.2c (Twin & Fitness) — `CoachingMessage`, `GenerationEvent` schema must exist.
-- Phase-1.1 (Auth) — Transactional outbox (`04-platform/system-event.md`) must exist to receive and publish the `onboarding_completed` event that triggers this phase.
+- Phase-1.1 (Auth) — Transactional outbox (`04-platform/system-event.md`) must exist to receive and publish the `twin_model_ready` event that triggers this phase.
 
 ## Downstream Enablement
 - Phase-1.5b (Workout Generation) — shares `ContextBudgetService`, `PromptRegistry`, `TwinContextAssembler`

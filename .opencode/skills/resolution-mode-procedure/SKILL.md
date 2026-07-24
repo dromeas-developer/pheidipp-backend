@@ -95,15 +95,47 @@ Architecture Gaps (they may change what the plan can promise), then
 Unauthorized Scope decisions (they depend on the plan being correct
 first).
 
-**Plan Gap / Plan Defect → update the implementation plan.** Edit the
-affected file directly using the `edit` tool — `overview.md` for
-architecture-level gaps (missing contracts, missing invariants, event
-table errors) or the specific batch BRD for execution-level gaps
-(missing Context Needed, broken Success Criteria). The update must
+**Plan Gap / Plan Defect → update the implementation plan.** The
+resolution depends on whether the affected batch already shipped:
+
+**If the batch was NOT yet implemented** (caught during planning, before
+the coder started) — edit the affected file directly using the `edit`
+tool. `overview.md` for architecture-level gaps (missing contracts,
+missing invariants, event table errors); the specific batch BRD for
+execution-level gaps (missing Context Needed, broken Success Criteria).
+
+**If the batch WAS already implemented** (you are in Resolution Mode
+handling a validator or devops report — the batch shipped, the coder
+built it, the validator found a gap) — **never edit the shipped batch
+BRD in place.** Create a new delta batch BRD instead:
+`batch-N-<theme>.md` where N is the next unused batch number. The new
+BRD is a self-contained unit of incremental work:
+- `## Preconditions`: name every completed batch this delta builds on
+  (e.g. "Batches 1–3 complete; their Batch Success Criteria hold. The
+  validator CRITICAL finding <description> is open and is resolved by
+  this batch.")
+- `## Scope`: only the delta — what changes, not a restatement of the
+  original batch
+- `## Steps`: the specific implementation steps for the delta only
+- `## Batch Success Criteria`: the delta's verifiable outcomes
+- `## Files Expected To Change`: only files touched by the delta
+- `## Context Needed`: the shipped batches' relevant artifacts the coder
+  needs to understand the existing state before applying the delta
+
+The shipped batches stay frozen — the coder never diffs a changed BRD
+against already-implemented code. The delta BRD gives the coder exactly
+what to do without reconstructing what changed.
+
+Also update `overview.md`: add the new batch under Scope, add any new
+architecture contracts or ADR references, add a Notes entry recording
+that the delta was delivered as Batch N rather than retro-editing the
+shipped batch, and update the Cross-Validation Summary if applicable.
+
+The update must
 preserve the template structure exactly — load the
 `implementation-plan-templates` skill to confirm. If the gap or defect
 affects a batch BRD's Context Needed or Batch Success Criteria, load
-the `coder-handoff-blocks` skill and update those blocks per its spec.
+the `implementation-handoff-blocks` skill and update those blocks per its spec.
 If the gap requires an ADR (see Step 8 criteria), write the ADR first,
 then reference it in `overview.md`'s Architecture Contracts section with
 the `DECISION` label.
@@ -119,10 +151,14 @@ say so.
 added (scoped to what the finding names — do not retrieve broadly).
 Decide:
 * **Accept** — the addition is architecturally sound and should become
-  part of the plan. Update the plan to incorporate it formally. If it
-  introduces a new ownership boundary, event contract, or invariant,
-  write an ADR first. Then the coder's next session implements against
-  the updated plan; no removal is needed.
+  part of the plan. Apply the same shipped-vs-unshipped gate as Plan
+  Gap/Defect: if the affected batch already shipped, create a new delta
+  batch BRD (not an in-place edit of the shipped BRD) that formally
+  incorporates the addition. If the addition introduces a new ownership
+  boundary, event contract, or invariant, write an ADR first, then
+  reference it in the delta BRD's Scope and in `overview.md`'s
+  Architecture Contracts. Update `overview.md` to record the new batch
+  and the ADR reference; do not retro-edit the shipped batch.
 * **Reject** — the addition should not have been made. Route back to
   `p-coder` with a one-line instruction to remove it. Do not remove it
   yourself — you do not write production code.
@@ -153,6 +189,13 @@ Before writing the Resolution Report, verify:
   boundaries, event contracts, invariants, or vision intent, it is an
   Architecture Delta Proposal, not a plan edit, and it goes to the
   Architecture Author instead
+* **no shipped batch BRD was edited in place** — if a resolution touched
+  a batch that the coder already implemented and the validator already
+  checked, the change must be in a new delta batch BRD, not an in-place
+  edit of the shipped one. The shipped BRD's file content should be
+  identical to what the coder received and the validator validated
+  against. If you find yourself about to `edit` a shipped batch BRD, STOP
+  — that batch is frozen; create a new batch instead
 
 ## R5 — Produce The Resolution Report
 
@@ -211,8 +254,11 @@ Plan: docs/implementation/<path-to-plan>.md
 
 ## Artifacts Produced
 
-* Updated files: docs/implementation/phase-N/phase-N-M/overview.md (list every section changed)
-* Updated BRDs: docs/implementation/phase-N/phase-N-M/batch-N-<theme>.md (list each, or omit if none)
+* New delta batch BRDs created: docs/implementation/phase-N/phase-N-M/batch-N-<theme>.md (list each, or omit if none)
+* Companion test files: docs/implementation/phase-N/phase-N-M/batch-N-<theme>-tests.md (list each, or omit if none)
+* Companion architecture handoffs: docs/implementation/phase-N/phase-N-M/batch-N-architecture.md (list each, or omit if none)
+* Updated overview.md: docs/implementation/phase-N/phase-N-M/overview.md (list every section changed)
+* Updated BRDs — pre-ship only, in-place edits: (list each, or omit if none — Resolution Mode should rarely produce these)
 * ADRs written: docs/adr/NNN-<slug>.md (list each, or omit if none)
 * Architecture docs updated: <path> (list each, or omit if none)
 * Architecture index refreshed: yes / no

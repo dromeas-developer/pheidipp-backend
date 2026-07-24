@@ -43,7 +43,7 @@ Persistence layer — each repository wraps a single database table (or closely 
 |---|---|
 | `coaching_message_repository.py` | CoachingMessage: append-only insert, type-filtered athlete feed, and per-activity idempotency lookups |
 | `generation_event_repository.py` | GenerationEvent: append-only LLM audit log insert and per-athlete history feed |
-| `system_event_outbox_repository.py` | SystemEventOutbox: insert and `mark_published` mutation — only mutable event table per ADR-004 |
+| `system_event_outbox_repository.py` | SystemEventOutbox: insert, `get_pending` batch read, and `mark_published` mutation — only mutable event table per ADR-004 |
 | `system_event_repository.py` | SystemEvent: append-only insert — always paired with `SystemEventOutboxRepository` in the same transaction |
 
 ## Architecture Notes
@@ -52,6 +52,7 @@ Persistence layer — each repository wraps a single database table (or closely 
 - The `add`/`insert` convention: `session.add()`, `flush()`, `refresh()` — consistent across all repositories. Bulk variants (`add_many`, `insert_many`) flush once for the batch then refresh each row
 - Append-only contracts (no `update`/`delete`): `CoachingMessageRepository`, `GeneratedWorkoutRepository`, `GenerationEventRepository`, `PhysiologyMeasurementRepository`, `RawSensorStreamRepository`, `TwinStateRepository`, `WorkoutStepRepository`
 - `SystemEventRepository` and `SystemEventOutboxRepository` must be called in the same transaction (ADR-004 atomicity). Producers should use `app.services.event_publisher.publish_event` to guarantee this
+- `SystemEventOutboxRepository.get_pending` is a read-only batch query (no flush, no commit) ordered by `created_at` so the outbox publisher transitions rows in insertion order, backed by `ix_system_event_outbox_status_created`
 - `WeeklyPlanRepository` and `WeeklySessionRepository` coexist in `weekly_plan_repository.py` — they share the plan-generation transaction lifecycle
 - `AthleteRepository.is_unique_violation` is a static helper for mapping PostgreSQL `23505` errors to application-level `409 Conflict` responses
 - `RefreshTokenRepository.is_active` is a pure static function — no session dependency, safe to call after the transaction closes

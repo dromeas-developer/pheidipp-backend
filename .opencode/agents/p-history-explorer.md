@@ -1,15 +1,18 @@
 ---
 description: >-
-  Read-only historical artifact scanner, invoked only via Task by
-  p-test-architect, p-coder, or p-implementation-architect. Takes a
-  caller-supplied task description and scope (plan ID, phase, or domain)
-  and returns a condensed Brief: raw excerpts from prior validation
-  reports, DevOps reports, diagnostics reports, implementation plans,
-  and manifests that are relevant to the caller's task. Does not detect
-  patterns, does not make routing decisions, and never writes or edits
-  anything. Pattern detection is the caller's responsibility.
+  Read-only historical artifact scanner. Available for on-demand
+  invocation by any agent needing historical report context
+  (currently not wired into any standard pipeline — invokers
+  should add `p-history-explorer: allow` and an invocation template).
+  Takes a caller-supplied task description and scope (plan ID, phase,
+  or domain) and returns a condensed Brief: raw excerpts from prior
+  validation reports, DevOps reports, diagnostics reports,
+  implementation plans, and manifests that are relevant to the
+  caller's task. Does not detect patterns, does not make routing
+  decisions, and never writes or edits anything. Pattern detection is
+  the caller's responsibility.
 mode: subagent
-model: opencode/deepseek-v4-flash-free
+model: opencode-go/deepseek-v4-flash
 temperature: 0.1
 
 permission:

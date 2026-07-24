@@ -36,7 +36,7 @@ from app.services.fit_parser_service import (
     ParsedFitData,
     BytesReader,
 )
-from app.services.first_message_agent import (
+from app.agents.first_message_agent import (
     FirstMessageAgent,
     FirstMessageAlreadyExistsError,
     LLMServiceUnavailableError,
@@ -89,6 +89,7 @@ from app.services.onboarding_service import (
     PreferencesInput,
     ProfileInput,
 )
+from app.services.outbox_publisher_service import OutboxPublisherService
 from app.services.physiology_update_service import (
     MissingAthletePhysiologyError,
     PhysiologyUpdateResult,
@@ -103,9 +104,10 @@ from app.services.plan_generation_service import (
     PlanGenerationService,
     SessionDayAssignment,
 )
+from app.services.plan_query_service import PlanQueryService
 from app.core.prompt_registry import PromptNotFoundError, PromptRegistry
 from app.services.signal_cleaning_service import SignalCleaningService
-from app.services.workout_generation_agent import WorkoutGenerationAgent
+from app.agents.workout_generation_agent import WorkoutGenerationAgent
 from app.services.workout_generation_errors import (
     LLMServiceUnavailableError as WorkoutLLMServiceUnavailableError,
     PlannedSessionNotFoundError,
@@ -183,12 +185,14 @@ __all__ = [
     "OnboardingService",
     "OnboardingStatus",
     "OutboxEvent",
+    "OutboxPublisherService",
     "ParsedFitData",
     "PhysiologyUpdateResult",
     "PhysiologyUpdateService",
     "PlanGenerationError",
     "PlanGenerationResult",
     "PlanGenerationService",
+    "PlanQueryService",
     "PlannedSessionNotFoundError",
     "PreferencesSnapshot",
     "ProfileSnapshot",

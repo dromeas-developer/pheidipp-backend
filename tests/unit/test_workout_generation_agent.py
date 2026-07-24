@@ -42,7 +42,7 @@ from app.services.context_budget_service import (
     WorkoutReadinessDigest,
     WorkoutSessionSummary,
 )
-from app.services.workout_generation_agent import WorkoutGenerationAgent
+from app.agents.workout_generation_agent import WorkoutGenerationAgent
 from app.services.workout_generation_errors import (
     LLMServiceUnavailableError,
     PlannedSessionNotFoundError,

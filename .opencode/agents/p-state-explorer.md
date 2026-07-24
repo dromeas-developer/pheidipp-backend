@@ -6,11 +6,11 @@ description: >-
   description or entity list and returns a condensed Brief: the
   current registry of what exists in that domain — entities, services,
   repositories, routes, registrations, event producers, transaction
-  boundaries. Does not perform open-ended discovery, does not resolve
+  boundaries, and which code files map to each entity. Does not perform open-ended discovery, does not resolve
   file content (that is p-code-explorer's job), and never writes or
   edits anything.
 mode: subagent
-model: opencode/deepseek-v4-flash-free
+model: opencode-go/deepseek-v4-flash
 temperature: 0.1
 
 permission:
@@ -39,6 +39,9 @@ permission:
   pheidipp-codebase-context_grep_files:       allow
   pheidipp-codebase-context_find_files:       allow
   pheidipp-codebase-context_get_files:        allow
+
+  # MCP — entity-to-code bridging
+  pheidipp-codebase-context_get_code_for_entity: allow
 ---
 
 # Pheidipp — State Explorer
@@ -113,9 +116,14 @@ for alternative names unless the task explicitly asks for that.
    to confirm each entity exists — but first check whether READMEs already
    list the files where those entities live.
 
-3. **For each domain or entity**, build a registry block containing:
+  3. **For each domain or entity**, build a registry block containing:
    - **Entities**: ORM models found in `app/models/`, their table names,
      and key columns (names and types — not full definitions)
+   - **Code files**: for each entity, use `get_code_for_entity(entity_name)`
+     to discover which code files implement it. This bridges the
+     architecture entity name to concrete file paths — essential when the
+     caller needs to know where an entity lives without searching layer
+     by layer
    - **Services**: service classes found in `app/services/`, their public
      methods (names only, not implementations)
    - **Repositories**: repository classes found in `app/repositories/`,
@@ -125,8 +133,8 @@ for alternative names unless the task explicitly asks for that.
      `app/models/__init__.py`, `app/services/__init__.py`, etc.
    - **Event producers**: files that call `publish_event` or emit system
      events, and which events they produce
-    - **Transaction boundaries**: where `session.commit()` appears in
-      services, and whether events are fired before or after commit
+   - **Transaction boundaries**: where `session.commit()` appears in
+     services, and whether events are fired before or after commit
 
 4. **Batch your queries.** Use `search_symbols` with all entity names in
    one call. Use `grep_files` with all relevant patterns in one call per

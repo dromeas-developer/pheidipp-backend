@@ -36,7 +36,7 @@ from app.schemas.workout import (
     WorkoutStepResponse,
 )
 from app.services.context_budget_service import ContextBudgetService
-from app.services.workout_generation_agent import WorkoutGenerationAgent
+from app.agents.workout_generation_agent import WorkoutGenerationAgent
 from app.services.workout_generation_errors import (
     LLMServiceUnavailableError as WorkoutLLMServiceUnavailableError,
     PlannedSessionNotFoundError,

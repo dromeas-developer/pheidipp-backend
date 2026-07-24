@@ -1,523 +1,153 @@
-version: '1.0'
-plan_id: phase-2-2-p1-signal-cleaning
-generated_at: '2026-07-08T00:00:00Z'
-last_reviewed_at: '2026-07-18T00:00:00Z'
-features:
-  signal_cleaning_pipeline:
-    status: promoted
-    test_type: unit
-    file_scope:
-      - app/services/signal_cleaning_service.py
-    plan: docs/implementation/phase-2/phase-2-2-p1-signal-cleaning.md
-    owned_by_plan:
-    - phase-2-2-p1-signal-cleaning
-    description: 'SignalCleaningService.clean() executes steps 1–4 (resample → artifact removal → smoothing → derived metrics + rolling features) and persists RawSensorStream when gates pass.'
-    protects:
-    - Steps run in fixed order 1→7. No step may be skipped or reordered.
-    - Null propagation: artifact-removed nulls propagate through smoothing. A channel with > 80% null values after artifact removal is marked unavailable in AvailableChannels.
-    - Resampling: FIT files vary in recording rate (1 Hz typical; some devices record at 0.5 Hz). The pipeline resamples to a uniform 1 Hz time series before step 1.
-    - If the pipeline produces a stream shorter than 5 minutes of non-null HR data, RawSensorStream is not created and segmentation is skipped.
-    - Signal cleaning failure does not block Activity creation — retry mechanism in place.
-    - Activities with source = manual_entry never get RawSensorStream (no FIT file).
-    - If cleaning fails (stream too short, all HR artifacts), no RawSensorStream is created. The Activity exists with null cleaning_pipeline_version. Segmentation is skipped for this activity.
-    impacts:
-    - threshold_detection
-    - segmentation
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_signal_cleaning_service.py
-        owner: phase-2-2-p1-signal-cleaning
+version: "1.0"
+plan_id: "phase-2-2-p1-signal-cleaning"
+generated_at: "2026-07-18T00:00:00Z"
+last_reviewed_at: "2026-07-18T00:00:00Z"
 
-  signal_cleaning_pipeline_integration:
-    status: promoted
-    test_type: integration
-    file_scope:
-      - app/services/signal_cleaning_service.py
-      - app/repositories/raw_sensor_stream_repository.py
-      - app/repositories/activity_repository.py
-      - app/services/object_storage_client.py
-    plan: docs/implementation/phase-2/phase-2-2-p1-signal-cleaning.md
-    owned_by_plan:
-    - phase-2-2-p1-signal-cleaning
-    description: 'End-to-end SignalCleaningService.clean() against the real DB and real local-fallback ObjectStorageClient. Verifies the service↔repository↔object-storage transaction contract: cleaned stream is uploaded, RawSensorStream row is inserted, Activity.cleaning_pipeline_version is set, all atomically. Also covers RR ±20% rolling-median deviation and Gen-1 population GAP formula accuracy against engineered ParsedFitData fixtures — both flagged as partial in the unit-test pack.'
-    protects:
-    - One RawSensorStream per Activity. Created atomically with the cleaned stream upload.
-    - Cleaned data stored in object storage is immutable (append-only, never updated).
-    - The fit_file_key on RawSensorStream is the cleaned stream key — different from Activity.fit_file_key (raw FIT).
-    - Activity.cleaning_pipeline_version null → non-null transition driven exclusively by the cleaning task.
-    - Cleaned RR values that deviate more than ±20% from the rolling median are filtered out.
-    - Gen-1 population GAP formula: gap = raw_pace / (1 + a*grade + b*grade²) with a=0.033, b=0.00012.
-    - available_channels reflects what survived artifact removal.
-    - If the pipeline produces a stream shorter than 5 minutes of non-null HR data, RawSensorStream is not created.
-    impacts:
-    - threshold_detection
-    - segmentation
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      integration:
-      - path: tests/integration/test_signal_cleaning_service_integration.py
-        owner: phase-2-2-p1-signal-cleaning
+prerequisites:
+  migrations: false
 
-  object_storage_cleaned_stream:
+files:
+  test_signal_cleaning_user_journey.py:
+    type: behaviour
     status: promoted
-    test_type: unit
-    file_scope:
-      - app/services/object_storage_client.py
-    plan: docs/implementation/phase-2/phase-2-2-p1-signal-cleaning.md
-    owned_by_plan:
-    - phase-2-2-p1-signal-cleaning
-    description: 'ObjectStorageClient extended with build_cleaned_stream_key and upload_cleaned_stream methods following the cleaned-streams/{athlete_id}/{activity_id}/stream.gz key pattern.'
-    protects:
-    - Cleaned data stored in object storage is immutable (append-only, never updated)
-    - The fit_file_key on RawSensorStream is the cleaned stream key — different from Activity.fit_file_key (raw FIT). The naming is intentional.
-    impacts:
-    - signal_cleaning_pipeline
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_signal_cleaning_object_storage.py
-        owner: phase-2-2-p1-signal-cleaning
-
-  ingestion_enqueue_hook:
+    functions:
+      test_activity_schema_includes_cleaning_pipeline_version_field: {implemented: true, executable: true, passed: true}
+      test_activity_stable_before_worker_runs: {implemented: true, executable: true, passed: true}
+      test_cleaning_pipeline_version_transitions_to_v1_after_worker_runs: {implemented: true, executable: true, passed: true}
+      test_cross_athlete_get_returns_403: {implemented: true, executable: true, passed: true}
+      test_cycling_activity_cleaning_pipeline_version_stays_null: {implemented: true, executable: true, passed: true}
+      test_raw_sensor_stream_row_exists_after_clean: {implemented: true, executable: true, passed: true}
+      test_upload_returns_202_with_task_id_and_activity_is_readable: {implemented: true, executable: true, passed: true}
+  test_activity_ingestion_signal_clean_enqueue_integration.py:
+    type: integration
     status: promoted
-    test_type: unit
-    file_scope:
-      - app/services/activity_ingestion_service.py
-    plan: docs/implementation/phase-2/phase-2-2-p1-signal-cleaning.md
-    owned_by_plan:
-    - phase-2-2-p1-signal-cleaning
-    description: 'ActivityIngestionService._run_ingestion_pipeline defers signal_clean task only when eligible AND sport_type=running AND source!=manual_entry, after twin_recalibration returns.'
-    protects:
-    - Activities with sport_type != running are treated as calibration_eligible = false and data_tier = 6 by the CalibrationEligibilityService.
-    - Signal cleaning failure does not block Activity creation — retry mechanism in place.
-    - Steps run in fixed order 1→7. No step may be skipped or reordered.
-    impacts:
-    - signal_cleaning_pipeline
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_activity_ingestion_service_signal_clean.py
-        owner: phase-2-2-p1-signal-cleaning
-
-  ingestion_enqueue_hook_integration:
+    functions:
+      test_defer_failure_does_not_break_ingestion: {implemented: true, executable: true, passed: true}
+      test_defer_fires_after_twin_recalibration: {implemented: true, executable: true, passed: true}
+      test_signal_clean_deferred_with_activity_id: {implemented: true, executable: true, passed: true}
+      test_signal_clean_not_deferred_for_cycling: {implemented: true, executable: true, passed: true}
+      test_signal_clean_not_deferred_for_manual_entry: {implemented: true, executable: true, passed: true}
+  test_activity_repository_cleaning_version_integration.py:
+    type: integration
     status: promoted
-    test_type: integration
-    file_scope:
-      - app/services/activity_ingestion_service.py
-      - app/repositories/activity_repository.py
-    plan: docs/implementation/phase-2/phase-2-2-p1-signal-cleaning.md
-    owned_by_plan:
-    - phase-2-2-p1-signal-cleaning
-    description: 'Real ActivityIngestionService.ingest(...) against the real test DB. Drives a real Activity row through to completion and verifies the task_dispatcher fake records the defer call with the right activity_id, AFTER the twin_recalibration.recalibrate(...) call returns (per async-pipeline ordering). Verifies the full gate: eligible+running+non-manual → defer; non-running OR ineligible OR manual → no defer; defer-raise → swallowed.'
-    protects:
-    - Activities with sport_type != running are treated as calibration_eligible = false and data_tier = 6.
-    - Signal cleaning failure does not block Activity creation — retry mechanism in place.
-    - Steps run in fixed order 1→7. No step may be skipped or reordered.
-    impacts:
-    - signal_cleaning_pipeline
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      integration:
-      - path: tests/integration/test_activity_ingestion_signal_clean_enqueue_integration.py
-        owner: phase-2-2-p1-signal-cleaning
-
-  signal_clean_task_integration:
+    functions:
+      test_missing_activity_raises_lookup_error: {implemented: true, executable: true, passed: true}
+      test_null_to_non_null_transition_persists: {implemented: true, executable: true, passed: true}
+      test_other_columns_unchanged_after_version_update: {implemented: true, executable: true, passed: true}
+      test_second_update_overwrites_previous_version: {implemented: true, executable: true, passed: true}
+  test_signal_cleaning_service_integration.py:
+    type: integration
     status: promoted
-    test_type: integration
-    file_scope:
-      - app/worker/app.py
-      - app/services/signal_cleaning_service.py
-      - app/repositories/raw_sensor_stream_repository.py
-      - app/repositories/activity_repository.py
-    plan: docs/implementation/phase-2/phase-2-2-p1-signal-cleaning.md
-    owned_by_plan:
-    - phase-2-2-p1-signal-cleaning
-    description: 'End-to-end signal_clean procrastinate task invocation against the real DB and real local-fallback object storage. Verifies the worker task body: opens its own AsyncSessionLocal session, constructs the SignalCleaningService with real dependencies, calls service.clean(activity_id), commits exactly once, and returns the documented result dict. Exercises the task idempotency path: a second invocation against an already-cleaned activity returns created=False without re-uploading.'
-    protects:
-    - Signal cleaning failure does not block Activity creation — retry mechanism in place.
-    - One RawSensorStream per Activity.
-    - Activity.cleaning_pipeline_version null → non-null transition driven exclusively by the cleaning task.
-    impacts:
-    - threshold_detection
-    - segmentation
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      integration:
-      - path: tests/integration/test_signal_cleaning_task_integration.py
-        owner: phase-2-2-p1-signal-cleaning
-
-  activity_repository_update_cleaning_version:
+    functions:
+      test_available_channels_shape_and_values: {implemented: true, executable: true, passed: true}
+      test_clean_persists_raw_sensor_stream_with_cleaned_key: {implemented: true, executable: true, passed: true}
+      test_clean_sets_activity_cleaning_pipeline_version_persists: {implemented: true, executable: true, passed: true}
+      test_cleaned_stream_bytes_are_gzipped_and_parseable: {implemented: true, executable: true, passed: true}
+      test_gap_equals_raw_pace_for_flat_grade: {implemented: true, executable: true, passed: true}
+      test_gap_matches_formula_for_uphill_grade: {implemented: true, executable: true, passed: true}
+      test_high_hr_dropout_still_produces_raw_sensor_stream: {implemented: true, executable: true, passed: true}
+      test_object_storage_conflict_is_treated_as_idempotent_success: {implemented: true, executable: true, passed: true}
+      test_rr_above_20pct_rolling_median_is_nulled: {implemented: true, executable: true, passed: true}
+      test_rr_deviation_filter_does_not_affect_hr_persistence: {implemented: true, executable: true, passed: true}
+      test_rr_deviation_filter_pushed_rr_intervals_to_unavailable: {implemented: true, executable: true, passed: true}
+      test_rr_deviation_filter_skips_when_window_too_small: {implemented: true, executable: true, passed: true}
+      test_second_clean_returns_already_cleaned_no_second_row: {implemented: true, executable: true, passed: true}
+      test_short_stream_does_not_persist_row_or_update_version: {implemented: true, executable: true, passed: true}
+  test_signal_cleaning_task_integration.py:
+    type: integration
     status: promoted
-    test_type: unit
-    file_scope:
-      - app/repositories/activity_repository.py
-    plan: docs/implementation/phase-2/phase-2-2-p1-signal-cleaning.md
-    owned_by_plan:
-    - phase-2-2-p1-signal-cleaning
-    description: 'ActivityRepository.update_cleaning_version sets cleaning_pipeline_version on the loaded row (null → non-null only; no downgrade path exposed).'
-    protects:
-    - Activity.cleaning_pipeline_version null → non-null transition driven exclusively by the cleaning task.
-    impacts:
-    - signal_cleaning_pipeline
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_activity_repository_update_cleaning_version.py
-        owner: phase-2-2-p1-signal-cleaning
-
-  activity_repository_update_cleaning_version_integration:
+    functions:
+      test_second_invocation_returns_already_cleaned: {implemented: true, executable: true, passed: true}
+      test_task_raises_not_found_for_missing_activity: {implemented: true, executable: true, passed: true}
+      test_task_returns_activity_id_raw_sensor_stream_id_and_created: {implemented: true, executable: true, passed: true}
+      test_task_returns_created_false_for_manual_entry: {implemented: true, executable: true, passed: true}
+  test_activity_ingestion_service_signal_clean.py:
+    type: unit
     status: promoted
-    test_type: integration
-    file_scope:
-      - app/repositories/activity_repository.py
-    plan: docs/implementation/phase-2/phase-2-2-p1-signal-cleaning.md
-    owned_by_plan:
-      - phase-2-2-p1-signal-cleaning
-    description: 'Real ActivityRepository.update_cleaning_version against the real test DB. Verifies the null → non-null transition lands in the activities table and is queryable by ActivityRepository.get_by_id after commit. Verifies LookupError is raised when the activity does not exist (DB-level missing row, not mock-level).'
-    protects:
-      - Activity.cleaning_pipeline_version null → non-null transition driven exclusively by the cleaning task.
-    impacts:
-      - signal_cleaning_pipeline
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      integration:
-      - path: tests/integration/test_activity_repository_cleaning_version_integration.py
-        owner: phase-2-2-p1-signal-cleaning
-
-  signal_cleaning_journey:
+    functions:
+      test_signal_clean_defer_failure_is_swallowed: {implemented: true, executable: true, passed: true}
+      test_signal_clean_deferred_when_eligible_running_non_manual: {implemented: true, executable: true, passed: true}
+      test_signal_clean_not_deferred_when_manual_entry: {implemented: true, executable: true, passed: true}
+      test_signal_clean_not_deferred_when_not_eligible: {implemented: true, executable: true, passed: true}
+      test_signal_clean_not_deferred_when_sport_type_not_running: {implemented: true, executable: true, passed: true}
+  test_activity_repository_update_cleaning_version.py:
+    type: unit
     status: promoted
-    test_type: behaviour
-    file_scope:
-      - app/api/v1/activity.py
-      - app/services/activity_ingestion_service.py
-      - app/services/signal_cleaning_service.py
-      - app/worker/app.py
-      - app/repositories/raw_sensor_stream_repository.py
-      - app/repositories/activity_repository.py
-      - app/services/object_storage_client.py
-    plan: docs/implementation/phase-2/phase-2-2-p1-signal-cleaning.md
-    owned_by_plan:
-      - phase-2-2-p1-signal-cleaning
-    description: 'Behaviour tests driving the full Phase-2.2 upload → ingestion → cleaning pipeline through the public HTTP surface. Each test registers an athlete via POST /auth/register, completes onboarding, and uploads a FIT through POST /athletes/{id}/activities/upload. The behaviour layer exercises the cross-layer transaction: stage_upload → fit_ingest worker task body → signal_clean worker task body, after which GET /athletes/{id}/activities/{aid} reflects the cleaning_pipeline_version non-null transition and the persisted RawSensorStream row. The two async tasks share the same per-tx AsyncSessionLocal that production uses, so the user-visible outcome is the same one the runner the user sees gets.'
-    protects:
-      - Activity.cleaning_pipeline_version null → non-null transition driven exclusively by the cleaning task.
-      - One RawSensorStream per Activity. Created atomically with the cleaned stream upload.
-      - The fit_file_key on RawSensorStream is the cleaned stream key — different from Activity.fit_file_key (raw FIT).
-      - Cleaned data stored in object storage is immutable (append-only, never updated).
-      - Signal cleaning failure does not block Activity creation — retry mechanism in place.
-      - Activities with source = manual_entry never get RawSensorStream (no FIT file).
-      - Activities with sport_type != running are treated as calibration_eligible = false and data_tier = 6.
-      - available_channels reflects what survived artifact removal.
-      - POST /upload returns 202 with task_id (Phase-1.8).
-      - activity_ingested event published AFTER commit (Phase-1.8).
-    impacts:
-      - threshold_detection
-      - segmentation
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      behaviour:
-      - path: tests/behaviour/test_signal_cleaning_user_journey.py
-        owner: phase-2-2-p1-signal-cleaning
-
-  rr_deviation_filter_remediation:
+    functions:
+      test_update_cleaning_version_does_not_delete_or_update_other_fields: {implemented: true, executable: true, passed: true}
+      test_update_cleaning_version_raises_when_activity_missing: {implemented: true, executable: true, passed: true}
+      test_update_cleaning_version_sets_version: {implemented: true, executable: true, passed: true}
+  test_signal_cleaning_object_storage.py:
+    type: unit
     status: promoted
-    test_type: unit
-    file_scope:
-      - app/services/signal_cleaning_service.py
-    plan: docs/implementation/phase-2/phase-2-2-p2-rr-deviation-filter-remediation.md
-    owned_by_plan:
-      - phase-2-2-p2-rr-deviation-filter-remediation
-    description: 'Phase-2.2-P2 remediation: extend SignalCleaningService._remove_artifacts with a follow-on RR ±20% rolling-median deviation filter (after hard bound) using a trailing window that EXCLUDES the candidate; remove the dead self._session field from __init__ while retaining the constructor parameter. The unit layer (this entry) and the integration layer (also added by P2) jointly cover the cross-section isolation AND the persistence-boundary contract for the new behaviour.'
-    protects:
-      - Cleaned RR values that deviate more than ±20% from the rolling median are filtered out — the cleaned RR series excludes them. (Sub-phase Exit Gate verbatim)
-      - Steps run in fixed order 1→7. No step may be skipped or reordered. (the new RR deviation pass must run AFTER hard bound and AFTER power pass — ordering is load-bearing)
-      - Null propagation: artifact-removed nulls propagate through smoothing.
-      - available_channels reflects what survived artifact removal — now including the deviation filter (post-deviation null fraction is the determinant). The deviation filter's nulls must propagate to the persisted available_channels JSONB column at the persistence boundary.
-      - If the pipeline produces a stream shorter than 5 minutes of non-null HR data, RawSensorStream is not created (HR gate is read from artifact_free.hr which the RR change does not touch — regression guard).
-      - If cleaning fails (stream too short, all HR artifacts), no RawSensorStream is created.
-    impacts:
-      - signal_cleaning_pipeline
-      - threshold_detection
-      - segmentation
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_signal_cleaning_service.py
-        owner: phase-2-2-p2-rr-deviation-filter-remediation
-      integration:
-      - path: tests/integration/test_signal_cleaning_service_integration.py
-        owner: phase-2-2-p2-rr-deviation-filter-remediation
-      api: []
-      behaviour: []
-
-execution_groups:
-  signal_cleaning_unit:
-    scope: feature
-    phase: 2
-    tests:
-    - tests/unit/test_signal_cleaning_service.py
-    - tests/unit/test_signal_cleaning_object_storage.py
-    - tests/unit/test_activity_ingestion_service_signal_clean.py
-    - tests/unit/test_activity_repository_update_cleaning_version.py
-    depends_on: []
-  # Phase-2.2-P2 reuse: the RR ±20% rolling-median deviation filter
-  # tests are added to tests/unit/test_signal_cleaning_service.py by
-  # the P2 patch plan. The path is already covered by signal_cleaning_unit.
-  rr_deviation_filter_unit:
-    scope: feature
-    phase: 2
-    tests:
-    - tests/unit/test_signal_cleaning_service.py
-    depends_on: []
-  # Phase-2.2-P2 integration-mode work: the strengthened and new
-  # integration tests live in tests/integration/test_signal_cleaning_service_integration.py
-  # in the TestCleanRrRollingMedianFilter class. The path is also
-  # covered by signal_cleaning_integration.
-  rr_deviation_filter_integration:
-    scope: feature
-    phase: 2
-    tests:
-    - tests/integration/test_signal_cleaning_service_integration.py
-    depends_on:
-    - rr_deviation_filter_unit
-  signal_cleaning_integration:
-    scope: feature
-    phase: 2
-    tests:
-    - tests/integration/test_signal_cleaning_service_integration.py
-    - tests/integration/test_signal_cleaning_task_integration.py
-    - tests/integration/test_activity_ingestion_signal_clean_enqueue_integration.py
-    - tests/integration/test_activity_repository_cleaning_version_integration.py
-    depends_on:
-    - signal_cleaning_unit
-  signal_cleaning_behaviour:
-    scope: feature
-    phase: 2
-    tests:
-    - tests/behaviour/test_signal_cleaning_user_journey.py
-    depends_on:
-    - signal_cleaning_integration
+    functions:
+      test_deterministic: {implemented: true, executable: true, passed: true}
+      test_different_inputs_different_keys: {implemented: true, executable: true, passed: true}
+      test_download_cleaned_stream_nonexistent_raises_error: {implemented: true, executable: true, passed: true}
+      test_download_cleaned_stream_returns_bytes: {implemented: true, executable: true, passed: true}
+      test_equality: {implemented: true, executable: true, passed: true}
+      test_format: {implemented: true, executable: true, passed: true}
+      test_frozen: {implemented: true, executable: true, passed: true}
+      test_no_fit_in_key: {implemented: true, executable: true, passed: true}
+      test_upload_cleaned_stream_conflict_raises_error: {implemented: true, executable: true, passed: true}
+      test_upload_cleaned_stream_creates_file_on_disk: {implemented: true, executable: true, passed: true}
+      test_upload_cleaned_stream_s3_conflict: {implemented: true, executable: true, passed: true}
+      test_upload_cleaned_stream_s3_success: {implemented: true, executable: true, passed: true}
+  test_signal_cleaning_service.py:
+    type: unit
+    status: promoted
+    functions:
+      test_clean_already_cleaned_is_idempotent: {implemented: true, executable: true, passed: true}
+      test_clean_available_channels_hr_false_when_gt_80pct_null: {implemented: true, executable: true, passed: true}
+      test_clean_available_channels_power_false_when_all_artifacted: {implemented: true, executable: true, passed: true}
+      test_clean_available_channels_rr_false_when_gt_80pct_null: {implemented: true, executable: true, passed: true}
+      test_clean_available_channels_rr_intervals_reflects_post_deviation_state: {implemented: true, executable: true, passed: true}
+      test_clean_cadence_always_false: {implemented: true, executable: true, passed: true}
+      test_clean_deviation_filter_window_excludes_candidate_sample: {implemented: true, executable: true, passed: true}
+      test_clean_eligible_running_creates_raw_sensor_stream: {implemented: true, executable: true, passed: true}
+      test_clean_hr_dropout_does_not_block_cleaning: {implemented: true, executable: true, passed: true}
+      test_clean_ineligible_raises_ineligible_error: {implemented: true, executable: true, passed: true}
+      test_clean_manual_entry_returns_noop_result: {implemented: true, executable: true, passed: true}
+      test_clean_missing_activity_raises_not_found_error: {implemented: true, executable: true, passed: true}
+      test_clean_non_running_raises_ineligible_error: {implemented: true, executable: true, passed: true}
+      test_clean_out_of_band_rr_inside_hard_bound_is_nulled: {implemented: true, executable: true, passed: true}
+      test_clean_power_above_3x_rolling_median_is_removed: {implemented: true, executable: true, passed: true}
+      test_clean_retry_on_conflict_succeeds: {implemented: true, executable: true, passed: true}
+      test_clean_rr_deviation_filter_does_not_apply_to_hr: {implemented: true, executable: true, passed: true}
+      test_clean_rr_deviation_filter_does_not_apply_to_power: {implemented: true, executable: true, passed: true}
+      test_clean_rr_deviation_filter_does_not_apply_to_speed: {implemented: true, executable: true, passed: true}
+      test_clean_rr_deviation_filter_nulls_in_2to1_pattern: {implemented: true, executable: true, passed: true}
+      test_clean_rr_deviation_filter_skips_when_window_too_small: {implemented: true, executable: true, passed: true}
+      test_clean_rr_outside_200_2500_ms_removed: {implemented: true, executable: true, passed: true}
+      test_clean_sets_activity_cleaning_pipeline_version: {implemented: true, executable: true, passed: true}
+      test_clean_sets_raw_sensor_stream_cleaning_pipeline_version: {implemented: true, executable: true, passed: true}
+      test_clean_short_stream_returns_short_stream_no_row: {implemented: true, executable: true, passed: true}
+      test_clean_uniform_rr_within_deviation_band_is_preserved: {implemented: true, executable: true, passed: true}
+      test_hr_five_minute_gate_unaffected_when_rr_data_is_all_artifacted: {implemented: true, executable: true, passed: true}
+      test_signal_clean_idempotency_short_circuits_before_deviation_filter: {implemented: true, executable: true, passed: true}
+      test_signal_cleaning_service_constructor_accepts_session_keyword_argument: {implemented: true, executable: true, passed: true}
+      test_signal_cleaning_service_init_signature_retains_session_parameter: {implemented: true, executable: true, passed: true}
+      test_signal_cleaning_service_source_does_not_reference_self_session: {implemented: true, executable: true, passed: true}
 
 coverage:
-  routes:
-    covered:
-    - POST /athletes/{id}/activities/upload
-    - GET /athletes/{id}/activities/{aid}
-    partial: []
-    missing: []
   events:
     covered:
-    - activity_ingested
-    - activity_calibration_eligible
-    partial: []
-    missing: []
+      - "activity_ingested"
+      - "activity_calibration_eligible"
   invariants:
     covered:
-    - Steps run in fixed order 1→7. No step may be skipped or reordered.
-    - Null propagation: artifact-removed nulls propagate through smoothing.
-    - Resampling: FIT files resampled to uniform 1 Hz time series.
-    - If the pipeline produces a stream shorter than 5 minutes of non-null HR data, RawSensorStream is not created.
-    - Signal cleaning failure does not block Activity creation.
-    - Activities with source = manual_entry never get RawSensorStream.
-    - If cleaning fails (stream too short, all HR artifacts), no RawSensorStream is created.
-    - Cleaned data stored in object storage is immutable.
-    - The fit_file_key on RawSensorStream is the cleaned stream key — different from Activity.fit_file_key.
-    - available_channels reflects what survived artifact removal.
-    - Activity.cleaning_pipeline_version null → non-null transition driven exclusively by the cleaning task.
-    - Activities with sport_type != running are treated as calibration_eligible = false.
-    - One RawSensorStream per Activity.
-    - Cleaned RR values that deviate more than ±20% from the rolling median are filtered out. (Phase-2.2-P2 sub-phase Exit Gate; P1 integration pack added end-to-end coverage; P2 unit-mode pack added cross-section isolation on _remove_artifacts; P2 integration-mode pack strengthened the existing end-to-end test with per-index assertions on the persisted cleaned stream and added 3 new integration tests covering the persistence-boundary contract for the filter-isolation guard, the null-propagation/window-too-small guard, and the available_channels.rr_intervals post-deviation state.)
-    - The RR ±20% deviation filter is RR-specific — it does NOT apply to HR, power, speed, or elevation channels. (Phase-2.2-P2 testing requirement 3; unit + integration coverage.)
-    partial: []
-    missing: []
-
-history:
-  - date: '2026-07-08'
-    plan: phase-2-2-p1-signal-cleaning
-    tests_added: 37
-    tests_modified: 0
-    tests_removed: 0
-    result: PENDING
-    coverage_delta: Initial manifest created with 37 unit tests covering all Phase-2.2 capabilities (signal_cleaning_pipeline, object_storage_cleaned_stream, ingestion_enqueue_hook, activity_repository_update_cleaning_version).
-  - date: '2026-07-08'
-    plan: phase-2-2-p1-signal-cleaning
-    tests_added: 24
-    tests_modified: 0
-    tests_removed: 0
-    result: PENDING
-    coverage_delta: 'Integration test pack: 21 tests across four files covering (a) SignalCleaningService.transaction contract end-to-end against the real DB and real local-fallback ObjectStorageClient — happy path, short-stream gate, idempotency at UNIQUE-constraint layer, retry idempotency at ObjectStorageConflictError, RR ±20% rolling-median deviation filter, Gen-1 population GAP formula accuracy against engineered GPS series, HR dropout does not block cleaning, available_channels shape; (b) signal_clean procrastinate task body — happy path, idempotent retry, missing-activity raises NotFound, manual-entry no-op; (c) ActivityIngestionService signal_clean enqueue hook — eligible+running fires once, non-running does not, manual-entry does not, defer failure swallowed, defer fires AFTER twin_recalibration appends TwinState(ACTIVITY_SYNC); (d) ActivityRepository.update_cleaning_version — null→non-null transaction contract, missing-row raises LookupError, second update overwrites previous version. Previously-partial invariants (RR ±20% filter, GAP formula) moved to covered. New integration features added: signal_cleaning_pipeline_integration, signal_clean_task_integration, ingestion_enqueue_hook_integration, activity_repository_update_cleaning_version_integration.'
-  - date: '2026-07-08'
-    plan: phase-2-2-p1-signal-cleaning
-    tests_added: 4
-    tests_modified: 0
-    tests_removed: 0
-    result: PENDING
-    coverage_delta: 'Behaviour test pack: 4 tests in tests/behaviour/test_signal_cleaning_user_journey.py — end-to-end user journeys driving POST /auth/register, onboarding PATCH, POST /athletes/{id}/activities/upload through the public HTTP surface, with the real fit_ingest + signal_clean procrastinate task bodies invoked against the real DB and ObjectStorageClient local fallback. Each journey verifies the user-visible outcome via GET /athletes/{id}/activities/{aid}: cleaning_pipeline_version is null at create time, populated to "v1-signal-cleaning" only after the signal_clean task commits, and resumption of the journey after each retry returns the same idempotent state. New behaviour feature added: signal_cleaning_journey. index.yaml selection.feature and coverage.routes updated to include the behaviour test path and the route coverage carried by the journey test.'
-  - date: '2026-07-08'
-    plan: phase-2-2-p2-rr-deviation-filter-remediation
-    tests_added: 14
-    tests_modified: 0
-    tests_removed: 0
-    result: PENDING
-    coverage_delta: 'Phase-2.2-P2 unit-mode test pack: 14 tests across three new test classes added to tests/unit/test_signal_cleaning_service.py. TestRrDeviationFilter (9) covers the RR ±20% rolling-median deviation filter: uniform-RR preserved (no false positives), in-bound high-deviation RR nulled (Exit Gate bullet), the filter does not apply to HR/power/speed channels (filter-isolation guards), < 2 non-null samples in window preserves the candidate (null-propagation guard), window excludes the candidate (Coder Handoff Notes warning), 2:1 conformant:outlier pattern nulls the outliers cleanly, and available_channels.rr_intervals is computed AFTER the deviation filter (the literal >80% test in the plan is implemented via a hard-bound-80%-boundary + deviation-push-past-80% construction). TestRrDeviationFilterRegression (2) covers regression guards: 5-minute HR gate unaffected when RR is entirely hard-bound-nulled, and signal_clean idempotency guard still short-circuits before the deviation filter runs. TestSessionDeadFieldRemoved (3) covers the MINOR fix: source contains no self._session *code* reference (docstring mentions allowed), __init__ signature retains the session keyword-only parameter, and the constructed service has no _session attribute. New feature added: rr_deviation_filter_remediation. P1 integration test for the same capability is unchanged. The sub-phase invariant "Cleaned RR values that deviate more than ±20% from the rolling median are filtered out" is now covered at unit, integration, and behaviour layers.'
-  - date: '2026-07-08'
-    plan: phase-2-2-p2-rr-deviation-filter-remediation
-    tests_added: 3
-    tests_modified: 1
-    tests_removed: 0
-    result: PENDING
-    coverage_delta: 'Phase-2.2-P2 integration-mode test pack: the existing P1 integration test test_rr_above_20pct_rolling_median_is_nulled (tests/integration/test_signal_cleaning_service_integration.py::TestCleanRrRollingMedianFilter) was strengthened — the prior assertion "some record in the spike window is null" was replaced with precise per-index assertions on the persisted cleaned stream (the spike at index 299 is nulled; the conformant samples at indices 298, 300, 0, 599 are preserved; the available_channels.rr_intervals boundary is correctly computed against the 1/600 null fraction). Three new integration tests added in the same class: test_rr_deviation_filter_pushed_rr_intervals_to_unavailable (Phase-2.2-P2 Testing Requirement 5: a constructed series where the hard bound leaves 480/600 null and the deviation pass adds enough additional nulls to push the cumulative fraction past 80% — verified at the persistence boundary by re-reading the cleaned stream from object storage and confirming null_count > 480 and the row carries available_channels.rr_intervals=False); test_rr_deviation_filter_skips_when_window_too_small (Phase-2.2-P2 Testing Requirement 4: a 30-leading-nulls + 5 conformant cluster + 565-trailing-nulls RR series with sufficient HR — the 5 conformant samples are preserved at the persistence boundary because the deviation filter''s "len < 2" guard fires for the leading samples and the equal-to-median cluster samples pass the deviation check); test_rr_deviation_filter_does_not_affect_hr_persistence (Phase-2.2-P2 Testing Requirement 3: an HR spike (100 bpm, inside the [30, 220] hard bound but 33% below the 150 bpm median) and an RR spike (400 ms, inside [200, 2500] hard bound but -50% from 800 ms median) co-located at index 31 — the RR spike is nulled at the persistence boundary, the HR spike is preserved (RR filter does not apply to HR), the HR EMA smoothing is unaffected by the RR filter). Manifest entry rr_deviation_filter_remediation updated: tests.integration now references tests/integration/test_signal_cleaning_service_integration.py; description updated to reflect the joint unit + integration coverage; protects updated to mention the persistence-boundary requirement on the deviation filter''s nulls propagating to available_channels. The sub-phase invariant "Cleaned RR values that deviate more than ±20% from the rolling median are filtered out" is now exercised at three layers (unit, integration, behaviour) with the integration layer covering the persistence boundary in addition to the in-memory logic.'
-  - date: '2026-07-09'
-    plan: phase-2-2-p2-rr-deviation-filter-remediation
-    tests_added: 0
-    tests_modified: 0
-    tests_removed: 0
-    result: PENDING
-    coverage_delta: 'DevOps reported 14 unit test failures (reports/phase-2-2-p2-rr-deviation-filter-remediation_devops.md). Root cause: fixture helper _parsed_fit_data_full in tests/unit/test_signal_cleaning_service.py (line 111) constructed GpsRecord(speed=..., altitude=...) without the required timestamp: datetime first field. Fix applied: added timestamp=start_time + timedelta(seconds=i) to the GpsRecord constructor in the helper, added timedelta to the datetime import. One-off fixture bug — not a reusable failure class, no README or MOCKING_CONTRACT update. Self-check via bash scripts/pytest.sh --collect-only confirms 31 unit tests + 14 integration tests collect cleanly. Awaiting DevOps re-execution to confirm all 31 unit tests pass. No coverage classification changes.'
-  - date: '2026-07-09'
-    plan: phase-2-2-p2-rr-deviation-filter-remediation
-    tests_added: 0
-    tests_modified: 7
-    tests_removed: 0
-    result: PENDING
-    coverage_delta: 'Test-architect fix cycle for DevOps Categories A and B (7 test-side failures; Category C procrastinate task-name mismatch is a separate coder fix). Fixes applied: A1 — variable shadowing of `mock` in test_clean_rr_outside_200_2500_ms_removed and test_clean_available_channels_rr_false_when_gt_80pct_null; renamed to `mock_activity` to keep the helper''s third argument a MagicMock(Activity). A2 — _minimal_parsed_fit in tests/unit/test_activity_ingestion_service_signal_clean.py now sets start_time=datetime(2026, 6, 15, 8, 0, tzinfo=timezone.utc); production code at app/services/activity_ingestion_service.py:585 calls parsed.start_time.date() unconditionally. B1 — test_clean_sets_activity_cleaning_pipeline_version asserts against mock.id (not the input activity_id), matching the production call site at app/services/signal_cleaning_service.py:546. B2 — test_clean_available_channels_power_false_when_all_artifacted now uses [None] * _SUFFICIENT_DURATION to exercise the null-fraction gate directly; a uniform [5000.0] * N cannot be artifacted by the 3×-rolling-median rule. B3 — test_clean_available_channels_hr_false_when_gt_80pct_null now uses [None] * 1700 + [150.0] * 300 with duration=2000 to clear the 5-minute non-null HR gate (300 ≥ 300) AND fire the null-fraction gate (300/2000 = 0.15 ≤ 0.80). B4 — test_clean_rr_deviation_filter_does_not_apply_to_power now uses pytest.approx(200.0, abs=1e-9) for the power assertion; Savitzky-Golay smoothing introduces FP noise on the order of 1e-13 on uniform inputs. B5 — test_download_cleaned_stream_nonexistent_raises_error now expects ObjectStorageUploadError (the S3 ClientError and the local-fallback missing-key path both raise this class); ObjectStorageConflictError is reserved for PUT conflicts on existing keys. Reusable failure classes from this cycle: (1) fixtures must populate every field production reads unconditionally → README 2026-07-09; (2) test data must clear every gate in the chain before the one under test → README 2026-07-09; (3) pytest.approx for numerically-filtered samples → README + MOCKING_CONTRACT 2026-07-09; (4) variable name `mock` must not be reused for ParsedFitData → README 2026-07-09. Self-check via bash scripts/pytest.sh --collect-only confirms 48 unit tests across 3 modified files collect cleanly with no import errors, fixture-not-found errors, or syntax errors. Awaiting DevOps re-execution to confirm all unit tests now pass.'
-  - date: '2026-07-09'
-    plan: phase-2-2-p2-rr-deviation-filter-remediation
-    tests_added: 0
-    tests_modified: 1
-    tests_removed: 0
-    result: PENDING
-    coverage_delta: 'DevOps retry report (reports/phase-2-2-p2-rr-deviation-filter-remediation_devops.md) flagged one remaining unit failure: test_clean_rr_outside_200_2500_ms_removed. Root cause: the test provided only 290 RR values for a 600-second signal. After the 200-2500 ms hard bound nulled 20 values (10×100 ms + 10×3000 ms), only 270 of 600 records (45%) carried non-null RR — the available_channels null-fraction gate (non_null / n > 0.80) marked rr_intervals=False, contradicting the test''s assertion. Fix applied: expanded rr_values to 600 entries matching the 600-second duration — [1000.0] * 290 + [100.0] * 10 + [3000.0] * 10 + [1000.0] * 290. After hard-bound removal, 580/600 = 96.7% non-null clears the gate; the deviation filter is a no-op because all surviving samples equal the rolling median (1000.0). This is the same reusable failure class already recorded in tests/README.md 2026-07-09 ("Test data must clear every gate in the chain before the one under test") — no new README or MOCKING_CONTRACT entry needed. Self-check via bash scripts/pytest.sh --collect-only confirms 31 unit tests in tests/unit/test_signal_cleaning_service.py collect cleanly. Awaiting DevOps re-execution to confirm the unit test now passes. The 5 behaviour-test failures from the same report (Category C: defer_async on a Psycopg2Connector sync-only connector) are a production bug routed to p-coder, not a test-side issue.'
-  - date: '2026-07-10'
-    plan: phase-2-2-p2-rr-deviation-filter-remediation
-    tests_added: 0
-    tests_modified: 1
-    tests_removed: 0
-    result: PENDING
-    coverage_delta: 'DevOps retry-2 report (reports/phase-2-2-p2-rr-deviation-filter-remediation_devops.md, dated 2026-07-10) flagged one remaining failure: test_upload_returns_202_with_task_id_and_activity_is_readable (behaviour, tests/behaviour/test_signal_cleaning_user_journey.py:184). Root cause: the test asserted sport_type == ''running'' on a staged activity, but stage_upload (app/services/activity_ingestion_service.py:281) does NOT parse FIT metadata — it creates a bare Activity row. The sport_type column has server_default=''unknown'' (app/models/activity.py:129), so the staged activity comes back with sport_type=''unknown''. The fit_ingest worker is what overwrites sport_type after parsing the FIT sport message, and the worker does not run as part of this HTTP-layer test. The fake FIT bytes (_FAKE_FIT_BYTES = b"FIT\x00" + b"\x00" * 100) used by the test cannot produce a real sport_type even if the worker did run. Fix applied: changed the assertion to sport_type == ''unknown'' with a detailed comment explaining the staging-time default and cross-referencing the integration-layer coverage at tests/integration/test_activity_endpoints.py::TestSportTypeResponse::test_get_activity_returns_sport_type (which already exercises the sport_type=''running'' end-to-end response by constructing the Activity row directly). Also corrected the test docstring and the Journey A section header comment, which both incorrectly claimed "sport_type is set to RUNNING on the staged activity" — that invariant does not hold at the staging layer. Updated docs/testing/phase-2-2-p1-signal-cleaning_test_pack.md to match. This is the same reusable failure class already recorded in tests/README.md 2026-07-09 ("Test data must clear every gate in the chain before the one under test") — fake bytes cannot produce a real sport_type, so the test should assert against the staging-time default rather than the post-parse value. Self-check via bash scripts/pytest.sh --collect-only confirms all 7 behaviour tests in tests/behaviour/test_signal_cleaning_user_journey.py and all 2113 tests across unit/integration/behaviour layers collect cleanly. Awaiting DevOps re-execution to confirm all 317 feature tests now pass. NOTE: the production bug conninfo= → dsn= in app/worker/app.py:46 is still present and is routed to p-coder.'
-  - date: '2026-07-10'
-    plan: phase-2-2-p2-rr-deviation-filter-remediation
-    tests_added: 0
-    tests_modified: 0
-    tests_removed: 0
-    result: PASS
-    coverage_delta: >-
-      FINAL PROMOTION — DevOps report (2026-07-10) confirms 318 passed, 0 failed,
-      2 skipped across all 18 feature test files. All 10 Phase 2.2 features promoted
-      from `generated` to `promoted`: signal_cleaning_pipeline,
-      signal_cleaning_pipeline_integration, object_storage_cleaned_stream,
-      ingestion_enqueue_hook, ingestion_enqueue_hook_integration,
-      signal_clean_task_integration, activity_repository_update_cleaning_version,
-      activity_repository_update_cleaning_version_integration,
-      signal_cleaning_journey, rr_deviation_filter_remediation.
-      index.yaml `regression` and `release` selection groups updated with all
-      Phase 2.2 test paths. Cross-phase coverage updated: `available_channels`
-      invariant moved from `partial` to `covered` (covered by unit >80% tests and
-      integration persisted-JSONB tests). Reusable failure classes from this cycle
-      already recorded in tests/README.md 2026-07-09. tests/conftest.py workaround
-      (connector replacement) removed after production fix landed in
-      app/worker/app.py. Behaviour test sport_type assertion corrected. Phase 2.2
-      is complete — the signal cleaning pipeline, RR deviation filter, and end-to-end
-      user journey are all verified at unit, integration, and behaviour layers.
-  - date: '2026-07-18'
-    plan: phase-2-2-p1-signal-cleaning
-    tests_added: 0
-    tests_modified: 1
-    tests_removed: 0
-    result: PENDING
-    coverage_delta: >-
-      Fix-mode cycle for DevOps report RC5a (reports/oneoff_unitary_validation_20260718.md).
-      Root cause: SignalCleaningService renamed `self.object_storage` to
-      `self._object_storage` (private convention) in the service body; the
-      constructor parameter name `object_storage` is unchanged and remains
-      keyword-only. 32 unit tests in tests/unit/test_signal_cleaning_service.py
-      failed at execution with `AttributeError: 'SignalCleaningService' object
-      has no attribute 'object_storage'` because they read/replaced methods on
-      the constructed service via the old public-attribute name.
-      Fix applied: mechanical rename `service.object_storage` → `service._object_storage`
-      across 14 attribute-access lines in tests/unit/test_signal_cleaning_service.py
-      (lines 157, 161, 164, 242, 274, 306, 416, 418, 421, 589, 671, 673, 676, 1445).
-      Constructor keyword arguments `object_storage=AsyncMock()` were deliberately
-      left unchanged (the parameter name is still public). One-off infrastructure
-      mismatch — the same test file already has `assert hasattr(service, "_object_storage")`
-      at line 1562 in TestSessionDeadFieldRemoved, so the new private name was
-      already anticipated by the test pack; only the read/replace sites were
-      stale. validation.implemented stays true; validation.executable and
-      validation.passed downgraded to false on both signal_cleaning_pipeline
-      and rr_deviation_filter_remediation features (the only two features
-      owning this test path). Awaiting DevOps re-execution to confirm the
-      32-failure count drops to zero. No new reusable failure class — this is
-      a one-off coupling between production encapsulation choices and test
-      coupling depth, not a pattern that recurs across the suite. No README
-      or MOCKING_CONTRACT update needed.
+      - "Steps run in fixed order 1→7. No step may be skipped or reordered."
+      - "{'Null propagation': 'artifact-removed nulls propagate through smoothing.'}"
+      - "{'Resampling': 'FIT files resampled to uniform 1 Hz time series.'}"
+      - "If the pipeline produces a stream shorter than 5 minutes of non-null HR data, RawSensorStream is not created."
+      - "Signal cleaning failure does not block Activity creation."
+      - "Activities with source = manual_entry never get RawSensorStream."
+      - "If cleaning fails (stream too short, all HR artifacts), no RawSensorStream is created."
+      - "Cleaned data stored in object storage is immutable."
+      - "The fit_file_key on RawSensorStream is the cleaned stream key — different from Activity.fit_file_key."
+      - "available_channels reflects what survived artifact removal."
+      - "Activity.cleaning_pipeline_version null → non-null transition driven exclusively by the cleaning task."
+      - "Activities with sport_type != running are treated as calibration_eligible = false."
+      - "One RawSensorStream per Activity."
+      - "Cleaned RR values that deviate more than ±20% from the rolling median are filtered out. (Phase-2.2-P2 sub-phase Exit Gate; P1 integration pack added end-to-end coverage; P2 unit-mode pack added cross-section isolation on _remove_artifacts; P2 integration-mode pack strengthened the existing end-to-end test with per-index assertions on the persisted cleaned stream and added 3 new integration tests covering the persistence-boundary contract for the filter-isolation guard, the null-propagation/window-too-small guard, and the available_channels.rr_intervals post-deviation state.)"
+      - "The RR ±20% deviation filter is RR-specific — it does NOT apply to HR, power, speed, or elevation channels. (Phase-2.2-P2 testing requirement 3; unit + integration coverage.)"

@@ -7,6 +7,10 @@ permission:
     "*": "deny"
     p-state-explorer: allow
     p-doc-explorer: allow
+    p-impact-analyzer: allow
+    p-code-structure-explorer: allow
+    p-contract-verifier: allow
+    p-index-health-guard: allow
 
   # Native tools
   read:       allow
@@ -45,7 +49,7 @@ permission:
   pheidipp-codebase-context_get_feature_context:          allow
 
   # Bulk / advanced retrieval
-  pheidipp-codebase-context_get_change_impact:        allow
+  pheidipp-codebase-context_get_agent_dependencies:   allow
 
   # Architecture maintenance
   pheidipp-codebase-context_refresh_architecture:     allow
@@ -85,9 +89,17 @@ You do NOT:
 
 ---
 
+## Todo List Discipline
+
+Load the `todowrite-discipline` skill. Protocol source: the steps in the
+entry mode you are entering (Plan or Resolution). Surfaced work:
+subagent calls to make, gaps found during roasting, ADRs to write.
+
+---
+
 ## Entry Mode
 
-You operate in exactly one of three entry modes. Decide which before doing
+You operate in exactly one of two entry modes. Decide which before doing
 anything else.
 
 **Plan Mode** — you are invoked with a sub-phase document as primary
@@ -107,21 +119,10 @@ determining that no architecture change is actually needed and bouncing
 the finding back to `p-coder`. The skill contains the full R0-R5
 procedure and Resolution Report Format.
 
-**Baseline Mode** — you are invoked with a list of old-format plan paths
-(from `docs/implementation/` before the directory structure was
-introduced). Your job is to migrate them to the current format:
-`## Steps` header, mandatory BRD blocks, companion `-tests.md`, and
-the `phase-N/phase-N-M/` directory structure. Processes up to 3 plans
-per invocation (the caller can pass 1, 2, or 3 — never more). After
-each invocation, report which plans were migrated and which remain.
-Output goes to `docs/implementation/archive/`. Follow the Baseline
-Mode Procedure below.
+If neither a sub-phase document nor a report file is provided → STOP and ask which mode applies.
 
-If neither a sub-phase document, a report file, nor a list of old plan
-paths is provided → STOP and ask which mode applies.
-
-The three modes share the same architecture authority, scope authority,
-and architecture principles — those sections below apply in all three.
+The two modes share the same architecture authority, scope authority,
+and architecture principles — those sections below apply in all modes.
 They differ in input, procedure, and output.
 
 **Gap Analysis capability.** When asked to perform a retrospective gap
@@ -129,8 +130,7 @@ analysis on already-implemented phases (not a single plan), you are
 operating in Plan Mode with a broader scope — the existing implementation
 is your "tentative plan." This is not a separate entry mode; it is Plan
 Mode applied retrospectively, with the codebase as the subject instead
-of a sub-phase document. To migrate old plans to the current BRD format
-instead, use Baseline Mode.
+of a sub-phase document.
 
 Gap Analysis follows a **two-round approach** to avoid context-window
 pressure from reading the entire documentation and code corpus at once:
@@ -181,7 +181,7 @@ not both, and not from turn one.
 |---|---|---|
 | `implementation-plan-templates` | Step 9 — you are persisting plans and need the exact template structure for `overview.md` and batch BRDs. Every plan needs this skill eventually; none need it before Step 9. Also load in Resolution Mode when editing `overview.md` or a batch BRD to confirm template structure is preserved. | `skills/implementation-plan-templates/SKILL.md` |
 | `resolution-mode-procedure` | Resolution Mode — you received a validator or devops report and need the R0-R5 procedure and Resolution Report Format. Load exactly once at mode entry; do not reload during the session. Not needed in Plan Mode. | `skills/resolution-mode-procedure/SKILL.md` |
-| `coder-handoff-blocks` | You are writing per-batch BRDs in Step 9 — the Implementation Steps are already drafted, batches are grouped, and you are producing the final BRD files. Every plan needs this skill eventually; none need it before Step 9. In Resolution Mode, also triggered when a plan update touches any BRD's Context Needed or Batch Success Criteria — load it to update those blocks per its spec. | `skills/coder-handoff-blocks/SKILL.md` |
+| `implementation-handoff-blocks` | You are writing per-batch BRDs in Step 9 — the Implementation Steps are already drafted, batches are grouped, and you are producing the final BRD files and any architecture documentation handoffs. Every plan needs this skill eventually; none need it before Step 9. In Resolution Mode, also triggered when a plan update touches any BRD's Context Needed or Batch Success Criteria — load it to update those blocks per its spec. | `skills/implementation-handoff-blocks/SKILL.md` |
 | `architecture-decision-templates` | Step 8 has determined an ADR is required, OR Step 4/6 surfaced a genuine architecture conflict needing escalation. In Resolution Mode, also triggered when an accepted deviation introduces a new ownership boundary, event contract, or invariant requiring an ADR. Most plans trigger neither. The decision criteria for whether either applies stay in Step 8 below — this skill is the file template only, needed at the moment of writing, not for the judgment call. | `skills/architecture-decision-templates/SKILL.md` |
 
 ---
@@ -304,7 +304,8 @@ incompatibility that makes the planned architecture undeliverable:
 
 1. STOP — do not generate an implementation plan
 2. Produce an **Architecture Delta Proposal** (see format below)
-3. Hand to the Vision & Architecture Author
+3. Escalate to the Technical Advisor, which routes to
+   `p-vision-and-architect-author` for resolution
 4. Wait for the architecture to be updated before resuming planning
 
 No plan is generated until the architecture conflict is resolved.
@@ -330,12 +331,19 @@ and not reloaded during the session.
 
 ### Step 1 — Read The Sub-Phase Document And Current Implementation State
 
-Understand the objective, scope, and constraints before retrieving anything.
-The sub-phase document names the contracts you need — use it as your retrieval
-list, not as a starting point for discovery.
+Before any retrieval, invoke `p-index-health-guard` AND `p-state-explorer`
+**in parallel** — they are independent (the guard refreshes doc indexes, the
+state explorer queries the live codebase). Use two `task` calls in the same
+turn:
 
-Invoke `p-state-explorer` via the `task` tool with the sub-phase's domain
-or entity scope:
+```
+Tool: task
+Input:
+{
+  "subagent_type": "p-index-health-guard",
+  "prompt": "Domains: architecture, vision, release_plan, adr, implementation"
+}
+```
 
 ```
 Tool: task
@@ -346,10 +354,12 @@ Input:
 }
 ```
 
-The State Explorer queries the live codebase and gives a current registry
-of what exists: entities, repositories, services, API routes, registration
-status, event producers, and transaction boundaries. Use its brief as the
-primary signal for "what already exists" before any retrieval.
+The guard ensures doc indexes are current before the Doc Explorer reads them
+in Step 2. The State Explorer gives a current registry of what exists:
+entities, services, repositories, API routes, registration status, event
+producers, transaction boundaries, and entity→code file mappings (which
+files implement each entity). Use its brief as the primary signal
+for "what already exists" before any retrieval.
 
 Also read any previous implementation plans for this phase
 (`docs/implementation/phase-N/`). Cross-check their stated scope against
@@ -385,9 +395,29 @@ dependencies.
 ### Step 3 — Verify Invariants And Check Change Impact
 
 Call `search_invariants` for the systems this sub-phase touches. Use
-filters when you know the constraint type. If the sub-phase modifies an
-existing entity, call `get_change_impact(concept)` — a single call
-returns all affected entities, events, agents, and vision references.
+filters when you know the constraint type.
+
+If the sub-phase modifies an existing entity, delegate to `p-impact-analyzer`
+via the `task` tool instead of using `get_change_impact` directly:
+
+```
+Tool: task
+Input:
+{
+  "subagent_type": "p-impact-analyzer",
+  "prompt": "Concept: <entity_name>"
+}
+```
+
+The Impact Analyzer returns the full blast radius: affected entities, events,
+agents, and vision references. Use this for impact analysis instead of direct
+tool calls.
+
+For agent coupling awareness — which agents reference the entities this plan
+touches — call `get_agent_dependencies(agent_name)` for any agent that the
+Impact Analyzer's report names. This surfaces context budgets, entity
+dependencies, and computation dependencies that RC4 (Modification Safety)
+must account for.
 
 ### Step 4 — Generate Tentative Plan From Docs
 
@@ -430,10 +460,27 @@ Execute these checks in order. For each, record one of:
 Every architecture entity, event, and invariant the Doc Explorer returned
 (Step 2) for this sub-phase's domain must appear in the plan's Architecture
 Contracts section or be explicitly excluded from scope. If a returned
-contract is absent from the plan and not excluded, flag as GAP. A single
-`get_related_contracts(entity)` call for the primary entity may be warranted
-if Doc Explorer's results feel narrow — but prefer reasoning over
-already-gathered context first.
+contract is absent from the plan and not excluded, flag as GAP.
+
+For entities the plan touches, delegate contract retrieval to
+`p-contract-verifier` for structured comparison — it returns schema,
+events (with payload fields), invariants (with type and enforcement),
+APIs, and storage rules in a condensed report. Compare its output against
+the plan's contracts table rather than re-extracting the same data from
+the Doc Explorer's brief manually:
+
+```
+Tool: task
+Input:
+{
+  "subagent_type": "p-contract-verifier",
+  "prompt": "Entity: <entity_name>\n\nAspects: events, invariants"
+}
+```
+
+A single `get_related_contracts(entity)` call for the primary entity may
+be warranted if Doc Explorer's results feel narrow — but prefer reasoning
+over already-gathered context first.
 
 #### RC2 — Vision Constraint Completeness
 
@@ -544,6 +591,13 @@ that expose missing contracts → Significant gap, escalate.
 Draft scenarios are not written to disk yet — they're notes for Step 9
 where they become the `-tests.md` companion file.
 
+**Test scenarios must validate implementation behaviour, never documentation
+content.** Do not draft scenarios that check whether a doc file exists,
+whether a doc contains specific text, or whether documentation matches
+expectations. Tests verify code behaviour against architecture contracts —
+not prose against prose. If a scenario would only pass or fail based on
+reading a markdown file, it is not a valid test scenario.
+
 ### Step 6 — Conditional Code Retrieval
 
 The State Explorer's brief (Step 1) covers most "does this exist"
@@ -561,7 +615,25 @@ the files and symbols identified in Step 4. Do not scan the repository broadly.
 Stop retrieval once plan uncertainty is resolved — if additional retrieval does
 not change the plan, do not make the call.
 
-Use:
+For structural questions — what classes exist in a module, what methods they
+expose, what imports they have — delegate to `p-code-structure-explorer`:
+
+```
+Tool: task
+Input:
+{
+  "subagent_type": "p-code-structure-explorer",
+  "prompt": "Module: <file path or module path>\n\nAspects: classes, functions, imports"
+}
+```
+
+The structure explorer uses AST-aware tools and returns structured data
+without reading full file content. Use it for discovery questions (does
+this module have a repository class? what methods does it expose?). Use
+raw `get_files` only for deep inspection — method bodies, logic flow,
+error handling — that the structure report alone cannot answer.
+
+For targeted retrievals that don't warrant a subagent call, use:
 * `get_files` for specific files identified in the State Explorer's brief or
   prior implementation plans
 * `search_symbols` for specific function or class signatures
@@ -695,7 +767,14 @@ Create the directory if it does not exist. Use the native write tool.
    batches (no behavioural changes). The test architect loads this file
    alongside the BRD; the coder never loads it.
 
-Load the `coder-handoff-blocks` skill now — this is the trigger
+4. **`batch-<theme>-architecture.md`** — one per batch that changes event
+   flows, event catalogue entries, or architecture contracts. Contains
+   the specific files/sections to update, formatted per Template 4 in the
+   `implementation-plan-templates` skill. Omit if the batch has no
+   architecture documentation impact. `p-vision-and-architect-author`
+   loads this file; the coder never loads it.
+
+Load the `implementation-handoff-blocks` skill now — this is the trigger
 condition — and follow its spec for the BRD structure (its sections,
 Context Needed tiers, Batch Success Criteria rules).
 
@@ -721,105 +800,6 @@ to confirm the template structure is preserved.
 **BRD section header:** The implementation steps section in every batch BRD
 must use `## Steps` as its header. The coder reads this section directly;
 the batcher validates against `## Steps`. Do not use `## Implementation Steps`.
-
----
-
-## Baseline Mode Procedure
-
-Invoked when the caller provides a list of old-format plan paths. Process
-up to 3 per invocation. If the caller passes more than 3, process the
-first 3 and report the remainder.
-
-### B0 — Batching gate
-
-Count the provided paths. If > 3 → process the first 3, note the
-remainder in the output. If ≤ 3 → process all.
-
-### B1 — Read the old plan
-
-For each plan in this batch, read it via `get_files`. Old plans are flat
-files with `## Implementation Steps`, no batch grouping, no directory
-structure. Note the original file path — you'll need it for the archive
-output and for the source annotation.
-
-### B2 — Verify against implementation
-
-For each old plan, cross-reference its steps against the actual codebase.
-Use the State Explorer (`task` → `p-state-explorer`) to confirm which
-files, services, and routes still exist at the paths the plan describes.
-If a plan mentions a file or service that no longer exists, flag it in
-the BRD's `## Coder Notes` as "historical — no longer present in
-codebase." Do not modify the plan's intent — you are documenting what
-was, not correcting it.
-
-### B3 — Consolidate into new-format BRD
-
-Map the old plan into the current BRD structure. One old plan → one BRD
-(old plans weren't batched). Specific mappings:
-
-| Old element | New element |
-|---|---|
-| `## Implementation Steps` | `## Steps` (copy verbatim, rename header only) |
-| Plan title / objective paragraph | `## Batch Objective` |
-| No Preconditions section | Insert: "No preconditions — this is the first batch." (old plans are single-batch) |
-| Implicit scope (the plan's own prose) | `## Scope` — extract from the plan's description of what it builds |
-| No Context Needed | `## Context Needed` — derive from steps: for each step, Primary = the architecture contracts and files the step's prose cites |
-| Completion conditions in prose | `## Batch Success Criteria` — extract: "Batch 1 complete when: <conditions from plan's stated goals>" |
-| No Files Expected To Change | `## Files Expected To Change` — list every file path the plan's steps mention creating or editing |
-
-If a mandatory block cannot be derived (the plan's prose is too vague),
-leave it empty and flag in `## Coder Notes`: "BASELINE GAP: <block> could
-not be derived from original plan text." An empty mandatory block is
-acceptable in a historical baseline — the plan already shipped.
-
-### B4 — Grill test scenarios from implementation
-
-For each plan, read the test files that exist for its implementation
-(use `find_files` to locate tests referencing the plan's services/routes).
-Extract concrete input/output pairs from actual assertions — these become
-the `-tests.md` companion file.
-
-If no test files exist for a plan, skip the companion file. Note in the
-BRD's `## Coder Notes`: "No tests found for this plan — companion
-`-tests.md` omitted."
-
-### B5 — Write to archive
-
-For each plan, write two files (or one if no tests):
-
-```
-docs/implementation/archive/phase-N/phase-N-M/batch-1-<theme>.md
-docs/implementation/archive/phase-N/phase-N-M/batch-1-<theme>-tests.md  (if tests exist)
-```
-
-Create the directory if it does not exist. Derive the `phase-N-M` and
-`<theme>` from the old plan's filename:
-- `phase-1-2a-p1-profile-preferences-activity.md` → `phase-1/phase-1-2a/batch-1-profile-preferences-activity.md`
-
-Add a metadata block at the top of each BRD:
-
-```markdown
-> **Baseline — migrated from** `<old plan path>` **on** `<date>`.
-> This plan was implemented before the BRD format was introduced.
-> It documents what was built, verified against the current codebase
-> on `<date>`. See `## Coder Notes` for any gaps found during migration.
-```
-
-### B6 — Report progress
-
-After writing all files for this batch, report:
-
-```
-## Baseline Migration — Batch <N> of <M>
-
-| # | Old plan | New BRD | Tests | Notes |
-|---|---|---|---|---|
-| 1 | phase-1-2a-p1-...md | archive/phase-1/phase-1-2a/batch-1-...md | ✓ | — |
-| 2 | phase-1-2a-p2-...md | archive/phase-1/phase-1-2a/batch-2-...md | ✗ | No tests found |
-| 3 | phase-1-2b-p1-...md | archive/phase-1/phase-1-2b/batch-1-...md | ✓ | 2 mandatory blocks gapped |
-
-<X> plans remaining. Invoke again to process the next 3.
-```
 
 ---
 
@@ -854,7 +834,7 @@ use retrieval tools for the architecture contracts it references.
 | Write a batch BRD | Native write tool → `docs/implementation/phase-N/phase-N-M/batch-N-<theme>.md` |
 | Update an existing plan (Resolution Mode) | `edit` tool on `overview.md` or the relevant batch BRD — preserve the template format exactly |
 | Write a Resolution Report (Resolution Mode) | Native write tool → `reports/<plan-id>_architect_resolution.md` |
-| Update architecture index after doc edits | `refresh_architecture()` — call after every ADR or doc write |
+| Update architecture index after ADR write | `refresh_architecture()` — call after every ADR file write |
 
 ---
 
@@ -901,14 +881,20 @@ Missing clarification, missing example, missing event detail — the intent is
 clear from surrounding context.
 
 Action:
-* Update the architecture document with the missing detail
-* Call `refresh_architecture` to re-index
-* Note the update in the relevant batch BRD's Coder Notes section
+* Do NOT edit the architecture document directly. Instead, produce (or append
+  to) the batch's `batch-N-architecture.md` handoff file — follow Template 4
+  in the `implementation-plan-templates` skill. The handoff specifies the
+  exact file, section, and change needed.
+* Note in the relevant batch BRD's `## Relevant Notes` section that an
+  architecture documentation handoff exists for this batch.
+* The handoff is routed to `p-vision-and-architect-author` (via
+  `p-technical-advisor` or direct user invocation) after implementation.
+  The architect subagent applies the change and calls `refresh_architecture`.
 
-**Constraint on minor gap edits:** minor gap updates may only add clarification.
-They may never introduce or change ownership boundaries, invariants, entity
-contracts, event contracts, or behavioural semantics. If the gap requires any
-of those, it is not a minor gap — reclassify as significant and escalate.
+Constraint on minor gap updates: the handoff may only add clarification.
+It may never introduce or change ownership boundaries, invariants, entity
+contracts, event contracts, or behavioural semantics. If the gap requires
+any of those, it is not a minor gap — reclassify as significant and escalate.
 
 ### Significant Gap
 Missing ownership boundary, missing invariant, missing subsystem contract,

@@ -166,21 +166,26 @@ Both run concurrently. `PostWorkoutTask` is not triggered by this event — it w
 twin_model_ready ──────────────────┐
                                    │
                                    ▼
-                    ┌─────────────────────────┐
-                    │ PlanGenerationService   │
-                    │ (phase definitions +   │
-                    │  first WeeklyPlan       │
-                    │  created)              │
-                    └─────────────────────────┘
+                  ┌─────────────────────────┐
+                  │ PlanGenerationService   │
+                  │ (phase definitions +   │
+                  │  first WeeklyPlan       │
+                  │  created)              │
+                  └─────────────────────────┘
                                    │
                                    ▼
                          training_plan_generated
                                    │
                     ┌──────────────┴──────────────┐
-                    ▼                              ▼
+                    ▼                           ▼
           FirstMessageAgent              WeatherForecast prefetch
           (reads WeeklyPlan)
+                    │
+                    ▼
+        coaching_message_generated
 ```
+
+**Producer:** `OnboardingService` (fires `twin_model_ready` after bootstrap TwinState insert)
 
 ### Plan Regeneration (Confidence Upgrade)
 ```
@@ -295,7 +300,7 @@ Event emission follows the transactional outbox pattern to prevent phantom state
 1. Domain service writes state change to database
 2. Same transaction writes `SystemEvent` row to `system_events` and `SystemEventOutbox` row with status = 'pending'
 3. Transaction commits atomically
-4. Publisher (post-commit) reads pending outbox entries and publishes to Redis/message bus
+4. Publisher (post-commit) reads pending outbox entries and transitions their status to 'published' (no external bus in the current implementation; see `system-event.md` for the publication state machine and the future bus insertion point)
 5. On successful delivery, outbox row updated to status = 'published'
 
 This ensures:
@@ -305,7 +310,7 @@ This ensures:
 
 ## Event Firing Timing Clarification
 
-The codebase uses two different labels to describe when `EventPublisher.publish()` is called relative to a transaction commit. Both describe the same transactional outbox pattern; the difference is only in *who* commits the producing transaction and *who* performs the external publish step.
+The codebase uses two different labels to describe when `EventPublisher.publish()` is called relative to a transaction commit. Both describe the same transactional outbox pattern; the difference is only in *who* commits the producing transaction and *who* performs the publication status transition.
 
 ### `[after_commit]` — the service owns the commit
 
@@ -315,7 +320,7 @@ In this pattern:
 
 1. The service writes domain state and writes the matching `SystemEvent` + `SystemEventOutbox` rows inside one transaction.
 2. The service calls `await session.commit()`.
-3. The platform publisher worker (a separate process) reads the pending outbox rows and publishes the event to the message bus.
+3. The platform publisher worker (a separate process) reads the pending outbox rows and transitions their status to 'published'. No external message bus is in the path today; the publisher task is the documented insertion point for a future bus (see `system-event.md`).
 
 The event is therefore *observed* by consumers only after the producing transaction has committed, even though the outbox write happened before `commit()` returned.
 
@@ -327,13 +332,13 @@ In this pattern:
 
 1. The service writes domain state and writes the matching `SystemEvent` + `SystemEventOutbox` rows inside the transaction that the worker opened.
 2. The service returns; the worker calls `commit()`.
-3. The platform publisher worker reads the pending outbox rows and publishes the event to the message bus.
+3. The platform publisher worker reads the pending outbox rows and transitions their status to 'published'. No external message bus is in the path today; the publisher task is the documented insertion point for a future bus (see `system-event.md`).
 
 Because the external publish happens in a separate process, the service method itself "fires" the event before its transaction is committed. The label `[uncommitted]` marks the fact that the service method does not close the transaction; it does *not* mean the event is published before the transaction commits.
 
 ### Both patterns preserve the same invariant
 
-- **Consumers never see uncommitted state.** In both cases, the external message-bus publish is performed by the platform publisher worker after the database transaction that wrote the outbox row has committed.
+- **Consumers never see uncommitted state.** In both cases, the status transition to 'published' is performed by the platform publisher worker after the database transaction that wrote the outbox row has committed; no external message bus is required for this guarantee.
 - **Events are never lost.** The outbox row is written in the same database transaction as the domain state, so a rollback of the domain transaction also rolls back the outbox row.
 - **No phantom reads.** Because publication is driven by the outbox table and not by an in-process callback, a crashed producer cannot leave consumers with an event whose state was never committed.
 
@@ -341,4 +346,4 @@ The apparent inconsistency between `[after_commit]` and `[uncommitted]` is a lab
 
 See also:
 - [ADR-004: Transactional Outbox for Event Persistence](../../docs/adr/004-transactional-outbox-for-event-persistence.md) — defines the outbox pattern
-- [System Events](system-event.md) — persistence schema and outbox lifecycle
+- [System Events](system-event.md) — persistence schema, outbox lifecycle, and the future bus insertion point

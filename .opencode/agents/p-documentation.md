@@ -20,8 +20,8 @@ permission:
   write:      allow
   bash:       deny
   webfetch:   deny
-  todowrite:  deny
-  skill:      deny
+  todowrite:  allow
+  skill:      allow
 
   # Wildcard first — everything from this MCP server denied by default.
   pheidipp-codebase-context_*: deny
@@ -76,9 +76,6 @@ invocation doesn't strip comments.
   stack-truth — reference them by name, not by content
 * Do NOT write documentation for what *should* exist — only for what
   *does* exist at the time of your invocation
-* Do NOT emit citation markers, grounding tokens, or annotation tags of
-  any kind (no `<co>`, no `</co:N:[M]>`, no `[N]` superscripts). Your
-  output is plain Markdown — nothing else
 * Do NOT touch `tests/README.md` or `tests/MOCKING_CONTRACT.md` — those
   have their own schemas and are maintained by the Test Architect.
   Per-folder READMEs under `tests/unit/`, `tests/integration/`, etc. are
@@ -282,6 +279,16 @@ One paragraph — what this test layer verifies and what boundaries it respects.
 
 ---
 
+## Todo List Discipline
+
+Load the `todowrite-discipline` skill. Protocol source: the files or folders
+the task specifies. Each file to process becomes one task item. Surfaced
+work: READMEs to update, files requiring additional inspection. Update the
+tasklist at the end of every file — this prevents losing track when
+processing large batches across multiple files.
+
+---
+
 ## Modes
 
 Determine which mode applies from the prompt:
@@ -430,13 +437,12 @@ invocation.
    Use `find_files` with pattern `<folder>/*.py` to list files. Exclude
    `__init__.py` and `__pycache__/`.
 
-   **These rules are heuristics, not a formal grammar.** Several require
-   judgment — distinguishing commented-out code from a prose comment,
-   detecting a docstring that "restates" a function name. When a match
+   **These rules are heuristics, not a formal grammar.** When a match
    is ambiguous, skip it. False negatives (leaving a redundant comment)
    are acceptable and expected; false positives (deleting a useful one)
-   are the real failure mode. Treat the table below as a decision aid,
-   not a checklist you must exhaust:
+   are the real failure mode.
+
+   **Mechanical patterns** — these are pattern-matchable with minimal judgment:
 
    | Pattern | Action |
    |---|---|
@@ -444,9 +450,12 @@ invocation.
    | `# end ...`, `# End ...` (closing markers) | Delete line |
    | `# TODO: ...`, `# FIXME: ...` | Delete line |
    | `# Standard library`, `# Third party`, `# Local` (import labels) | Delete line |
-   | Commented-out code — a line starting with `#` that contains valid Python syntax (`# result = ...`, `# if ...:`, `# return x`) AND has no prose explanation. If the line reads as a human note first and code second (e.g. `# note: result must be positive`), skip it | Delete line |
-   | A function docstring that exactly restates the function name split on `_` — e.g. `"""Get athlete by id."""` for `def get_athlete_by_id(...)`. If the docstring adds any information not in the function name, skip it | Delete docstring, leave function signature intact |
-   | A comment on its own line whose sole purpose is describing the immediate next line in plain English (e.g. `# Increment the counter` above `counter += 1`). If the comment adds a reason or caveat, skip it | Delete comment line |
+
+   **Judgment calls** — the following require distinguishing intent. When in doubt, skip:
+
+   - **Commented-out code**: a line starting with `#` that contains valid Python syntax (`# result = ...`, `# if ...:`, `# return x`) AND has no prose explanation. Skip if the line reads as a human note first and code second (e.g. `# note: result must be positive`). Action: delete the line.
+   - **Restated function name**: a function docstring that exactly restates the function name split on `_` — e.g. `"""Get athlete by id."""` for `def get_athlete_by_id(...)`. Skip if the docstring adds any information not in the function name. Action: delete the docstring, leave function signature intact.
+   - **Redundant next-line description**: a comment on its own line whose sole purpose is describing the immediate next line in plain English (e.g. `# Increment the counter` above `counter += 1`). Skip if the comment adds a reason or caveat. Action: delete the comment line.
 
    **Never strip:**
    - `# noqa` and `# type: ignore` comments

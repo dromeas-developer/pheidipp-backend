@@ -3,16 +3,14 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_db, require_self
-from app.models.checkpoint import Checkpoint
-from app.models.planned_session import PlannedSession
-from app.models.weekly_plan import WeeklyPlan
+from app.api.deps import (
+    build_plan_query_service,
+    build_plan_repository,
+    require_self,
+)
 from app.repositories.training_plan_repository import TrainingPlanRepository
 from app.schemas.plan import (
     CheckpointResponse,
@@ -20,6 +18,7 @@ from app.schemas.plan import (
     TrainingPlanResponse,
     UpcomingSessionsResponse,
 )
+from app.services.plan_query_service import PlanQueryService
 
 
 plan_router = APIRouter(prefix="/athletes", tags=["plan"])
@@ -42,12 +41,6 @@ def _plan_not_found() -> HTTPException:
             "to generate a plan."
         ),
     )
-
-
-def build_plan_repository(
-    session: AsyncSession = Depends(get_db),
-) -> TrainingPlanRepository:
-    return TrainingPlanRepository(session=session)
 
 
 @plan_router.get(
@@ -79,7 +72,7 @@ async def get_plan_sessions(
     athlete_id: uuid.UUID,
     athlete_id_dep: uuid.UUID = Depends(require_self),
     plans: TrainingPlanRepository = Depends(build_plan_repository),
-    session: AsyncSession = Depends(get_db),
+    plan_query: PlanQueryService = Depends(build_plan_query_service),
 ) -> list[PlannedSessionResponse]:
     plan_id = await _resolve_active_plan_id(
         athlete_id=athlete_id, plans=plans
@@ -87,16 +80,7 @@ async def get_plan_sessions(
     if plan_id is None:
         raise _plan_not_found()
 
-    result = await session.execute(
-        select(PlannedSession)
-        .join(WeeklyPlan, WeeklyPlan.id == PlannedSession.weekly_plan_id)
-        .where(WeeklyPlan.training_plan_id == plan_id)
-        .order_by(
-            PlannedSession.target_date.asc(),
-            PlannedSession.session_slot.asc(),
-        )
-    )
-    rows = list(result.scalars().all())
+    rows = await plan_query.get_sessions_for_plan(plan_id)
     return [PlannedSessionResponse.model_validate(r) for r in rows]
 
 
@@ -108,7 +92,7 @@ async def get_upcoming_sessions(
     athlete_id: uuid.UUID,
     athlete_id_dep: uuid.UUID = Depends(require_self),
     plans: TrainingPlanRepository = Depends(build_plan_repository),
-    session: AsyncSession = Depends(get_db),
+    plan_query: PlanQueryService = Depends(build_plan_query_service),
 ) -> UpcomingSessionsResponse:
     plan_id = await _resolve_active_plan_id(
         athlete_id=athlete_id, plans=plans
@@ -116,21 +100,9 @@ async def get_upcoming_sessions(
     if plan_id is None:
         raise _plan_not_found()
 
-    today = datetime.now(timezone.utc).date()
-    result = await session.execute(
-        select(PlannedSession)
-        .join(WeeklyPlan, WeeklyPlan.id == PlannedSession.weekly_plan_id)
-        .where(
-            WeeklyPlan.training_plan_id == plan_id,
-            PlannedSession.target_date >= today,
-        )
-        .order_by(
-            PlannedSession.target_date.asc(),
-            PlannedSession.session_slot.asc(),
-        )
-        .limit(5)
+    rows = await plan_query.get_upcoming_sessions(
+        plan_id=plan_id, limit=5
     )
-    rows = list(result.scalars().all())
     return UpcomingSessionsResponse(
         sessions=[PlannedSessionResponse.model_validate(r) for r in rows],
     )
@@ -144,7 +116,7 @@ async def get_plan_checkpoints(
     athlete_id: uuid.UUID,
     athlete_id_dep: uuid.UUID = Depends(require_self),
     plans: TrainingPlanRepository = Depends(build_plan_repository),
-    session: AsyncSession = Depends(get_db),
+    plan_query: PlanQueryService = Depends(build_plan_query_service),
 ) -> list[CheckpointResponse]:
     plan_id = await _resolve_active_plan_id(
         athlete_id=athlete_id, plans=plans
@@ -152,12 +124,6 @@ async def get_plan_checkpoints(
     if plan_id is None:
         raise _plan_not_found()
 
-    result = await session.execute(
-        select(Checkpoint)
-        .join(PlannedSession, PlannedSession.id == Checkpoint.planned_session_id)
-        .join(WeeklyPlan, WeeklyPlan.id == PlannedSession.weekly_plan_id)
-        .where(WeeklyPlan.training_plan_id == plan_id)
-        .order_by(PlannedSession.target_date.asc())
-    )
-    rows = list(result.scalars().all())
+    rows = await plan_query.get_checkpoints_for_plan(plan_id)
     return [CheckpointResponse.model_validate(r) for r in rows]
+

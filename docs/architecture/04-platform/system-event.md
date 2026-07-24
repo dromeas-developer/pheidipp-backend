@@ -49,7 +49,7 @@ type SystemEventOutbox = {
 None. `SystemEvent` and `SystemEventOutbox` are terminal state — other entities write to them, but they produce no downstream events.
 
 ### Consumed
-None. Publication consumers subscribe to the message bus (Redis); no event consumption at the entity level.
+None. The publication pipeline is internal; the outbox publisher flips `status` to `'published'` without an external message bus (see `## Runtime Flow`). Future external consumers (Kafka, NATS, Redis) attach at the documented insertion point — they do not consume SystemEvent rows directly.
 
 ## APIs
 None. Event persistence is internal to the platform; all writes occur via transactional outbox pattern in application services.
@@ -78,6 +78,8 @@ None. Event persistence is internal to the platform; all writes occur via transa
 | Service | Yes | Yes (event + outbox in same transaction) | No |
 | Repository | Yes | Yes | No |
 
+**Publish-side ownership note:** The Service-tier write applies to two distinct services: `EventPublisher` owns the producer-side transaction (event + outbox insertion together with domain state), while `OutboxPublisherService` owns the publish-side transaction (status transition from `pending` to `published`). See ADR-013.
+
 ## Runtime Ownership
 
 Owns:
@@ -101,11 +103,12 @@ Does Not Own:
 - Transaction rollback: domain state and event/outbox rows are rolled back together
 - Publish failure: outbox `status = 'pending'` → retry up to max attempts (configurable, default 3); on exhaustion → `status = 'dlq'` and alert fires
 - DLQ entries are retained for investigation; replay mechanism provided via manual reprocessing
+- The publisher is a status-transitioner, not a message-bus publisher. Adding a bus (Kafka, NATS, Redis) is a localized change to `OutboxPublisherService` — see `## Runtime Flow`. The producing services are unaffected.
 
 ## Performance Constraints
 
 - Event persistence is synchronous within the producing transaction; p95 latency must not exceed transaction SLA
-- Publisher reads pending outbox entries via periodic query (recommended every 100ms) or LISTEN/NOTIFY on PostgreSQL
+- Publisher reads pending outbox entries via periodic polling on `system_event_outbox` (`OutboxPublisherService` invoked by procrastinate periodic task, default every 15 seconds); `LISTEN/NOTIFY` on PostgreSQL is a future latency optimization
 
 ## Observability
 
@@ -129,21 +132,32 @@ Traces:
 sequenceDiagram
     participant Service
     participant DB
-    participant Publisher
-    participant MessageBus
-    participant Consumer
+    participant OutboxPublisherService
+    participant PublisherTask
 
     Service->>DB: BEGIN transaction
     Service->>DB: INSERT domain state
     Service->>DB: INSERT system_event
     Service->>DB: INSERT system_event_outbox(status='pending')
     Service->>DB: COMMIT
-    DB-->>Publisher: outbox entry available
-    Publisher->>MessageBus: publish(event)
-    MessageBus-->>Consumer: deliver(event)
-    Consumer-->>Publisher: ack
-    Publisher->>DB: UPDATE outbox(status='published', published_at)
+    DB-->>OutboxPublisherService: outbox entry available
+    PublisherTask->>OutboxPublisherService: publish_pending(limit)
+    OutboxPublisherService->>DB: SELECT pending rows ORDER BY created_at LIMIT 100
+    loop for each pending row
+        OutboxPublisherService->>DB: UPDATE outbox(status='published', published_at)
+    end
+    OutboxPublisherService->>DB: COMMIT
 ```
+
+**Current implementation (no external bus).** The platform runs a PostgreSQL-native outbox: the `OutboxPublisherService` (invoked by the procrastinate periodic task `outbox_publisher` in `app/worker/app.py`) reads `system_event_outbox` for `status = 'pending'` rows, transitions them to `'published'`, and stamps `published_at`. There is no Redis, NATS, Kafka, or any other message bus in the path. The publisher is a status-transitioner, not a message-bus publisher; producing services, repositories, the outbox schema, and the API surface are unaffected by publication-target decisions.
+
+**Future bus insertion point.** The `OutboxPublisherService` is the single chokepoint for external delivery. When a message bus is introduced:
+
+1. Inject the bus client into `OutboxPublisherService` (constructor / module-level import — the existing `AsyncSessionLocal` / repository wiring is the model).
+2. After `mark_published(event_id)` succeeds for a row, push the corresponding `SystemEvent` payload to the bus.
+3. Bus consumer acknowledgement is reflected back into the outbox row (`status = 'published'`, `attempts += 1`, `last_error` on failure).
+
+This change is localized to `OutboxPublisherService`. The transactional outbox atomicity invariant is preserved: event + outbox row remain in the same producing transaction; the bus is downstream of the outbox, never upstream. Redis/Celery remains documented as a future migration option if queue contention warrants it — see `04-platform/storage-topology.md` ("Why PostgreSQL for the task queue") and `04-platform/async-pipeline.md` ("Migration path"). The outbox table and publication state machine are independent of that decision and persist regardless of the chosen publication target.
 
 ## Implementation Notes
 

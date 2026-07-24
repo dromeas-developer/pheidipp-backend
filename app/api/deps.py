@@ -11,9 +11,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security.token_service import TokenService
 from app.db.session import get_db as _get_db_session
+from app.repositories.training_plan_repository import TrainingPlanRepository
 from app.services.auth_service import AuthService
 from app.services.onboarding_service import OnboardingService
 from app.services.plan_generation_service import PlanGenerationService
+from app.services.plan_query_service import PlanQueryService
 
 # Re-export the canonical session dependency under one name so router
 # modules have a single import path.
@@ -31,19 +33,20 @@ def build_onboarding_service(
 ) -> OnboardingService:
     return OnboardingService(session=session)
 
-def build_onboarding_service_with_plan(
-    session: AsyncSession = Depends(get_db),
-) -> OnboardingService:
-    plan_service = PlanGenerationService(session=session)
-    return OnboardingService(
-        session=session,
-        plan_service=plan_service,
-    )
-
 def build_plan_service(
     session: AsyncSession = Depends(get_db),
 ) -> PlanGenerationService:
     return PlanGenerationService(session=session)
+
+def build_plan_repository(
+    session: AsyncSession = Depends(get_db),
+) -> TrainingPlanRepository:
+    return TrainingPlanRepository(session=session)
+
+def build_plan_query_service(
+    session: AsyncSession = Depends(get_db),
+) -> PlanQueryService:
+    return PlanQueryService(session=session)
 
 def _extract_bearer(credentials: HTTPAuthorizationCredentials | None) -> str:
     if credentials is None or not credentials.credentials:

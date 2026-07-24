@@ -1,1284 +1,161 @@
-version: '1.0'
-plan_id: phase-2-3-p3-twin-recalibration-pipeline
-generated_at: '2026-07-15T16:00:00Z'
-last_reviewed_at: '2026-07-19T00:00:00Z'
-features:
-  # ---------------------------------------------------------------------------
-  # Confidence derivation pure helpers.
-  # ---------------------------------------------------------------------------
-  confidence_rank_numeric_ordering:
-    status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/twin_recalibration_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p3-twin-recalibration-pipeline.md
-    owned_by_plan:
-    - phase-2-3-p3-twin-recalibration-pipeline
-    description: '_confidence_rank() assigns numeric ranks to TwinConfidenceLevel
-      values: LOW=0, MEDIUM=1, HIGH=2.
+version: "1.0"
+plan_id: "phase-2-3-p3-twin-recalibration-pipeline"
+generated_at: "2026-07-19T00:00:00Z"
+last_reviewed_at: "2026-07-19T00:00:00Z"
 
-      '
-    protects:
-    - LOW is rank 0
-    - MEDIUM is rank 1
-    - HIGH is rank 2
-    - Ranking is consistent (LOW < MEDIUM < HIGH)
-    - Unknown levels resolve to rank 0
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_twin_recalibration_service_calibration_pure_helpers.py
-        owner: phase-2-3-p3-twin-recalibration-pipeline
-  max_confidence_level_global_ratchet:
-    status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/twin_recalibration_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p3-twin-recalibration-pipeline.md
-    owned_by_plan:
-    - phase-2-3-p3-twin-recalibration-pipeline
-    description: '_max_confidence_level() returns the higher of two TwinConfidenceLevel
-      values — the global ratchet that prevents confidence_level from ever decreasing.
+prerequisites:
+  migrations: false
 
-      '
-    protects:
-    - Returns a when a is higher
-    - Returns b when b is higher
-    - Returns the same value when both equal
-    - Monotonicity invariant preserved for all combinations
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_twin_recalibration_service_calibration_pure_helpers.py
-        owner: phase-2-3-p3-twin-recalibration-pipeline
-  max_confidence_level_string_per_metric_ratchet:
+files:
+  test_twin_recalibration_calibration_user_journey.py:
+    type: behaviour
     status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/twin_recalibration_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p3-twin-recalibration-pipeline.md
-    owned_by_plan:
-    - phase-2-3-p3-twin-recalibration-pipeline
-    description: '_max_confidence_level_string() applies the per-metric monotonicity
-      ratchet (ADR-011) with None semantics: None previous means "no data" (not
-      "low confidence"), so computed wins.
-
-      '
-    protects:
-    - None previous + non-null computed → computed wins
-    - None computed + non-null previous → previous preserved
-    - Both None → None
-    - Higher computed → computed wins
-    - Lower computed → previous preserved (ratchet)
-    - Equal values → previous preserved
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_twin_recalibration_service_calibration_pure_helpers.py
-        owner: phase-2-3-p3-twin-recalibration-pipeline
-  state_prior_weight_extraction:
+    functions:
+      test_confidence_level_never_decreases: {implemented: true, executable: true, passed: true}
+      test_full_pipeline_writes_calibration_twin_state: {implemented: true, executable: true, passed: true}
+      test_metric_confidence_lt2_hr_has_prior_weight_greater_than_zero: {implemented: true, executable: true, passed: true}
+      test_metric_confidence_transitions_to_medium: {implemented: true, executable: true, passed: true}
+      test_posterior_mean_shifts_from_population_default: {implemented: true, executable: true, passed: true}
+      test_twin_confidence_upgraded_event_fires_on_upgrade: {implemented: true, executable: true, passed: true}
+      test_twin_recalibrated_event_fires: {implemented: true, executable: true, passed: true}
+  test_signal_clean_threshold_detection_defer_integration.py:
+    type: integration
     status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/twin_recalibration_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p3-twin-recalibration-pipeline.md
-    owned_by_plan:
-    - phase-2-3-p3-twin-recalibration-pipeline
-    description: '_state_prior_weight() defensively extracts prior_weight from a
-      PhysiologyParameterState dict.
-
-      '
-    protects:
-    - Returns weight when present
-    - Returns None when state is None
-    - Returns None when key missing
-    - Returns zero for explicit zero weight
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_twin_recalibration_service_calibration_pure_helpers.py
-        owner: phase-2-3-p3-twin-recalibration-pipeline
-  min_prior_weight_weakest_link:
+    functions:
+      test_defer_failure_does_not_break_cleaning: {implemented: true, executable: true, passed: true}
+      test_defer_runs_after_commit: {implemented: true, executable: true, passed: true}
+      test_no_defer_for_manual_entry: {implemented: true, executable: true, passed: true}
+      test_threshold_detection_deferred_after_successful_clean: {implemented: true, executable: true, passed: true}
+  test_threshold_detection_task_integration.py:
+    type: integration
     status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/twin_recalibration_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p3-twin-recalibration-pipeline.md
-    owned_by_plan:
-    - phase-2-3-p3-twin-recalibration-pipeline
-    description: '_min_prior_weight() returns the smaller of two prior weights,
-      treating None as zero.
-
-      '
-    protects:
-    - Returns smaller of two values
-    - Returns zero when one is None
-    - Returns zero when both None
-    - Returns value when both equal
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_twin_recalibration_service_calibration_pure_helpers.py
-        owner: phase-2-3-p3-twin-recalibration-pipeline
-  prior_weight_to_level_threshold_mapping:
+    functions:
+      test_empty_observations_skips_physiology_and_twin: {implemented: true, executable: true, passed: true}
+      test_full_pipeline_orchestration: {implemented: true, executable: true, passed: true}
+      test_missing_activity_raises_error: {implemented: true, executable: true, passed: true}
+      test_no_shifted_parameters_skips_twin: {implemented: true, executable: true, passed: true}
+      test_pipeline_passes_activity_id_and_athlete_id: {implemented: true, executable: true, passed: true}
+  test_twin_recalibration_service_calibration.py:
+    type: unit
     status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/twin_recalibration_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p3-twin-recalibration-pipeline.md
-    owned_by_plan:
-    - phase-2-3-p3-twin-recalibration-pipeline
-    description: '_prior_weight_to_level() maps a prior_weight to a TwinConfidenceLevel
-      using the 4.0 / 8.0 thresholds from the confidence model.
-
-      '
-    protects:
-    - Zero weight → LOW
-    - 3.99 → LOW (strict less than 4.0)
-    - 4.0 → MEDIUM (inclusive boundary)
-    - Between 4 and 8 → MEDIUM
-    - 8.0 → HIGH (inclusive boundary)
-    - Above 8 → HIGH
-    - None → LOW
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_twin_recalibration_service_calibration_pure_helpers.py
-        owner: phase-2-3-p3-twin-recalibration-pipeline
-  derive_confidence_level_global:
+    functions:
+      test_confidence_ratchet_preserves_higher_previous: {implemented: true, executable: true, passed: true}
+      test_confidence_ratchet_upgrades_to_higher_computed: {implemented: true, executable: true, passed: true}
+      test_first_snapshot_uses_computed_confidence: {implemented: true, executable: true, passed: true}
+      test_first_snapshot_uses_data_tier_3_when_no_previous: {implemented: true, executable: true, passed: true}
+      test_fitness_snapshot_from_aggregate: {implemented: true, executable: true, passed: true}
+      test_inherits_data_tier_from_previous: {implemented: true, executable: true, passed: true}
+      test_inherits_lt1_power_from_previous: {implemented: true, executable: true, passed: true}
+      test_inherits_readiness_level_from_previous: {implemented: true, executable: true, passed: true}
+      test_insert_called_with_calibration_trigger: {implemented: true, executable: true, passed: true}
+      test_missing_athlete_fitness_raises: {implemented: true, executable: true, passed: true}
+      test_missing_fitness_does_not_publish_events: {implemented: true, executable: true, passed: true}
+      test_missing_training_goal_raises: {implemented: true, executable: true, passed: true}
+      test_model_version_class_constants: {implemented: true, executable: true, passed: true}
+      test_model_version_is_v2_threshold_detection: {implemented: true, executable: true, passed: true}
+      test_per_metric_ratchet_mixed_high_and_low: {implemented: true, executable: true, passed: true}
+      test_per_metric_ratchet_none_previous_uses_computed: {implemented: true, executable: true, passed: true}
+      test_per_metric_ratchet_preserves_higher_previous: {implemented: true, executable: true, passed: true}
+      test_per_metric_ratchet_upgrades_to_higher_computed: {implemented: true, executable: true, passed: true}
+      test_prior_activity_sync_does_not_block_calibration: {implemented: true, executable: true, passed: true}
+      test_prior_calibration_returns_existing: {implemented: true, executable: true, passed: true}
+      test_threshold_snapshot_from_physiology: {implemented: true, executable: true, passed: true}
+      test_threshold_snapshot_null_when_physiology_null: {implemented: true, executable: true, passed: true}
+      test_trigger_is_calibration: {implemented: true, executable: true, passed: true}
+  test_twin_recalibration_service_calibration_pure_helpers.py:
+    type: unit
     status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/twin_recalibration_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p3-twin-recalibration-pipeline.md
-    owned_by_plan:
-    - phase-2-3-p3-twin-recalibration-pipeline
-    description: '_derive_confidence_level() derives the global confidence_level
-      from the updated AthletePhysiology row using min(lt1.hr.prior_weight, lt2.hr.prior_weight)
-      mapped through the 4.0 / 8.0 thresholds.
-
-      '
-    protects:
-    - Both below 4.0 → LOW
-    - One above 4.0, one below → LOW (weakest link)
-    - Both above 4.0, below 8.0 → MEDIUM
-    - Both above 8.0 → HIGH
-    - No HR data → LOW
-    - Lt1 null outer → LOW
-    - Only lt1.hr → drives global (with min(weight, 0))
-    - Only lt2.hr → drives global (with min(weight, 0))
-    - Power and pace do not drive global
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_twin_recalibration_service_calibration_pure_helpers.py
-        owner: phase-2-3-p3-twin-recalibration-pipeline
-  extract_param_value_threshold_snapshot:
+    functions:
+      test_above_8_is_high: {implemented: true, executable: true, passed: true}
+      test_below_threshold_resolves_to_low: {implemented: true, executable: true, passed: true}
+      test_between_4_and_8_is_medium: {implemented: true, executable: true, passed: true}
+      test_both_above_4_drives_medium: {implemented: true, executable: true, passed: true}
+      test_both_above_8_drives_high: {implemented: true, executable: true, passed: true}
+      test_both_none_returns_none: {implemented: true, executable: true, passed: true}
+      test_equal_values_preserved: {implemented: true, executable: true, passed: true}
+      test_exactly_4_is_medium: {implemented: true, executable: true, passed: true}
+      test_exactly_8_is_high: {implemented: true, executable: true, passed: true}
+      test_extracts_lt1_hr_for_calibration_twin_state: {implemented: true, executable: true, passed: true}
+      test_extracts_lt2_hr_for_calibration_twin_state: {implemented: true, executable: true, passed: true}
+      test_high_is_rank_two: {implemented: true, executable: true, passed: true}
+      test_higher_computed_wins: {implemented: true, executable: true, passed: true}
+      test_just_below_4_is_low: {implemented: true, executable: true, passed: true}
+      test_low_and_high_resolves_to_high: {implemented: true, executable: true, passed: true}
+      test_low_and_medium_resolves_to_medium: {implemented: true, executable: true, passed: true}
+      test_low_is_rank_zero: {implemented: true, executable: true, passed: true}
+      test_lower_computed_preserves_previous: {implemented: true, executable: true, passed: true}
+      test_lt1_null_outer_resolves_to_low: {implemented: true, executable: true, passed: true}
+      test_medium_is_rank_one: {implemented: true, executable: true, passed: true}
+      test_metric_with_no_data_then_appears: {implemented: true, executable: true, passed: true}
+      test_monotonicity_invariant_preserved: {implemented: true, executable: true, passed: true}
+      test_no_hr_data_resolves_to_low: {implemented: true, executable: true, passed: true}
+      test_none_computed_returns_previous: {implemented: true, executable: true, passed: true}
+      test_none_previous_returns_computed: {implemented: true, executable: true, passed: true}
+      test_none_weight_is_low: {implemented: true, executable: true, passed: true}
+      test_one_above_4_drives_medium: {implemented: true, executable: true, passed: true}
+      test_one_above_8_drives_medium: {implemented: true, executable: true, passed: true}
+      test_only_lt1_hr_drives_global: {implemented: true, executable: true, passed: true}
+      test_only_lt2_hr_drives_global: {implemented: true, executable: true, passed: true}
+      test_power_and_pace_do_not_drive_global: {implemented: true, executable: true, passed: true}
+      test_rank_ordering_matches_value_ordering: {implemented: true, executable: true, passed: true}
+      test_returns_a_when_a_is_higher: {implemented: true, executable: true, passed: true}
+      test_returns_a_when_both_equal: {implemented: true, executable: true, passed: true}
+      test_returns_b_when_b_is_higher: {implemented: true, executable: true, passed: true}
+      test_returns_none_when_container_is_empty: {implemented: true, executable: true, passed: true}
+      test_returns_none_when_container_is_none: {implemented: true, executable: true, passed: true}
+      test_returns_none_when_key_missing: {implemented: true, executable: true, passed: true}
+      test_returns_none_when_state_is_none: {implemented: true, executable: true, passed: true}
+      test_returns_none_when_sub_state_is_none: {implemented: true, executable: true, passed: true}
+      test_returns_none_when_sub_state_missing: {implemented: true, executable: true, passed: true}
+      test_returns_none_when_value_field_missing: {implemented: true, executable: true, passed: true}
+      test_returns_none_when_value_is_none: {implemented: true, executable: true, passed: true}
+      test_returns_smaller_of_two_values: {implemented: true, executable: true, passed: true}
+      test_returns_value_when_both_equal: {implemented: true, executable: true, passed: true}
+      test_returns_value_when_present: {implemented: true, executable: true, passed: true}
+      test_returns_weight_when_present: {implemented: true, executable: true, passed: true}
+      test_returns_zero_for_explicit_zero_weight: {implemented: true, executable: true, passed: true}
+      test_returns_zero_when_both_none: {implemented: true, executable: true, passed: true}
+      test_returns_zero_when_one_is_none: {implemented: true, executable: true, passed: true}
+      test_zero_weight_is_low: {implemented: true, executable: true, passed: true}
+  test_twin_recalibration_service_event_firing.py:
+    type: unit
     status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/twin_recalibration_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p3-twin-recalibration-pipeline.md
-    owned_by_plan:
-    - phase-2-3-p3-twin-recalibration-pipeline
-    description: '_extract_param_value() returns the value field of a PhysiologyParameterState
-      sub-state for the inline threshold snapshot (lt1_hr_bpm, lt2_hr_bpm).
-
-      '
-    protects:
-    - Returns value when present
-    - Returns None when container is None
-    - Returns None when container is empty
-    - Returns None when sub-state is None
-    - Returns None when sub-state missing
-    - Returns None when value field missing
-    - Returns None when value is None
-    - Extracts lt1_hr for calibration TwinState
-    - Extracts lt2_hr for calibration TwinState
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_twin_recalibration_service_calibration_pure_helpers.py
-        owner: phase-2-3-p3-twin-recalibration-pipeline
-  # ---------------------------------------------------------------------------
-  # insert_if_not_exists deduplication.
-  # ---------------------------------------------------------------------------
-  insert_if_not_exists_calibration_supersedes_all:
+    functions:
+      test_downgrade_does_not_fire: {implemented: true, executable: true, passed: true}
+      test_first_snapshot_does_not_fire_upgraded: {implemented: true, executable: true, passed: true}
+      test_no_events_when_prior_calibration_exists: {implemented: true, executable: true, passed: true}
+      test_no_upgrade_does_not_fire: {implemented: true, executable: true, passed: true}
+      test_payload_athlete_id_matches_event_athlete_id: {implemented: true, executable: true, passed: true}
+      test_payload_includes_previous_twin_state_id_when_present: {implemented: true, executable: true, passed: true}
+      test_payload_includes_required_fields: {implemented: true, executable: true, passed: true}
+      test_payload_includes_required_fields: {implemented: true, executable: true, passed: true}
+      test_returns_calibration_recalibration_result: {implemented: true, executable: true, passed: true}
+      test_returns_confidence_upgraded_false_on_no_upgrade: {implemented: true, executable: true, passed: true}
+      test_twin_recalibrated_before_twin_confidence_upgraded: {implemented: true, executable: true, passed: true}
+      test_twin_recalibrated_fires_on_first_snapshot: {implemented: true, executable: true, passed: true}
+      test_twin_recalibrated_fires_on_subsequent_snapshot: {implemented: true, executable: true, passed: true}
+      test_upgrade_low_to_medium_fires: {implemented: true, executable: true, passed: true}
+      test_upgrade_medium_to_high_fires: {implemented: true, executable: true, passed: true}
+  test_twin_recalibration_service_insert_if_not_exists.py:
+    type: unit
     status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/twin_recalibration_service.py
-    - app/repositories/twin_state_repository.py
-    plan: docs/implementation/phase-2/phase-2-3-p3-twin-recalibration-pipeline.md
-    owned_by_plan:
-    - phase-2-3-p3-twin-recalibration-pipeline
-    description: 'insert_if_not_exists() returns the existing calibration TwinState
-      when one already exists, regardless of incoming trigger. Calibration is the
-      most complete snapshot.
+    functions:
+      test_activity_id_passed_to_calibration_lookup: {implemented: true, executable: true, passed: true}
+      test_activity_id_passed_to_fallback_lookup: {implemented: true, executable: true, passed: true}
+      test_activity_lookup_skipped_when_calibration_exists: {implemented: true, executable: true, passed: true}
+      test_calibration_check_runs_first: {implemented: true, executable: true, passed: true}
+      test_calibration_check_uses_correct_trigger_value: {implemented: true, executable: true, passed: true}
+      test_calibration_existing_skips_activity_sync_insert: {implemented: true, executable: true, passed: true}
+      test_calibration_existing_skips_calibration_insert: {implemented: true, executable: true, passed: true}
+      test_calibration_inserts_when_activity_sync_exists: {implemented: true, executable: true, passed: true}
+      test_calibration_inserts_when_wellness_update_exists: {implemented: true, executable: true, passed: true}
+      test_duplicate_activity_sync_skipped: {implemented: true, executable: true, passed: true}
+      test_duplicate_wellness_update_skipped: {implemented: true, executable: true, passed: true}
+      test_first_activity_sync_insert: {implemented: true, executable: true, passed: true}
+      test_first_calibration_insert: {implemented: true, executable: true, passed: true}
 
-      '
-    protects:
-    - Prior calibration + new calibration → skip insert
-    - Prior calibration + new activity_sync → skip insert
-    - Calibration check uses the correct trigger value (TwinTrigger.CALIBRATION.value)
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_twin_recalibration_service_insert_if_not_exists.py
-        owner: phase-2-3-p3-twin-recalibration-pipeline
-  insert_if_not_exists_calibration_supersedes_activity_sync:
-    status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/twin_recalibration_service.py
-    - app/repositories/twin_state_repository.py
-    plan: docs/implementation/phase-2/phase-2-3-p3-twin-recalibration-pipeline.md
-    owned_by_plan:
-    - phase-2-3-p3-twin-recalibration-pipeline
-    description: 'When a non-calibration TwinState exists and the incoming trigger
-      is calibration, the new calibration record is inserted and the prior non-calibration
-      record remains as history.
-
-      '
-    protects:
-    - Prior activity_sync + new calibration → insert new
-    - Prior wellness_update + new calibration → insert new
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_twin_recalibration_service_insert_if_not_exists.py
-        owner: phase-2-3-p3-twin-recalibration-pipeline
-  insert_if_not_exists_duplicate_non_calibration_skipped:
-    status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/twin_recalibration_service.py
-    - app/repositories/twin_state_repository.py
-    plan: docs/implementation/phase-2/phase-2-3-p3-twin-recalibration-pipeline.md
-    owned_by_plan:
-    - phase-2-3-p3-twin-recalibration-pipeline
-    description: 'When a non-calibration TwinState exists and the incoming trigger
-      is also non-calibration, the new record is skipped.
-
-      '
-    protects:
-    - Duplicate activity_sync skipped
-    - Duplicate wellness_update skipped
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_twin_recalibration_service_insert_if_not_exists.py
-        owner: phase-2-3-p3-twin-recalibration-pipeline
-  insert_if_not_exists_no_existing_inserts:
-    status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/twin_recalibration_service.py
-    - app/repositories/twin_state_repository.py
-    plan: docs/implementation/phase-2/phase-2-3-p3-twin-recalibration-pipeline.md
-    owned_by_plan:
-    - phase-2-3-p3-twin-recalibration-pipeline
-    description: 'When no TwinState exists for the activity, the new record is inserted
-      regardless of trigger.
-
-      '
-    protects:
-    - First calibration insert
-    - First activity_sync insert
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_twin_recalibration_service_insert_if_not_exists.py
-        owner: phase-2-3-p3-twin-recalibration-pipeline
-  insert_if_not_exists_lookup_order:
-    status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/twin_recalibration_service.py
-    - app/repositories/twin_state_repository.py
-    plan: docs/implementation/phase-2/phase-2-3-p3-twin-recalibration-pipeline.md
-    owned_by_plan:
-    - phase-2-3-p3-twin-recalibration-pipeline
-    description: 'The lookup order is: get_by_activity_and_trigger first (for the
-      calibration check), then get_by_activity (for the non-calibration fallback).
-
-      '
-    protects:
-    - Calibration check runs first
-    - Activity lookup skipped when calibration exists
-    - activity_id passed to both lookups unchanged
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_twin_recalibration_service_insert_if_not_exists.py
-        owner: phase-2-3-p3-twin-recalibration-pipeline
-  # ---------------------------------------------------------------------------
-  # recalibrate_for_calibration orchestration.
-  # ---------------------------------------------------------------------------
-  recalibrate_for_calibration_missing_prerequisites:
-    status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/twin_recalibration_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p3-twin-recalibration-pipeline.md
-    owned_by_plan:
-    - phase-2-3-p3-twin-recalibration-pipeline
-    description: 'recalibrate_for_calibration() raises MissingTrainingGoalError or
-      MissingAthleteFitnessError when the prerequisite repositories return None.
-
-      '
-    protects:
-    - Missing training goal → MissingTrainingGoalError
-    - Missing athlete fitness → MissingAthleteFitnessError
-    - Missing fitness does not publish events
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_twin_recalibration_service_calibration.py
-        owner: phase-2-3-p3-twin-recalibration-pipeline
-  recalibrate_for_calibration_first_snapshot:
-    status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/twin_recalibration_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p3-twin-recalibration-pipeline.md
-    owned_by_plan:
-    - phase-2-3-p3-twin-recalibration-pipeline
-    description: 'When no previous TwinState exists, the calibration TwinState is
-      the first snapshot and the ratchet is a no-op.
-
-      '
-    protects:
-    - First snapshot uses computed confidence
-    - data_tier defaults to TIER_3 when no previous
-    - trigger is CALIBRATION
-    - model_version is "v2-threshold-detection"
-    - training_goal_id is the active goal's id
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_twin_recalibration_service_calibration.py
-        owner: phase-2-3-p3-twin-recalibration-pipeline
-  recalibrate_for_calibration_ratchet:
-    status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/twin_recalibration_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p3-twin-recalibration-pipeline.md
-    owned_by_plan:
-    - phase-2-3-p3-twin-recalibration-pipeline
-    description: 'The global confidence_level ratchet preserves the higher of (previous,
-      computed) levels — confidence never decreases across consecutive TwinStates.
-
-      '
-    protects:
-    - Previous MEDIUM + computed LOW → stored MEDIUM (preserved)
-    - Previous LOW + computed HIGH → stored HIGH (upgraded)
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_twin_recalibration_service_calibration.py
-        owner: phase-2-3-p3-twin-recalibration-pipeline
-  recalibrate_for_calibration_per_metric_ratchet:
-    status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/twin_recalibration_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p3-twin-recalibration-pipeline.md
-    owned_by_plan:
-    - phase-2-3-p3-twin-recalibration-pipeline
-    description: 'The per-metric metric_confidence ratchet (ADR-011) preserves the
-      higher of (previous[metric], computed[metric]) for each metric key, with None
-      semantics.
-
-      '
-    protects:
-    - Previous medium + computed low → stored medium (preserved)
-    - Previous low + computed medium → stored medium (upgraded)
-    - None previous + computed medium → stored medium (None = no data)
-    - Mixed scenario: one upgrade, one preserved, one new
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_twin_recalibration_service_calibration.py
-        owner: phase-2-3-p3-twin-recalibration-pipeline
-  recalibrate_for_calibration_threshold_snapshot:
-    status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/twin_recalibration_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p3-twin-recalibration-pipeline.md
-    owned_by_plan:
-    - phase-2-3-p3-twin-recalibration-pipeline
-    description: 'The inline threshold snapshot (lt1_hr_bpm, lt2_hr_bpm, cp_watts)
-      is populated from the updated AthletePhysiology row.
-
-      '
-    protects:
-    - Threshold snapshot extracted from physiology
-    - Null threshold fields when physiology is null
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_twin_recalibration_service_calibration.py
-        owner: phase-2-3-p3-twin-recalibration-pipeline
-  recalibrate_for_calibration_fitness_snapshot:
-    status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/twin_recalibration_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p3-twin-recalibration-pipeline.md
-    owned_by_plan:
-    - phase-2-3-p3-twin-recalibration-pipeline
-    description: 'The fitness/fatigue/form values are read from the current AthleteFitness.aggregate
-      block (Banister update was already applied during ingestion).
-
-      '
-    protects:
-    - fitness/fatigue/form from aggregate JSONB
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_twin_recalibration_service_calibration.py
-        owner: phase-2-3-p3-twin-recalibration-pipeline
-  recalibrate_for_calibration_inherit_from_previous:
-    status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/twin_recalibration_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p3-twin-recalibration-pipeline.md
-    owned_by_plan:
-    - phase-2-3-p3-twin-recalibration-pipeline
-    description: 'Non-threshold fields fall back to the previous TwinState values
-      when one exists.
-
-      '
-    protects:
-    - Inherits lt1_power_watts from previous
-    - Inherits readiness_level from previous
-    - Inherits data_tier from previous
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_twin_recalibration_service_calibration.py
-        owner: phase-2-3-p3-twin-recalibration-pipeline
-  recalibrate_for_calibration_dedup_integration:
-    status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/twin_recalibration_service.py
-    - app/repositories/twin_state_repository.py
-    plan: docs/implementation/phase-2/phase-2-3-p3-twin-recalibration-pipeline.md
-    owned_by_plan:
-    - phase-2-3-p3-twin-recalibration-pipeline
-    description: 'The calibration flow routes through insert_if_not_exists: a prior
-      activity_sync TwinState does not block the calibration insert, but a prior
-      calibration TwinState is returned unchanged.
-
-      '
-    protects:
-    - Prior calibration returns existing record (no insert, no events)
-    - Prior activity_sync does not block calibration insert
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_twin_recalibration_service_calibration.py
-        owner: phase-2-3-p3-twin-recalibration-pipeline
-  # ---------------------------------------------------------------------------
-  # Event firing.
-  # ---------------------------------------------------------------------------
-  twin_recalibrated_always_fires:
-    status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/twin_recalibration_service.py
-    - app/services/event_publisher.py
-    plan: docs/implementation/phase-2/phase-2-3-p3-twin-recalibration-pipeline.md
-    owned_by_plan:
-    - phase-2-3-p3-twin-recalibration-pipeline
-    description: 'twin_recalibrated fires for every new calibration TwinState (no
-      threshold gate).
-
-      '
-    protects:
-    - Fires on first snapshot
-    - Fires on subsequent snapshot
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_twin_recalibration_service_event_firing.py
-        owner: phase-2-3-p3-twin-recalibration-pipeline
-  twin_recalibrated_payload:
-    status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/twin_recalibration_service.py
-    - app/services/event_publisher.py
-    plan: docs/implementation/phase-2/phase-2-3-p3-twin-recalibration-pipeline.md
-    owned_by_plan:
-    - phase-2-3-p3-twin-recalibration-pipeline
-    description: 'twin_recalibrated payload includes athlete_id, twin_state_id,
-      previous_twin_state_id (None for first), trigger ("calibration"), confidence_level,
-      fitness_score, fatigue_score.
-
-      '
-    protects:
-    - All required fields present
-    - previous_twin_state_id None for first snapshot
-    - previous_twin_state_id set for subsequent snapshot
-    - athlete_id matches event publisher athlete_id
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_twin_recalibration_service_event_firing.py
-        owner: phase-2-3-p3-twin-recalibration-pipeline
-  twin_confidence_upgraded_fires_on_upgrade:
-    status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/twin_recalibration_service.py
-    - app/services/event_publisher.py
-    plan: docs/implementation/phase-2/phase-2-3-p3-twin-recalibration-pipeline.md
-    owned_by_plan:
-    - phase-2-3-p3-twin-recalibration-pipeline
-    description: 'twin_confidence_upgraded fires only when confidence_level strictly
-      increases.
-
-      '
-    protects:
-    - LOW → MEDIUM upgrade fires
-    - MEDIUM → HIGH upgrade fires
-    - No upgrade (equal levels) does NOT fire
-    - Downgrade attempt does NOT fire (ratchet preserves)
-    - First snapshot does NOT fire (no previous to compare)
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_twin_recalibration_service_event_firing.py
-        owner: phase-2-3-p3-twin-recalibration-pipeline
-  twin_confidence_upgraded_payload:
-    status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/twin_recalibration_service.py
-    - app/services/event_publisher.py
-    plan: docs/implementation/phase-2/phase-2-3-p3-twin-recalibration-pipeline.md
-    owned_by_plan:
-    - phase-2-3-p3-twin-recalibration-pipeline
-    description: 'twin_confidence_upgraded payload includes athlete_id, from_level,
-      to_level, twin_state_id.
-
-      '
-    protects:
-    - All required fields present
-    - from_level/to_level correctly reflect transition
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_twin_recalibration_service_event_firing.py
-        owner: phase-2-3-p3-twin-recalibration-pipeline
-  event_ordering_recalibrated_before_upgraded:
-    status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/twin_recalibration_service.py
-    - app/services/event_publisher.py
-    plan: docs/implementation/phase-2/phase-2-3-p3-twin-recalibration-pipeline.md
-    owned_by_plan:
-    - phase-2-3-p3-twin-recalibration-pipeline
-    description: 'Event ordering within the calibration transaction: twin_recalibrated
-      fires BEFORE twin_confidence_upgraded (when applicable).
-
-      '
-    protects:
-    - twin_recalibrated before twin_confidence_upgraded
-    - Both events fire on upgrade
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_twin_recalibration_service_event_firing.py
-        owner: phase-2-3-p3-twin-recalibration-pipeline
-  no_events_on_dedup_short_circuit:
-    status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/twin_recalibration_service.py
-    - app/services/event_publisher.py
-    plan: docs/implementation/phase-2/phase-2-3-p3-twin-recalibration-pipeline.md
-    owned_by_plan:
-    - phase-2-3-p3-twin-recalibration-pipeline
-    description: 'When insert_if_not_exists returns an existing calibration TwinState,
-      no events are published.
-
-      '
-    protects:
-    - No twin_recalibrated on dedup
-    - No twin_confidence_upgraded on dedup
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_twin_recalibration_service_event_firing.py
-        owner: phase-2-3-p3-twin-recalibration-pipeline
-  return_value_calibration_recalibration_result:
-    status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/twin_recalibration_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p3-twin-recalibration-pipeline.md
-    owned_by_plan:
-    - phase-2-3-p3-twin-recalibration-pipeline
-    description: 'recalibrate_for_calibration returns a CalibrationRecalibrationResult
-      carrying the new TwinState and the confidence_upgraded flag.
-
-      '
-    protects:
-    - Returns CalibrationRecalibrationResult
-    - confidence_upgraded True on upgrade
-    - confidence_upgraded False on no upgrade
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_twin_recalibration_service_event_firing.py
-        owner: phase-2-3-p3-twin-recalibration-pipeline
-  # ---------------------------------------------------------------------------
-  # Worker task — threshold_detection.
-  # ---------------------------------------------------------------------------
-  threshold_detection_task_full_pipeline:
-    status: promoted
-    test_type: integration
-    file_scope:
-    - app/worker/app.py
-    plan: docs/implementation/phase-2/phase-2-3-p3-twin-recalibration-pipeline.md
-    owned_by_plan:
-    - phase-2-3-p3-twin-recalibration-pipeline
-    description: 'The threshold_detection worker task runs the full pipeline (detect
-      → apply_observations → recalibrate_for_calibration → commit) in a single
-      transaction.
-
-      '
-    protects:
-    - Full pipeline commits atomically
-    - activity_id and athlete_id flow through all three services
-    - All three services called exactly once in the happy path
-    impacts: []
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      integration:
-      - path: tests/integration/test_threshold_detection_task_integration.py
-        owner: phase-2-3-p3-twin-recalibration-pipeline
-  threshold_detection_task_early_return_empty_observations:
-    status: promoted
-    test_type: integration
-    file_scope:
-    - app/worker/app.py
-    plan: docs/implementation/phase-2/phase-2-3-p3-twin-recalibration-pipeline.md
-    owned_by_plan:
-    - phase-2-3-p3-twin-recalibration-pipeline
-    description: 'When the threshold detection service returns an empty list, the
-      task returns early without calling the physiology update or twin recalibration
-      services.
-
-      '
-    protects:
-    - No physiology update on empty observations
-    - No twin recalibration on empty observations
-    - Return value reflects early-return path
-    impacts: []
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      integration:
-      - path: tests/integration/test_threshold_detection_task_integration.py
-        owner: phase-2-3-p3-twin-recalibration-pipeline
-  threshold_detection_task_early_return_no_shifted_parameters:
-    status: promoted
-    test_type: integration
-    file_scope:
-    - app/worker/app.py
-    plan: docs/implementation/phase-2/phase-2-3-p3-twin-recalibration-pipeline.md
-    owned_by_plan:
-    - phase-2-3-p3-twin-recalibration-pipeline
-    description: 'When the physiology update returns no shifted parameters, the
-      task returns early without calling the twin recalibration service.
-
-      '
-    protects:
-    - Physiology update called
-    - Twin recalibration NOT called when no shifted parameters
-    - Return value reflects shifted=False
-    impacts: []
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      integration:
-      - path: tests/integration/test_threshold_detection_task_integration.py
-        owner: phase-2-3-p3-twin-recalibration-pipeline
-  threshold_detection_task_missing_activity:
-    status: promoted
-    test_type: integration
-    file_scope:
-    - app/worker/app.py
-    plan: docs/implementation/phase-2/phase-2-3-p3-twin-recalibration-pipeline.md
-    owned_by_plan:
-    - phase-2-3-p3-twin-recalibration-pipeline
-    description: 'A missing activity causes the task to raise an error before any
-      service is called.
-
-      '
-    protects:
-    - Nonexistent activity_id raises error
-    - No service called
-    impacts: []
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      integration:
-      - path: tests/integration/test_threshold_detection_task_integration.py
-        owner: phase-2-3-p3-twin-recalibration-pipeline
-  # ---------------------------------------------------------------------------
-  # Worker task — signal_clean defer wiring.
-  # ---------------------------------------------------------------------------
-  signal_clean_defers_threshold_detection:
-    status: promoted
-    test_type: integration
-    file_scope:
-    - app/worker/app.py
-    plan: docs/implementation/phase-2/phase-2-3-p3-twin-recalibration-pipeline.md
-    owned_by_plan:
-    - phase-2-3-p3-twin-recalibration-pipeline
-    description: 'After a successful signal_clean that creates a RawSensorStream,
-      the threshold_detection task is deferred with activity_id only.
-
-      '
-    protects:
-    - Defer fires after successful clean (created=True)
-    - activity_id passed to defer
-    impacts: []
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      integration:
-      - path: tests/integration/test_signal_clean_threshold_detection_defer_integration.py
-        owner: phase-2-3-p3-twin-recalibration-pipeline
-  signal_clean_no_defer_when_not_created:
-    status: promoted
-    test_type: integration
-    file_scope:
-    - app/worker/app.py
-    plan: docs/implementation/phase-2/phase-2-3-p3-twin-recalibration-pipeline.md
-    owned_by_plan:
-    - phase-2-3-p3-twin-recalibration-pipeline
-    description: 'When signal_clean does not create a RawSensorStream (manual entry,
-      already cleaned), threshold_detection is NOT deferred.
-
-      '
-    protects:
-    - No defer for manual entry
-    - No defer when already cleaned
-    impacts: []
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      integration:
-      - path: tests/integration/test_signal_clean_threshold_detection_defer_integration.py
-        owner: phase-2-3-p3-twin-recalibration-pipeline
-  signal_clean_defer_failure_swallowed:
-    status: promoted
-    test_type: integration
-    file_scope:
-    - app/worker/app.py
-    plan: docs/implementation/phase-2/phase-2-3-p3-twin-recalibration-pipeline.md
-    owned_by_plan:
-    - phase-2-3-p3-twin-recalibration-pipeline
-    description: 'A defer failure (queue backend outage) is swallowed after logging
-      so the cleaning commit still succeeds.
-
-      '
-    protects:
-    - Defer failure does not break cleaning
-    - RawSensorStream is committed despite defer failure
-    impacts: []
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      integration:
-      - path: tests/integration/test_signal_clean_threshold_detection_defer_integration.py
-        owner: phase-2-3-p3-twin-recalibration-pipeline
-  signal_clean_defer_after_commit:
-    status: promoted
-    test_type: integration
-    file_scope:
-    - app/worker/app.py
-    plan: docs/implementation/phase-2/phase-2-3-p3-twin-recalibration-pipeline.md
-    owned_by_plan:
-    - phase-2-3-p3-twin-recalibration-pipeline
-    description: 'The defer fires AFTER the commit, not inside the transaction
-      (ADR-009 decoupling principle).
-
-      '
-    protects:
-    - Defer runs after commit
-    - RawSensorStream is committed at defer time
-    impacts: []
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      integration:
-      - path: tests/integration/test_signal_clean_threshold_detection_defer_integration.py
-        owner: phase-2-3-p3-twin-recalibration-pipeline
-  # ---------------------------------------------------------------------------
-  # Behaviour — full user journey.
-  # ---------------------------------------------------------------------------
-  full_pipeline_writes_calibration_twin_state:
-    status: promoted
-    test_type: behaviour
-    file_scope:
-    - app/services/threshold_detection_service.py
-    - app/services/physiology_update_service.py
-    - app/services/twin_recalibration_service.py
-    - app/services/event_publisher.py
-    plan: docs/implementation/phase-2/phase-2-3-p3-twin-recalibration-pipeline.md
-    owned_by_plan:
-    - phase-2-3-p3-twin-recalibration-pipeline
-    description: 'After the threshold detection → physiology update → twin recalibration
-      pipeline runs against the real test database, a calibration TwinState is appended
-      with updated metric_confidence.
-
-      '
-    protects:
-    - Calibration TwinState appended with trigger=CALIBRATION
-    - model_version is "v2-threshold-detection"
-    - metric_confidence includes lt2_hr
-    impacts: []
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      behaviour:
-      - path: tests/behaviour/test_twin_recalibration_calibration_user_journey.py
-        owner: phase-2-3-p3-twin-recalibration-pipeline
-  metric_confidence_lt2_hr_growth:
-    status: promoted
-    test_type: behaviour
-    file_scope:
-    - app/services/threshold_detection_service.py
-    - app/services/physiology_update_service.py
-    - app/services/twin_recalibration_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p3-twin-recalibration-pipeline.md
-    owned_by_plan:
-    - phase-2-3-p3-twin-recalibration-pipeline
-    description: 'Exit gate condition 1: after a calibration-eligible session with
-      ≥3 intensity steps, AthletePhysiology.lt2.hr.prior_weight grows from the
-      prior value.
-
-      '
-    protects:
-    - prior_weight > 0 after a single session
-    - prior_weight increases across consecutive sessions
-    impacts: []
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      behaviour:
-      - path: tests/behaviour/test_twin_recalibration_calibration_user_journey.py
-        owner: phase-2-3-p3-twin-recalibration-pipeline
-  posterior_mean_shifts_from_population_default:
-    status: promoted
-    test_type: behaviour
-    file_scope:
-    - app/services/threshold_detection_service.py
-    - app/services/physiology_update_service.py
-    - app/services/twin_recalibration_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p3-twin-recalibration-pipeline.md
-    owned_by_plan:
-    - phase-2-3-p3-twin-recalibration-pipeline
-    description: 'Exit gate condition 3: AthletePhysiology.lt2.hr.value shows posterior
-      mean shifted from population default toward observed values.
-
-      '
-    protects:
-    - Posterior value updated to reflect observation
-    impacts: []
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      behaviour:
-      - path: tests/behaviour/test_twin_recalibration_calibration_user_journey.py
-        owner: phase-2-3-p3-twin-recalibration-pipeline
-  metric_confidence_transitions_to_medium:
-    status: promoted
-    test_type: behaviour
-    file_scope:
-    - app/services/threshold_detection_service.py
-    - app/services/physiology_update_service.py
-    - app/services/twin_recalibration_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p3-twin-recalibration-pipeline.md
-    owned_by_plan:
-    - phase-2-3-p3-twin-recalibration-pipeline
-    description: 'Exit gate condition 2: after 4+ HR deflection-eligible sessions,
-      metric_confidence.lt2_hr transitions to "medium" when prior_weight >= 4.0.
-
-      '
-    protects:
-    - metric_confidence.lt2_hr reaches "medium" or "high" after 5 sessions
-    impacts: []
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      behaviour:
-      - path: tests/behaviour/test_twin_recalibration_calibration_user_journey.py
-        owner: phase-2-3-p3-twin-recalibration-pipeline
-  confidence_level_monotonic:
-    status: promoted
-    test_type: behaviour
-    file_scope:
-    - app/services/twin_recalibration_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p3-twin-recalibration-pipeline.md
-    owned_by_plan:
-    - phase-2-3-p3-twin-recalibration-pipeline
-    description: 'Sub-phase invariant: confidence_level is monotonic — the calibration
-      TwinState''s confidence_level never decreases across consecutive snapshots.
-
-      '
-    protects:
-    - Second TwinState confidence_level >= first TwinState
-    impacts: []
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      behaviour:
-      - path: tests/behaviour/test_twin_recalibration_calibration_user_journey.py
-        owner: phase-2-3-p3-twin-recalibration-pipeline
-  events_fire_for_calibration_twin_state:
-    status: promoted
-    test_type: behaviour
-    file_scope:
-    - app/services/twin_recalibration_service.py
-    - app/services/event_publisher.py
-    plan: docs/implementation/phase-2/phase-2-3-p3-twin-recalibration-pipeline.md
-    owned_by_plan:
-    - phase-2-3-p3-twin-recalibration-pipeline
-    description: 'The twin_recalibrated and twin_confidence_upgraded events are
-      written to the transactional outbox in the same transaction as the TwinState
-      insert.
-
-      '
-    protects:
-    - twin_recalibrated event in outbox after calibration TwinState
-    - twin_confidence_upgraded event in outbox after upgrade
-    - Payload well-formed when event fires
-    impacts: []
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      behaviour:
-      - path: tests/behaviour/test_twin_recalibration_calibration_user_journey.py
-        owner: phase-2-3-p3-twin-recalibration-pipeline
+coverage:
+  events:
+    covered: []
+  invariants:
+    covered: []

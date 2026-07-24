@@ -18,6 +18,34 @@ the common patterns.
 
 ---
 
+## Delegation vs Direct Access
+
+**When to delegate to subagents instead of using tools directly:**
+
+| Question Type | Delegate To | Why |
+|---|---|---|
+| "What depends on this entity?" | `p-impact-analyzer` | Single call returns full blast radius |
+| "What is the structure of this module?" | `p-code-structure-explorer` | AST-aware tools, no file reads needed |
+| "What are the contracts for this entity/event?" | `p-contract-verifier` | Condenses entity/event context |
+| "What exists in this domain?" | `p-state-explorer` | Registry resolution, not file content |
+| "What does this file look like?" | `p-code-explorer` | Full file content retrieval |
+
+**Delegation pattern:**
+```
+Tool: task
+Input:
+{
+  "subagent_type": "p-impact-analyzer",
+  "prompt": "Concept: <entity_name>"
+}
+```
+
+Use delegation when the same retrieval question would be asked by multiple
+agents, or when the question is purely informational (not requiring
+judgment or decision-making).
+
+---
+
 ## Bulk vs Targeted Retrieval
 
 **Default: prefer bulk tools when gathering information about multiple
@@ -27,8 +55,8 @@ independent concepts.**
 |---|---|---|
 | Discovery across multiple concepts/domains | `multi_search(searches[])` | One call per concept across domains — batch all searches |
 | Cross-domain context for multiple concepts | `multi_context(concepts: ["A","B","C"])` | Full context for all named concepts in one call |
-| Impact analysis before modifying an existing entity | `get_change_impact(concept)` | Returns affected entities + events + agents + vision + release features |
-| Who depends on a given entity | `get_related_contracts(entity_name)` | JSON list of referencing entities |
+| Impact analysis before modifying an existing entity | `p-impact-analyzer` (subagent) | Returns full blast radius; delegates to `get_change_impact` internally |
+| Who depends on a given entity | `p-impact-analyzer` (subagent) | Delegates to `get_related_contracts` internally |
 
 **Use targeted single-tool retrieval when:**
 - investigating a specific entity in depth
@@ -46,30 +74,35 @@ maximising bulk tool usage.
 
 ## Tool Selection Reference
 
-| Situation | Tool |
-|---|---|
-| Fetch multiple entities at once | `multi_context(concepts: ["A","B","C"])` — one call for all |
-| Multiple searches across domains | `multi_search(searches[])` — batch all searches, one call |
-| Check what depends on an entity | `get_related_contracts(entity_name)` — JSON list |
-| Check full impact of modifying an entity | `get_change_impact(concept)` — entities + events + agents + vision |
-| Full spec for one entity (sections optional) | `get_entity_context(entity_name, sections?)` |
-| Event producer/consumer/schema | `get_event_context(event_name)` |
-| Invariants by type or enforcement layer | `search_invariants(query, invariant_type?, enforcement?)` |
-| Discover entity names | `list_entities()` |
-| Discover vision document names | `list_vision_entities(category?)` |
-| List all release phases | `list_release_plan_phases()` |
-| List features in a phase | `list_release_plan_features(phase?)` |
-| Full phase spec | `get_phase_context(phase_number)` |
-| Full feature spec | `get_feature_context(feature_id)` |
-| Read specific files (known paths) | `get_files([paths])` — scoped, never speculative |
-| Find specific function or class signatures | `search_symbols([symbols])` — batch all symbols, one call |
-| Find specific patterns across known files | `grep_files(pattern, paths?)` |
-| Semantic search when file location unknown | `search_codebase(query)` — last resort; targeted query only |
+**Use this table to decide: delegate to subagent OR use tool directly.**
+
+| Situation | Delegate To | Direct Tool (fallback) |
+|---|---|---|
+| Check full impact of modifying an entity | `p-impact-analyzer` | `get_change_impact(concept)` |
+| Full spec for one entity (contracts) | `p-contract-verifier` | `get_entity_context(entity_name, sections?)` |
+| Event producer/consumer/schema | `p-contract-verifier` | `get_event_context(event_name)` |
+| Invariants by type or enforcement layer | `p-contract-verifier` | `search_invariants(query, invariant_type?, enforcement?)` |
+| What depends on an entity | `p-impact-analyzer` | `get_related_contracts(entity_name)` |
+| Module structure and signatures | `p-code-structure-explorer` | `get_module_context`, `get_class_context`, `get_function_context` |
+| Fetch multiple entities at once | `p-doc-explorer` | `multi_context(concepts: ["A","B","C"])` |
+| Multiple searches across domains | `p-doc-explorer` | `multi_search(searches[])` |
+| Discover entity names | N/A (no subagent) | `list_entities()` |
+| Discover vision document names | N/A (no subagent) | `list_vision_entities(category?)` |
+| List all release phases | N/A (no subagent) | `list_release_plan_phases()` |
+| List features in a phase | N/A (no subagent) | `list_release_plan_features(phase?)` |
+| Full phase spec | N/A (no subagent) | `get_phase_context(phase_number)` |
+| Full feature spec | N/A (no subagent) | `get_feature_context(feature_id)` |
+| Read specific files (known paths) | N/A (no subagent) | `get_files([paths])` — scoped, never speculative |
+| Find specific function or class signatures | N/A (no subagent) | `search_symbols([symbols])` — batch all symbols, one call |
+| Find specific patterns across known files | N/A (no subagent) | `grep_files(pattern, paths?)` |
+| Semantic search when file location unknown | N/A (no subagent) | `search_codebase(query)` — last resort; targeted query only |
 
 **Retrieval pattern:**
-- Discovery and comparison → prefer bulk tools (`multi_search`, `multi_context`)
-- Impact analysis → `get_change_impact`
-- Verification and contract detail → prefer targeted tools (`get_entity_context`, `get_event_context`, `get_phase_context`)
+- Impact analysis → delegate to `p-impact-analyzer`
+- Contract verification → delegate to `p-contract-verifier`
+- Structure analysis → delegate to `p-code-structure-explorer`
+- Cross-domain research → delegate to `p-doc-explorer`
+- Direct file access → use `get_files` directly (no subagent needed)
 
 ---
 

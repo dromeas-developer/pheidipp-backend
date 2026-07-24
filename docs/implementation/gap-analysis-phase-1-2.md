@@ -15,7 +15,7 @@ However, the retrospective roast surfaces **15 findings** ranging from hard cont
 
 - ~~**G-01 (CRITICAL):** LLM router does not exist.~~ **RETRACTED** — on verification, the code is ADR-007 compliant; the stack-truth instruction was stale and has been corrected. See §5 G-01 for the full retraction.
 - ~~**G-02 (CRITICAL):** No TimescaleDB hypertables exist.~~ **RETRACTED** — on verification against the corrected discriminator in stack-truth, none of the six flagged tables are hypertable candidates. The original stack-truth rule under-specified its trigger ("daily or per-second time-series samples" without defining "sample"); the rule has been corrected to state the full three-criterion discriminator. The single true hypertable in the model is `athlete_wellness` (planned, unimplemented) — it lands with its producer in the wellness ingestion phase. See §5 G-02 for the full retraction and the per-table verdicts.
-- **G-03 (HIGH):** The `twin_model_ready` event — which the architecture names as the trigger for plan generation and first-message generation — is never produced. Plan generation is wired directly into the onboarding transaction instead. This is an event-flow contract violation, not a behavioural bug.
+- **G-03 (HIGH):** The `twin_model_ready` event — which the architecture names as the trigger for plan generation and first-message generation — was originally never produced (plan generation was wired directly into the onboarding transaction). Phase 2.7 Batch 3 added the event and wired its async consumer chain, but TA review surfaced that the implemented producer (`OnboardingService` at bootstrap) did not match the catalogue's named producer (`TwinRecalibrationService` at "sufficient data"). **G-03 is RESOLVED** — the Vision & Architecture Author chose Path B (amend the catalogue to match the implemented behaviour) via ADR-012. The catalogue's `twin_model_ready` producer is now `OnboardingService`, the trigger fires immediately after the bootstrap TwinState insert for all tiers, and the Tier-1 historical-ingestion language has been removed. No code change required; no Batch 4 coder work. See §5 G-03 for the full resolution record.
 - **G-04 (HIGH):** No outbox publisher worker exists. `SystemEventOutbox` rows are written with `status='pending'` and never transition to `published`. The transactional outbox pattern is half-implemented — the write side works, the publish side does not.
 - **G-05 (HIGH):** Two agent services (`WorkoutGenerationAgent`, `FirstMessageAgent`) live in `app/services/` rather than `app/agents/`. This is a layer-architecture inconsistency, not a runtime bug, but it muddies the `agents → services` boundary the stack-truth instruction defines.
 
@@ -72,9 +72,9 @@ The remaining 10 findings are MEDIUM or LOW — orphaned models, stale docstring
 | **RC2** Vision Constraints | ✓ | All Phase 1/2 vision constraints touched by implemented sub-phases are enforced: running-only calibration (sport-type gate), no raw pace (GAP in prompts), append-only TwinState (repository exposes only insert), no averages on Activity (model has no avg_* columns), Python-computes/LLM-narrates (all agents receive pre-computed context). One gap: "no AI-feel" voice constraints are prompt-level only — no automated validation, but this is by design (voice quality gate is a human review per 1-5a BRD). |
 | **RC3** Entity Collision | ✗ | `SecondaryEvent` and `RegenerationTask` models exist (migrations + ORM) but have **no repository, no service, no route** (G-08). They are orphaned — created by the 1-2b schema plan but never consumed. Not a collision (nothing else claims their role), but a dead contract. |
 | **RC4** Modification Safety | ✓ | No downstream consumers are broken by any implemented change. The `twin_states` unique-index drop (migration 21f955c743cb) correctly replaced the unique constraint with `insert_if_not_exists` application-level deduplication. The `training_plans.twin_state_id` FK was added in a separate migration (d1579f4430e7) after TwinState existed — correct forward-only pattern. |
-| **RC5** Event Flow Consistency | ✗ | Two event-flow contract violations: (a) `twin_model_ready` is defined in the event catalogue as the trigger for `PlanGenerationService.generate()` and `FirstMessageAgent.generate()`, but the code wires plan generation directly into the onboarding transaction and first-message generation behind a manual API endpoint — `twin_model_ready` is never produced (G-03). (b) The outbox publish side is unimplemented — events are written to `system_event_outbox` with `status='pending'` but no worker ever transitions them to `published` (G-04). All other event chains (produce → consume ordering, payload fields) are consistent. |
-| **RC6** Invariant Enforcement | ✗ | Three invariants originally flagged; only one survives: (a) ~~TimescaleDB hypertable mandate for time-series tables~~ — **retracted**: the original stack-truth rule under-specified its trigger; once corrected to the full three-criterion discriminator (fixed cadence + row-is-measurement + fleet-wide window-scan), none of the six flagged tables qualify (G-02 retracted). The single true hypertable (`athlete_wellness`) is unimplemented — correctly deferred to its producer phase. (b) ~~`app.core.llm_router.get_llm()` as sole LLM gateway~~ — **retracted**: ADR-007 blesses the direct `AsyncOpenAI`-via-proxy pattern the code uses; the stack-truth instruction was stale and has been corrected (G-01 retracted). (c) `agents → services` layer boundary — two agents live in `services/` (G-05, the one surviving invariant finding in this row). All other invariants (append-only TwinState, fit_file_key prerequisite, no averages, GAP-only pace, single active goal, form = fitness − fatigue) are enforced at the correct layer. |
-| **RC7** ADR Re-Check | ✗ | ~~G-02 (hypertables)~~ — **retracted**: false positive caused by under-specified rule; rule corrected, no implementation (G-02 retired). G-03 (`twin_model_ready` event flow) may require an ADR if the team chooses to amend the event topology rather than implement the missing event. G-04 (outbox publisher) is an implementation gap with a Redis-vs-no-Redis tension that has been resolved by Option A (no external bus; publisher marks rows `published`) — no ADR required. G-01 was retracted — no ADR needed. No new ADRs are strictly required unless G-03 is resolved by amending architecture rather than implementing it. |
+| **RC5** Event Flow Consistency | ✓ | Two event-flow contract violations originally flagged; both resolved: (a) `twin_model_ready` was missing (G-03) — Batch 3 added the event and wired its async consumer chain (`generate_plan` task → `PlanGenerationService.generate()` → `training_plan_generated` → `generate_first_message` task → `FirstMessageAgent.generate()`), matching the topology's consumer flow. The producer-side disagreement (catalogue originally named `TwinRecalibrationService` at "sufficient data"; code fires from `OnboardingService` at bootstrap) is **resolved via ADR-012** — the catalogue is amended to name `OnboardingService` as the producer with the trigger firing immediately after the bootstrap TwinState insert for all tiers. The implementation now matches the amended catalogue. (b) The outbox publish side is unimplemented (G-04) — Batch 2 closes this with the publisher task; consistent. All other event chains (produce → consume ordering, payload fields) are consistent. |
+| **RC6** Invariant Enforcement | ✗ | Three invariants originally flagged; only one survives: (a) ~~TimescaleDB hypertable mandate for time-series tables~~ — **retracted**: the original stack-truth rule under-specified its trigger; once corrected to the full three-criterion discriminator (fixed cadence + row-is-measurement + fleet-wide window-scan), none of the six flagged tables qualify (G-02 retracted). The single true hypertable (`athlete_wellness`) is unimplemented — correctly deferred to its producer phase. (b) ~~`app.core.llm_router.get_llm()` as sole LLM gateway~~ — **retracted**: ADR-007 blesses the direct `AsyncOpenAI`-via-proxy pattern the code uses; the stack-truth instruction was stale and has been corrected (G-01 retracted). (c) `agents → services` layer boundary — two agents live in `services/` at original finding time (G-05, now closed by Batch 1's relocation). All other invariants (append-only TwinState, fit_file_key prerequisite, no averages, GAP-only pace, single active goal, form = fitness − fatigue) are enforced at the correct layer. |
+| **RC7** ADR Re-Check | ✓ | ~~G-02 (hypertables)~~ — **retracted**: false positive caused by under-specified rule; rule corrected, no implementation (G-02 retired). G-03 (`twin_model_ready` producer semantic) — **resolved via ADR-012** (Path B chosen by `p-vision-and-architect-author`): the catalogue is amended to name `OnboardingService` as the producer with the trigger firing immediately after the bootstrap TwinState insert for all tiers; the Tier-1 historical-ingestion language is removed; the implemented code is the target end-state; no code change required. G-04 (outbox publisher) is an implementation gap with a Redis-vs-no-Redis tension that has been resolved by Option A (no external bus; publisher marks rows `published`) — no ADR required. G-01 was retracted — no ADR needed. G-09 and G-13 were retracted after TA review as "filed at wrong layer — not implementation tasks" — no ADR. |
 
 ---
 
@@ -119,23 +119,35 @@ Applying the corrected discriminator to all six flagged tables: none qualify.
 
 ---
 
-### G-03 — `twin_model_ready` event never produced (HIGH)
+### G-03 — `twin_model_ready` event never produced, then produced from the wrong service, then catalogue amended (HIGH — RESOLVED via ADR-012)
 
-**Contract:** `00-foundations/event-catalogue.md` defines `twin_model_ready` with producer `TwinRecalibrationService` ("fires once after onboarding when twin has sufficient data") and consumers `PlanGenerationService` (triggers initial plan generation + first WeeklyPlan) and `FirstMessageAgent` (generates first message from WeeklyPlan). `04-platform/event-topology.md` "Plan Generation Event Flows → Initial Plan Generation" shows `twin_model_ready → PlanGenerationService → training_plan_generated → FirstMessageAgent`. The `onboarding_completed` event catalogue entry explicitly states: "plan generation is triggered by `twin_model_ready`, NOT by `onboarding_completed`."
+**Contract (original):** `00-foundations/event-catalogue.md` originally defined `twin_model_ready` with producer `TwinRecalibrationService` ("fires once after onboarding when twin has sufficient data") and consumers `PlanGenerationService` (triggers initial plan generation + first WeeklyPlan) and `FirstMessageAgent` (generates first message from WeeklyPlan). `04-platform/event-topology.md` "Plan Generation Event Flows → Initial Plan Generation" showed `twin_model_ready → PlanGenerationService → training_plan_generated → FirstMessageAgent`. The `onboarding_completed` event catalogue entry originally stated: "plan generation is triggered by `twin_model_ready`, NOT by `onboarding_completed`. For Tier 1 athletes, `twin_model_ready` fires after historical data ingestion completes."
 
-**Code:** `grep` for `twin_model_ready` across `app/**/*.py` → **0 matches**. The event is never produced. Instead:
-- `OnboardingService.complete_onboarding()` directly invokes `self.plan_service.generate_plan(athlete_id)` within the onboarding transaction (confirmed at `app/services/onboarding_service.py` line 471).
-- `FirstMessageAgent.generate()` is triggered by a manual `POST /athletes/{id}/coach/first-message` API call, not by any event.
+**Original finding (Phase 1/2 baseline):** `grep` for `twin_model_ready` across `app/**/*.py` originally returned **0 matches**. The event was never produced. `OnboardingService.complete_onboarding()` directly invoked `self.plan_service.generate_plan(athlete_id)` within the onboarding transaction; `FirstMessageAgent.generate()` was triggered only by a manual `POST /athletes/{id}/coach/first-message` API call.
 
-**Why it matters:** The architecture deliberately separates `onboarding_completed` (state transition) from `twin_model_ready` (twin is ready to drive a plan) because Tier 1 athletes (with imported history) should have their plan generated after historical data ingestion, not immediately at onboarding. The current implementation hard-codes the Tier 3 behaviour (questionnaire-only → plan immediately) into the onboarding transaction. When Tier 1 onboarding is implemented (Phase 3+), the direct-wiring approach will either (a) generate a plan prematurely from a twin with no history, or (b) require conditional logic in the onboarding service that duplicates the event-driven decision. The event-driven design was chosen specifically to avoid this.
+**Phase 2.7 Batch 3 resolution attempt:** The Phase 2.7 Batch 3 plan produced by this architect (Steps 1–4 + 10–11 in `batch-3-event-flow-plan-router-fix.md`) instructed the coder to fire `twin_model_ready` from `OnboardingService.complete_onboarding()` immediately after the bootstrap TwinState insert, deferred the `generate_plan` and `generate_first_message` procrastinate worker tasks to consume it, and removed the direct `PlanGenerationService.generate_plan()` call. The plan labelled this *"Option 1 — implement the event as the architecture specifies, no ADR."* The code shipped against that plan.
 
-**Resolution:** This is an event-flow contract violation. Two options:
-1. **Implement the event** — `TwinRecalibrationService` produces `twin_model_ready` after the first TwinState insert when `trigger = questionnaire` (Tier 3) or after historical ingestion completes (Tier 1). `PlanGenerationService` and `FirstMessageAgent` consume it. The direct wiring in `OnboardingService` is removed. This restores the architecture as written.
-2. **Amend the architecture** — if the team decides the direct-wiring approach is simpler and Tier 1 will be handled differently, update `event-catalogue.md` and `event-topology.md` to remove `twin_model_ready` and document the direct-wiring pattern. This requires an ADR because it changes the event topology.
+**TA review surfaced a producer-semantic drift:** The catalogue originally named **`TwinRecalibrationService`** as the producer of `twin_model_ready`, with the trigger "fires once after onboarding when twin has sufficient data" — explicitly NOT the bootstrap TwinState (which has `confidence_level='low'`). The `onboarding_completed` entry additionally contrasted the two: *"For Tier 1 athletes, `twin_model_ready` fires after historical data ingestion completes."* The implemented code fired from `OnboardingService` at the bootstrap TwinState, which (a) was the wrong producer against the original catalogue and (b) collapsed the Tier 1/3 distinction the architecture had deliberately introduced. The "Option 1 — implement as architecture specifies, no ADR" label was therefore wrong: the plan did not implement what the catalogue said, and the no-ADR call ratified an unstated architecture amendment through inertia rather than through an architecture decision.
 
-**Recommendation:** Option 1 (implement the event). The event-driven design is more flexible and the direct wiring is a shortcut that will cause rework. But this is an architecture decision — escalate to the Architecture Author if Option 2 is preferred.
+**Resolution — RESOLVED via ADR-012 (Path B chosen):** The Vision & Architecture Author reviewed the Architecture Delta Proposal at `reports/phase-2-7_architecture-delta_twin-model-ready-producer.md` and chose **Path B** — amend the catalogue to match the implemented behaviour. The decision is recorded in **ADR-012** (`docs/adr/012-twin-model-ready-producer-amendment.md`, status: `accepted`).
 
-**Severity:** HIGH — event-flow contract violation. Behaviour is currently correct for Tier 3 but will break the Tier 1 design when it is implemented.
+The amendment:
+- `twin_model_ready` producer is now `OnboardingService` (via `TwinBootstrapService`) after the bootstrap TwinState insert.
+- The trigger fires immediately after onboarding completes for all tiers (1, 2, and 3).
+- The Tier-1 historical-ingestion trigger language has been removed from the `onboarding_completed` entry.
+- Tier 1 athletes receive a plan at onboarding from questionnaire-only twin data; that plan is later superseded via the existing `twin_confidence_upgraded` → plan regeneration path once historical data is ingested.
+- `PlanGenerationService.generate()` is triggered by `twin_model_ready`; `FirstMessageAgent` is triggered by `training_plan_generated` (sequenced after `twin_model_ready`).
+
+Affected documents amended by the Architecture Author:
+- `docs/architecture/00-foundations/event-catalogue.md` — producer changed to `OnboardingService`; Tier-1 historical-ingestion language removed.
+- `docs/architecture/04-platform/event-topology.md` — producer annotation updated.
+- `docs/architecture/01-entities/twin-state.md` — clarified which service produces which twin event.
+- `docs/architecture/03-agents/first-message-agent.md` — trigger corrected to `training_plan_generated` (sequenced after `twin_model_ready`).
+- `docs/release-plan/phase-1/phase-1-5a-first-coach-message.md` — trigger corrected to `twin_model_ready`.
+
+**No code change is required.** The Phase 2.7 Batch 3 shipped code is the target end-state. No Batch 4 coder work for this finding. The catalogue amendments the coder made in Batch 3 Steps 10–11 (updating `event-catalogue.md` and `event-topology.md` to name `OnboardingService` as the producer) are ratified by ADR-012 — they are no longer provisional.
+
+**Severity:** HIGH — event-flow contract violation, now resolved by architecture amendment. The plan-vs-architecture drift that TA review surfaced is closed: the architecture now matches the implementation, and the decision is recorded in ADR-012 with its rationale (immediate value delivery for all tiers; existing `twin_confidence_upgraded` regeneration path handles Tier-1 refinement; simplicity of single-producer single-trigger-point design).
 
 ---
 
@@ -217,17 +229,17 @@ The `app/api/v1/plan.py` README notes this is intentional ("no service class wra
 
 ---
 
-### G-09 — `run_ingestion_pipeline` docstring is stale (LOW)
+### ~~G-09 — `run_ingestion_pipeline` docstring is stale (LOW)~~ **RETRACTED — filed at wrong layer**
 
-**Contract:** Code documentation should match code behaviour.
+**Original concern:** The `_run_ingestion_pipeline` helper in `ActivityIngestionService` had a docstring that said "Does NOT publish events" while the implementation does publish `sport_type_detected`, `activity_ingested`, and `activity_calibration_eligible`. Flagged as a stale-docstring finding.
 
-**Code:** The Phase 1-6 BRD's Coder Notes flag this: "Flag — stale docstring: `run_ingestion_pipeline` docstring says it 'Does NOT publish events' but the implementation DOES publish `sport_type_detected`, `activity_ingested`, and `activity_calibration_eligible`. This was updated in Phase 2 but the docstring was not fixed." Confirmed still present.
+**Retraction:** This finding was filed at the wrong layer. `_run_ingestion_pipeline` is the architecture's intentional internal helper — a caller-responsibility contract helper inside a deliberate two-method design. The public wrappers `ingest()` and `ingest_async()` are the methods that own the contract for the published events, and the wrapper docstrings already correctly list `sport_type_detected`, `activity_ingested`, and `activity_calibration_eligible`. The helper's docstring deliberately does not restate those events because the helper is shared between the two wrappers and the responsibility for documenting published events lives at the wrapper layer, not the helper layer.
 
-**Why it matters:** A stale docstring is a minor lie that will mislead the next engineer who reads it. Low impact, but trivial to fix.
+The Phase 2.7 Batch 3 plan (Step 8) prescribed an edit to the helper docstring that would invert this contract — it would have made the documentation claim publishing happens at the helper when it does not, and would have blurred the intentional caller-vs-helper separation the architecture establishes. **No implementation is required.** The Architecture Delta Proposal / TA review process surfaced this filing-layer error after the code shipped against the original Batch 3 plan; see `reports/phase-2-7_architecture-delta_twin-model-ready-producer.md` for the routing record and the Batch 3 BRD's annotated status.
 
-**Resolution:** Implementation gap. Update the docstring to match the implementation. One-line fix.
+**Resolution:** No implementation. Filed at wrong layer — not an implementation task.
 
-**Severity:** LOW — documentation defect.
+**G-09 is retracted as a non-finding.**
 
 ---
 
@@ -273,17 +285,17 @@ The `app/api/v1/plan.py` README notes this is intentional ("no service class wra
 
 ---
 
-### G-13 — `onboarding_service.py` references `TrainingGoalRepository_unique_violation` (LOW — UNVERIFIED)
+### ~~G-13 — `onboarding_service.py` references `TrainingGoalRepository_unique_violation` (LOW — UNVERIFIED)~~ **RETRACTED — filed at wrong layer**
 
-**Contract:** ADR-006 → "explicit rollback after caught DB exception." The pattern is `await session.rollback()` before re-raising.
+**Original concern:** The State Explorer's brief flagged a line in `app/services/onboarding_service.py` referencing `TrainingGoalRepository_unique_violation(exc)` as a possible typo (should be `is_unique_violation` as on other repos). Flagged for verification.
 
-**Code:** The State Explorer's brief flagged: "Line references `TrainingGoalRepository_unique_violation(exc)` — this appears to be a missing import or the method should be `is_unique_violation` as on other repos." This was noted as unverified in the brief.
+**Retraction:** This finding was filed against an undocumented contract. `TrainingGoalRepository_unique_violation` (and `is_unique_violation` on other repositories) is a test-level error-detection helper — it is not a documented contract anywhere in the architecture or vision corpora. The Phase 2.7 Batch 3 plan (Step 9) invited the coder to "fix or verify" the reference against no architecture reference, producing a scenario where the coder cannot succeed because there is no contract to verify against. That is scope creep beyond the corpus.
 
-**Why it matters:** If the reference is a typo, it would raise `AttributeError` at runtime when a unique-violation occurs during onboarding. If it's correct (e.g. a static method on `TrainingGoalRepository`), no issue.
+No architecture or vision reference governs the shape of test-level error-detection helpers. The Phase 2.7 Batch 3 plan's prescription was therefore scope creep beyond the corpus. **No implementation is required.** The TA review surfaced this filing-layer error; the gap-analysis report now records it rather than routing it to the coder.
 
-**Resolution:** Needs verification — read `app/services/onboarding_service.py` around the referenced line. If it's a typo, fix it. If it's correct, no action. Not blocking for the gap-closing phase but should be verified before the phase ships.
+**Resolution:** No implementation. Filed at wrong layer — not an implementation task.
 
-**Severity:** LOW — possible typo, unverified.
+**G-13 is retracted as a non-finding.**
 
 ---
 
@@ -325,23 +337,25 @@ The 15 findings cluster into three implementation batches plus several documenta
 |---|---|---|---|
 | **Batch 1** | Agent relocation | G-05 | None — pure file move + import update |
 | **Batch 2** | Outbox publisher | G-04 | None (the original hypertable-migration half of Batch 2 is retracted per G-02; the TimescaleDB extension prerequisite is removed) |
-| **Batch 3** | Event-flow contract alignment + plan-router layer fix + low-severity cleanups | G-03, G-07, G-09, G-13 | Batch 1 (agents must be relocated before touching their trigger wiring); G-03 may require an ADR if the team chooses to amend the event topology rather than implement `twin_model_ready` |
+| **Batch 3** | Event-flow contract alignment + plan-router layer fix | G-03 *(resolved via ADR-012 — see §5 G-03)*, G-07 | Batch 1 (agents must be relocated before touching their trigger wiring) |
 
-*G-01 and G-02 were retracted — no batch is required for either. The single true hypertable in the model (`athlete_wellness`) is unimplemented and correctly deferred to the wellness ingestion phase that introduces its first writer.*
+*G-01, G-02, G-09, and G-13 were retracted — no batch is required for any of them. G-03 is resolved via ADR-012 (Path B: catalogue amended to match implemented behaviour; no code change; no Batch 4 coder work). The single true hypertable in the model (`athlete_wellness`) is unimplemented and correctly deferred to the wellness ingestion phase that introduces its first writer.*
+
+**G-03 status:** The Phase 2.7 Batch 3 plan originally labelled G-03 as "Option 1 — implement as architecture specifies, no ADR" and shipped code that fires `twin_model_ready` from `OnboardingService` after the bootstrap TwinState insert. TA review surfaced that the catalogue originally named `TwinRecalibrationService` as the producer and the trigger as "after onboarding when twin has sufficient data" — explicitly NOT the bootstrap firing. The shipped code therefore did not implement what the catalogue said; the "no ADR" call was too fast. The Vision & Architecture Author reviewed the Architecture Delta Proposal and chose **Path B** — amend the catalogue to match the implemented behaviour. The decision is recorded in **ADR-012** (`docs/adr/012-twin-model-ready-producer-amendment.md`, status: `accepted`). The catalogue's `twin_model_ready` producer is now `OnboardingService`, the trigger fires immediately after the bootstrap TwinState insert for all tiers, and the Tier-1 historical-ingestion language has been removed. No code change required; no Batch 4 coder work. See §5 G-03 for the full resolution record.
 
 ### 6.2 Documentation / Escalation Actions (no code)
 
 | Finding | Action | Owner |
 |---|---|---|
-| G-03 | If Option 2 (amend event topology) is chosen, write ADR-012 and update `event-catalogue.md` + `event-topology.md`. If Option 1 (implement `twin_model_ready`), no ADR needed. | Architecture Author (decision) → Implementation Architect (ADR if needed) |
+| G-03 | **RESOLVED via ADR-012 (Path B).** The Vision & Architecture Author chose Path B — amend the catalogue to match the implemented behaviour. ADR-012 (`docs/adr/012-twin-model-ready-producer-amendment.md`, status: `accepted`) records the decision. The catalogue's `twin_model_ready` producer is now `OnboardingService`, the trigger fires immediately after the bootstrap TwinState insert for all tiers, and the Tier-1 historical-ingestion language has been removed. Affected docs amended by the Architecture Author: `event-catalogue.md`, `event-topology.md`, `twin-state.md`, `first-message-agent.md`, `phase-1-5a-first-coach-message.md`. No code change required; no Batch 4 coder work. | `p-vision-and-architect-author` (decision + ADR + catalogue amendment) — **CLOSED** |
 | G-04 | Resolve the Redis-vs-no-Redis tension between `system-event.md` ("publishes to Redis/message bus") and stack-truth ("No Redis"). The outbox publisher's target destination depends on this. | Architecture Author |
 | G-06 | Author `05-api-contracts/` documents or remove the empty directory. | Architecture Author |
 | G-08 | Add deferred-decision notes for `SecondaryEvent` and `RegenerationTask` to the 1-2b BRD. | Implementation Architect |
-| G-09 | Fix the stale `run_ingestion_pipeline` docstring. | Coder (can be bundled into Batch 3) |
+| ~~G-09~~ | ~~Fix the stale `run_ingestion_pipeline` docstring.~~ **Retracted — filed at wrong layer.** The helper's docstring is the architecture's intentional caller-responsibility contract; the public wrappers `ingest`/`ingest_async` own the published-events documentation and already list them. | — |
 | G-10 | No action — correctly deferred. | — |
 | G-11 | No action — will be addressed in Phase 2-5. | — |
 | G-12 | No action — benign drift. | — |
-| G-13 | Verify the `TrainingGoalRepository_unique_violation` reference in `onboarding_service.py`. | Coder (can be bundled into Batch 3) |
+| ~~G-13~~ | ~~Verify the `TrainingGoalRepository_unique_violation` reference in `onboarding_service.py`.~~ **Retracted — filed at wrong layer.** `TrainingGoalRepository_unique_violation` (and `is_unique_violation` on other repos) is a test-level error-detection helper, not a documented architecture/vision contract. | — |
 | G-14 | Run `reindex_vision`. | DevOps / tooling |
 | G-15 | Amend release plan or add implementation-directory README note for 1-7/1-8. | Release Strategy Architect |
 
@@ -453,10 +467,11 @@ This section records the per-sub-phase cross-check performed during the roast. F
 
 ## 9. Next Steps
 
-1. **Decide on G-03** — implement `twin_model_ready` event (Option 1) or amend the event topology (Option 2, requires ADR). This decision gates Batch 3 of the gap-closing phase. **Resolved:** Option 1 — implement as architecture specifies.
+1. ~~Decide on G-03~~ → **RESOLVED via ADR-012 (Path B).** The Vision & Architecture Author chose Path B — amend the catalogue to match the implemented behaviour. ADR-012 (`docs/adr/012-twin-model-ready-producer-amendment.md`, status: `accepted`) records the decision. The catalogue's `twin_model_ready` producer is now `OnboardingService`, the trigger fires immediately after the bootstrap TwinState insert for all tiers, and the Tier-1 historical-ingestion language has been removed. No code change required; no Batch 4 coder work. The Architecture Delta Proposal at `reports/phase-2-7_architecture-delta_twin-model-ready-producer.md` is closed.
 2. **Decide on G-04** — resolve the Redis-vs-no-Redis tension for the outbox publisher's target. **Resolved:** Option A — publisher marks rows `published` without external bus; `system-event.md` Redis references to be removed.
 3. ~~Confirm TimescaleDB~~ — **mooted by G-02 retraction**: the hypertable-conversion portion of Batch 2 is removed; no TimescaleDB extension prerequisite remains for Phase 2.7. The `athlete_wellness` hypertable (the one true hypertable in the model) will install the extension when it lands with its producer in the wellness ingestion phase.
-4. **Produce the gap-closing phase BRDs** — once decisions 1 and 2 are made, produce `docs/implementation/phase-2/phase-2-7/` with `overview.md` and 3 batch BRDs per the implementation-plan-templates skill.
+4. **Produce the gap-closing phase BRDs** — Batches 1, 2, 3 are produced and shipped. **No Batch 4 is required** — G-03 is resolved via ADR-012 with no code change; G-09 and G-13 are retracted as filed-at-wrong-layer. Phase 2.7 is complete.
+5. **TA review follow-through** — G-09 and G-13 have been retracted in this report as "filed at wrong layer — not implementation tasks" per TA review. The Phase 2.7 Batch 3 BRD is annotated (in the file) to document that its Steps 8 and 9 (docstring fix and `TrainingGoalRepository_unique_violation` verification) should not have been in the plan; the code shipped against them is benign and not reverted.
 
 ---
 

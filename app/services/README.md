@@ -46,14 +46,8 @@ Business-logic layer — the single owner of domain rules, multi-step workflows,
 ### Workout Generation
 | File | Responsibility |
 |---|---|
-| `workout_generation_agent.py` | `WorkoutGenerationAgent` — idempotent day-of workout generation with LLM step synthesis and GenerationEvent audit |
 | `workout_generation_errors.py` | Domain exceptions: `PlannedSessionNotFoundError`, `WorkoutAlreadyGeneratedError`, `LLMServiceUnavailableError` |
 | `workout_target_types.py` | Canonical `SESSION_INTENT_MAP` (SessionType → PhysiologicalIntent) and `DATA_TIER_TARGET_TYPE` (DataTier → signal_type) |
-
-### Coach Agents
-| File | Responsibility |
-|---|---|
-| `first_message_agent.py` | `FirstMessageAgent` — idempotent onboarding coach message generation with context-budget enforcement |
 
 ### Platform
 | File | Responsibility |
@@ -62,6 +56,7 @@ Business-logic layer — the single owner of domain rules, multi-step workflows,
 | `event_publisher.py` | `EventPublisher` — atomically writes `SystemEvent` + `SystemEventOutbox` in the caller's transaction |
 | `health_service.py` | Database connectivity check for Kubernetes readiness probe |
 | `object_storage_client.py` | S3-compatible object storage client for FIT files — supports AWS S3, MinIO, and local filesystem fallback |
+| `outbox_publisher_service.py` | `OutboxPublisherService` — publish-side transaction owner for `system_event_outbox` status transitions per ADR-013 |
 
 ## Common Entry Points
 - **Athlete registration**: `auth_service.py` (register) → creates Athlete + AthleteAuth + AthleteProfile + RefreshToken + outbox event
@@ -75,6 +70,7 @@ Business-logic layer — the single owner of domain rules, multi-step workflows,
 - Domain exceptions follow a per-subsystem pattern: `*_errors.py` for exception types, `*_results.py` for frozen dataclass return values. Exceptions map to HTTP status codes at the API layer.
 - `EventPublisher` must be called in the same transaction as the producing domain writes (ADR-004 atomicity). All service methods that produce events inject `EventPublisher` via constructor.
 - `PlanGenerationService` is pure Python — no LLM, no external API calls. Templates live in `plan_generation_templates.py` for isolated unit testing.
+- `OutboxPublisherService` is a deliberate exception to the "caller provides the session" pattern — it opens its own `AsyncSession` internally per ADR-013 `SessionOwnership`, because the publish-side outbox transition is an independent transaction that must not participate in the caller's (worker's) transaction scope.
 - `ObjectStorageClient` is constructed once per process via `get_object_storage_client()` and reused — the underlying `boto3.client` is thread-safe.
 - Several services accept repositories via TYPE_CHECKING imports to avoid circular import chains (e.g., `ContextBudgetService`, agents).
 
@@ -82,3 +78,4 @@ Business-logic layer — the single owner of domain rules, multi-step workflows,
 - [ADR-004: Event Persistence Atomicity](../../docs/architecture/adr/ADR-004-system-events.md) — `EventPublisher` paired-write invariant
 - [ADR-005: Refresh Token IP Retention](../../docs/architecture/adr/ADR-005-refresh-token-ip-retention.md) — `RefreshTokenRepository` IP sweep
 - [ADR-007: LLM Provider Gateway](../../docs/architecture/adr/ADR-007-llm-provider-gateway.md) — LiteLLM proxy access pattern in all agent services
+- [ADR-013: Outbox Publisher Service Ownership](../../docs/architecture/adr/ADR-013-outbox-publisher-service-ownership.md) — `OutboxPublisherService` owns the publish-side transaction; worker tasks must not construct repositories

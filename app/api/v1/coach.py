@@ -31,7 +31,7 @@ from app.schemas.coaching import (
     MessagesListResponse,
 )
 from app.services.context_budget_service import ContextBudgetService
-from app.services.first_message_agent import (
+from app.agents.first_message_agent import (
     FirstMessageAgent,
     FirstMessageAlreadyExistsError,
     LLMServiceUnavailableError,

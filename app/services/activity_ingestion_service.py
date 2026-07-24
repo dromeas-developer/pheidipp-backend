@@ -197,10 +197,16 @@ class ActivityIngestionService:
     #                                only becomes visible to the
     #                                publisher worker after the
     #                                producing transaction commits.
-    # * :meth:`_run_ingestion_pipeline` — internal helper: parse → load
-    #                                → update → recalibrate. Does NOT
-    #                                publish events; called by both
-    #                                ``ingest`` and ``ingest_async``.
+    # * :meth:`run_ingestion_pipeline` — the heavy steps: parse → load
+    #                                → update → recalibrate → publish.
+    #                                Emits ``sport_type_detected``,
+    #                                ``activity_ingested``, and
+    #                                ``activity_calibration_eligible``
+    #                                (the last only when the five-rule
+    #                                gate passes and aerobic load is
+    #                                non-null) via the transactional
+    #                                outbox. Called by both ``ingest``
+    #                                and ``ingest_async``.
     # ------------------------------------------------------------------
 
     async def stage_upload(
@@ -292,10 +298,11 @@ class ActivityIngestionService:
 
         Convenience wrapper used by tests and debugging. Calls
         :meth:`stage_upload` to persist the file + empty Activity
-        row, then :meth:`_run_ingestion_pipeline` to run the heavy
-        steps + publish both ``activity_ingested`` and
-        ``activity_calibration_eligible`` events inside the caller's
-        transaction. The caller commits once.
+        row, then :meth:`run_ingestion_pipeline` to run the heavy
+        steps and publish ``sport_type_detected``,
+        ``activity_ingested``, and ``activity_calibration_eligible``
+        (when eligible) through the transactional outbox inside the
+        caller's transaction. The caller commits once.
 
         Production traffic uses the two-step flow instead — see
         :meth:`stage_upload` + :meth:`ingest_async` — so the API
@@ -404,12 +411,23 @@ class ActivityIngestionService:
             6. Evaluate calibration eligibility with full five-rule gate
             7. Apply Banister update via TwinRecalibrationService
             8. Append new TwinState (trigger = activity_sync)
-            9. Fire ``activity_calibration_eligible`` event when eligible
+            9. Publish events via the transactional outbox
 
-        Does **NOT** publish events; the caller is responsible for
-        firing ``activity_ingested`` within the same transaction so
-        the outbox row only becomes visible to the publisher worker
-        after the producing transaction commits.
+        Publishes three events through :class:`EventPublisher` within the
+        caller's transaction so the outbox rows only become visible to
+        the publisher worker after the producing transaction commits:
+
+        * ``sport_type_detected`` — fires for every non-manual-entry
+          source before the ingested event; the detection result is
+          the event payload.
+        * ``activity_ingested`` — fires after the activity is
+          updated with load scores and signal flags; the payload
+          includes sport type for downstream consumers.
+        * ``activity_calibration_eligible`` — fires after the
+          ingested event when the five-rule gate passes and the
+          aerobic load is non-null; the outbox publisher reads
+          events in insertion order so this naturally lands
+          after the ingested event.
 
         Returns ``(recalibration, scores)`` — the caller may need
         the recalibration result for its ``ActivityIngestionResult``

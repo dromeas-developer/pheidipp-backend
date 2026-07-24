@@ -1,191 +1,118 @@
-# Test manifest for Phase-1.5b — Workout Generation
-# Plan ID: Phase-1.5b-P1
 version: "1.0"
 plan_id: "Phase-1.5b-P1"
-
 generated_at: "2026-06-28T00:00:00Z"
-last_reviewed_at: "2026-06-28T04:00:00Z"
+last_reviewed_at: "2026-06-28T00:00:00Z"
 
-features:
-  generated_workout_repository:
+prerequisites:
+  migrations: false
+
+files:
+  test_workout_endpoints.py:
+    type: integration
     status: promoted
-    plan: "docs/implementation/phase-1/phase-1-5b-p1-workout-generation.md"
-    owned_by_plan:
-      - "Phase-1.5b-P1"
-    description: "GeneratedWorkoutRepository — append-only insert and idempotent lookup"
-    protects:
-      - "GeneratedWorkout is append-only — no update/delete methods"
-      - "One GeneratedWorkout per (planned_session_id, generation_date) idempotency key"
-      - "insert() flushes without commit — transaction boundary owned by agent"
-    impacts: []
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-        - path: "tests/unit/test_generated_workout_repository.py"
-          owner: "Phase-1.5b-P1"
-
-  workout_step_repository:
+    functions:
+      test_200_with_existing_workout: {implemented: true, executable: true, passed: true}
+      test_201_on_successful_generation: {implemented: true, executable: true, passed: true}
+      test_401_without_auth: {implemented: true, executable: true, passed: true}
+      test_401_without_auth: {implemented: true, executable: true, passed: true}
+      test_403_accessing_different_athlete: {implemented: true, executable: true, passed: true}
+      test_403_accessing_different_athlete: {implemented: true, executable: true, passed: true}
+      test_404_when_no_session_for_today: {implemented: true, executable: true, passed: true}
+      test_404_when_session_not_found: {implemented: true, executable: true, passed: true}
+      test_409_when_workout_already_generated: {implemented: true, executable: true, passed: true}
+      test_502_on_llm_failure: {implemented: true, executable: true, passed: true}
+      test_second_post_returns_409_with_same_workout: {implemented: true, executable: true, passed: true}
+  test_generated_workout_repository.py:
+    type: unit
     status: promoted
-    plan: "docs/implementation/phase-1/phase-1-5b-p1-workout-generation.md"
-    owned_by_plan:
-      - "Phase-1.5b-P1"
-    description: "WorkoutStepRepository — batch insert and ordered retrieval"
-    protects:
-      - "WorkoutStep is append-only — no update/delete methods"
-      - "(generated_workout_id, step_order) uniqueness enforced by DB"
-      - "insert_many flushes once for entire batch"
-    impacts: []
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-        - path: "tests/unit/test_workout_step_repository.py"
-          owner: "Phase-1.5b-P1"
-
-  planned_session_repository:
+    functions:
+      test_adds_workout_to_session: {implemented: true, executable: true, passed: true}
+      test_queries_by_both_keys: {implemented: true, executable: true, passed: true}
+      test_refreshes_workout_to_get_persisted_ids: {implemented: true, executable: true, passed: true}
+      test_returns_empty_list_when_no_workouts: {implemented: true, executable: true, passed: true}
+      test_returns_none_when_not_exists: {implemented: true, executable: true, passed: true}
+      test_returns_workout: {implemented: true, executable: true, passed: true}
+      test_returns_workout_when_exists: {implemented: true, executable: true, passed: true}
+      test_returns_workouts_ordered_by_generated_at_desc: {implemented: true, executable: true, passed: true}
+  test_planned_session_repository.py:
+    type: unit
     status: promoted
-    plan: "docs/implementation/phase-1/phase-1-5b-p1-workout-generation.md"
-    owned_by_plan:
-      - "Phase-1.5b-P1"
-    description: "PlannedSessionRepository — today lookup via WeeklyPlan→TrainingPlan join"
-    protects:
-      - "Staleness invariant: queries MUST join through WeeklyPlan.training_plan_id"
-      - "get_today_for_athlete filters by TrainingPlan.status='active'"
-    impacts: []
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-        - path: "tests/unit/test_planned_session_repository.py"
-          owner: "Phase-1.5b-P1"
-
-  workout_target_types:
+    functions:
+      test_filters_by_athlete_id_and_active_plan: {implemented: true, executable: true, passed: true}
+      test_queries_by_id: {implemented: true, executable: true, passed: true}
+      test_queries_via_weekly_plan_training_plan_join: {implemented: true, executable: true, passed: true}
+      test_returns_empty_list_when_no_sessions: {implemented: true, executable: true, passed: true}
+      test_returns_none_when_not_exists: {implemented: true, executable: true, passed: true}
+      test_returns_session_when_exists: {implemented: true, executable: true, passed: true}
+      test_returns_sessions_ordered_by_session_slot_asc: {implemented: true, executable: true, passed: true}
+  test_workout_generation_agent.py:
+    type: unit
     status: promoted
-    plan: "docs/implementation/phase-1/phase-1-5b-p1-workout-generation.md"
-    owned_by_plan:
-      - "Phase-1.5b-P1"
-    description: "SESSION_INTENT_MAP, DATA_TIER_TARGET_TYPE constants and get_step_physiological_intent helper"
-    protects:
-      - "SESSION_INTENT_MAP completeness — all SessionType values covered"
-      - "DATA_TIER_TARGET_TYPE: Tier 1-2→power, Tier 3-4→gap, Tier 5-6→description"
-      - "warmup/cooldown/recovery steps always yield RECOVERY intent"
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-        - path: "tests/unit/test_workout_target_types.py"
-          owner: "Phase-1.5b-P1"
-
-  workout_generation_agent:
+    functions:
+      test_build_workout_context_receives_correct_arguments: {implemented: true, executable: true, passed: true}
+      test_contract_error_has_descriptive_message: {implemented: true, executable: true, passed: true}
+      test_does_not_create_workout_on_llm_failure: {implemented: true, executable: true, passed: true}
+      test_proceeds_with_generation_when_no_existing_workout: {implemented: true, executable: true, passed: true}
+      test_raises_llm_service_unavailable_when_no_twin_state: {implemented: true, executable: true, passed: true}
+      test_raises_planned_session_not_found_when_session_missing: {implemented: true, executable: true, passed: true}
+      test_raises_workout_already_generated_when_allow_existing_false: {implemented: true, executable: true, passed: true}
+      test_returns_existing_without_llm_call: {implemented: true, executable: true, passed: true}
+      test_writes_generation_event_with_success_false_on_llm_error: {implemented: true, executable: true, passed: true}
+  test_workout_step_repository.py:
+    type: unit
     status: promoted
-    plan: "docs/implementation/phase-1/phase-1-5b-p1-workout-generation.md"
-    owned_by_plan:
-      - "Phase-1.5b-P1"
-    description: "WorkoutGenerationAgent — LLM-driven workout generation with idempotency and error handling"
-    protects:
-      - "Idempotency gate: existing workout returned without LLM call"
-      - "TwinState pre-condition: raises LLMServiceUnavailableError when no twin state"
-      - "LLM failure: GenerationEvent(success=false) written, no workout created"
-      - "Step validation: physiological_intent never null, warmup first, cooldown last"
-      - "Transaction boundary: agent flushes but does NOT commit"
-    impacts: []
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services:
-        - "LiteLLM proxy"
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-        - path: "tests/unit/test_workout_generation_agent.py"
-          owner: "Phase-1.5b-P1"
-
-  workout_endpoints:
+    functions:
+      test_adds_all_steps_to_session: {implemented: true, executable: true, passed: true}
+      test_empty_list_flushes_and_returns_empty: {implemented: true, executable: true, passed: true}
+      test_flushes_once_for_batch: {implemented: true, executable: true, passed: true}
+      test_queries_by_generated_workout_id: {implemented: true, executable: true, passed: true}
+      test_refreshes_each_step: {implemented: true, executable: true, passed: true}
+      test_returns_empty_list_when_no_steps: {implemented: true, executable: true, passed: true}
+      test_returns_steps: {implemented: true, executable: true, passed: true}
+      test_returns_steps_ordered_by_step_order_asc: {implemented: true, executable: true, passed: true}
+  test_workout_target_types.py:
+    type: unit
     status: promoted
-    plan: "docs/implementation/phase-1/phase-1-5b-p1-workout-generation.md"
-    owned_by_plan:
-      - "Phase-1.5b-P1"
-    description: "GET /athletes/{id}/today and POST /athletes/{id}/sessions/{sid}/generate-workout endpoints"
-    protects:
-      - "GET /today returns 404 when no session for today"
-      - "GET /today auto-triggers generation when no workout exists"
-      - "POST /generate-workout returns 201 on first call, 409 on re-call (idempotency)"
-      - "POST /generate-workout returns 502 on LLM failure"
-      - "Cross-athlete access returns 403 via require_self auth"
-    impacts:
-      - "generated_workout_repository"
-      - "workout_generation_agent"
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services:
-        - "LiteLLM proxy"
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      integration:
-        - path: "tests/integration/test_workout_endpoints.py"
-          owner: "Phase-1.5b-P1"
-
-execution_groups:
-  phase_1_5b_feature:
-    scope: feature
-    phase: 1
-    tests:
-      - "tests/unit/test_generated_workout_repository.py"
-      - "tests/unit/test_workout_step_repository.py"
-      - "tests/unit/test_planned_session_repository.py"
-      - "tests/unit/test_workout_target_types.py"
-      - "tests/unit/test_workout_generation_agent.py"
-      - "tests/integration/test_workout_endpoints.py"
-    depends_on:
-      - "phase_1_5a_feature"
+    functions:
+      test_cooldown_ignores_session_type: {implemented: true, executable: true, passed: true}
+      test_cooldown_returns_recovery: {implemented: true, executable: true, passed: true}
+      test_covers_all_data_tiers: {implemented: true, executable: true, passed: true}
+      test_covers_all_session_types: {implemented: true, executable: true, passed: true}
+      test_cross_training_maps_to_low_aerobic: {implemented: true, executable: true, passed: true}
+      test_drills_mobility_maps_to_neuromuscular: {implemented: true, executable: true, passed: true}
+      test_easy_run_maps_to_low_aerobic: {implemented: true, executable: true, passed: true}
+      test_fartlek_maps_to_vo2max: {implemented: true, executable: true, passed: true}
+      test_hill_repeats_maps_to_vo2max: {implemented: true, executable: true, passed: true}
+      test_long_run_maps_to_high_aerobic: {implemented: true, executable: true, passed: true}
+      test_medium_long_run_maps_to_high_aerobic: {implemented: true, executable: true, passed: true}
+      test_optional_run_maps_to_recovery: {implemented: true, executable: true, passed: true}
+      test_recovery_run_maps_to_recovery: {implemented: true, executable: true, passed: true}
+      test_recovery_step_type_returns_recovery: {implemented: true, executable: true, passed: true}
+      test_rest_maps_to_recovery: {implemented: true, executable: true, passed: true}
+      test_steady_state_maps_to_high_aerobic: {implemented: true, executable: true, passed: true}
+      test_strides_maps_to_neuromuscular: {implemented: true, executable: true, passed: true}
+      test_tempo_maps_to_threshold: {implemented: true, executable: true, passed: true}
+      test_test_session_maps_to_vo2max: {implemented: true, executable: true, passed: true}
+      test_threshold_maps_to_threshold: {implemented: true, executable: true, passed: true}
+      test_tier_1_maps_to_power: {implemented: true, executable: true, passed: true}
+      test_tier_2_maps_to_power: {implemented: true, executable: true, passed: true}
+      test_tier_3_maps_to_gap: {implemented: true, executable: true, passed: true}
+      test_tier_4_maps_to_gap: {implemented: true, executable: true, passed: true}
+      test_tier_5_maps_to_description: {implemented: true, executable: true, passed: true}
+      test_tier_6_maps_to_description: {implemented: true, executable: true, passed: true}
+      test_vo2max_maps_to_vo2max: {implemented: true, executable: true, passed: true}
+      test_warmup_ignores_session_type: {implemented: true, executable: true, passed: true}
+      test_warmup_returns_recovery: {implemented: true, executable: true, passed: true}
+      test_work_step_derives_from_session_intent_map: {implemented: true, executable: true, passed: true}
+      test_work_step_easy_run_yields_low_aerobic: {implemented: true, executable: true, passed: true}
+      test_work_step_rest_yields_recovery: {implemented: true, executable: true, passed: true}
+      test_work_step_strides_yields_neuromuscular: {implemented: true, executable: true, passed: true}
+      test_work_step_vo2max_yields_vo2max: {implemented: true, executable: true, passed: true}
 
 coverage:
-  routes:
-    covered:
-      - "GET /athletes/{id}/today"
-      - "POST /athletes/{id}/sessions/{sid}/generate-workout"
-    partial: []
-    missing: []
-
   events:
     covered:
       - "workout_generated"
-    partial: []
-    missing: []
-
   invariants:
     covered:
       - "WorkoutStep.physiological_intent is never null"
@@ -194,142 +121,3 @@ coverage:
       - "Target type depends on data tier (power/gap/description)"
       - "Steps never updated after creation — append-only"
       - "warmup step first, cooldown step last"
-    partial: []
-    missing: []
-
-history:
-  - date: "2026-06-28"
-    plan: "Phase-1.5b-P1"
-    tests_added: 6
-    tests_modified: 0
-    tests_removed: 0
-    result: "PARTIAL"
-    coverage_delta: >
-      Initial test generation for Phase-1.5b (Workout Generation).
-      Generated unit tests for GeneratedWorkoutRepository,
-      WorkoutStepRepository, PlannedSessionRepository,
-      workout_target_types constants, and WorkoutGenerationAgent.
-      Generated integration tests for GET /today and
-      POST /generate-workout endpoints. All tests set to
-      validation.executable=false; DevOps will execute and
-      update to passed/failed after running.
-  - date: "2026-06-28"
-    plan: "Phase-1.5b-P1"
-    tests_added: 0
-    tests_modified: 6
-    tests_removed: 0
-    result: "FAIL"
-    coverage_delta: >
-      Test-pack fixes per DevOps report (62 passed, 15 failed).
-      Tests modified:
-      - test_generated_workout_repository.py: replaced str(call_args)
-        assertions with call_args[0][0] inspection (Select.__repr__
-        shows object identity, not SQL).
-      - test_workout_step_repository.py: same fix.
-      - test_planned_session_repository.py: same fix in 3 tests.
-      - test_workout_generation_agent.py: (1) replaced empty steps
-        array with valid warmup step in test_proceeds_with_generation
-        and test_build_workout_context_receives_correct_arguments
-        (validator requires non-empty steps); (2) added
-        request=MagicMock() to APIConnectionError for newer openai
-        library; (3) removed incorrect assert_called_once on
-        GenerationEvent.insert for twin_state failure path
-        (pre-condition error fires before LLM call, no
-        GenerationEvent is written); added corresponding
-        assert_not_called assertions.
-      - test_workout_endpoints.py: replaced phase_label="Threshold
-        Build" string literal with PhaseLabel.THRESHOLD_BUILD enum
-        member (string was not a valid PhaseLabel value, caused
-        LookupError on insert). Added PhaseLabel to imports.
-      Manifest state updated by DevOps: workout_target_types passed;
-      generated_workout_repository, workout_step_repository,
-      planned_session_repository, workout_generation_agent,
-      workout_endpoints remain executable=true but passed=false.
-      After all fixes, awaiting re-run.
-  - date: "2026-06-28"
-    plan: "Phase-1.5b-P1"
-    tests_added: 0
-    tests_modified: 3
-    tests_removed: 0
-    result: "FAIL"
-    coverage_delta: >
-      Test-pack fixes per DevOps report (74 passed, 3 failed).
-      Tests modified:
-      - test_workout_generation_agent.py:
-        test_proceeds_with_generation_when_no_existing_workout and
-        test_build_workout_context_receives_correct_arguments:
-        updated mock LLM response to include the required
-        target_gap_sec_per_km field for target_type='gap' (was
-        missing; the agent's validator requires it for power/gap
-        target types since Tier-3 athletes need GAP pace). Replaced
-        string-concatenated mock content with json.dumps() for
-        clarity and to avoid string-concatenation edge cases.
-        Added `import json` at the top of the file.
-      - test_workout_endpoints.py:
-        test_404_when_no_session_for_today: the
-        _create_athlete_with_onboarding helper always creates a
-        PlannedSession for today, which made the 404 path
-        unreachable — the endpoint would find a session and the
-        agent would be invoked instead. Inlined a minimal
-        athlete-with-active-plan-but-no-today-session setup that
-        stops at TrainingPlan/WeeklyPlan (no PlannedSession).
-        The endpoint then finds no session and returns 404.
-      Manifest state: workout_target_types, generated_workout_repository,
-      workout_step_repository, planned_session_repository all
-      pass=true. workout_generation_agent and workout_endpoints
-      remain pass=false awaiting re-run.
-  - date: "2026-06-28"
-    plan: "Phase-1.5b-P1"
-    tests_added: 0
-    tests_modified: 2
-    tests_removed: 0
-    result: "FAIL"
-    coverage_delta: >
-      Test-pack fixes per DevOps report (75 passed, 2 failed).
-      Tests modified:
-      - test_workout_generation_agent.py:
-        test_proceeds_with_generation_when_no_existing_workout and
-        test_build_workout_context_receives_correct_arguments: the
-        mock LLM response contained a single 'warmup' step but the
-        agent's validator enforces that the LAST step must be
-        'cooldown' (and steps must be strictly sequential from
-        step_order=1). Added a 'work' step (physiological_intent=
-        'threshold' — matching SESSION_INTENT_MAP for the THRESHOLD
-        session fixture) and a 'cooldown' step (recovery intent),
-        producing a complete [warmup, work, cooldown] sequence that
-        passes every validator invariant: first=warmup, last=cooldown,
-        sequential step_orders, intent alignment with session_type,
-        target_gap_sec_per_km non-null on all three steps for the
-        gap target_type. No changes to test assertion structure —
-        the test still verifies build_workout_context is called
-        exactly once with the correct arguments.
-      Manifest state: workout_target_types, generated_workout_repository,
-      workout_step_repository, planned_session_repository pass=true.
-      workout_generation_agent and workout_endpoints remain pass=false
-      awaiting re-run.
-  - date: "2026-06-28"
-    plan: "Phase-1.5b-P1"
-    tests_added: 0
-    tests_modified: 0
-    tests_removed: 0
-    result: "PASS"
-    coverage_delta: >
-      All 6 features promoted: generated_workout_repository,
-      workout_step_repository, planned_session_repository,
-      workout_target_types, workout_generation_agent,
-      workout_endpoints. DevOps Run 5 reported 77/77 tests passed
-      with no failures, no skipped, and a clean build of all 4
-      containers. Selection group membership advanced:
-      tests/unit/test_generated_workout_repository.py,
-      tests/unit/test_workout_step_repository.py,
-      tests/unit/test_planned_session_repository.py,
-      tests/unit/test_workout_target_types.py,
-      tests/unit/test_workout_generation_agent.py, and
-      tests/integration/test_workout_endpoints.py moved from
-      index.yaml selection.feature into both selection.regression
-      and selection.release. Cross-phase coverage in index.yaml
-      already enumerated Phase-1.5b routes/events/invariants
-      (no change required). Smoke group unchanged. No new
-      cross-phase execution dependencies introduced. Phase-1.5b
-      test pack is now the second promoted sub-phase (after
-      Phase-1.5a coaching) in the regression/release gate.

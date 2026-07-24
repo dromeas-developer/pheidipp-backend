@@ -1,1502 +1,258 @@
-version: '1.0'
-plan_id: phase-2-3-p2-physiology-update
-generated_at: '2026-07-12T10:00:00Z'
-last_reviewed_at: '2026-07-15T00:00:00Z'
-features:
-  bayesian_update_posterior_mean:
-    status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/physiology_update_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p2-physiology-update.md
-    owned_by_plan:
-    - phase-2-3-p2-physiology-update
-    description: 'bayesian_update() returns a posterior mean equal to the decayed-prior-weighted
-      blend of current and observation values.
+version: "1.0"
+plan_id: "phase-2-3-p2-physiology-update"
+generated_at: "2026-07-15T00:00:00Z"
+last_reviewed_at: "2026-07-15T00:00:00Z"
 
-      '
-    protects:
-    - Bayesian update formula correctness for posterior mean
-    - Weight conservation — new_total_weight = decayed_weight + obs.weight
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_physiology_update_service_bayesian.py
-        owner: phase-2-3-p2-physiology-update
-  bayesian_update_uncertainty_floor:
-    status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/physiology_update_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p2-physiology-update.md
-    owned_by_plan:
-    - phase-2-3-p2-physiology-update
-    description: 'bayesian_update() floors posterior uncertainty at 0.5 (UNCERTAINTY_FLOOR)
-      so uncertainty never collapses to zero even with massive evidence.
+prerequisites:
+  migrations: false
 
-      '
-    protects:
-    - Posterior uncertainty has a 0.5 floor
-    - Uncertainty scales as sqrt(decayed_weight / new_total_weight)
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_physiology_update_service_bayesian.py
-        owner: phase-2-3-p2-physiology-update
-  bayesian_update_dominant_source:
+files:
+  test_physiology_update_user_journey.py:
+    type: behaviour
     status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/physiology_update_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p2-physiology-update.md
-    owned_by_plan:
-    - phase-2-3-p2-physiology-update
-    description: 'bayesian_update() sets dominant_source to the observation''s source
-      iff observation.weight > decayed prior weight, else keeps the current dominant
-      source.
+    functions:
+      test_journey_duplicate_observation_writes_measurement_not_event: {implemented: true, executable: true, passed: true}
+      test_journey_eight_observations_reach_high_confidence: {implemented: true, executable: true, passed: true}
+      test_journey_event_payload_matches_shifted_parameters: {implemented: true, executable: true, passed: true}
+      test_journey_first_cp_observation_bootstraps_null_column: {implemented: true, executable: true, passed: true}
+      test_journey_four_observations_reach_medium_confidence: {implemented: true, executable: true, passed: true}
+      test_journey_small_shift_writes_measurement_not_event: {implemented: true, executable: true, passed: true}
+      test_journey_threshold_detection_to_physiology_updated_event: {implemented: true, executable: true, passed: true}
+  test_athlete_physiology_repository_update_in_place_integration.py:
+    type: integration
+    status: promoted
+    functions:
+      test_cp_non_null_to_null_clears: {implemented: true, executable: true, passed: true}
+      test_cp_null_to_non_null_persists: {implemented: true, executable: true, passed: true}
+      test_cp_unchanged_when_not_passed: {implemented: true, executable: true, passed: true}
+      test_cp_unchanged_when_unset_sentinel: {implemented: true, executable: true, passed: true}
+      test_lt1_mapping_persists_in_db: {implemented: true, executable: true, passed: true}
+      test_lt1_unchanged_when_not_passed: {implemented: true, executable: true, passed: true}
+      test_lt2_mapping_persists_in_db: {implemented: true, executable: true, passed: true}
+      test_max_hr_non_null_to_null_clears: {implemented: true, executable: true, passed: true}
+      test_max_hr_null_to_non_null_persists: {implemented: true, executable: true, passed: true}
+      test_max_hr_unchanged_when_unset_sentinel: {implemented: true, executable: true, passed: true}
+      test_no_flush_when_no_row: {implemented: true, executable: true, passed: true}
+      test_raises_runtime_error_when_no_row: {implemented: true, executable: true, passed: true}
+      test_row_id_unchanged_after_update: {implemented: true, executable: true, passed: true}
+      test_updated_at_changes_after_update: {implemented: true, executable: true, passed: true}
+  test_physiology_update_service_confidence_transitions_integration.py:
+    type: integration
+    status: promoted
+    functions:
+      test_eight_observations_reach_prior_weight_8_point_5: {implemented: true, executable: true, passed: true}
+      test_eighth_observation_triggers_medium_to_high_transition: {implemented: true, executable: true, passed: true}
+      test_four_observations_reach_prior_weight_4_point_5: {implemented: true, executable: true, passed: true}
+      test_four_observations_trigger_low_to_medium_transition: {implemented: true, executable: true, passed: true}
+      test_four_rr_observations_reach_high_confidence: {implemented: true, executable: true, passed: true}
+      test_three_calls_each_with_one_observation: {implemented: true, executable: true, passed: true}
+      test_two_rr_observations_reach_medium_confidence: {implemented: true, executable: true, passed: true}
+  test_physiology_update_service_first_observation_integration.py:
+    type: integration
+    status: promoted
+    functions:
+      test_bootstrapped_state_carries_observation_fields: {implemented: true, executable: true, passed: true}
+      test_cp_transitions_from_null_to_physiology_parameter_state: {implemented: true, executable: true, passed: true}
+      test_first_observation_does_not_fire_event: {implemented: true, executable: true, passed: true}
+      test_max_hr_bootstraps_from_null: {implemented: true, executable: true, passed: true}
+      test_second_observation_fires_event_when_shift_exceeds_one: {implemented: true, executable: true, passed: true}
+      test_second_observation_grows_prior_weight: {implemented: true, executable: true, passed: true}
+  test_physiology_update_service_idempotency_integration.py:
+    type: integration
+    status: promoted
+    functions:
+      test_different_activity_id_is_not_a_duplicate: {implemented: true, executable: true, passed: true}
+      test_different_observed_value_is_not_a_duplicate: {implemented: true, executable: true, passed: true}
+      test_different_source_is_not_a_duplicate: {implemented: true, executable: true, passed: true}
+      test_second_call_dedupes_observation_written_by_first: {implemented: true, executable: true, passed: true}
+      test_second_observation_does_not_fire_event: {implemented: true, executable: true, passed: true}
+      test_second_observation_writes_measurement_but_does_not_mutate: {implemented: true, executable: true, passed: true}
+  test_physiology_update_service_integration.py:
+    type: integration
+    status: promoted
+    functions:
+      test_athlete_physiology_row_id_preserved_across_update: {implemented: true, executable: true, passed: true}
+      test_event_atomicity_rolls_back_when_later_step_fails: {implemented: true, executable: true, passed: true}
+      test_event_not_persisted_when_shift_le_one_unit: {implemented: true, executable: true, passed: true}
+      test_event_payload_includes_all_shifted_parameters: {implemented: true, executable: true, passed: true}
+      test_event_persisted_when_shift_exceeds_one_unit: {implemented: true, executable: true, passed: true}
+      test_existing_lt2_hr_value_persists_when_only_lt1_updated: {implemented: true, executable: true, passed: true}
+      test_lt2_hr_posterior_persists_after_commit: {implemented: true, executable: true, passed: true}
+      test_measurement_row_persists_for_single_observation: {implemented: true, executable: true, passed: true}
+      test_measurement_written_even_when_posterior_does_not_shift: {implemented: true, executable: true, passed: true}
+      test_one_measurement_per_observation_in_batch: {implemented: true, executable: true, passed: true}
+      test_outbox_row_pending_status: {implemented: true, executable: true, passed: true}
+      test_service_builds_default_repos_and_publisher: {implemented: true, executable: true, passed: true}
+      test_service_with_missing_physiology_raises_at_db_layer: {implemented: true, executable: true, passed: true}
+      test_updated_at_hook_fires_on_update_in_place: {implemented: true, executable: true, passed: true}
+  test_athlete_physiology_repository_update_in_place.py:
+    type: unit
+    status: promoted
+    functions:
+      test_cp_cleared_to_none_when_explicit_none: {implemented: true, executable: true, passed: true}
+      test_cp_unchanged_when_not_passed: {implemented: true, executable: true, passed: true}
+      test_cp_unchanged_when_unset_sentinel_passed: {implemented: true, executable: true, passed: true}
+      test_cp_updated_when_mapping_passed: {implemented: true, executable: true, passed: true}
+      test_different_object_instance_is_not_sentinel: {implemented: true, executable: true, passed: true}
+      test_does_not_commit: {implemented: true, executable: true, passed: true}
+      test_flush_called_even_with_no_mutations: {implemented: true, executable: true, passed: true}
+      test_flushes_session: {implemented: true, executable: true, passed: true}
+      test_lt1_unchanged_when_explicit_none: {implemented: true, executable: true, passed: true}
+      test_lt1_unchanged_when_not_passed: {implemented: true, executable: true, passed: true}
+      test_lt1_updated_when_mapping_passed: {implemented: true, executable: true, passed: true}
+      test_lt2_cp_max_hr_unchanged_when_only_lt1_updated: {implemented: true, executable: true, passed: true}
+      test_lt2_updated_when_mapping_passed: {implemented: true, executable: true, passed: true}
+      test_max_hr_cleared_to_none_when_explicit_none: {implemented: true, executable: true, passed: true}
+      test_max_hr_unchanged_when_unset_sentinel_passed: {implemented: true, executable: true, passed: true}
+      test_max_hr_updated_when_mapping_passed: {implemented: true, executable: true, passed: true}
+      test_multiple_parameters_updated_together: {implemented: true, executable: true, passed: true}
+      test_no_flush_when_no_row: {implemented: true, executable: true, passed: true}
+      test_raises_runtime_error_when_no_row: {implemented: true, executable: true, passed: true}
+      test_returns_same_row_instance: {implemented: true, executable: true, passed: true}
+      test_unset_sentinel_explicitly_passed_is_no_op: {implemented: true, executable: true, passed: true}
+  test_physiology_update_service_bayesian.py:
+    type: unit
+    status: promoted
+    functions:
+      test_42_day_gap_decays_prior_to_37_percent: {implemented: true, executable: true, passed: true}
+      test_all_fields_can_be_set_explicitly: {implemented: true, executable: true, passed: true}
+      test_bare_date_string_in_current_date: {implemented: true, executable: true, passed: true}
+      test_bootstrap_shape_matches_bayesian_update_return: {implemented: true, executable: true, passed: true}
+      test_bootstrap_uses_initial_uncertainty: {implemented: true, executable: true, passed: true}
+      test_bootstrap_uses_observation_date: {implemented: true, executable: true, passed: true}
+      test_bootstrap_uses_observation_source: {implemented: true, executable: true, passed: true}
+      test_bootstrap_uses_observation_value: {implemented: true, executable: true, passed: true}
+      test_bootstrap_uses_observation_weight: {implemented: true, executable: true, passed: true}
+      test_date_observation_used_directly: {implemented: true, executable: true, passed: true}
+      test_datetime_observation_truncated_to_date: {implemented: true, executable: true, passed: true}
+      test_decay_time_constant_is_42_days: {implemented: true, executable: true, passed: true}
+      test_default_confidence_transitions_is_empty_dict: {implemented: true, executable: true, passed: true}
+      test_default_lists_are_independent_per_instance: {implemented: true, executable: true, passed: true}
+      test_default_measurements_written_is_zero: {implemented: true, executable: true, passed: true}
+      test_default_metric_confidence_is_empty_dict: {implemented: true, executable: true, passed: true}
+      test_default_shifted_parameters_is_empty_list: {implemented: true, executable: true, passed: true}
+      test_dominant_source_stored_as_value_string: {implemented: true, executable: true, passed: true}
+      test_future_observation_date_clamped_to_zero_days: {implemented: true, executable: true, passed: true}
+      test_initial_uncertainty_is_one: {implemented: true, executable: true, passed: true}
+      test_is_a_dataclass: {implemented: true, executable: true, passed: true}
+      test_iso_datetime_string_in_current_date: {implemented: true, executable: true, passed: true}
+      test_long_gap_decays_prior_toward_zero: {implemented: true, executable: true, passed: true}
+      test_new_total_weight_is_decayed_plus_observation: {implemented: true, executable: true, passed: true}
+      test_observation_dominates_when_weight_exceeds_decayed_prior: {implemented: true, executable: true, passed: true}
+      test_posterior_mean_between_current_and_observation: {implemented: true, executable: true, passed: true}
+      test_posterior_mean_exact_when_weights_equal: {implemented: true, executable: true, passed: true}
+      test_posterior_mean_returns_fresh_dict: {implemented: true, executable: true, passed: true}
+      test_posterior_mean_weighted_toward_observation_when_obs_weight_high: {implemented: true, executable: true, passed: true}
+      test_posterior_mean_weighted_toward_prior_when_obs_weight_low: {implemented: true, executable: true, passed: true}
+      test_prior_dominates_when_decayed_weight_exceeds_observation: {implemented: true, executable: true, passed: true}
+      test_prior_dominates_when_weights_equal: {implemented: true, executable: true, passed: true}
+      test_required_field_physiology: {implemented: true, executable: true, passed: true}
+      test_returned_last_observation_date_is_iso_string: {implemented: true, executable: true, passed: true}
+      test_same_day_observation_keeps_prior_weight_intact: {implemented: true, executable: true, passed: true}
+      test_uncertainty_above_floor_when_evidence_moderate: {implemented: true, executable: true, passed: true}
+      test_uncertainty_floor_applied_when_scaled_below_floor: {implemented: true, executable: true, passed: true}
+      test_uncertainty_floor_is_half: {implemented: true, executable: true, passed: true}
+      test_uncertainty_never_below_floor: {implemented: true, executable: true, passed: true}
+      test_unsupported_current_date_type_raises_type_error: {implemented: true, executable: true, passed: true}
+      test_unsupported_observation_date_type_raises_type_error: {implemented: true, executable: true, passed: true}
+  test_physiology_update_service_orchestration.py:
+    type: unit
+    status: promoted
+    functions:
+      test_calls_update_in_place_with_post_mutation_values: {implemented: true, executable: true, passed: true}
+      test_construct_with_all_dependencies_injected: {implemented: true, executable: true, passed: true}
+      test_construct_with_events_none_builds_default_publisher: {implemented: true, executable: true, passed: true}
+      test_cp_column_replaced_wholesale: {implemented: true, executable: true, passed: true}
+      test_cp_resolves_to_cp_column: {implemented: true, executable: true, passed: true}
+      test_does_not_fire_event_when_shift_le_one_unit: {implemented: true, executable: true, passed: true}
+      test_duplicate_observation_does_not_fire_event: {implemented: true, executable: true, passed: true}
+      test_duplicate_observation_does_not_shift_posterior: {implemented: true, executable: true, passed: true}
+      test_duplicate_observation_writes_measurement: {implemented: true, executable: true, passed: true}
+      test_eight_observations_reach_high: {implemented: true, executable: true, passed: true}
+      test_event_payload_includes_dominant_sources_and_weights: {implemented: true, executable: true, passed: true}
+      test_fires_event_when_shift_exceeds_one_unit: {implemented: true, executable: true, passed: true}
+      test_first_cp_observation_bootstraps_state: {implemented: true, executable: true, passed: true}
+      test_first_observation_does_not_count_as_shift: {implemented: true, executable: true, passed: true}
+      test_flag_modified_called_on_touched_column: {implemented: true, executable: true, passed: true}
+      test_flag_modified_called_once_per_column_even_with_multiple_substates: {implemented: true, executable: true, passed: true}
+      test_four_observations_reach_medium: {implemented: true, executable: true, passed: true}
+      test_lt1_hr_resolves_to_lt1_hr_substate: {implemented: true, executable: true, passed: true}
+      test_lt1_hr_substate_replaced: {implemented: true, executable: true, passed: true}
+      test_lt2_hr_resolves_to_lt2_hr_substate: {implemented: true, executable: true, passed: true}
+      test_max_hr_resolves_to_max_hr_column: {implemented: true, executable: true, passed: true}
+      test_measurement_carries_all_observation_fields: {implemented: true, executable: true, passed: true}
+      test_measurement_raw_data_reference_and_notes_are_none: {implemented: true, executable: true, passed: true}
+      test_missing_physiology_error_importable_from_app_services: {implemented: true, executable: true, passed: true}
+      test_no_event_published_on_missing_row: {implemented: true, executable: true, passed: true}
+      test_no_measurement_inserts_on_missing_row: {implemented: true, executable: true, passed: true}
+      test_non_duplicate_observation_proceeds_normally: {implemented: true, executable: true, passed: true}
+      test_null_container_builds_fresh_three_dimension_dict: {implemented: true, executable: true, passed: true}
+      test_physiology_update_result_importable_from_app_services: {implemented: true, executable: true, passed: true}
+      test_physiology_update_service_importable_from_app_services: {implemented: true, executable: true, passed: true}
+      test_raises_when_no_physiology_row: {implemented: true, executable: true, passed: true}
+      test_returns_none_when_cp_is_null: {implemented: true, executable: true, passed: true}
+      test_returns_none_when_substate_is_null: {implemented: true, executable: true, passed: true}
+      test_returns_shallow_copy_not_reference: {implemented: true, executable: true, passed: true}
+      test_rr_observations_reach_medium_faster: {implemented: true, executable: true, passed: true}
+      test_unsupported_parameter_raises_value_error: {implemented: true, executable: true, passed: true}
+      test_writes_one_measurement_per_observation: {implemented: true, executable: true, passed: true}
+  test_physiology_update_service_pure_helpers.py:
+    type: unit
+    status: promoted
+    functions:
+      test_all_null_states_return_low: {implemented: true, executable: true, passed: true}
+      test_bare_date_string: {implemented: true, executable: true, passed: true}
+      test_cp_high_when_prior_weight_above_eight: {implemented: true, executable: true, passed: true}
+      test_cp_low_when_null: {implemented: true, executable: true, passed: true}
+      test_date_instance_returned_as_is: {implemented: true, executable: true, passed: true}
+      test_date_instance_returned_as_is: {implemented: true, executable: true, passed: true}
+      test_datetime_instance_truncated_to_date: {implemented: true, executable: true, passed: true}
+      test_datetime_instance_truncated_to_date: {implemented: true, executable: true, passed: true}
+      test_enum_member_returns_value_string: {implemented: true, executable: true, passed: true}
+      test_exact_threshold_eight_is_high: {implemented: true, executable: true, passed: true}
+      test_exact_threshold_four_is_medium: {implemented: true, executable: true, passed: true}
+      test_high_to_low_not_reported: {implemented: true, executable: true, passed: true}
+      test_iso_datetime_string: {implemented: true, executable: true, passed: true}
+      test_iso_datetime_string_no_timezone: {implemented: true, executable: true, passed: true}
+      test_low_to_high_reported_as_single_transition: {implemented: true, executable: true, passed: true}
+      test_low_to_medium_reported: {implemented: true, executable: true, passed: true}
+      test_lt1_hr_high_when_prior_weight_above_eight: {implemented: true, executable: true, passed: true}
+      test_lt2_hr_medium_when_prior_weight_between_four_and_eight: {implemented: true, executable: true, passed: true}
+      test_medium_to_high_reported: {implemented: true, executable: true, passed: true}
+      test_medium_to_low_not_reported: {implemented: true, executable: true, passed: true}
+      test_missing_metric_in_old_treated_as_none: {implemented: true, executable: true, passed: true}
+      test_multiple_transitions_reported_independently: {implemented: true, executable: true, passed: true}
+      test_no_change_returns_empty_dict: {implemented: true, executable: true, passed: true}
+      test_none_old_level_normalised_to_low: {implemented: true, executable: true, passed: true}
+      test_none_prior_weight_returns_low: {implemented: true, executable: true, passed: true}
+      test_null_lt1_container_returns_low_for_all_sub_states: {implemented: true, executable: true, passed: true}
+      test_per_signal_sub_states_read_independently: {implemented: true, executable: true, passed: true}
+      test_pre_stringified_value_returned_as_is: {implemented: true, executable: true, passed: true}
+      test_prior_weight_above_eight_returns_high: {implemented: true, executable: true, passed: true}
+      test_prior_weight_below_four_returns_low: {implemented: true, executable: true, passed: true}
+      test_prior_weight_between_four_and_eight_returns_medium: {implemented: true, executable: true, passed: true}
+      test_returns_float_for_integer_prior_weight: {implemented: true, executable: true, passed: true}
+      test_returns_none_for_none_state: {implemented: true, executable: true, passed: true}
+      test_returns_none_when_prior_weight_is_none: {implemented: true, executable: true, passed: true}
+      test_returns_none_when_prior_weight_key_missing: {implemented: true, executable: true, passed: true}
+      test_returns_prior_weight_from_state: {implemented: true, executable: true, passed: true}
+      test_returns_seven_keys: {implemented: true, executable: true, passed: true}
+      test_unknown_level_string_skipped: {implemented: true, executable: true, passed: true}
+      test_unsupported_type_raises_type_error: {implemented: true, executable: true, passed: true}
+      test_unsupported_type_raises_type_error: {implemented: true, executable: true, passed: true}
 
-      '
-    protects:
-    - dominant_source flips when observation dominates
-    - dominant_source preserved when decayed prior dominates
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_physiology_update_service_bayesian.py
-        owner: phase-2-3-p2-physiology-update
-  bayesian_update_prior_decay:
-    status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/physiology_update_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p2-physiology-update.md
-    owned_by_plan:
-    - phase-2-3-p2-physiology-update
-    description: 'bayesian_update() applies the 42-day exponential decay to the current
-      prior weight before blending with the observation.
-
-      '
-    protects:
-    - decay_factor = exp(-days_since_last / 42)
-    - 42-day time constant matches the architecture contract
-    - days_since_last = 0 (same-day observation) keeps prior weight intact
-    - large gap (e.g. 1 year) shrinks decayed_weight toward 0
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_physiology_update_service_bayesian.py
-        owner: phase-2-3-p2-physiology-update
-  bayesian_update_date_parsing:
-    status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/physiology_update_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p2-physiology-update.md
-    owned_by_plan:
-    - phase-2-3-p2-physiology-update
-    description: 'bayesian_update() accepts both ISO-8601 datetime strings and bare
-      "YYYY-MM-DD" date strings for current.last_observation_date and accepts both
-      datetime and date objects for observation.date.
-
-      '
-    protects:
-    - ISO-8601 datetime string in last_observation_date parses to date
-    - Bare-date string in last_observation_date parses to date
-    - datetime.date observation coerced to date
-    - datetime.datetime observation truncated to date
-    - days_since_last is non-negative (max(0, delta))
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_physiology_update_service_bayesian.py
-        owner: phase-2-3-p2-physiology-update
-  init_null_parameter_state_bootstrap:
-    status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/physiology_update_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p2-physiology-update.md
-    owned_by_plan:
-    - phase-2-3-p2-physiology-update
-    description: 'init_null_parameter_state() bootstraps a brand-new PhysiologyParameterState
-      from the first qualifying observation against a previously-null parameter column.
-
-      '
-    protects:
-    - value, uncertainty (1.0), prior_weight, dominant_source, last_observation_date
-      all set from observation
-    - Same shape as _bootstrap_signal output
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_physiology_update_service_bayesian.py
-        owner: phase-2-3-p2-physiology-update
-  physiology_update_result_dataclass:
-    status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/physiology_update_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p2-physiology-update.md
-    owned_by_plan:
-    - phase-2-3-p2-physiology-update
-    description: 'PhysiologyUpdateResult dataclass carries the updated physiology
-      row, shifted parameters, per-metric confidence, confidence transitions, and
-      measurements-written count.
-
-      '
-    protects:
-    - 'Field defaults: shifted_parameters=[], metric_confidence={}, confidence_transitions={},
-      measurements_written=0'
-    - 'Field types: physiology: AthletePhysiology, shifted_parameters: list[PhysiologyParameter]'
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_physiology_update_service_bayesian.py
-        owner: phase-2-3-p2-physiology-update
-  compute_metric_confidence_pure:
-    status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/physiology_update_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p2-physiology-update.md
-    owned_by_plan:
-    - phase-2-3-p2-physiology-update
-    description: '_compute_metric_confidence() returns a per-metric dict in TwinState
-      shape, mapping prior_weight to LOW / MEDIUM / HIGH using the 4.0 / 8.0 thresholds.
-
-      '
-    protects:
-    - prior_weight >= 8.0 → "high"
-    - 4.0 <= prior_weight < 8.0 → "medium"
-    - prior_weight < 4.0 → "low"
-    - None prior_weight → "low"
-    - cp returns None when physiology.cp is null
-    - Per-signal sub-states (lt1.hr / power / pace) read independently
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_physiology_update_service_pure_helpers.py
-        owner: phase-2-3-p2-physiology-update
-  detect_confidence_transitions_pure:
-    status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/physiology_update_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p2-physiology-update.md
-    owned_by_plan:
-    - phase-2-3-p2-physiology-update
-    description: '_detect_confidence_transitions() returns a per-metric dict of (from_level,
-      to_level) tuples for monotonic LOW→MEDIUM and MEDIUM→HIGH transitions; downward
-      changes are ignored.
-
-      '
-    protects:
-    - LOW→MEDIUM transition reported
-    - MEDIUM→HIGH transition reported
-    - LOW→HIGH reported as LOW→HIGH (single transition, not two)
-    - MEDIUM→MEDIUM (no change) NOT reported
-    - LOW→LOW (no change) NOT reported
-    - HIGH→LOW (downward) NOT reported
-    - None old/new levels normalised to LOW for the comparison
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_physiology_update_service_pure_helpers.py
-        owner: phase-2-3-p2-physiology-update
-  athlete_physiology_repo_update_in_place:
-    status: promoted
-    test_type: unit
-    file_scope:
-    - app/repositories/athlete_physiology_repository.py
-    plan: docs/implementation/phase-2/phase-2-3-p2-physiology-update.md
-    owned_by_plan:
-    - phase-2-3-p2-physiology-update
-    description: 'AthletePhysiologyRepository.update_in_place() mutates the existing
-      row without creating a new one; flushes but does not commit.
-
-      '
-    protects:
-    - Mutates the existing row in place
-    - Flushes the session so updated_at hook fires
-    - Does NOT call session.commit() — caller owns the boundary
-    - Raises RuntimeError when no row exists for athlete_id
-    - lt1/lt2 (non-nullable) accept a dict and assign it
-    - cp/max_hr accept dict, None, or UNSET_SENTINEL
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_athlete_physiology_repository_update_in_place.py
-        owner: phase-2-3-p2-physiology-update
-  service_get_parameter_state_for_lt1_hr:
-    status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/physiology_update_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p2-physiology-update.md
-    owned_by_plan:
-    - phase-2-3-p2-physiology-update
-    description: '_get_parameter_state() returns physiology.lt1["hr"] as a shallow
-      copy for LT1_HR; returns None when null.
-
-      '
-    protects:
-    - LT1_HR resolves to physiology.lt1["hr"]
-    - LT2_HR resolves to physiology.lt2["hr"]
-    - CP resolves to physiology.cp
-    - MAX_HR resolves to physiology.max_hr
-    - Null sub-state returns None (not raise)
-    - Null outer column returns None
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_physiology_update_service_orchestration.py
-        owner: phase-2-3-p2-physiology-update
-  service_get_parameter_state_unsupported_raises:
-    status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/physiology_update_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p2-physiology-update.md
-    owned_by_plan:
-    - phase-2-3-p2-physiology-update
-    description: '_get_parameter_state() raises ValueError for PhysiologyParameter
-      values not in _PARAMETER_PATH (defensive: prevents silent dispatch on a future
-      enum value).
-
-      '
-    protects:
-    - ValueError raised for unsupported parameter
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_physiology_update_service_orchestration.py
-        owner: phase-2-3-p2-physiology-update
-  service_apply_updated_states_writes_back_with_flag_modified:
-    status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/physiology_update_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p2-physiology-update.md
-    owned_by_plan:
-    - phase-2-3-p2-physiology-update
-    description: '_apply_updated_states() writes the new sub-state back into the JSONB
-      container and calls flag_modified on every touched outer column so SQLAlchemy
-      persists the mutation.
-
-      '
-    protects:
-    - lt1["hr"] is replaced (not mutated in place) when only that sub-state changed
-    - lt1["power"] is preserved across a single-sub-state update
-    - cp is replaced wholesale when updated
-    - flag_modified called on each touched outer column exactly once
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_physiology_update_service_orchestration.py
-        owner: phase-2-3-p2-physiology-update
-  service_construct_with_dependencies:
-    status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/physiology_update_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p2-physiology-update.md
-    owned_by_plan:
-    - phase-2-3-p2-physiology-update
-    description: 'PhysiologyUpdateService can be constructed with explicit repository
-      and event-publisher dependencies, or with only an AsyncSession (default publisher
-      auto-built from the session).
-
-      '
-    protects:
-    - Constructor accepts session, athlete_physiology, physiology_measurements, events
-    - events=None defaults to a freshly-built EventPublisher bound to the session
-    - events=<mock> stores the mock as self.events
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_physiology_update_service_orchestration.py
-        owner: phase-2-3-p2-physiology-update
-  service_apply_observations_raises_missing_physiology_error:
-    status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/physiology_update_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p2-physiology-update.md
-    owned_by_plan:
-    - phase-2-3-p2-physiology-update
-    description: 'apply_observations() raises MissingAthletePhysiologyError when no
-      AthletePhysiology row exists for athlete_id.
-
-      '
-    protects:
-    - MissingAthletePhysiologyError raised on missing row
-    - No posterior update, no event fired
-    - athlete_physiology.get_by_athlete_id is the only repo call
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_physiology_update_service_orchestration.py
-        owner: phase-2-3-p2-physiology-update
-  service_apply_observations_writes_measurement_for_each_observation:
-    status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/physiology_update_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p2-physiology-update.md
-    owned_by_plan:
-    - phase-2-3-p2-physiology-update
-    description: 'apply_observations() writes a PhysiologyMeasurement row (UNCONDITIONALLY,
-      even when the posterior does not shift) for every observation in the batch.
-
-      '
-    protects:
-    - physiology_measurements.insert called once per observation
-    - Measurement carries athlete_id, activity_id, parameter, observed_value, source,
-      measurement_date, algorithm_used, confidence_weight
-    - raw_data_reference and notes are None for training-derived observations
-    - measurements_written in result equals len(observations)
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_physiology_update_service_orchestration.py
-        owner: phase-2-3-p2-physiology-update
-  service_apply_observations_shifts_posterior_and_fires_event_when_gt_1_unit:
-    status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/physiology_update_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p2-physiology-update.md
-    owned_by_plan:
-    - phase-2-3-p2-physiology-update
-    description: 'apply_observations() calls update_in_place on the repository and
-      fires physiology_updated with the correct payload when any parameter posterior
-      shifted by > 1 unit.
-
-      '
-    protects:
-    - update_in_place called with the post-mutation lt1/lt2/cp/max_hr values
-    - physiology_updated event published when shifted_parameters is non-empty
-    - Payload includes athlete_id, parameters_updated (list of values), dominant_sources,
-      prior_weights
-    - shifted_parameters in result equals parameters_updated in event payload
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_physiology_update_service_orchestration.py
-        owner: phase-2-3-p2-physiology-update
-  service_apply_observations_does_not_fire_event_when_shift_le_1_unit:
-    status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/physiology_update_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p2-physiology-update.md
-    owned_by_plan:
-    - phase-2-3-p2-physiology-update
-    description: 'apply_observations() does NOT fire physiology_updated when every
-      parameter''s posterior shifted by <= 1 unit, but still writes the PhysiologyMeasurement
-      record.
-
-      '
-    protects:
-    - physiology_updated event NOT published when shifted_parameters is empty
-    - physiology_measurements.insert still called once per observation
-    - update_in_place still called (posterior IS updated in place)
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_physiology_update_service_orchestration.py
-        owner: phase-2-3-p2-physiology-update
-  service_apply_observations_idempotent_duplicate:
-    status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/physiology_update_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p2-physiology-update.md
-    owned_by_plan:
-    - phase-2-3-p2-physiology-update
-    description: 'apply_observations() detects duplicate observations via get_recent_for_parameter
-      and writes the measurement but does NOT shift the posterior and does NOT fire
-      the event.
-
-      '
-    protects:
-    - get_recent_for_parameter queried for each observation
-    - Duplicate on (parameter, source, measurement_date, observed_value, activity_id)
-      → still inserts measurement
-    - Duplicate → no shift contribution (working_state not updated for that parameter)
-    - Duplicate → not added to shifted_parameters
-    - Duplicate → not added to event payload
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_physiology_update_service_orchestration.py
-        owner: phase-2-3-p2-physiology-update
-  service_apply_observations_first_observation_for_null_cp:
-    status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/physiology_update_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p2-physiology-update.md
-    owned_by_plan:
-    - phase-2-3-p2-physiology-update
-    description: 'apply_observations() bootstraps a fresh PhysiologyParameterState
-      via init_null_parameter_state when the first observation for a previously-null
-      parameter arrives.
-
-      '
-    protects:
-    - cp=null + first CP observation → init_null_parameter_state shape applied
-    - Subsequent CP observation runs bayesian_update against the bootstrapped state
-    - posterior moves from null to a non-null dict
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_physiology_update_service_orchestration.py
-        owner: phase-2-3-p2-physiology-update
-  service_apply_observations_confidence_transitions:
-    status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/physiology_update_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p2-physiology-update.md
-    owned_by_plan:
-    - phase-2-3-p2-physiology-update
-    description: 'apply_observations() returns per-metric confidence_transitions in
-      PhysiologyUpdateResult when a metric moves from LOW to MEDIUM (at prior_weight
-      >= 4.0) or MEDIUM to HIGH (>= 8.0).
-
-      '
-    protects:
-    - 4 observations of weight 1.0 for LT2_HR → LOW→MEDIUM transition
-    - 8 observations of weight 1.0 for LT2_HR → MEDIUM→HIGH transition
-    - RR observations (weight 2.5) — 2 observations reach MEDIUM (5.0 >= 4.0)
-    - Transitions dict keyed by metric name, value is (from, to) tuple
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_physiology_update_service_orchestration.py
-        owner: phase-2-3-p2-physiology-update
-  service_registration_in_services_init:
-    status: promoted
-    test_type: unit
-    file_scope:
-    - app/services/__init__.py
-    - app/services/physiology_update_service.py
-    plan: docs/implementation/phase-2/phase-2-3-p2-physiology-update.md
-    owned_by_plan:
-    - phase-2-3-p2-physiology-update
-    description: 'PhysiologyUpdateService, PhysiologyUpdateResult, and MissingAthletePhysiologyError
-      are importable from app.services (registered in app/services/__init__.py).
-
-      '
-    protects:
-    - from app.services import PhysiologyUpdateService works
-    - from app.services import PhysiologyUpdateResult works
-    - from app.services import MissingAthletePhysiologyError works
-    impacts: []
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_physiology_update_service_orchestration.py
-        owner: phase-2-3-p2-physiology-update
-  integration_physiology_update_service_end_to_end:
-    status: promoted
-    test_type: integration
-    file_scope:
-    - app/services/physiology_update_service.py
-    - app/repositories/athlete_physiology_repository.py
-    - app/repositories/physiology_measurement_repository.py
-    - app/repositories/system_event_repository.py
-    - app/repositories/system_event_outbox_repository.py
-    - app/models/athlete_physiology.py
-    - app/models/physiology_measurement.py
-    - app/models/system_event.py
-    plan: docs/implementation/phase-2/phase-2-3-p2-physiology-update.md
-    owned_by_plan:
-    - phase-2-3-p2-physiology-update
-    description: 'apply_observations() persists AthletePhysiology JSONB updates, PhysiologyMeasurement
-      audit rows, and a paired SystemEvent + SystemEventOutbox (physiology_updated)
-      in the SAME transaction, against a real test database.
-
-      '
-    protects:
-    - AthletePhysiology JSONB columns (lt1, lt2, cp, max_hr) are mutated in place
-      at the DB layer
-    - PhysiologyMeasurement rows are written for every observation (unconditional)
-    - physiology_updated SystemEvent row exists with correct payload when shift >
-      1 unit
-    - physiology_updated SystemEventOutbox row paired with PENDING status
-    - physiology_updated event NOT persisted when shift <= 1 unit
-    - idem_measurement rows carry the exact observation fields (athlete_id, activity_id,
-      parameter, observed_value, source, measurement_date, algorithm_used, confidence_weight)
-    - idem_measurement.raw_data_reference and notes are NULL for training-derived
-      observations
-    - AthletePhysiology row id is preserved across the update (no second row created)
-    - AthletePhysiology.updated_at hook fires on update
-    impacts: []
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      integration:
-      - path: tests/integration/test_physiology_update_service_integration.py
-        owner: phase-2-3-p2-physiology-update
-  integration_physiology_update_idempotency_db:
-    status: promoted
-    test_type: integration
-    file_scope:
-    - app/services/physiology_update_service.py
-    - app/repositories/physiology_measurement_repository.py
-    - app/models/physiology_measurement.py
-    plan: docs/implementation/phase-2/phase-2-3-p2-physiology-update.md
-    owned_by_plan:
-    - phase-2-3-p2-physiology-update
-    description: 'apply_observations() writes the PhysiologyMeasurement audit row
-      for a duplicate observation but does NOT mutate AthletePhysiology and does NOT
-      write a physiology_updated event, at the real-DB layer.
-
-      '
-    protects:
-    - Duplicate (parameter, source, measurement_date, observed_value, activity_id)
-      → PhysiologyMeasurement row written
-    - Duplicate → AthletePhysiology posterior NOT changed (JSONB columns unchanged
-      from pre-call state)
-    - Duplicate → NO SystemEvent row written
-    - Duplicate → NO SystemEventOutbox row written
-    - The dedup lookup uses get_recent_for_parameter with from_date=measurement_date
-    impacts: []
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      integration:
-      - path: tests/integration/test_physiology_update_service_idempotency_integration.py
-        owner: phase-2-3-p2-physiology-update
-  integration_physiology_update_confidence_transitions_db:
-    status: promoted
-    test_type: integration
-    file_scope:
-    - app/services/physiology_update_service.py
-    - app/models/athlete_physiology.py
-    plan: docs/implementation/phase-2/phase-2-3-p2-physiology-update.md
-    owned_by_plan:
-    - phase-2-3-p2-physiology-update
-    description: 'apply_observations() returns per-metric confidence_transitions in
-      PhysiologyUpdateResult when a metric moves from LOW to MEDIUM (at prior_weight
-      >= 4.0) or MEDIUM to HIGH (>= 8.0), and the JSONB columns reflect the accumulated
-      prior_weight at the real-DB layer.
-
-      '
-    protects:
-    - 4 observations of weight 1.0 for LT2_HR → prior_weight reaches 4.0 at the DB
-      layer
-    - 8 observations of weight 1.0 for LT2_HR → prior_weight reaches 8.0 at the DB
-      layer
-    - metric_confidence in result reports "low" then "medium" then "high" as the prior_weight
-      crosses thresholds
-    - confidence_transitions keyed by metric name with (from, to) tuple
-    - RR observations (weight 2.5) — 2 observations push prior_weight past 4.0
-    - Subsequent apply_observations calls continue to accumulate prior_weight against
-      the persisted state
-    impacts: []
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      integration:
-      - path: tests/integration/test_physiology_update_service_confidence_transitions_integration.py
-        owner: phase-2-3-p2-physiology-update
-  integration_physiology_update_first_observation_cp_db:
-    status: promoted
-    test_type: integration
-    file_scope:
-    - app/services/physiology_update_service.py
-    - app/repositories/athlete_physiology_repository.py
-    - app/models/athlete_physiology.py
-    plan: docs/implementation/phase-2/phase-2-3-p2-physiology-update.md
-    owned_by_plan:
-    - phase-2-3-p2-physiology-update
-    description: 'apply_observations() bootstraps a fresh PhysiologyParameterState
-      via init_null_parameter_state when the first observation for a previously-null
-      parameter (e.g. CP) arrives, and the bootstrapped state persists to the real
-      DB.
-
-      '
-    protects:
-    - cp=null + first CP observation → cp column transitions from NULL to a non-null
-      PhysiologyParameterState dict
-    - The bootstrapped state's value, uncertainty, prior_weight, dominant_source,
-      last_observation_date all match the observation
-    - A second CP observation applies bayesian_update against the persisted bootstrapped
-      state
-    impacts: []
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      integration:
-      - path: tests/integration/test_physiology_update_service_first_observation_integration.py
-        owner: phase-2-3-p2-physiology-update
-  integration_physiology_update_repo_persistence:
-    status: promoted
-    test_type: integration
-    file_scope:
-    - app/repositories/athlete_physiology_repository.py
-    - app/models/athlete_physiology.py
-    plan: docs/implementation/phase-2/phase-2-3-p2-physiology-update.md
-    owned_by_plan:
-    - phase-2-3-p2-physiology-update
-    description: 'AthletePhysiologyRepository.update_in_place() mutates the existing
-      row''s JSONB columns at the real-DB layer and fires the updated_at onupdate=
-      hook.
-
-      '
-    protects:
-    - lt1 mapping passed → row.lt1 JSONB column updated at the DB layer
-    - lt2 mapping passed → row.lt2 JSONB column updated at the DB layer
-    - cp mapping passed → row.cp JSONB column updated at the DB layer (null → non-null)
-    - cp=None passed → row.cp column cleared to NULL
-    - cp=UNSET_SENTINEL passed → row.cp column unchanged
-    - max_hr=UNSET_SENTINEL passed → row.max_hr column unchanged
-    - row.updated_at changes after update_in_place (onupdate hook fires)
-    - row.id preserved across update (no second row created)
-    - Raise RuntimeError when no row exists for athlete_id
-    impacts: []
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      integration:
-      - path: tests/integration/test_athlete_physiology_repository_update_in_place_integration.py
-        owner: phase-2-3-p2-physiology-update
-  behaviour_physiology_update_user_journey_threshold_to_event:
-    status: promoted
-    test_type: behaviour
-    file_scope:
-    - app/services/physiology_update_service.py
-    - app/services/threshold_detection_service.py
-    - app/repositories/athlete_physiology_repository.py
-    - app/repositories/physiology_measurement_repository.py
-    - app/repositories/system_event_repository.py
-    - app/repositories/system_event_outbox_repository.py
-    - app/models/athlete_physiology.py
-    - app/models/physiology_measurement.py
-    - app/models/system_event.py
-    plan: docs/implementation/phase-2/phase-2-3-p2-physiology-update.md
-    owned_by_plan:
-    - phase-2-3-p2-physiology-update
-    description: 'Full user journey: HTTP register → activity creation → signal-cleaned
-      stream upload → ThresholdDetectionService.detect() → PhysiologyUpdateService.apply_observations()
-      → physiology_updated event lands in the transactional outbox (SystemEvent +
-      SystemEventOutbox PENDING) in the same transaction as the AthletePhysiology
-      JSONB mutation and PhysiologyMeasurement audit rows.'
-    protects:
-    - End-to-end pipeline from HTTP registration through to the transactional outbox
-    - physiology_updated event fires only when posterior shifts > 1 unit
-    - PhysiologyMeasurement audit rows written for every observation (unconditional)
-    - AthletePhysiology JSONB columns mutated in place at the DB layer
-    - ADR-004 transactional outbox atomicity at the full user-journey boundary
-    impacts: []
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      behaviour:
-      - path: tests/behaviour/test_physiology_update_user_journey.py
-        owner: phase-2-3-p2-physiology-update
-  behaviour_physiology_update_user_journey_idempotency:
-    status: promoted
-    test_type: behaviour
-    file_scope:
-    - app/services/physiology_update_service.py
-    - app/repositories/physiology_measurement_repository.py
-    - app/models/physiology_measurement.py
-    plan: docs/implementation/phase-2/phase-2-3-p2-physiology-update.md
-    owned_by_plan:
-    - phase-2-3-p2-physiology-update
-    description: 'Full user journey: the same observation (same parameter, value,
-      date, source, activity_id) is submitted twice across separate apply_observations
-      calls — the second submission writes the PhysiologyMeasurement audit row but
-      does NOT mutate AthletePhysiology and does NOT fire the physiology_updated event.'
-    protects:
-    - Duplicate detection at the full user-journey boundary
-    - PhysiologyMeasurement audit row written for duplicate (audit completeness)
-    - AthletePhysiology posterior NOT changed on duplicate
-    - NO SystemEvent / SystemEventOutbox row written on duplicate
-    impacts: []
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      behaviour:
-      - path: tests/behaviour/test_physiology_update_user_journey.py
-        owner: phase-2-3-p2-physiology-update
-  behaviour_physiology_update_user_journey_confidence_transitions:
-    status: promoted
-    test_type: behaviour
-    file_scope:
-    - app/services/physiology_update_service.py
-    - app/models/athlete_physiology.py
-    plan: docs/implementation/phase-2/phase-2-3-p2-physiology-update.md
-    owned_by_plan:
-    - phase-2-3-p2-physiology-update
-    description: 'Full user journey: multiple observations accumulate prior_weight
-      across separate apply_observations calls and trigger LOW→MEDIUM (at prior_weight
-      ≥ 4.0) and MEDIUM→HIGH (at ≥ 8.0) confidence transitions, with the JSONB columns
-      reflecting the accumulated prior_weight at the DB layer.'
-    protects:
-    - 4 observations of weight 1.0 for LT2_HR → LOW→MEDIUM transition at the DB layer
-    - 8 observations of weight 1.0 for LT2_HR → MEDIUM→HIGH transition at the DB layer
-    - RR observations (weight 2.5) reach MEDIUM faster (2 observations)
-    - Subsequent apply_observations calls accumulate against persisted state
-    impacts: []
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      behaviour:
-      - path: tests/behaviour/test_physiology_update_user_journey.py
-        owner: phase-2-3-p2-physiology-update
-  behaviour_physiology_update_user_journey_first_observation_cp:
-    status: promoted
-    test_type: behaviour
-    file_scope:
-    - app/services/physiology_update_service.py
-    - app/repositories/athlete_physiology_repository.py
-    - app/models/athlete_physiology.py
-    plan: docs/implementation/phase-2/phase-2-3-p2-physiology-update.md
-    owned_by_plan:
-    - phase-2-3-p2-physiology-update
-    description: 'Full user journey: the first CP observation bootstraps a previously-null
-      cp column to a non-null PhysiologyParameterState, and the bootstrapped state
-      persists to the DB. A second CP observation applies the Bayesian update against
-      the persisted bootstrapped state.'
-    protects:
-    - cp=null + first CP observation → cp column transitions from NULL to non-null
-      PhysiologyParameterState
-    - Bootstrapped state carries observation fields (value, uncertainty, prior_weight,
-      dominant_source, last_observation_date)
-    - Second CP observation applies bayesian_update against persisted bootstrapped
-      state
-    impacts: []
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      behaviour:
-      - path: tests/behaviour/test_physiology_update_user_journey.py
-        owner: phase-2-3-p2-physiology-update
-  behaviour_physiology_update_user_journey_no_event_when_shift_le_1_unit:
-    status: promoted
-    test_type: behaviour
-    file_scope:
-    - app/services/physiology_update_service.py
-    - app/repositories/system_event_repository.py
-    - app/repositories/system_event_outbox_repository.py
-    - app/models/system_event.py
-    plan: docs/implementation/phase-2/phase-2-3-p2-physiology-update.md
-    owned_by_plan:
-    - phase-2-3-p2-physiology-update
-    description: 'Full user journey: observations produce PhysiologyMeasurement audit
-      rows and mutate AthletePhysiology in place, but the posterior shift is ≤ 1 unit
-      so NO physiology_updated event is written to the transactional outbox.'
-    protects:
-    - PhysiologyMeasurement audit rows written even when posterior does not shift
-    - AthletePhysiology JSONB columns mutated in place even when shift ≤ 1 unit
-    - NO SystemEvent row written when shift ≤ 1 unit
-    - NO SystemEventOutbox row written when shift ≤ 1 unit
-    impacts: []
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      behaviour:
-      - path: tests/behaviour/test_physiology_update_user_journey.py
-        owner: phase-2-3-p2-physiology-update
-execution_groups:
-  physiology_update_unit:
-    scope: feature
-    phase: 2
-    tests:
-    - tests/unit/test_physiology_update_service_bayesian.py
-    - tests/unit/test_physiology_update_service_pure_helpers.py
-    - tests/unit/test_physiology_update_service_orchestration.py
-    - tests/unit/test_athlete_physiology_repository_update_in_place.py
-    depends_on: []
-  physiology_update_integration:
-    scope: feature
-    phase: 2
-    tests:
-    - tests/integration/test_physiology_update_service_integration.py
-    - tests/integration/test_physiology_update_service_idempotency_integration.py
-    - tests/integration/test_physiology_update_service_confidence_transitions_integration.py
-    - tests/integration/test_physiology_update_service_first_observation_integration.py
-    - tests/integration/test_athlete_physiology_repository_update_in_place_integration.py
-    depends_on:
-    - physiology_update_unit
-  physiology_update_behaviour:
-    scope: feature
-    phase: 2
-    tests:
-    - tests/behaviour/test_physiology_update_user_journey.py
-    depends_on:
-    - physiology_update_integration
 coverage:
-  routes: []
   events:
     covered:
-    - physiology_updated
-    partial: []
-    missing: []
+      - "physiology_updated"
   invariants:
     covered:
-    - AthletePhysiology is mutable in place — posterior updates applied in place
-    - Bayesian update with 42-day prior decay for evidence staleness
-    - physiology_updated event fires only when posterior shifts by > 1 bpm
-    - Per-metric evidence accumulation — observations routed to specific metrics
-    - PhysiologyMeasurement record is always written regardless of shift
-    - cp and vo2max are null until a qualifying observation is made
-    - Confidence is monotonic (only increases, never decreases) — raw prior_weight
-      can decay, but per-metric level ratchets up only
-    - physiology_updated event atomicity — SystemEvent + SystemEventOutbox land in
-      the SAME transaction as the AthletePhysiology update (ADR-004)
-    - One AthletePhysiology row per athlete — the row id is preserved across update_in_place
-      (no second row created)
-    partial: []
-    missing: []
-history:
-- date: '2026-07-12'
-  plan: phase-2-3-p2-physiology-update
-  tests_added: 0
-  tests_modified: 0
-  tests_removed: 0
-  result: PENDING
-  coverage_delta: 'Initial capability inventory built from docs/implementation/phase-2/phase-2-3-p2-physiology-update.md.
-    No tests generated yet — this is the first Test Architect session for Phase-2.3-P2.  Every
-    capability tagged with test_type and file_scope so a later integration/behaviour
-    session can pick up exactly the capabilities it still owes without re-deriving
-    from the plan.
-
-    '
-- date: '2026-07-12'
-  plan: phase-2-3-p2-physiology-update
-  tests_added: 4
-  tests_modified: 0
-  tests_removed: 0
-  result: GENERATED
-  coverage_delta: "Unit-mode session generated four test files covering every unit-tagged\
-    \ capability in the inventory:\n* tests/unit/test_physiology_update_service_bayesian.py\n\
-    \  — bayesian_update() posterior mean / uncertainty floor /\n  dominant source\
-    \ / prior decay / date parsing;\n  init_null_parameter_state() bootstrap;\n  PhysiologyUpdateResult\
-    \ dataclass fields and defaults;\n  architecture constants (DECAY_TIME_CONSTANT_DAYS,\n\
-    \  UNCERTAINTY_FLOOR, INITIAL_UNCERTAINTY).\n\n* tests/unit/test_physiology_update_service_pure_helpers.py\n\
-    \  — _confidence_level() threshold mapping;\n  _state_prior_weight() extraction;\n\
-    \  _compute_metric_confidence() per-metric dict;\n  _detect_confidence_transitions()\
-    \ monotonic transitions;\n  _parse_iso_date() / _coerce_observation_date() /\n\
-    \  _source_value() coercion helpers.\n\n* tests/unit/test_physiology_update_service_orchestration.py\n\
-    \  — PhysiologyUpdateService construction;\n  apply_observations() happy path,\
-    \ missing-physiology error,\n  measurement writing, posterior shift detection,\
-    \ event\n  firing, idempotency, first-observation bootstrap,\n  confidence transitions;\n\
-    \  _get_parameter_state() JSONB path navigation;\n  _apply_updated_states() write-back\
-    \ with flag_modified;\n  registration in app/services/__init__.py.\n\n* tests/unit/test_athlete_physiology_repository_update_in_place.py\n\
-    \  — AthletePhysiologyRepository.update_in_place() per-parameter\n  semantics\
-    \ (lt1/lt2/cp/max_hr), UNSET_SENTINEL identity,\n  flush-not-commit, RuntimeError\
-    \ on missing row.\n\nAll 22 unit-tagged capabilities promoted from pending to\
-    \ generated.  validation.implemented = true; validation.executable and validation.passed\
-    \ remain false (DevOps-owned). Integration and behaviour capabilities remain pending\
-    \ for later sessions.\n"
-- date: '2026-07-12'
-  plan: phase-2-3-p2-physiology-update
-  tests_added: 0
-  tests_modified: 0
-  tests_removed: 0
-  result: PENDING
-  coverage_delta: "Integration-mode session added five integration-tagged capabilities\
-    \ to the inventory:\n* integration_physiology_update_service_end_to_end —\n  full\
-    \ DB round-trip: AthletePhysiology JSONB persistence,\n  PhysiologyMeasurement\
-    \ audit rows, and paired\n  SystemEvent + SystemEventOutbox (physiology_updated)\n\
-    \  in the same transaction.\n* integration_physiology_update_idempotency_db —\n\
-    \  duplicate observation writes the measurement but does\n  NOT mutate physiology\
-    \ and does NOT fire the event, at\n  the real-DB layer.\n* integration_physiology_update_confidence_transitions_db\
-    \ —\n  prior_weight accumulates across calls; confidence\n  transitions detected\
-    \ at the 4.0 and 8.0 thresholds.\n* integration_physiology_update_first_observation_cp_db\
-    \ —\n  first CP observation bootstraps a fresh\n  PhysiologyParameterState from\
-    \ null at the real-DB layer.\n* integration_physiology_update_repo_persistence\
-    \ —\n  AthletePhysiologyRepository.update_in_place() persists\n  JSONB mutations\
-    \ and fires the updated_at onupdate= hook.\n\nA new execution group ``physiology_update_integration``\
-    \ was added; it depends on ``physiology_update_unit`` (intra-phase) because the\
-    \ integration tests verify the real-DB persistence of behaviours the unit tests\
-    \ already covered at the in-memory boundary. No tests generated yet — this is\
-    \ the capability-inventory step of the integration session.\n"
-- date: '2026-07-12'
-  plan: phase-2-3-p2-physiology-update
-  tests_added: 5
-  tests_modified: 0
-  tests_removed: 0
-  result: GENERATED
-  coverage_delta: 'Integration-mode session generated five test files covering every
-    integration-tagged capability in the inventory:
-
-
-    * tests/integration/test_physiology_update_service_integration.py — service construction
-    with default repos and publisher; lt2.hr posterior persistence at the DB layer;
-    lt1-only update preserves lt2 verbatim; row id preserved across update; updated_at
-    hook fires; PhysiologyMeasurement audit rows with full observation fields; one
-    measurement per observation in batch; measurement written even when posterior
-    does not shift; physiology_updated SystemEvent + SystemEventOutbox PENDING when
-    shift > 1 unit; event NOT persisted when shift <= 1 unit; multi-parameter event
-    payload; ADR-004 transactional outbox atomicity verified by rollback.
-
-
-    * tests/integration/test_physiology_update_service_idempotency_integration.py
-    — duplicate observation in same call writes measurement but does not mutate physiology;
-    duplicate does not fire event; duplicate detection across separate calls at the
-    real-DB layer; different observed_value / activity_id / source are NOT duplicates.
-
-
-    * tests/integration/test_physiology_update_service_confidence_transitions_integration.py
-    — four HR-deflection observations reach prior_weight 4.5 (LOW→MEDIUM); eight reach
-    8.5 (MEDIUM→HIGH); two RR observations (weight=2.5) reach MEDIUM faster; four
-    RR observations reach HIGH; subsequent calls accumulate against persisted state.
-
-
-    * tests/integration/test_physiology_update_service_first_observation_integration.py
-    — first CP observation transitions cp from NULL to non-null PhysiologyParameterState;
-    bootstrapped state carries observation fields; first observation does NOT fire
-    event (current_state is None guard); second observation grows prior_weight; second
-    observation fires event when shift > 1 watt; max_hr bootstrap from null.
-
-
-    * tests/integration/test_athlete_physiology_repository_update_in_place_integration.py
-    — lt1/lt2 mapping persists in DB; cp null→non-null and non-null→null transitions;
-    cp/max_hr UNSET_SENTINEL leaves column unchanged; updated_at hook fires on flush
-    (with and without column mutations); RuntimeError when no row exists; no flush
-    when no row; row id preserved across update.
-
-
-    All 5 integration-tagged capabilities promoted from pending to generated. validation.implemented
-    = true; validation.executable and validation.passed remain false (DevOps-owned).
-    API and behaviour capabilities remain pending for later sessions.'
-- date: '2026-07-13'
-  plan: phase-2-3-p2-physiology-update
-  tests_added: 1
-  tests_modified: 0
-  tests_removed: 0
-  result: GENERATED
-  coverage_delta: 'Behaviour-mode session generated one test file covering all five
-    behaviour-tagged capabilities in the inventory:
-
-
-    * tests/behaviour/test_physiology_update_user_journey.py — full user journey from
-    HTTP register through to the transactional outbox: - TestPhysiologyUpdateThresholdToEventJourney:
-    end-to-end pipeline (HTTP register → activity creation → signal-cleaned stream
-    upload → ThresholdDetectionService.detect() → PhysiologyUpdateService.apply_observations()
-    → physiology_updated event in SystemEvent + SystemEventOutbox PENDING); event
-    payload matches shifted_parameters list. - TestPhysiologyUpdateIdempotencyJourney:
-    duplicate observation across separate apply_observations calls writes measurement
-    but does NOT mutate physiology and does NOT fire event. - TestPhysiologyUpdateConfidenceTransitionsJourney:
-    four observations reach prior_weight ≥ 4.0 (LOW→MEDIUM); eight observations reach
-    prior_weight ≥ 8.0 (MEDIUM→HIGH). - TestPhysiologyUpdateFirstObservationJourney:
-    first CP observation bootstraps previously-null cp column to non-null PhysiologyParameterState;
-    first observation does NOT fire event. - TestPhysiologyUpdateNoEventWhenShiftLeOneJourney:
-    observations produce measurements and mutate physiology but shift ≤ 1 unit so
-    NO event written.
-
-
-    All 5 behaviour-tagged capabilities promoted from pending to generated. validation.implemented
-    = true; validation.executable and validation.passed remain false (DevOps-owned).
-    A new execution group ``physiology_update_behaviour`` was added; it depends on
-    ``physiology_update_integration`` (intra-phase) because the behaviour tests verify
-    the full user-journey persistence of behaviours the integration tests already
-    covered at the real-DB layer. No DevOps report exists yet for this plan, so Step
-    2 (Ingest DevOps Infrastructure Fixes) was skipped. The next session (api-mode)
-    should re-check tests/README.md and tests/MOCKING_CONTRACT.md for any new dated
-    lessons before generating api tests.'
-- date: '2026-07-13'
-  plan: phase-2-3-p2-physiology-update
-  tests_added: 0
-  tests_modified: 48
-  tests_removed: 0
-  result: GENERATED
-  coverage_delta: 'Integration fix pass — replaced 25 `.scalar_one()` post-commit
-    reads with `.scalars().all()[0]` across all 5 integration test files (test_physiology_update_service_integration.py,
-    test_physiology_update_service_idempotency_integration.py, test_physiology_update_service_confidence_transitions_integration.py,
-    test_physiology_update_service_first_observation_integration.py, test_athlete_physiology_repository_update_in_place_integration.py).  The
-    original `scalar_one()` calls would have returned identity-mapped ORM instances
-    with stale JSONB attributes after the `await db_session.commit()` boundary, causing
-    `fresh.cp is None` (or other stale values) assertions to fail despite the prior
-    `repo.update_in_place()` having persisted a non-null value.  The `.scalars().all()[0]`
-    path constructs a fresh instance from result rows, bypassing the identity map.
-
-    No test count change (48 tests still collected cleanly via `bash scripts/pytest.sh
-    --collect-only` in 0.13s). No validation status change (already at `validation.implemented
-    = true` from prior generation; `validation.executable` and `validation.passed`
-    remain DevOps-owned).
-
-    Lesson recorded in `tests/README.md` under "Dated Lessons (2026-07-13)" and added
-    to `tests/MOCKING_CONTRACT.md` "Known Anti-Patterns" table.  Test pack "Recurring
-    Infrastructure Risk" section updated.  This is a reusable failure class — any
-    future integration test doing a post-commit read of a JSONB-mutated row is at
-    risk.  If a second integration test author encounters this pattern, the fix should
-    move into a shared conftest helper (e.g. `fresh_row(session, model, id)`). '
-  last_reviewed_at: '2026-07-13T11:00:00Z'
-- date: '2026-07-13'
-  plan: phase-2-3-p2-physiology-update
-  tests_added: 0
-  tests_modified: 0
-  tests_removed: 1
-  result: TRIAGE
-  coverage_delta: 'DevOps report triage (2026-07-13) — 51 of 194 tests failed. Categorised
-    as a mix of test-pack issues (fixed) and implementation bugs (routed to p-coder
-    with detailed analysis). No infrastructure changes were needed; the MOCKING_CONTRACT.md
-    was not modified because none of the listed Known Anti-Patterns matched these
-    failures.
-
-    **Test-pack fixes (5 issues, 1 test removed, 1 factory added, ~20 tests touched):**
-    1. **Bayesian fixture date mismatch (4 tests)**: the unit tests'' `_state()` default
-    `last_observation_date` is `2026-05-01` and the default `_observation()` `obs_date`
-    is `2026-06-15` — a 45-day gap that decays the prior weight via the 42-day time
-    constant. Four tests (test_posterior_mean_exact_when_weights_equal, test_new_total_weight_is_decayed_plus_observation,
-    test_uncertainty_above_floor_when_evidence_moderate, test_prior_dominates_when_weights_equal)
-    expected no-decay math and asserted same-day results. Pinned `last_observation_date=''2026-06-15''`
-    on the `_state()` calls in those four tests so the dates match the observation
-    date. 2. **Integration test FK violation (`activity_id=uuid.uuid4()`)**: the `_observation()`
-    helper defaulted `activity_id` to a fresh `uuid.uuid4()`, which violated the `physiology_measurements.activity_id`
-    foreign key (the column is nullable, but a non-null value must reference a real
-    `activities.id`). Changed the default to `None` in all 4 integration test files,
-    and added a `make_activity` factory in `tests/utils/factories.py` for tests that
-    explicitly need a real `Activity` reference (idempotency dedup tests, the `test_measurement_row_persists_for_single_observation`
-    test). 3. **Behaviour test missing `AthletePhysiology` row**: `http_register`
-    only creates `Athlete + AthleteAuth + AthleteProfile` — the `AthletePhysiology`
-    row is bootstrapped by the onboarding service (separate sub-phase, out of P2 scope).
-    The behaviour tests called `apply_observations` without first creating the row,
-    raising `MissingAthletePhysiologyError`. Added an `_ensure_physiology_row` helper
-    in `test_physiology_update_user_journey.py` and call it after every `http_register`
-    (7 test bodies touched). 4. **`test_updated_at_changes_even_with_no_column_mutations`
-    removed**: this test asserted `updated_at` advances on a `flush()` with no column
-    mutations. SQLAlchemy''s `onupdate=` hook only fires when an actual `UPDATE` statement
-    is issued — i.e. when at least one column is mutated. A no-op call does not issue
-    an UPDATE; the hook does NOT fire. The test was asserting the wrong behaviour;
-    the correct semantics are pinned by `test_updated_at_changes_after_update` (a
-    mutated-column call DOES fire the hook). Replaced the test with a NOTE comment
-    explaining the removal.
-
-    **Implementation bugs (routed to p-coder — NOT fixed by Test Architect):** 1.
-    **`_source_value()` returns the wrong string format** — the function is `return
-    str(source)` for any source value. For `class MeasurementSource(str, Enum)`, `str(enum_member)`
-    returns `''ClassName.MEMBER_NAME''` (e.g. `''MeasurementSource.TRAINING_RR_INFLECTION''`)
-    rather than the `.value` string (`''training_rr_inflection''`). Affects every
-    observation whose source is a `MeasurementSource` enum member: the `dominant_source`
-    field on `AthletePhysiology.lt1/l2/cp/max_hr` JSONB and the `dominant_sources`
-    dict in the `physiology_updated` event payload. Verified with `.venv/bin/python`
-    — the enum behaviour is the same on Python 3.11 (the project''s runtime). The
-    fix is one line: `return source.value if isinstance(source, MeasurementSource)
-    else str(source)`. 2. **`apply_observations` loop does not accumulate state across
-    multiple observations of the same parameter in a single call**. The implementation
-    reads `current_state` from `physiology` on every iteration via `_get_parameter_state(physiology,
-    obs.parameter)`, but `physiology` is only mutated AFTER the loop (via `_apply_updated_states`).
-    So 4 observations of the same parameter in a single call all see the ORIGINAL
-    prior_weight; only the last iteration''s `working_state[parameter] = new_state`
-    survives the dict-overwrite, and the posterior reflects exactly 1 observation''s
-    contribution rather than 4. Breaks the confidence transition tests (4 observations
-    should reach `prior_weight=4.0`, but instead `prior_weight=1.0` after the loop).
-    The fix is in `apply_observations` — use `working_state.get(obs.parameter, current_state)`
-    as the next iteration''s `current_state`, OR update `working_state[obs.parameter]`
-    BEFORE reading the next observation''s `current_state`.
-
-    **Test count after triage**: 172 collected cleanly via `bash scripts/pytest.sh
-    --collect-only` (down from 194 — the `test_updated_at_changes_even_with_no_column_mutations`
-    test was removed and... actually no, the count is 172 because the removed test
-    was a single test; the test count of 194 in the DevOps report included tests in
-    the `feature` group plus `smoke` and `regression` selections not relevant to this
-    triage). Collection time unchanged (0.13s).
-
-    **No validation status change** — all 30 features in this sub-phase remain at
-    `validation.implemented = true`, `validation.executable = true`, `validation.passed
-    = false` (set by DevOps during the failed execution). The next DevOps run will
-    re-execute and re-evaluate `executable`/`passed` based on the test-pack fixes;
-    the two implementation bugs above will still cause failures until p-coder fixes
-    the implementation. '
-- date: '2026-07-14'
-  plan: phase-2-3-p2-physiology-update
-  tests_added: 0
-  tests_modified: 23
-  tests_removed: 0
-  result: TRIAGE
-  coverage_delta: 'DevOps report test pack re-run (2026-07-14) — 23 of 193 tests still
-    failed after p-coder resolved the 2 implementation bugs from the 2026-07-13 triage.
-    All 23 failures were test-pack issues, not implementation bugs. No infrastructure
-    changes needed; the MOCKING_CONTRACT.md Known Anti-Patterns were extended with
-    4 new entries matching the 4 failure classes.
-
-    **Test-pack fixes (4 issues, 23 tests touched, 1 helper added, 0 tests removed):**
-    1. **Integration `_state()` default date (16 tests)** — the integration test files''
-    `_state()` helper defaulted `last_observation_date` to `"2026-05-01"` while the
-    sibling `_observation()` helper defaulted `measurement_date=date(2026, 6, 15)`,
-    creating a 45-day gap that decayed the prior weight via the 42-day time constant.
-    The 2026-07-13 unit-test date-default lesson was correct but only fixed the 4
-    unit tests that explicitly pinned the date; the integration tests relied on the
-    helper''s default, so the default''s drift from the observation''s date was the
-    single point of failure for 16 of 23 failures. Aligned the `_state()` default
-    to `"2026-06-15"` in all 4 integration test files. 2. **Rollback fixture isolation
-    (1 test)** — `test_event_atomicity_rolls_back_when_later_step_fails` created an
-    `AthletePhysiology` row via `_create_physiology_row()` (flush-only) then called
-    `apply_observations` then `rollback()`. The accumulation fix (RC2 production fix)
-    made `apply_observations` actually mutate the row in place via `update_in_place`
-    + `flag_modified`, which now flushes real SQL updates through the same session.
-    The rollback unwound BOTH the fixture row''s INSERT AND the observation batch''s
-    UPDATE, leaving no row at all. The post-rollback SELECT returned `[]` and `.scalars().all()[0]`
-    raised `IndexError`. Committed the fixture row in its own transaction before the
-    service call so it survives the subsequent rollback. 3. **Unit batch transition
-    (1 test)** — `test_eight_observations_reach_high` expected `confidence_transitions["lt2_hr"]
-    == ("medium", "high")` but the service reports a single batch `(pre_call_level,
-    post_call_level)` transition per `apply_observations` call, not per-observation
-    transitions. A single batch that starts at LOW (prior_weight 0.0) and ends at
-    HIGH (prior_weight 8.0) reports a direct `LOW→HIGH` transition. Updated the expected
-    to `("low", "high")` and added a doc comment explaining the batch-transition contract.
-    4. **Behaviour pre-population + same-date activities (6 tests)** — the behaviour
-    tests inserted empty `AthletePhysiology` rows (no `lt1`/`lt2` kwargs) and then
-    called `apply_observations` with a single activity''s observations. The first
-    observation for each parameter bootstrapped the state from null, and the shift
-    detection''s `current_state is None` guard suppressed shift detection. The multi-activity
-    tests were spread over multiple weeks (7-day gaps), so the 42-day decay reduced
-    `prior_weight` to ~3.17 after 4 observations and ~4.79 after 8 observations —
-    both below the 4.0 and 8.0 MEDIUM/HIGH thresholds. Added a `_state()` helper to
-    the behaviour test file; pre-populated `lt1.hr` and `lt2.hr` in 3 single-activity
-    shift tests with state that differs from the cleaned-stream observations by more
-    than 1 bpm; pre-populated `lt2.hr` in 2 multi-activity tests with `prior_weight=0.5`
-    and used same-date activities (distinct `activity_id` UUIDs, no decay); pre-populated
-    `lt2.hr` in the small-shift test with a baseline posterior that differs from the
-    observation by > 1 bpm.
-
-    **No implementation bugs (routed to p-coder)** — both production bugs from the
-    2026-07-13 triage pass were already resolved by p-coder before the 2026-07-14
-    re-run: `_source_value()` enum `.value` fix at line 334-335 of `physiology_update_service.py`
-    (all 7 previously failing tests now pass) and `apply_observations` intra-call
-    state accumulation fix at lines 584-586 (cross-call accumulation was always correct;
-    the fix is intra-call only).
-
-    **Reusable failure classes recorded** — 4 new dated lessons added to `tests/README.md`
-    under "Dated Lessons (2026-07-14, Phase-2.3-P2 test pack re-run)" and 4 new rows
-    added to `tests/MOCKING_CONTRACT.md` "Known Anti-Patterns" table. The integration
-    date-default rule extends the 2026-07-13 unit-test rule; the batch transition
-    rule, rollback fixture-isolation rule, and behaviour pre-population rule are new
-    failure classes that should be flagged in any future test-pack that exercises
-    `apply_observations` or any other Bayesian service with a single-batch pre/post
-    confidence transition.
-
-    **Test count after this triage**: 77 tests in scope (1 unit + 5 integration +
-    1 behaviour, plus the orchestrator''s helper file) collected cleanly via `bash
-    scripts/pytest.sh --collect-only` in 0.15s. The full plan total of 193 tests is
-    unchanged (no tests added or removed). No validation status change (all features
-    remain at `validation.implemented = true` from prior generation; `validation.executable`
-    and `validation.passed` remain DevOps-owned). The next DevOps run is expected
-    to show 193 passed, 0 failed (modulo any pre-existing failures from other plans).
-
-    `last_reviewed_at` bumped to 2026-07-14T12:00:00Z. '
-- date: '2026-07-14'
-  plan: phase-2-3-p2-physiology-update
-  tests_added: 0
-  tests_modified: 8
-  tests_removed: 0
-  result: TRIAGE
-  coverage_delta: "DevOps report test pack re-run (2026-07-14, pass 2) — 8 of 193\
-    \ tests still failed after p-test-architect resolved the integration `_state()`\
-    \ default date and the rollback fixture-isolation from pass 1. All 8 failures\
-    \ were test-pack issues, not implementation bugs. No infrastructure changes needed.\n\
-    \n**Test-pack fixes (3 issues, 8 tests touched, 0 helpers added, 0 tests removed):**\
-    \ 1. **RC2 — Integration multi-day accumulation (6 tests)** —\n   six tests in\n\
-    \   `tests/integration/test_physiology_update_service_confidence_transitions_integration.py`\n\
-    \   and\n   `tests/integration/test_physiology_update_service_first_observation_integration.py`\n\
-    \   explicitly construct observations at\n   `measurement_date=date(2026, 6, 15\
-    \ + i)` for `i in\n   range(N)`, introducing 1-day gaps that the 42-day time\n\
-    \   constant decays by `exp(-1/42) ≈ 0.9765` per gap. The\n   tests assert linear\
-    \ accumulation (e.g. `0.5 + 4 × 1.0\n   = 4.5`) but the actual values are 4.3265,\
-    \ 7.7945, 1.9765,\n   2.4647 etc. Pinned all observations in these tests to\n\
-    \   `measurement_date=date(2026, 6, 15)` (same-day) with\n   distinct `observed_value`\
-    \ to avoid dedup, restoring the\n   expected linear accumulation. The decay-between-observations\n\
-    \   behaviour remains pinned by\n   `TestBayesianUpdatePriorDecay` in the unit\
-    \ tests. Tests\n   fixed: `test_four_observations_reach_prior_weight_4_point_5`,\n\
-    \   `test_eight_observations_reach_prior_weight_8_point_5`,\n   `test_eighth_observation_triggers_medium_to_high_transition`,\n\
-    \   `test_three_calls_each_with_one_observation`,\n   `test_second_observation_grows_prior_weight`,\n\
-    \   `test_second_observation_fires_event_when_shift_exceeds_one`.\n2. **RC2 —\
-    \ Loop `from_level` pattern (1 test)** —\n   `test_four_rr_observations_reach_high_confidence`\
-    \ used\n   a 4-call loop asserting `from_level == \"low\"` on the\n   4th call.\
-    \ This is structurally impossible: the 3rd call\n   already crosses MEDIUM (with\
-    \ 1-day gaps) or HIGH (with\n   same-day dates), so the 4th call's pre-call level\
-    \ is\n   never LOW. Restructured the test to use a single\n   `apply_observations`\
-    \ call with all 4 observations in one\n   batch — the service reports a single\n\
-    \   `(pre_call_level, post_call_level)` transition\n   reflecting the full batch,\
-    \ making the `(\"low\", \"high\")`\n   transition observable. Test fixed:\n  \
-    \ `test_four_rr_observations_reach_high_confidence`.\n3. **RC3 — Post-rollback\
-    \ ORM attribute access (1 test)** —\n   `test_event_atomicity_rolls_back_when_later_step_fails`\n\
-    \   passed the pass-1 fix (committing the fixture row in its\n   own transaction)\
-    \ but the post-rollback assertion\n   `fresh.lt2[\"hr\"][\"value\"]` triggered\
-    \ a `MissingGreenlet`\n   because accessing an ORM attribute on a freshly-loaded\n\
-    \   instance after `rollback()` attempts async lazy loading\n   outside the greenlet\
-    \ context. Replaced the ORM-attribute\n   access with a column-level SELECT on\n\
-    \   `AthletePhysiology.lt2` and `.scalar_one()`, bypassing\n   the ORM attribute\
-    \ layer entirely. This is a different\n   anti-pattern from the 2026-07-11\n \
-    \  `expire_all()` + lazy load rule — `rollback()` puts the\n   session in a distinct\
-    \ state where the connection\n   lifecycle cannot service subsequent lazy loads,\
-    \ and\n   column-level SELECT is the only safe pattern. Test\n   fixed:\n   `test_event_atomicity_rolls_back_when_later_step_fails`.\n\
-    \n\n**Reusable failure classes recorded** — 3 new dated lessons added to `tests/README.md`\
-    \ under \"Dated Lessons (2026-07-14, Phase-2.3-P2 test pack re-run, pass 2)\"\
-    \ and 3 new rows added to `tests/MOCKING_CONTRACT.md` \"Known Anti-Patterns\"\
-    \ table with cross-references to the README. The integration multi-day accumulation\
-    \ rule extends the 2026-07-13 and 2026-07-14 pass-1 date-default rules; the loop\
-    \ `from_level` rule is a new failure class specific to tests that assert `from_level`\
-    \ on the Nth call of a loop; the post-rollback column-level SELECT rule is a new\
-    \ failure class that complements (but does not replace) the 2026-07-11 `expire_all()`\
-    \ + `populate_existing=True` rule.\n\n**No implementation bugs (routed to p-coder)**\
-    \ — the implementation's decay behaviour is architecturally correct and is already\
-    \ pinned by `TestBayesianUpdatePriorDecay` in the unit tests. The 7 RC2 failures\
-    \ were all test-pack issues (multi-day dates, structurally-impossible loop assertion),\
-    \ not implementation bugs. The RC3 failure was a test-pack issue (ORM attribute\
-    \ access after rollback), not an implementation bug — the service correctly rolls\
-    \ back the batch; the test's post-rollback verification path was the defect.\n\
-    \n**No validation status change** — all 30 features in this sub-phase remain at\
-    \ `validation.implemented = true`, `validation.executable = true`, `validation.passed\
-    \ = false` (set by DevOps during the failed execution). The next DevOps run will\
-    \ re-execute and re-evaluate `executable` / `passed` based on the test-pack fixes.\
-    \ `last_reviewed_at` bumped to 2026-07-14T18:00:00Z.\n"
-- date: '2026-07-14'
-  plan: phase-2-3-p2-physiology-update
-  tests_added: 0
-  tests_modified: 1
-  tests_removed: 0
-  result: TRIAGE
-  coverage_delta: "DevOps report test pack re-run (2026-07-14, pass 3) — 1 of 193 tests still failed after p-test-architect resolved the 7 RC2 test-pack issues and the 1 RC3 post-rollback JSONB access issue from passes 1 and 2. The remaining failure is a refinement of the pass-2 RC3 post-rollback ORM access pattern: the column-level SELECT for `AthletePhysiology.lt2` was applied correctly, but the same hazard was present in the WHERE-clause references (`SystemEvent.athlete_id == athlete.id`, `PhysiologyMeasurement.athlete_id == athlete.id`, `AthletePhysiology.athlete_id == athlete.id` in the column-level SELECT WHERE clause), all of which access `athlete.id` AFTER `db_session.rollback()`. The pass-2 fix bypassed the ORM attribute layer for the freshly-loaded instance via column-level SELECT, but the in-memory `athlete` instance loaded BEFORE the rollback cannot be replaced by column-level SELECT because its PK is the WHERE-clause value. No infrastructure changes were made; the `expire_on_rollback=False` conftest fix was attempted by DevOps and reverted because SQLAlchemy 2.x does not support that parameter (raises `TypeError`). The fix is a per-test content change.\n\n**Test-pack fixes (1 issue, 1 test touched, 0 helpers added, 0 tests removed):** 1. **RC3 — Post-rollback PK access in WHERE clauses (1 test)** — `test_event_atomicity_rolls_back_when_later_step_fails` in `tests/integration/test_physiology_update_service_integration.py` passed the pass-2 column-level SELECT fix for the `fresh_lt2` JSONB read but failed on the next assertion: `select(SystemEvent).where(SystemEvent.athlete_id == athlete.id)` at line 878 triggered `sqlalchemy.exc.MissingGreenlet: greenlet_spawn has not been called; can't call await_only() here.` `db_session.rollback()` expires ALL ORM instances tracked by the session, including the `athlete` object loaded at the start of the test (line 835). Accessing `athlete.id` (or any other mapped attribute — even a PK) on an expired instance triggers an async lazy load to re-fetch the row. Under async SQLAlchemy + NullPool, the lazy load fires outside the greenlet context, raising `MissingGreenlet`. Fixed by capturing `athlete_id = athlete.id` as a plain Python UUID BEFORE the `rollback()` call, then replacing `athlete.id` with `athlete_id` in all 3 post-rollback WHERE clauses (`SystemEvent`, `PhysiologyMeasurement`, `AthletePhysiology.lt2` column-level SELECT). The captured `athlete_id` is a plain Python UUID, immune to the session-expiration hazard. Test fixed: `test_event_atomicity_rolls_back_when_later_step_fails`.\n\n**Reusable failure classes recorded** — 1 new dated lesson added to `tests/README.md` under \"Dated Lessons (2026-07-14, Phase-2.3-P2 test pack re-run, pass 2)\" (the same section as the pass-2 fix because the new lesson is a direct refinement of the pass-2 post-rollback ORM access pattern): \"Post-rollback PK access in WHERE clauses triggers `MissingGreenlet` — capture the PK before `rollback()`\". The new lesson is a strict superset of the 2026-07-11 `expire_all()` + lazy-load-on-captured-scalar rule: `rollback()` is a different state-setter than `expire_all()` (rollback evicts transaction state; expire_all evicts attribute state), but both leave the instance in a state where lazy loads are unservicable, and the capture-first pattern works for both. 1 new row added to `tests/MOCKING_CONTRACT.md` \"Known Anti-Patterns\" table cross-referencing the new README lesson, and a new change-log entry for 2026-07-14 pass 3 documenting the SQLAlchemy 2.x `expire_on_rollback` non-support finding. The \"session-state-change → async lazy load hazard\" failure class has now occurred 3 times across this plan and is flagged as a Recurring Infrastructure Risk in the test pack (recommended against moving to a shared conftest fixture at this time — the per-test capture pattern is one line, clearly named, and immediately visible to a reviewer; the marginal value of a fixture at 3 occurrences is small).\n\n**No implementation bugs (routed to p-coder)** — the implementation's behaviour in the RC3 scenario is correct: `apply_observations` correctly mutates the row, `db_session.rollback()` correctly unwinds the mutation, and no event/measurement/outbox/JSONB mutation persists. The test's post-rollback verification path was the defect — `athlete.id` access on an expired instance triggers an async lazy load that fires outside the greenlet context. The production code is not at fault.\n\n**No validation status change** — all 30 features in this sub-phase remain at `validation.implemented = true`, `validation.executable = true`, `validation.passed = false` (set by DevOps during the failed execution). The next DevOps run will re-execute and re-evaluate `executable` / `passed` based on the test-pack fixes. `last_reviewed_at` bumped to 2026-07-14T20:00:00Z.\n"
-
-- date: '2026-07-15'
-  plan: phase-2-3-p2-physiology-update
-  tests_added: 0
-  tests_modified: 0
-  tests_removed: 0
-  result: PROMOTED
-  coverage_delta: "DevOps report (2026-07-15) reports a full PASS for the feature execution group: 193/193 tests passed, 0 failed, 0 skipped, 25.70s duration. No infrastructure changes were made by DevOps. All 3 prior root causes (RC1 source_value enum .value, RC2 intra-call state accumulation, RC3 post-rollback PK access) were already resolved across the 2026-07-13/14 triage passes. **Test Architect promotion action**: advanced all 32 features from `status: generated` to `status: promoted` (all already at `validation.implemented = true`, `validation.executable = true`, `validation.passed = true` from the DevOps report). Added all 10 test file paths to `index.yaml` `selection.regression` and `selection.release` groups. Added `physiology_updated` to `index.yaml` `coverage.events.covered`. Added 3 new invariants to `index.yaml` `coverage.invariants.covered`: (1) one AthletePhysiology row per athlete — row id preserved across update_in_place, (2) confidence is monotonic (only increases, never decreases), (3) physiology_updated event atomicity — SystemEvent + SystemEventOutbox land in the SAME transaction as the AthletePhysiology update (ADR-004). No new tests generated — the suite was already complete and passing from prior sessions. No new infrastructure fixes to ingest — the DevOps report's `## Infrastructure Fixes` section explicitly states 'No infrastructure changes were made in this session.' `last_reviewed_at` bumped to 2026-07-15T00:00:00Z. Phase-2.3-P2 is now promoted to the `regression` and `release` execution groups; the sub-phase is complete."
+      - "AthletePhysiology is mutable in place — posterior updates applied in place"
+      - "Bayesian update with 42-day prior decay for evidence staleness"
+      - "physiology_updated event fires only when posterior shifts by > 1 bpm"
+      - "Per-metric evidence accumulation — observations routed to specific metrics"
+      - "PhysiologyMeasurement record is always written regardless of shift"
+      - "cp and vo2max are null until a qualifying observation is made"
+      - "Confidence is monotonic (only increases, never decreases) — raw prior_weight"
+      - "physiology_updated event atomicity — SystemEvent + SystemEventOutbox land in"
+      - "One AthletePhysiology row per athlete — the row id is preserved across update_in_place"

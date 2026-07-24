@@ -112,7 +112,7 @@ The vision (`vision/coach/first-message.md` → "Onboarding Time to Value") spec
 
 - `PlanGenerationService` must complete before `FirstMessageAgent` runs (pre-condition)
 - `TwinState` must exist (any trigger) before agent runs (pre-condition)
-- The `onboarding_completed` event fires after model build, triggering agent execution
+- The `twin_model_ready` event fires after the bootstrap TwinState is created, triggering the plan generation and message generation pipeline
 
 The timing is an architectural property of the pipeline, not a prompt constraint.
 
@@ -124,7 +124,7 @@ The timing is an architectural property of the pipeline, not a prompt constraint
 - No existing `CoachingMessage` with `message_type = 'first_message'` for this goal
 
 ## Events
-- Fires after `onboarding_completed` event
+- Fires after `training_plan_generated` event (which is triggered by `twin_model_ready`)
 - Writes `GenerationEvent` (success or failure)
 - On success: writes `CoachingMessage` with `message_type = 'first_message'`
 - On failure: 503 returned; no `CoachingMessage` created; retry available

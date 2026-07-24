@@ -9,6 +9,16 @@ LangGraph-style agent DAGs that orchestrate LLM calls for specific coaching work
 |---|---|
 | `post_workout_agent.py` | `PostWorkoutAgent` — idempotent post-workout coach message generation with compliance-driven context and GenerationEvent audit logging |
 
+### Workout Generation
+| File | Responsibility |
+|---|---|
+| `workout_generation_agent.py` | `WorkoutGenerationAgent` — idempotent day-of workout generation with LLM step synthesis and GenerationEvent audit |
+
+### Coach Onboarding
+| File | Responsibility |
+|---|---|
+| `first_message_agent.py` | `FirstMessageAgent` — idempotent onboarding coach message generation with context-budget enforcement |
+
 ## Architecture Notes
 - All agent classes accept repositories and services via constructor injection, receive `AsyncSession` directly, and never create sessions or engines themselves.
 - Idempotency is enforced at the agent level: calling `generate` twice for the same input key returns the existing result without LLM invocation.

@@ -5,11 +5,12 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime, timezone
 from decimal import Decimal
-from typing import Any, Mapping, Optional, TYPE_CHECKING
+from typing import Any, Callable, Mapping, Optional, TYPE_CHECKING, cast
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.logging_utils import log_event
 from app.models.athlete_fitness import AthleteFitness
 from app.models.athlete_physiology import AthletePhysiology
 from app.models.athlete_preferences import (
@@ -56,12 +57,7 @@ from app.services.onboarding_results import (
 )
 
 if TYPE_CHECKING:
-    # Imported only for type-checking so the runtime dependency graph
-    # between the onboarding and plan-generation services stays
-    # one-way. ``OnboardingService.__init__`` accepts an optional
-    # ``PlanGenerationService`` instance built on the same
-    # ``AsyncSession`` so the two services share a single transaction.
-    from app.services.plan_generation_service import PlanGenerationService
+    pass
 
 # ---------------------------------------------------------------------------
 # Constants — bootstrapped from architecture documents.
@@ -215,23 +211,21 @@ class OnboardingService:
     every operation participates in a single transaction. The session
     is committed exactly once — inside ``complete_onboarding`` —
     after the full bootstrap sequence has landed and the
-    ``onboarding_completed`` event has been written through the
-    transactional outbox.
+    ``onboarding_completed`` + ``twin_model_ready`` events have been
+    written through the transactional outbox.
 
-    Phase-1.4 onboarding integration: when ``plan_service`` is
-    provided, plan generation is wired into the same transaction so
-    the plan and onboarding land atomically. The commit boundary is
-    then moved to ``plan_service.generate_plan`` (the plan service
-    owns the final ``commit``); when ``plan_service is None``,
-    ``complete_onboarding`` commits directly. This is the only way
-    plan-service failures roll back onboarding state.
+    Plan generation is NOT triggered from this service after the
+    onboarding commit. The ``twin_model_ready`` event published here
+    is consumed by the ``generate_plan`` procrastinate worker task,
+    which runs in its own transaction. If plan generation fails, the
+    onboarding stays complete; the plan is generated asynchronously
+    and the manual retry path is ``POST /coach/first-message``.
     """
 
     def __init__(
         self,
         session: AsyncSession,
         events: Optional[EventPublisher] = None,
-        plan_service: Optional["PlanGenerationService"] = None,
     ) -> None:
         self.session = session
         self.athletes = AthleteRepository(session)
@@ -241,7 +235,6 @@ class OnboardingService:
         self.physiology = AthletePhysiologyRepository(session)
         self.fitness = AthleteFitnessRepository(session)
         self.twin_states = TwinStateRepository(session)
-        self.plan_service = plan_service
         if events is None:
             # Build a real publisher on demand — keep the constructor
             # signature thin while preserving atomic event writes.
@@ -354,6 +347,12 @@ class OnboardingService:
             await self.training_goals.add(goal_row)
         except IntegrityError as exc:
             await self.session.rollback()
+            # ``TrainingGoalRepository_unique_violation`` is the
+            # module-level helper defined at the bottom of this file;
+            # ``TrainingGoalRepository`` has no static
+            # ``is_unique_violation`` of its own yet, so the helper
+            # mirrors ``AthleteRepository.is_unique_violation`` and is
+            # used here as a 23505 detection entry point.
             if TrainingGoalRepository_unique_violation(exc):
                 raise TrainingGoalConflictError(
                     "athlete already has an active training goal"
@@ -458,27 +457,37 @@ class OnboardingService:
             },
         )
 
-        # 9. Plan generation — Phase-1.4. When ``plan_service`` is
-        #    wired, atomically generate the initial plan in this same
-        #    transaction. The plan service commits once at the end of
-        #    its work, so we skip the standalone commit below; any
-        #    plan-generation error rolls the entire transaction back
-        #    so ``onboarding_complete`` stays ``False``.
-        #    When ``plan_service is None``, onboarding commits directly
-        #    (graceful degradation for unit tests that do not exercise
-        #    the plan path).
-        if self.plan_service is not None:
-            await self.plan_service.generate_plan(athlete_id=athlete_id)
-            return OnboardingResult(
-                twin_state=twin_state,
-                training_goal=goal_row,
-                preferences=prefs_row,
-                profile=profile_row,
-                data_tier=int(data_tier.value),
-            )
+        # 9. Persist the twin_model_ready event via the outbox. This
+        #    signals that the onboarding twin snapshot is in place and
+        #    the plan pipeline can start. The event is consumed by the
+        #    ``generate_plan`` procrastinate worker task via task
+        #    deferral (not outbox polling); the outbox row exists for
+        #    audit and future external consumers.
+        await self.events.publish(
+            event_type="twin_model_ready",
+            athlete_id=athlete_id,
+            payload={
+                "twin_state_id": str(twin_state.id),
+                "data_tier": int(data_tier.value),
+                "confidence_level": TwinConfidenceLevel.LOW.value,
+            },
+        )
 
-        # 9. Commit the whole bootstrap atomically.
+        # 10. Commit the whole bootstrap atomically — the outbox
+        #     publishes both ``onboarding_completed`` and
+        #     ``twin_model_ready`` rows for downstream consumers.
         await self.session.commit()
+
+        # 11. Defer the ``generate_plan`` procrastinate task AFTER the
+        #     commit so a worker failure cannot roll back the
+        #     onboarding transaction. Same pattern as
+        #     ``ActivityIngestionService`` deferring ``signal_clean``
+        #     after the ingestion commit. If the defer itself raises
+        #     (queue backend outage), swallow and log so the onboarding
+        #     commit is unaffected — the ``twin_model_ready`` row is
+        #     in the outbox and a future publisher pass / manual
+        #     retry can recover.
+        await self._defer_generate_plan(athlete_id)
 
         return OnboardingResult(
             twin_state=twin_state,
@@ -487,6 +496,40 @@ class OnboardingService:
             profile=profile_row,
             data_tier=int(data_tier.value),
         )
+
+    async def _defer_generate_plan(self, athlete_id: uuid.UUID) -> None:
+        """Defer the ``generate_plan`` procrastinate task post-commit.
+
+        Same swallow-and-log pattern as ``ActivityIngestionService``
+        deferring ``signal_clean`` (ADR-009 decoupling principle):
+        the onboarding commit already succeeded; a queue outage
+        here does not invalidate the published ``twin_model_ready``
+        event in the outbox — a future publisher pass or manual
+        retry is the recovery path.
+        """
+        dispatcher: Any
+        try:
+            from app.worker.app import generate_plan
+
+            dispatcher = cast(Callable[..., Any], generate_plan.defer)
+        except Exception as exc:
+            log_event(
+                event="generate_plan.enqueue.failure",
+                athlete_id=str(athlete_id),
+                outcome="failed",
+                error=str(exc),
+            )
+            return
+
+        try:
+            dispatcher(athlete_id=str(athlete_id))
+        except Exception as exc:
+            log_event(
+                event="generate_plan.enqueue.failure",
+                athlete_id=str(athlete_id),
+                outcome="failed",
+                error=str(exc),
+            )
 
     # ------------------------------------------------------------------
     # Status + read endpoints.

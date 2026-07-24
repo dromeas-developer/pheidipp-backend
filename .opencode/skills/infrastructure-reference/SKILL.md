@@ -4,7 +4,7 @@ description: >
   Load this when an agent needs the Pheidipp platform's service map,
   database architecture, command inventory, check-file rule, or
   TimescaleDB augmentation procedures. Consumed by p-devops (primary),
-  p-coder, and p-test-architect. Agents that do not interact with
+  and p-coder. Agents that do not interact with
   runtime infrastructure should not load this skill.
 ---
 
@@ -123,6 +123,20 @@ bash scripts/pytest.sh --collect-only <path> [<path> ...]
 Always use `scripts/pytest.sh`, never bare `pytest` — pytest is installed
 in `.venv`, which a bare `pytest` invocation will not have activated, and
 the check will fail with "pytest not installed" even though it is.
+
+**Class-based test discovery:** The test manifest stores an optional `class`
+field per function entry for class-based tests. When present, construct the
+pytest selector as `file.py::ClassName::function_name`. When absent, use
+`file.py::function_name` (module-level). If a function's `class` field is
+missing but the test is actually class-based (pytest reports "not found"),
+run `--collect-only` as a fallback to discover the correct class-qualified
+path:
+
+```bash
+# Fallback: discover class-qualified paths when manifest class field is missing
+bash scripts/pytest.sh --collect-only -q tests/api/test_coach_endpoints_async.py
+# Output: tests/api/test_coach_endpoints_async.py::TestManualFirstMessageReturns201IfAsyncHasNotRun::test_201_with_new_message
+```
 
 ### Diagnostics Fixer scripts
 

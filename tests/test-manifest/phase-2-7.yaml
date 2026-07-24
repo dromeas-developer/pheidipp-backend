@@ -1,0 +1,175 @@
+version: "1.0"
+plan_id: "phase-2-7-batch-3-event-flow-plan-router-fix"
+generated_at: "2026-07-22T00:00:00Z"
+last_reviewed_at: "2026-07-24T12:00:01Z"
+
+prerequisites:
+  migrations: false
+
+files:
+  test_coach_endpoints_async.py:
+    type: api
+    status: promoted
+    functions:
+      test_201_with_new_message: {class: TestManualFirstMessageReturns201IfAsyncHasNotRun, implemented: true, executable: true, passed: true}
+      test_409_with_existing_message_id: {class: TestManualFirstMessageReturns409IfAsyncAlreadyRan, implemented: true, executable: true, passed: true}
+      test_get_messages_returns_first_message: {class: TestGetCoachMessagesAfterAsyncGeneration, implemented: true, executable: true, passed: true}
+  test_onboarding_endpoints_async_plan.py:
+    type: api
+    status: promoted
+    functions:
+      test_get_plan_returns_404_immediately_after_onboarding: {class: TestOnboardingAsyncPlanGeneration, implemented: true, executable: true, passed: true}
+      test_post_onboarding_returns_201: {class: TestOnboardingAsyncPlanGeneration, implemented: true, executable: true, passed: true}
+      test_response_does_not_include_plan_fields: {class: TestOnboardingAsyncPlanGeneration, implemented: true, executable: true, passed: true}
+  test_plan_endpoints_async.py:
+    type: api
+    status: promoted
+    functions:
+      test_get_plan_checkpoints_returns_expected_shape: {class: TestPlanRouterResponseShape, implemented: true, executable: true, passed: true}
+      test_get_plan_returns_200_with_plan_body: {class: TestGetPlanAfterWorkerTask, implemented: true, executable: true, passed: true}
+      test_get_plan_sessions_returns_expected_shape: {class: TestPlanRouterResponseShape, implemented: true, executable: true, passed: true}
+      test_get_plan_upcoming_returns_expected_shape: {class: TestPlanRouterResponseShape, implemented: true, executable: true, passed: true}
+  test_generate_first_message_task.py:
+    type: integration
+    status: promoted
+    functions:
+      test_creates_first_message: {class: TestGenerateFirstMessageTaskCreatesCoachingMessage, implemented: true, executable: true, passed: true}
+      test_existing_first_message_returns_idempotent_success: {class: TestGenerateFirstMessageTaskHandlesAlreadyExistsError, implemented: true, executable: true, passed: true}
+      test_llm_failure_propagates_for_retry: {class: TestGenerateFirstMessageTaskRetriesOnLLMFailure, implemented: true, executable: true, passed: true}
+      test_second_run_returns_already_existed: {class: TestGenerateFirstMessageTaskIsIdempotent, implemented: true, executable: true, passed: true}
+      test_writes_coaching_message_generated_outbox_row: {class: TestGenerateFirstMessageTaskCreatesCoachingMessage, implemented: true, executable: true, passed: true}
+  test_generate_plan_task.py:
+    type: integration
+    status: generated
+    functions:
+      test_creates_active_training_plan: {class: TestGeneratePlanTaskCreatesTrainingPlan, implemented: true, executable: true, passed: true}
+      test_creates_planned_sessions_for_plan: {class: TestGeneratePlanTaskCreatesWeeklyPlansAndPlannedSessions, implemented: true, executable: true, passed: true}
+      test_creates_weekly_plans_for_plan: {class: TestGeneratePlanTaskCreatesWeeklyPlansAndPlannedSessions, implemented: true, executable: true, passed: true}
+      test_defers_generate_first_message_with_athlete_id: {class: TestGeneratePlanTaskDefersFirstMessage, implemented: true, executable: true, passed: true}
+      test_second_run_supersedes_first_plan: {class: TestGeneratePlanTaskIsIdempotentViaSupersession, implemented: true, executable: true, passed: true}
+      test_writes_training_plan_generated_outbox_row: {class: TestGeneratePlanTaskCreatesTrainingPlan, implemented: true, executable: true, passed: true}
+  test_onboarding_service_twin_model_ready.py:
+    type: integration
+    status: generated
+    functions:
+      test_complete_onboarding_raises_conflict_on_duplicate_active_goal: {class: TestOnboardingDuplicateGoalConflict, implemented: true, executable: true, passed: true}
+      test_generate_plan_task_is_deferred_after_onboarding: {class: TestOnboardingNoLongerCallsPlanGenerationService, implemented: true, executable: true, passed: true}
+      test_onboarding_creates_no_plan_rows: {class: TestOnboardingNoLongerCallsPlanGenerationService, implemented: true, executable: true, passed: true}
+      test_onboarding_service_constructor_does_not_accept_plan_service: {class: TestOnboardingNoLongerCallsPlanGenerationService, implemented: true, executable: true, passed: true}
+      test_twin_model_ready_outbox_row_exists: {class: TestTwinModelReadyEventProduction, implemented: true, executable: true, passed: true}
+      test_twin_model_ready_paired_with_outbox_row_in_pending: {class: TestTwinModelReadyEventProduction, implemented: true, executable: true, passed: true}
+      test_twin_model_ready_rolled_back_on_mid_transaction_failure: {class: TestTwinModelReadyTransactionalAtomicity, implemented: true, executable: true, passed: true}
+  test_outbox_publisher_task_integration.py:
+    type: integration
+    status: generated
+    functions:
+      test_empty_queue_does_not_modify_existing_published_rows: {class: TestPublisherHandlesEmptyQueue, implemented: true, executable: true, passed: true}
+      test_empty_queue_returns_zero: {class: TestPublisherHandlesEmptyQueue, implemented: true, executable: true, passed: true}
+      test_event_count_unchanged_after_publisher_run: {class: TestPublisherDoesNotProduceNewEvents, implemented: true, executable: true, passed: true}
+      test_event_publisher_publish_not_called: {class: TestPublisherDoesNotCallEventPublisherPublish, implemented: true, executable: true, passed: true}
+      test_first_run_transitions_only_limit_rows: {class: TestPublisherHandlesPartialBatch, implemented: true, executable: true, passed: true}
+      test_fresh_session_sees_published_status: {class: TestPublisherStatusTransitionObservableAfterCommit, implemented: true, executable: true, passed: true}
+      test_second_run_returns_zero_and_modifies_nothing: {class: TestPublisherIsIdempotent, implemented: true, executable: true, passed: true}
+      test_second_run_transitions_remaining_rows: {class: TestPublisherHandlesPartialBatch, implemented: true, executable: true, passed: true}
+      test_three_pending_rows_all_published: {class: TestPublisherTransitionsPendingToPublished, implemented: true, executable: true, passed: true}
+      test_uncommitted_row_in_other_session_not_visible: {class: TestPublisherRunsInOwnTransaction, implemented: true, executable: true, passed: true}
+  test_plan_query_service.py:
+    type: integration
+    status: promoted
+    functions:
+      test_default_limit_is_five: {class: TestGetUpcomingSessions, implemented: true, executable: true, passed: true}
+      test_filters_out_sessions_before_today: {class: TestGetUpcomingSessions, implemented: true, executable: true, passed: true}
+      test_joins_through_planned_session: {class: TestGetCheckpointsForPlan, implemented: true, executable: true, passed: true}
+      test_joins_through_weekly_plan_not_denormalized_column: {class: TestGetSessionsForPlan, implemented: true, executable: true, passed: true}
+      test_orders_by_target_date_ascending: {class: TestGetSessionsForPlan, implemented: true, executable: true, passed: true}
+      test_respects_limit: {class: TestGetUpcomingSessions, implemented: true, executable: true, passed: true}
+      test_returns_checkpoints_for_plan: {class: TestGetCheckpointsForPlan, implemented: true, executable: true, passed: true}
+      test_returns_empty_list_when_no_checkpoints: {class: TestGetCheckpointsForPlan, implemented: true, executable: true, passed: true}
+      test_returns_empty_list_when_no_sessions: {class: TestGetSessionsForPlan, implemented: true, executable: true, passed: true}
+      test_returns_sessions_for_plan: {class: TestGetSessionsForPlan, implemented: true, executable: true, passed: true}
+  test_system_event_outbox_repository_get_pending_integration.py:
+    type: integration
+    status: promoted
+    functions:
+      test_does_not_modify_status: {class: TestGetPendingIsReadOnly, implemented: true, executable: true, passed: true}
+      test_does_not_return_failed_or_dlq_rows: {class: TestGetPendingExcludesPublishedRows, implemented: true, executable: true, passed: true}
+      test_does_not_return_published_rows: {class: TestGetPendingExcludesPublishedRows, implemented: true, executable: true, passed: true}
+      test_identical_created_at_returns_stable_order: {class: TestGetPendingDeterministicTiebreak, implemented: true, executable: true, passed: true}
+      test_limit_returns_oldest_by_created_at: {class: TestGetPendingRespectsLimit, implemented: true, executable: true, passed: true}
+      test_published_at_remains_null: {class: TestGetPendingIsReadOnly, implemented: true, executable: true, passed: true}
+      test_results_ordered_by_created_at_ascending: {class: TestGetPendingReturnsPendingRowsOrdered, implemented: true, executable: true, passed: true}
+      test_returns_all_pending_rows_within_limit: {class: TestGetPendingReturnsPendingRowsOrdered, implemented: true, executable: true, passed: true}
+      test_returns_at_most_limit_rows: {class: TestGetPendingRespectsLimit, implemented: true, executable: true, passed: true}
+      test_returns_empty_list_when_no_rows: {class: TestGetPendingEmptyQueue, implemented: true, executable: true, passed: true}
+  test_event_catalogue_twin_model_ready_producer.py:
+    type: unit
+    status: promoted
+    functions:
+      test_consumer_is_plan_generation_path: {implemented: true, executable: true, passed: true}
+      test_producer_is_onboarding_service: {implemented: true, executable: true, passed: true}
+      test_twin_model_ready_section_exists: {implemented: true, executable: true, passed: true}
+  test_event_topology_plan_flow.py:
+    type: unit
+    status: generated
+    functions:
+      test_initial_plan_generation_section_exists: {implemented: true, executable: true, passed: true}
+      test_section_documents_coaching_message_generated: {implemented: true, executable: true, passed: true}
+      test_section_documents_training_plan_generated: {implemented: true, executable: true, passed: true}
+      test_section_documents_twin_model_ready: {implemented: true, executable: true, passed: true}
+      test_section_names_onboarding_service_as_producer: {implemented: true, executable: true, passed: true}
+  test_outbox_publisher_registration.py:
+    type: unit
+    status: promoted
+    functions:
+      test_outbox_publisher_callable: {implemented: true, executable: true, passed: true}
+      test_outbox_publisher_in_task_registry: {implemented: true, executable: true, passed: true}
+      test_outbox_publisher_task_named_correctly: {implemented: true, executable: true, passed: true}
+      test_periodic_cron_in_ten_to_thirty_seconds_band: {implemented: true, executable: true, passed: true}
+      test_periodic_decorator_present: {implemented: true, executable: true, passed: true}
+  test_plan_router_layer_fix.py:
+    type: unit
+    status: promoted
+    functions:
+      test_plan_router_does_not_call_session_execute: {implemented: true, executable: true, passed: true}
+      test_plan_router_does_not_construct_select_statements: {implemented: true, executable: true, passed: true}
+      test_plan_router_does_not_import_sqlalchemy: {implemented: true, executable: true, passed: true}
+  test_run_ingestion_pipeline_docstring.py:
+    type: unit
+    status: generated
+    functions:
+      test_docstring_names_activity_calibration_eligible: {implemented: true, executable: true, passed: true}
+      test_docstring_names_activity_ingested: {implemented: true, executable: true, passed: true}
+      test_docstring_names_sport_type_detected: {implemented: true, executable: true, passed: true}
+      test_docstring_no_longer_denies_event_publication: {implemented: true, executable: true, passed: true}
+      test_docstring_references_event_publisher: {implemented: true, executable: true, passed: true}
+      test_docstring_references_transactional_outbox: {implemented: true, executable: true, passed: true}
+  test_system_event_md_no_redis.py:
+    type: unit
+    status: generated
+    functions:
+      test_documents_future_bus_insertion_point: {implemented: true, executable: true, passed: true}
+      test_documents_publisher_as_status_transitioner: {implemented: true, executable: true, passed: true}
+      test_event_catalogue_exists: {implemented: true, executable: true, passed: true}
+      test_event_catalogue_not_aware_of_outbox_publisher_task: {implemented: true, executable: true, passed: true}
+      test_event_topology_exists: {implemented: true, executable: true, passed: true}
+      test_event_topology_not_aware_of_outbox_publisher_task: {implemented: true, executable: true, passed: true}
+      test_mermaid_no_messagebus_participant: {implemented: true, executable: true, passed: true}
+      test_mermaid_shows_publisher_transitioning_outbox_status: {implemented: true, executable: true, passed: true}
+
+coverage:
+  events:
+    covered:
+      - "twin_model_ready"
+      - "training_plan_generated"
+      - "coaching_message_generated"
+      - "onboarding_completed"
+  invariants:
+    covered:
+      - "Transactional outbox atomicity"
+      - "twin_model_ready fires in the onboarding transaction (ADR-012 ratified)"
+      - "generate_plan task fires after onboarding commit"
+      - "generate_first_message task handles FirstMessageAlreadyExistsError gracefully"
+      - "First message idempotency"
+      - "PlanQueryService is read-only"
+      - "Route handlers MUST NOT execute SQLAlchemy queries directly"
+      - "Layer architecture (non-negotiable) — PlanQueryService enforces this for plan read queries"

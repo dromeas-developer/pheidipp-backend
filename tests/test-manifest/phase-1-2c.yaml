@@ -1,455 +1,467 @@
 version: "1.0"
 plan_id: "phase-1-2c-p1-twin-fitness-coaching-workouts"
-generated_at: "2026-06-24T12:45:00+00:00"
-last_reviewed_at: "2026-07-18T00:00:00+00:00"
+generated_at: "2026-06-25T00:00:00Z"
+last_reviewed_at: "2026-06-25T00:00:00Z"
 
-# Plan covered by this sub-phase file:
-#   docs/implementation/phase-1/phase-1-2c-p1-twin-fitness-coaching-workouts.md
-# Delivered migrations (cumulative Phase-1.2c lineage):
-#   1. alembic/versions/79dc97d4e433_phase_1_2c_twin_fitness_coaching_.py
-#      (down_revision=1b9e9026db1e — chains from Phase-1.2b head)
-#   2. alembic/versions/d1579f4430e7_add_training_plans_twin_state_fk.py
-#      (down_revision=79dc97d4e433 — wires training_plans.twin_state_id
-#       -> twin_states.id with ON DELETE SET NULL now that twin_states
-#       exists)
-# Validator report: docs/implementation/phase-1/Phase-1.2c-P1_validation.md
-# DevOps report: reports/phase-1-2c-P1_devops.md (PASS — promoted)
-# DevOps round-2: reports/phase-1-2c-P1_devops_round2.md (consolidated into
-#                  the final report — see history below)
+prerequisites:
+  migrations: false
 
-features:
-  phase-1-2c-enums:
+files:
+  test_athlete_fitness_schema.py:
+    type: integration
     status: promoted
-    plan: "docs/implementation/phase-1/phase-1-2c-p1-twin-fitness-coaching-workouts.md"
-    owned_by_plan:
-      - "phase-1-2c-p1-twin-fitness-coaching-workouts"
-    description: "Closed ontology membership for TwinTrigger, TwinConfidenceLevel, MessageType, StepType, RecoveryModifierLevel, WellnessTrend, PhysiologicalIntent, MeasurementSource, SignalType, SessionPurpose; re-export from app.models."
-    protects:
-      - "TwinTrigger values are exactly questionnaire, activity_sync, calibration, physiology_input, wellness_update"
-      - "TwinConfidenceLevel values are exactly low, medium, high"
-      - "MessageType values are exactly first_message, post_workout, wellness_alert, phase_transition, plan_regeneration, confidence_upgrade, cycle_check_in, weekly_summary"
-      - "StepType values are exactly warmup, work, recovery, cooldown"
-      - "RecoveryModifierLevel values are exactly green, amber, red"
-      - "WellnessTrend values are exactly improving, stable, declining"
-      - "PhysiologicalIntent values are exactly low_aerobic, high_aerobic, threshold, vo2max, neuromuscular, recovery"
-      - "MeasurementSource values are exactly questionnaire_estimate, training_hr_deflection, training_rr_inflection, training_power_hr_ratio, field_test, lab_test"
-      - "SignalType values are exactly power, gap, hr, description"
-      - "SessionPurpose values are exactly general, race_specific, calibration"
-      - "All Phase-1.2c enums are re-exported from app.models.__init__ for Alembic autogen"
-    impacts:
-      - "phase-1-2c-twin-state-schema"
-      - "phase-1-2c-athlete-physiology-schema"
-      - "phase-1-2c-athlete-fitness-schema"
-      - "phase-1-2c-coaching-message-schema"
-      - "phase-1-2c-generation-event-schema"
-      - "phase-1-2c-generated-workout-schema"
-      - "phase-1-2c-workout-step-schema"
-      - "phase-1-2c-migration"
-    execution_prerequisites:
-      migrations: false
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-        - path: "tests/unit/test_enum_values.py"
-          owner: "phase-1-2c-p1-twin-fitness-coaching-workouts"
-      integration: []
-      api: []
-      behaviour: []
-      release: []
-
-  phase-1-2c-twin-state-schema:
+    functions:
+      test_aerobic_form_check_present: {implemented: true, executable: true, passed: true}
+      test_aggregate_form_check_present: {implemented: true, executable: true, passed: true}
+      test_athlete_fk_ondelete_is_cascade: {implemented: true, executable: true, passed: true}
+      test_athlete_id_fk_to_athletes: {implemented: true, executable: true, passed: true}
+      test_invalid_form_in_aggregate_rejected: {implemented: true, executable: true, passed: true}
+      test_invalid_source_rejected: {implemented: true, executable: true, passed: true}
+      test_last_activity_fk_ondelete_is_set_null: {implemented: true, executable: true, passed: true}
+      test_last_activity_id_fk_to_activities: {implemented: true, executable: true, passed: true}
+      test_last_activity_id_set_null_on_activity_delete: {implemented: true, executable: true, passed: true}
+      test_minimal_fitness_row_persists: {implemented: true, executable: true, passed: true}
+      test_negative_form_in_aggregate_accepted: {implemented: true, executable: true, passed: true}
+      test_neuromuscular_form_check_present: {implemented: true, executable: true, passed: true}
+      test_null_aerobic_does_not_trigger_form_check: {implemented: true, executable: true, passed: true}
+      test_populated_aerobic_with_bad_form_rejected: {implemented: true, executable: true, passed: true}
+      test_populated_aerobic_with_good_form_accepted: {implemented: true, executable: true, passed: true}
+      test_required_column_present: {implemented: true, executable: true, passed: true}
+      test_source_check_present: {implemented: true, executable: true, passed: true}
+      test_structural_form_check_present: {implemented: true, executable: true, passed: true}
+      test_two_fitness_rows_same_athlete_rejected: {implemented: true, executable: true, passed: true}
+      test_unique_index_present: {implemented: true, executable: true, passed: true}
+      test_update_aggregate_succeeds: {implemented: true, executable: true, passed: true}
+      test_valid_form_in_aggregate_accepted: {implemented: true, executable: true, passed: true}
+  test_athlete_physiology_schema.py:
+    type: integration
     status: promoted
-    plan: "docs/implementation/phase-1/phase-1-2c-p1-twin-fitness-coaching-workouts.md"
-    owned_by_plan:
-      - "phase-1-2c-p1-twin-fitness-coaching-workouts"
-    description: "TwinState append-only snapshot table — inline fitness/fatigue/form/thresholds, metric_confidence JSONB, partial lookup index on (athlete_id, activity_id) WHERE activity_id IS NOT NULL (uniqueness enforced at the service layer)."
-    protects:
-      - "twin_states carries the documented column set"
-      - "Partial non-unique index ix_twin_states_athlete_activity present with WHERE activity_id IS NOT NULL — supports per-activity lookups; uniqueness moved to service layer in Phase 2.3 P3"
-      - "Multiple TwinStates for the same (athlete_id, activity_id) are permitted at the DB layer; service layer enforces the dedup contract"
-      - "Multiple TwinStates per athlete with NULL activity_id coexist (non-activity triggers permitted)"
-      - "Index idx_twin_states_latest on (athlete_id, created_at) supports get_latest"
-      - "athlete_id, training_goal_id, model_version, fitness, fatigue, form are NOT NULL"
-      - "lt1_*, lt2_*, cp_watts nullable (no signal yet)"
-      - "metric_confidence default '{}'::jsonb is applied"
-      - "activity_id FK SET NULL on activity deletion (history preserved)"
-      - "athlete_id FK CASCADES on athlete deletion"
-      - "training_goal_id FK CASCADES on goal deletion"
-      - "Append-only contract — model exposes no update()/delete() helper methods"
-    impacts:
-      - "phase-1-2c-coaching-message-schema"
-      - "phase-1-2c-generated-workout-schema"
-      - "phase-1-2c-migration"
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-        - path: "tests/unit/test_twin_state_columns.py"
-          owner: "phase-1-2c-p1-twin-fitness-coaching-workouts"
-      integration:
-        - path: "tests/integration/test_twin_state_schema.py"
-          owner: "phase-1-2c-p1-twin-fitness-coaching-workouts"
-      api: []
-      behaviour: []
-      release: []
-
-  phase-1-2c-athlete-physiology-schema:
+    functions:
+      test_athlete_id_fk_to_athletes: {implemented: true, executable: true, passed: true}
+      test_full_physiology_row_persists: {implemented: true, executable: true, passed: true}
+      test_max_hr_only_persists: {implemented: true, executable: true, passed: true}
+      test_minimal_row_with_only_lt1_lt2_persists: {implemented: true, executable: true, passed: true}
+      test_missing_lt1_rejected: {implemented: true, executable: true, passed: true}
+      test_missing_lt2_rejected: {implemented: true, executable: true, passed: true}
+      test_ondelete_is_cascade_in_pg_catalog: {implemented: true, executable: true, passed: true}
+      test_populate_cp_later: {implemented: true, executable: true, passed: true}
+      test_required_column_present: {implemented: true, executable: true, passed: true}
+      test_two_physiology_rows_same_athlete_rejected: {implemented: true, executable: true, passed: true}
+      test_unique_index_present: {implemented: true, executable: true, passed: true}
+      test_update_lt1_succeeds: {implemented: true, executable: true, passed: true}
+  test_coaching_message_schema.py:
+    type: integration
     status: promoted
-    plan: "docs/implementation/phase-1/phase-1-2c-p1-twin-fitness-coaching-workouts.md"
-    owned_by_plan:
-      - "phase-1-2c-p1-twin-fitness-coaching-workouts"
-    description: "AthletePhysiology mutable current-state entity — one row per athlete, per-parameter JSONB posterior states (lt1/lt2/cp/vo2max/max_hr)."
-    protects:
-      - "athlete_physiology carries the documented column set"
-      - "Unique index uq_athlete_physiology_athlete on athlete_id enforces one row per athlete"
-      - "Two AthletePhysiology rows for the same athlete raise IntegrityError"
-      - "lt1 and lt2 JSONB columns are NOT NULL (always populated)"
-      - "cp, vo2max, max_hr nullable JSONB (null until first qualifying observation)"
-      - "updated_at timestamp present and updated on row write"
-      - "athlete_id FK CASCADES on athlete deletion"
-      - "Mutable — row update succeeds (service layer writes posterior updates)"
-    impacts:
-      - "phase-1-2c-twin-state-schema"
-      - "phase-1-2c-migration"
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-        - path: "tests/unit/test_athlete_physiology_columns.py"
-          owner: "phase-1-2c-p1-twin-fitness-coaching-workouts"
-      integration:
-        - path: "tests/integration/test_athlete_physiology_schema.py"
-          owner: "phase-1-2c-p1-twin-fitness-coaching-workouts"
-      api: []
-      behaviour: []
-      release: []
-
-  phase-1-2c-athlete-fitness-schema:
+    functions:
+      test_activity_fk_ondelete_is_set_null: {implemented: true, executable: true, passed: true}
+      test_activity_id_fk_to_activities: {implemented: true, executable: true, passed: true}
+      test_activity_partial_predicate: {implemented: true, executable: true, passed: true}
+      test_activity_partial_unique_index_present: {implemented: true, executable: true, passed: true}
+      test_athlete_fk_ondelete_is_cascade: {implemented: true, executable: true, passed: true}
+      test_athlete_id_fk_to_athletes: {implemented: true, executable: true, passed: true}
+      test_content_non_empty_check_present: {implemented: true, executable: true, passed: true}
+      test_empty_content_rejected: {implemented: true, executable: true, passed: true}
+      test_first_message_and_post_workout_coexist: {implemented: true, executable: true, passed: true}
+      test_minimal_message_persists: {implemented: true, executable: true, passed: true}
+      test_null_activity_id_accepted_for_non_post_workout: {implemented: true, executable: true, passed: true}
+      test_partial_predicate_is_first_message: {implemented: true, executable: true, passed: true}
+      test_partial_unique_index_present: {implemented: true, executable: true, passed: true}
+      test_post_workout_different_activities_coexist: {implemented: true, executable: true, passed: true}
+      test_required_column_present: {implemented: true, executable: true, passed: true}
+      test_twin_state_fk_ondelete_is_cascade: {implemented: true, executable: true, passed: true}
+      test_twin_state_id_fk_to_twin_states: {implemented: true, executable: true, passed: true}
+      test_two_first_message_rejected: {implemented: true, executable: true, passed: true}
+      test_two_post_workout_same_activity_rejected: {implemented: true, executable: true, passed: true}
+  test_generated_workout_schema.py:
+    type: integration
     status: promoted
-    plan: "docs/implementation/phase-1/phase-1-2c-p1-twin-fitness-coaching-workouts.md"
-    owned_by_plan:
-      - "phase-1-2c-p1-twin-fitness-coaching-workouts"
-    description: "AthleteFitness mutable Banister rolling-state — aggregate + per-dimension (aerobic/neuromuscular/structural) JSONB scores with CHECK constraints enforcing form = fitness - fatigue on every populated dimension."
-    protects:
-      - "athlete_fitness carries the documented column set"
-      - "Unique index uq_athlete_fitness_athlete on athlete_id enforces one row per athlete"
-      - "Two AthleteFitness rows for the same athlete raise IntegrityError"
-      - "aggregate JSONB is NOT NULL (always populated)"
-      - "aerobic/neuromuscular/structural JSONB nullable"
-      - "CHECK constraint ck_athlete_fitness_aggregate_form_invariant enforced on aggregate"
-      - "CHECK constraints ck_athlete_fitness_aerobic/_neuromuscular/_structural_form_invariant enforced on populated dimensions"
-      - "CHECK constraint ck_athlete_fitness_time_constants_source_valid bounds source to population_default|individual_fitted"
-      - "Invalid form value in aggregate raises IntegrityError"
-      - "Null aerobic block does NOT trigger its form CHECK (NULL passes)"
-      - "last_activity_id FK SET NULL on activity deletion"
-      - "athlete_id FK CASCADES on athlete deletion"
-      - "Mutable — row update succeeds (service layer writes rolling scores)"
-    impacts:
-      - "phase-1-2c-twin-state-schema"
-      - "phase-1-2c-migration"
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-        - path: "tests/unit/test_athlete_fitness_columns.py"
-          owner: "phase-1-2c-p1-twin-fitness-coaching-workouts"
-      integration:
-        - path: "tests/integration/test_athlete_fitness_schema.py"
-          owner: "phase-1-2c-p1-twin-fitness-coaching-workouts"
-      api: []
-      behaviour: []
-      release: []
-
-  phase-1-2c-coaching-message-schema:
+    functions:
+      test_duplicate_session_date_rejected: {implemented: true, executable: true, passed: true}
+      test_idempotency_unique_constraint_present: {implemented: true, executable: true, passed: true}
+      test_identical_targets_allowed: {implemented: true, executable: true, passed: true}
+      test_minimal_workout_persists: {implemented: true, executable: true, passed: true}
+      test_modifier_level_check_present: {implemented: true, executable: true, passed: true}
+      test_non_object_targets_rejected: {implemented: true, executable: true, passed: true}
+      test_planned_session_fk_ondelete_is_cascade: {implemented: true, executable: true, passed: true}
+      test_planned_session_generated_index_present: {implemented: true, executable: true, passed: true}
+      test_planned_session_id_fk_to_planned_sessions: {implemented: true, executable: true, passed: true}
+      test_recovery_modifier_level_defaults_to_green: {implemented: true, executable: true, passed: true}
+      test_required_column_present: {implemented: true, executable: true, passed: true}
+      test_same_session_different_dates_coexist: {implemented: true, executable: true, passed: true}
+      test_targets_are_objects_check_present: {implemented: true, executable: true, passed: true}
+      test_twin_state_fk_ondelete_is_cascade: {implemented: true, executable: true, passed: true}
+      test_twin_state_id_fk_to_twin_states: {implemented: true, executable: true, passed: true}
+      test_twin_state_reverse_lookup_index_present: {implemented: true, executable: true, passed: true}
+  test_generation_event_schema.py:
+    type: integration
     status: promoted
-    plan: "docs/implementation/phase-1/phase-1-2c-p1-twin-fitness-coaching-workouts.md"
-    owned_by_plan:
-      - "phase-1-2c-p1-twin-fitness-coaching-workouts"
-    description: "CoachingMessage immutable LLM-generated message — twin_state linkage, partial unique indexes for first_message (per athlete) and post_workout (per activity), CHECK constraint on non-empty content."
-    protects:
-      - "coaching_messages carries the documented column set"
-      - "Partial unique index uq_coaching_messages_athlete_first_message on (athlete_id) WHERE message_type = 'first_message'"
-      - "Two first_message rows for the same athlete raise IntegrityError"
-      - "first_message + post_workout coexist (different message_types)"
-      - "Partial unique index uq_coaching_messages_activity_post_workout on (activity_id) WHERE message_type = 'post_workout' AND activity_id IS NOT NULL"
-      - "Two post_workout rows for the same activity_id raise IntegrityError"
-      - "CHECK constraint ck_coaching_messages_content_non_empty rejects empty content"
-      - "Index ix_coaching_messages_athlete_generated_at on (athlete_id, generated_at) supports message feed"
-      - "Index ix_coaching_messages_athlete_type_generated_at supports frequency guards"
-      - "athlete_id, twin_state_id FKs CASCADE on parent deletion"
-      - "activity_id FK SET NULL on activity deletion"
-      - "Append-only contract — no update()/delete() helpers"
-    impacts:
-      - "phase-1-2c-twin-state-schema"
-      - "phase-1-2c-migration"
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-        - path: "tests/unit/test_coaching_message_columns.py"
-          owner: "phase-1-2c-p1-twin-fitness-coaching-workouts"
-      integration:
-        - path: "tests/integration/test_coaching_message_schema.py"
-          owner: "phase-1-2c-p1-twin-fitness-coaching-workouts"
-      api: []
-      behaviour: []
-      release: []
-
-  phase-1-2c-generation-event-schema:
+    functions:
+      test_agent_monitoring_index_present: {implemented: true, executable: true, passed: true}
+      test_athlete_audit_index_present: {implemented: true, executable: true, passed: true}
+      test_athlete_fk_ondelete_is_cascade: {implemented: true, executable: true, passed: true}
+      test_athlete_id_fk_to_athletes: {implemented: true, executable: true, passed: true}
+      test_default_token_counts_apply_when_omitted: {implemented: true, executable: true, passed: true}
+      test_failure_dashboard_index_present: {implemented: true, executable: true, passed: true}
+      test_failure_event_persists: {implemented: true, executable: true, passed: true}
+      test_failure_reason_check_present: {implemented: true, executable: true, passed: true}
+      test_failure_row_with_reason_accepted: {implemented: true, executable: true, passed: true}
+      test_failure_row_without_failure_reason_rejected: {implemented: true, executable: true, passed: true}
+      test_minimal_event_persists: {implemented: true, executable: true, passed: true}
+      test_negative_input_token_count_rejected: {implemented: true, executable: true, passed: true}
+      test_negative_latency_rejected: {implemented: true, executable: true, passed: true}
+      test_negative_output_token_count_rejected: {implemented: true, executable: true, passed: true}
+      test_required_column_present: {implemented: true, executable: true, passed: true}
+      test_success_row_no_failure_reason_accepted: {implemented: true, executable: true, passed: true}
+      test_success_row_with_failure_reason_rejected: {implemented: true, executable: true, passed: true}
+      test_zero_token_counts_and_latency_accepted: {implemented: true, executable: true, passed: true}
+  test_migration_phase_1_2c.py:
+    type: integration
     status: promoted
-    plan: "docs/implementation/phase-1/phase-1-2c-p1-twin-fitness-coaching-workouts.md"
-    owned_by_plan:
-      - "phase-1-2c-p1-twin-fitness-coaching-workouts"
-    description: "GenerationEvent append-only LLM call audit log — agent_name, prompt_version, token counts, latency, success, failure_reason with strict consistency CHECK."
-    protects:
-      - "generation_events carries the documented column set"
-      - "CHECK constraint ck_generation_events_failure_reason_consistency enforced (failure_reason IS NOT NULL iff success=false)"
-      - "Row with success=false and failure_reason=NULL raises IntegrityError"
-      - "Row with success=true and failure_reason='error' raises IntegrityError"
-      - "CHECK constraint ck_generation_events_token_counts_non_negative on input/output token counts"
-      - "CHECK constraint ck_generation_events_latency_non_negative on latency_ms"
-      - "Negative token counts or latency raise IntegrityError"
-      - "Index ix_generation_events_athlete_at on (athlete_id, created_at) for per-athlete audit"
-      - "Index ix_generation_events_agent_at on (agent_name, created_at) for per-agent monitoring"
-      - "Index ix_generation_events_success_at on (success, created_at) for failure dashboards"
-      - "athlete_id FK CASCADES on athlete deletion"
-      - "Append-only contract — no update()/delete() helpers"
-    impacts:
-      - "phase-1-2c-migration"
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-        - path: "tests/unit/test_generation_event_columns.py"
-          owner: "phase-1-2c-p1-twin-fitness-coaching-workouts"
-      integration:
-        - path: "tests/integration/test_generation_event_schema.py"
-          owner: "phase-1-2c-p1-twin-fitness-coaching-workouts"
-      api: []
-      behaviour: []
-      release: []
-
-  phase-1-2c-generated-workout-schema:
+    functions:
+      test_all_phase_12c_tables_created: {implemented: true, executable: true, passed: true}
+      test_athlete_fitness_form_invariant_check_active: {implemented: true, executable: true, passed: true}
+      test_down_revision_chains_from_phase_1_2b_head: {implemented: true, executable: true, passed: true}
+      test_downgrade_drops_new_objects_only: {implemented: true, executable: true, passed: true}
+      test_followup_drops_training_plans_twin_state_fk: {implemented: true, executable: true, passed: true}
+      test_generation_events_failure_reason_check_active: {implemented: true, executable: true, passed: true}
+      test_migration_creates_seven_phase_12c_tables: {implemented: true, executable: true, passed: true}
+      test_migration_declares_revision_and_down_revision: {implemented: true, executable: true, passed: true}
+      test_migration_emits_athlete_fitness_form_invariant_checks: {implemented: true, executable: true, passed: true}
+      test_migration_emits_athlete_fitness_time_constants_check: {implemented: true, executable: true, passed: true}
+      test_migration_emits_coaching_message_content_check: {implemented: true, executable: true, passed: true}
+      test_migration_emits_coaching_message_partial_indexes: {implemented: true, executable: true, passed: true}
+      test_migration_emits_failure_reason_check: {implemented: true, executable: true, passed: true}
+      test_migration_emits_generated_workout_checks: {implemented: true, executable: true, passed: true}
+      test_migration_emits_token_count_and_latency_checks: {implemented: true, executable: true, passed: true}
+      test_migration_emits_twin_state_activity_partial_index: {implemented: true, executable: true, passed: true}
+      test_migration_emits_workout_step_checks: {implemented: true, executable: true, passed: true}
+      test_migration_file_present: {implemented: true, executable: true, passed: true}
+      test_migration_never_drops_existing_tables: {implemented: true, executable: true, passed: true}
+      test_migration_wires_training_plans_twin_state_fk: {implemented: true, executable: true, passed: true}
+      test_phase_12a_and_12b_tables_survive: {implemented: true, executable: true, passed: true}
+      test_training_plans_twin_state_fk_present: {implemented: true, executable: true, passed: true}
+      test_twin_state_partial_activity_index_present: {implemented: true, executable: true, passed: true}
+  test_twin_state_schema.py:
+    type: integration
     status: promoted
-    plan: "docs/implementation/phase-1/phase-1-2c-p1-twin-fitness-coaching-workouts.md"
-    owned_by_plan:
-      - "phase-1-2c-p1-twin-fitness-coaching-workouts"
-    description: "GeneratedWorkout append-only day-of-workout record — two-column TargetSet JSONB (theoretical/adjusted), unique on (planned_session_id, generation_date), recovery_modifier_level with green default."
-    protects:
-      - "generated_workouts carries the documented column set"
-      - "Unique constraint uq_generated_workouts_planned_session_generation_date on (planned_session_id, generation_date)"
-      - "Duplicate (planned_session_id, generation_date) raises IntegrityError"
-      - "Two workouts with same planned_session_id but different generation_date coexist"
-      - "CHECK constraint ck_generated_workouts_targets_are_objects rejects null/non-object theoretical_targets or adjusted_targets"
-      - "CHECK constraint ck_generated_workouts_recovery_modifier_level_valid bounds to green|amber|red"
-      - "Invalid recovery_modifier_level value raises IntegrityError"
-      - "recovery_modifier_level default 'green' applied when omitted"
-      - "planned_session_id, twin_state_id FKs CASCADE on parent deletion"
-      - "Index ix_generated_workouts_twin_state on twin_state_id for reverse lookup"
-      - "Index ix_generated_workouts_planned_session_generated on (planned_session_id, generated_at) for today's view"
-      - "Append-only contract — no update()/delete() helpers"
-    impacts:
-      - "phase-1-2c-twin-state-schema"
-      - "phase-1-2c-workout-step-schema"
-      - "phase-1-2c-migration"
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-        - path: "tests/unit/test_generated_workout_columns.py"
-          owner: "phase-1-2c-p1-twin-fitness-coaching-workouts"
-      integration:
-        - path: "tests/integration/test_generated_workout_schema.py"
-          owner: "phase-1-2c-p1-twin-fitness-coaching-workouts"
-      api: []
-      behaviour: []
-      release: []
-
-  phase-1-2c-workout-step-schema:
+    functions:
+      test_activity_and_null_activity_coexist: {implemented: true, executable: true, passed: true}
+      test_activity_id_fk_set_null: {implemented: true, executable: true, passed: true}
+      test_athlete_deletion_cascades_twin_state: {implemented: true, executable: true, passed: true}
+      test_athlete_id_fk_cascade: {implemented: true, executable: true, passed: true}
+      test_duplicate_activity_accepted: {implemented: true, executable: true, passed: true}
+      test_latest_index_present: {implemented: true, executable: true, passed: true}
+      test_metric_confidence_default_empty_dict: {implemented: true, executable: true, passed: true}
+      test_metric_confidence_jsonb_round_trip: {implemented: true, executable: true, passed: true}
+      test_missing_athlete_id_rejected: {implemented: true, executable: true, passed: true}
+      test_missing_form_rejected: {implemented: true, executable: true, passed: true}
+      test_multiple_null_activity_coexist: {implemented: true, executable: true, passed: true}
+      test_partial_activity_index_present: {implemented: true, executable: true, passed: true}
+      test_partial_predicate_is_activity_id_not_null: {implemented: true, executable: true, passed: true}
+      test_questionnaire_trigger_persists: {implemented: true, executable: true, passed: true}
+      test_required_column_present: {implemented: true, executable: true, passed: true}
+      test_training_goal_id_fk_cascade: {implemented: true, executable: true, passed: true}
+  test_workout_step_schema.py:
+    type: integration
     status: promoted
-    plan: "docs/implementation/phase-1/phase-1-2c-p1-twin-fitness-coaching-workouts.md"
-    owned_by_plan:
-      - "phase-1-2c-p1-twin-fitness-coaching-workouts"
-    description: "WorkoutStep individual segment of a GeneratedWorkout — three-layer hierarchy (session_type/physiological_intent/session_purpose), JSONB target with WorkoutTarget shape, CHECK constraints on step_order/duration/description."
-    protects:
-      - "workout_steps carries the documented column set"
-      - "Unique constraint uq_workout_steps_generated_workout_step_order on (generated_workout_id, step_order)"
-      - "Duplicate (workout, step_order) raises IntegrityError"
-      - "Two steps with different step_order values coexist"
-      - "CHECK constraint ck_workout_steps_step_order_positive enforces step_order >= 1"
-      - "step_order=0 or negative raises IntegrityError"
-      - "CHECK constraint ck_workout_steps_duration_non_negative on duration_seconds"
-      - "Negative duration_seconds raises IntegrityError"
-      - "CHECK constraint ck_workout_steps_description_non_empty rejects empty description"
-      - "physiological_intent is NOT NULL (the primary intent signal)"
-      - "session_purpose defaults to 'general'"
-      - "target JSONB is NOT NULL (always populated)"
-      - "generated_workout_id FK CASCADES on workout deletion"
-      - "Index ix_workout_steps_generated_workout_order on (generated_workout_id, step_order) for ordered read"
-      - "Append-only contract — no update()/delete() helpers"
-    impacts:
-      - "phase-1-2c-generated-workout-schema"
-      - "phase-1-2c-migration"
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-        - path: "tests/unit/test_workout_step_columns.py"
-          owner: "phase-1-2c-p1-twin-fitness-coaching-workouts"
-      integration:
-        - path: "tests/integration/test_workout_step_schema.py"
-          owner: "phase-1-2c-p1-twin-fitness-coaching-workouts"
-      api: []
-      behaviour: []
-      release: []
-
-  phase-1-2c-migration:
+    functions:
+      test_calibration_session_purpose_round_trips: {implemented: true, executable: true, passed: true}
+      test_cooldown_step_round_trips: {implemented: true, executable: true, passed: true}
+      test_distinct_step_orders_coexist: {implemented: true, executable: true, passed: true}
+      test_duplicate_step_order_rejected: {implemented: true, executable: true, passed: true}
+      test_empty_description_rejected: {implemented: true, executable: true, passed: true}
+      test_full_step_round_trips: {implemented: true, executable: true, passed: true}
+      test_generated_workout_fk_ondelete_is_cascade: {implemented: true, executable: true, passed: true}
+      test_generated_workout_id_fk_to_generated_workouts: {implemented: true, executable: true, passed: true}
+      test_negative_duration_rejected: {implemented: true, executable: true, passed: true}
+      test_null_duration_accepted: {implemented: true, executable: true, passed: true}
+      test_ordered_read_index_present: {implemented: true, executable: true, passed: true}
+      test_race_specific_session_purpose_round_trips: {implemented: true, executable: true, passed: true}
+      test_required_column_present: {implemented: true, executable: true, passed: true}
+      test_session_purpose_defaults_to_general: {implemented: true, executable: true, passed: true}
+      test_step_order_negative_rejected: {implemented: true, executable: true, passed: true}
+      test_step_order_one_accepted: {implemented: true, executable: true, passed: true}
+      test_step_order_unique_constraint_present: {implemented: true, executable: true, passed: true}
+      test_step_order_zero_rejected: {implemented: true, executable: true, passed: true}
+      test_warmup_step_round_trips: {implemented: true, executable: true, passed: true}
+      test_work_step_round_trips: {implemented: true, executable: true, passed: true}
+      test_zero_duration_accepted: {implemented: true, executable: true, passed: true}
+  test_athlete_fitness_columns.py:
+    type: unit
     status: promoted
-    plan: "docs/implementation/phase-1/phase-1-2c-p1-twin-fitness-coaching-workouts.md"
-    owned_by_plan:
-      - "phase-1-2c-p1-twin-fitness-coaching-workouts"
-    description: "Alembic migration 79dc97d4e433 — creates 7 tables, all partial unique indexes, all CHECK constraints; chains from Phase-1.2b head (1b9e9026db1e); purely additive."
-    protects:
-      - "alembic upgrade head on a fresh database succeeds (rc=0)"
-      - "Migration down_revision chains from Phase-1.2b head (1b9e9026db1e)"
-      - "Migration revision equals 79dc97d4e433"
-      - "Migration creates all 7 documented tables"
-      - "Migration never drops Phase-1.1 / Phase-1.2a / Phase-1.2b tables"
-      - "Migration emits the TwinState partial unique index uq_twin_states_athlete_activity"
-      - "Migration emits the coaching_messages partial unique indexes (first_message + post_workout)"
-      - "Migration emits the form=fitness-fatigue CHECK constraints for all AthleteFitness dimensions"
-      - "Migration emits the generation_events failure_reason consistency CHECK"
-      - "Migration emits the generated_workouts targets-are-objects CHECK"
-      - "Migration emits the workout_steps step_order/duration/description CHECKs"
-      - "Phase-1.2b tables survive the upgrade"
-      - "training_plans.twin_state_id gains a foreign key to twin_states.id in this migration"
-    impacts: []
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit: []
-      integration:
-        - path: "tests/integration/test_migration_phase_1_2c.py"
-          owner: "phase-1-2c-p1-twin-fitness-coaching-workouts"
-      api: []
-      behaviour: []
-      release: []
+    functions:
+      test_aerobic_form_invariant_check: {implemented: true, executable: true, passed: true}
+      test_aerobic_nullable_jsonb: {implemented: true, executable: true, passed: true}
+      test_aggregate_form_invariant_check: {implemented: true, executable: true, passed: true}
+      test_aggregate_required_jsonb: {implemented: true, executable: true, passed: true}
+      test_athlete_id_cascade_fk_to_athletes: {implemented: true, executable: true, passed: true}
+      test_athlete_id_required_uuid: {implemented: true, executable: true, passed: true}
+      test_forbidden_columns_are_absent: {implemented: true, executable: true, passed: true}
+      test_id_column_uuid_primary_key: {implemented: true, executable: true, passed: true}
+      test_last_activity_id_nullable_uuid: {implemented: true, executable: true, passed: true}
+      test_last_activity_id_set_null_fk_to_activities: {implemented: true, executable: true, passed: true}
+      test_last_activity_index_present: {implemented: true, executable: true, passed: true}
+      test_neuromuscular_form_invariant_check: {implemented: true, executable: true, passed: true}
+      test_neuromuscular_nullable_jsonb: {implemented: true, executable: true, passed: true}
+      test_structural_form_invariant_check: {implemented: true, executable: true, passed: true}
+      test_structural_nullable_jsonb: {implemented: true, executable: true, passed: true}
+      test_time_constants_required_jsonb: {implemented: true, executable: true, passed: true}
+      test_time_constants_source_check_present: {implemented: true, executable: true, passed: true}
+      test_unique_index_columns: {implemented: true, executable: true, passed: true}
+      test_unique_index_is_unique: {implemented: true, executable: true, passed: true}
+      test_unique_index_present: {implemented: true, executable: true, passed: true}
+      test_updated_at_has_server_default_now: {implemented: true, executable: true, passed: true}
+      test_updated_at_required_datetime: {implemented: true, executable: true, passed: true}
+  test_athlete_physiology_columns.py:
+    type: unit
+    status: promoted
+    functions:
+      test_athlete_id_cascade_fk_to_athletes: {implemented: true, executable: true, passed: true}
+      test_athlete_id_required_uuid: {implemented: true, executable: true, passed: true}
+      test_cp_nullable_jsonb: {implemented: true, executable: true, passed: true}
+      test_forbidden_columns_are_absent: {implemented: true, executable: true, passed: true}
+      test_id_column_uuid_primary_key: {implemented: true, executable: true, passed: true}
+      test_lt1_required_jsonb: {implemented: true, executable: true, passed: true}
+      test_lt2_required_jsonb: {implemented: true, executable: true, passed: true}
+      test_max_hr_nullable_jsonb: {implemented: true, executable: true, passed: true}
+      test_unique_index_columns: {implemented: true, executable: true, passed: true}
+      test_unique_index_is_unique: {implemented: true, executable: true, passed: true}
+      test_unique_index_present: {implemented: true, executable: true, passed: true}
+      test_updated_at_has_server_default_now: {implemented: true, executable: true, passed: true}
+      test_updated_at_required_datetime: {implemented: true, executable: true, passed: true}
+      test_vo2max_nullable_jsonb: {implemented: true, executable: true, passed: true}
+  test_coaching_message_columns.py:
+    type: unit
+    status: promoted
+    functions:
+      test_activity_id_nullable_uuid: {implemented: true, executable: true, passed: true}
+      test_activity_id_set_null_fk_to_activities: {implemented: true, executable: true, passed: true}
+      test_athlete_generated_at_index_present: {implemented: true, executable: true, passed: true}
+      test_athlete_id_cascade_fk_to_athletes: {implemented: true, executable: true, passed: true}
+      test_athlete_id_required_uuid: {implemented: true, executable: true, passed: true}
+      test_athlete_type_generated_at_index_present: {implemented: true, executable: true, passed: true}
+      test_content_non_empty_check_present: {implemented: true, executable: true, passed: true}
+      test_content_required_text: {implemented: true, executable: true, passed: true}
+      test_first_message_index_columns: {implemented: true, executable: true, passed: true}
+      test_first_message_index_is_unique: {implemented: true, executable: true, passed: true}
+      test_first_message_partial_predicate_present: {implemented: true, executable: true, passed: true}
+      test_first_message_partial_unique_index_present: {implemented: true, executable: true, passed: true}
+      test_forbidden_columns_are_absent: {implemented: true, executable: true, passed: true}
+      test_generated_at_required_datetime: {implemented: true, executable: true, passed: true}
+      test_id_column_uuid_primary_key: {implemented: true, executable: true, passed: true}
+      test_message_type_required_enum: {implemented: true, executable: true, passed: true}
+      test_no_update_helper_methods: {implemented: true, executable: true, passed: true}
+      test_no_updated_at_column: {implemented: true, executable: true, passed: true}
+      test_post_workout_index_columns: {implemented: true, executable: true, passed: true}
+      test_post_workout_index_is_unique: {implemented: true, executable: true, passed: true}
+      test_post_workout_partial_predicate_includes_activity_id_not_null: {implemented: true, executable: true, passed: true}
+      test_post_workout_partial_predicate_present: {implemented: true, executable: true, passed: true}
+      test_post_workout_partial_unique_index_present: {implemented: true, executable: true, passed: true}
+      test_prompt_version_required_string: {implemented: true, executable: true, passed: true}
+      test_twin_state_id_cascade_fk_to_twin_states: {implemented: true, executable: true, passed: true}
+      test_twin_state_id_required_uuid: {implemented: true, executable: true, passed: true}
+      test_twin_state_reverse_lookup_index_present: {implemented: true, executable: true, passed: true}
+  test_enum_values.py:
+    type: unit
+    status: promoted
+    functions:
+      test_activity_source_excludes_multi_sport_sources: {implemented: true, executable: true, passed: true}
+      test_activity_source_has_exactly_four_values: {implemented: true, executable: true, passed: true}
+      test_activity_source_includes_manual_entry: {implemented: true, executable: true, passed: true}
+      test_activity_source_values_are_lowercase_strings: {implemented: true, executable: true, passed: true}
+      test_checkpoint_status_values: {implemented: true, executable: true, passed: true}
+      test_checkpoint_type_values: {implemented: true, executable: true, passed: true}
+      test_data_tier_has_exactly_six_values: {implemented: true, executable: true, passed: true}
+      test_data_tier_ordered_low_to_high: {implemented: true, executable: true, passed: true}
+      test_data_tier_values_are_integers: {implemented: true, executable: true, passed: true}
+      test_enum_is_exported_from_models_package: {implemented: true, executable: true, passed: true}
+      test_goal_event_type_has_expected_values: {implemented: true, executable: true, passed: true}
+      test_goal_event_type_includes_custom: {implemented: true, executable: true, passed: true}
+      test_goal_event_type_values_are_lowercase_or_alphanumeric: {implemented: true, executable: true, passed: true}
+      test_goal_type_has_exactly_five_values: {implemented: true, executable: true, passed: true}
+      test_goal_type_includes_recovery: {implemented: true, executable: true, passed: true}
+      test_goal_type_values_are_lowercase_strings: {implemented: true, executable: true, passed: true}
+      test_gps_source_values: {implemented: true, executable: true, passed: true}
+      test_hr_source_includes_chest_strap_rr: {implemented: true, executable: true, passed: true}
+      test_hr_source_includes_none: {implemented: true, executable: true, passed: true}
+      test_hr_source_value_count: {implemented: true, executable: true, passed: true}
+      test_injury_severity_count: {implemented: true, executable: true, passed: true}
+      test_injury_severity_values: {implemented: true, executable: true, passed: true}
+      test_measurement_source_count: {implemented: true, executable: true, passed: true}
+      test_measurement_source_has_exactly_six_values: {implemented: true, executable: true, passed: true}
+      test_measurement_source_values_are_lowercase: {implemented: true, executable: true, passed: true}
+      test_message_type_count: {implemented: true, executable: true, passed: true}
+      test_message_type_first_message_value: {implemented: true, executable: true, passed: true}
+      test_message_type_has_exactly_eight_values: {implemented: true, executable: true, passed: true}
+      test_message_type_post_workout_value: {implemented: true, executable: true, passed: true}
+      test_message_type_values_are_lowercase_strings: {implemented: true, executable: true, passed: true}
+      test_objective_category_values: {implemented: true, executable: true, passed: true}
+      test_only_two_priority_levels: {implemented: true, executable: true, passed: true}
+      test_pending_status_exists: {implemented: true, executable: true, passed: true}
+      test_phase_label_includes_canonical_labels: {implemented: true, executable: true, passed: true}
+      test_phase_label_includes_legacy_aliases: {implemented: true, executable: true, passed: true}
+      test_phase_label_value_count: {implemented: true, executable: true, passed: true}
+      test_physiological_intent_count: {implemented: true, executable: true, passed: true}
+      test_physiological_intent_has_exactly_six_values: {implemented: true, executable: true, passed: true}
+      test_physiological_intent_values_are_lowercase: {implemented: true, executable: true, passed: true}
+      test_planned_session_status_values: {implemented: true, executable: true, passed: true}
+      test_power_source_values: {implemented: true, executable: true, passed: true}
+      test_primary_training_platform_values: {implemented: true, executable: true, passed: true}
+      test_race_specific_is_session_purpose_not_session_type: {implemented: true, executable: true, passed: true}
+      test_recovery_modifier_level_count: {implemented: true, executable: true, passed: true}
+      test_recovery_modifier_level_has_exactly_three_values: {implemented: true, executable: true, passed: true}
+      test_recovery_modifier_level_values_are_lowercase: {implemented: true, executable: true, passed: true}
+      test_secondary_event_priority_values: {implemented: true, executable: true, passed: true}
+      test_session_priority_values: {implemented: true, executable: true, passed: true}
+      test_session_purpose_general_default_value: {implemented: true, executable: true, passed: true}
+      test_session_purpose_has_exactly_three_values: {implemented: true, executable: true, passed: true}
+      test_session_purpose_values_are_lowercase: {implemented: true, executable: true, passed: true}
+      test_session_slot_count: {implemented: true, executable: true, passed: true}
+      test_session_slot_values: {implemented: true, executable: true, passed: true}
+      test_session_type_excludes_race_specific: {implemented: true, executable: true, passed: true}
+      test_session_type_has_exactly_sixteen_values: {implemented: true, executable: true, passed: true}
+      test_sex_has_exactly_three_values: {implemented: true, executable: true, passed: true}
+      test_sex_values_are_lowercase_strings: {implemented: true, executable: true, passed: true}
+      test_signal_type_count: {implemented: true, executable: true, passed: true}
+      test_signal_type_has_exactly_four_values: {implemented: true, executable: true, passed: true}
+      test_signal_type_values_are_lowercase: {implemented: true, executable: true, passed: true}
+      test_sport_background_count: {implemented: true, executable: true, passed: true}
+      test_sport_background_includes_running_primary: {implemented: true, executable: true, passed: true}
+      test_sport_background_values: {implemented: true, executable: true, passed: true}
+      test_sport_background_values_are_lowercase_strings_or_none: {implemented: true, executable: true, passed: true}
+      test_step_type_count: {implemented: true, executable: true, passed: true}
+      test_step_type_has_exactly_four_values: {implemented: true, executable: true, passed: true}
+      test_step_type_values_are_lowercase_strings: {implemented: true, executable: true, passed: true}
+      test_training_goal_status_active_value: {implemented: true, executable: true, passed: true}
+      test_training_goal_status_values: {implemented: true, executable: true, passed: true}
+      test_training_plan_status_has_exactly_three_values: {implemented: true, executable: true, passed: true}
+      test_training_plan_status_values: {implemented: true, executable: true, passed: true}
+      test_training_time_of_day_values: {implemented: true, executable: true, passed: true}
+      test_twin_confidence_level_count: {implemented: true, executable: true, passed: true}
+      test_twin_confidence_level_has_exactly_three_values: {implemented: true, executable: true, passed: true}
+      test_twin_confidence_level_values_are_lowercase: {implemented: true, executable: true, passed: true}
+      test_twin_trigger_has_exactly_five_values: {implemented: true, executable: true, passed: true}
+      test_twin_trigger_includes_activity_sync: {implemented: true, executable: true, passed: true}
+      test_twin_trigger_values_are_lowercase_strings: {implemented: true, executable: true, passed: true}
+      test_weekly_plan_status_values: {implemented: true, executable: true, passed: true}
+      test_wellness_trend_count: {implemented: true, executable: true, passed: true}
+      test_wellness_trend_has_exactly_three_values: {implemented: true, executable: true, passed: true}
+      test_wellness_trend_values_are_lowercase: {implemented: true, executable: true, passed: true}
+  test_generated_workout_columns.py:
+    type: unit
+    status: promoted
+    functions:
+      test_adjusted_targets_required_jsonb: {implemented: true, executable: true, passed: true}
+      test_forbidden_columns_are_absent: {implemented: true, executable: true, passed: true}
+      test_generated_at_required_datetime: {implemented: true, executable: true, passed: true}
+      test_generation_date_required_date: {implemented: true, executable: true, passed: true}
+      test_id_column_uuid_primary_key: {implemented: true, executable: true, passed: true}
+      test_idempotency_unique_constraint_columns: {implemented: true, executable: true, passed: true}
+      test_idempotency_unique_constraint_present: {implemented: true, executable: true, passed: true}
+      test_modifier_level_check_present: {implemented: true, executable: true, passed: true}
+      test_no_update_helper_methods: {implemented: true, executable: true, passed: true}
+      test_no_updated_at_column: {implemented: true, executable: true, passed: true}
+      test_planned_session_generated_index_present: {implemented: true, executable: true, passed: true}
+      test_planned_session_id_cascade_fk_to_planned_sessions: {implemented: true, executable: true, passed: true}
+      test_planned_session_id_required_uuid: {implemented: true, executable: true, passed: true}
+      test_recovery_modifier_level_required_enum_default_green: {implemented: true, executable: true, passed: true}
+      test_recovery_modifier_reason_nullable_text: {implemented: true, executable: true, passed: true}
+      test_targets_are_objects_check_present: {implemented: true, executable: true, passed: true}
+      test_theoretical_targets_required_jsonb: {implemented: true, executable: true, passed: true}
+      test_twin_state_id_cascade_fk_to_twin_states: {implemented: true, executable: true, passed: true}
+      test_twin_state_id_required_uuid: {implemented: true, executable: true, passed: true}
+      test_twin_state_reverse_lookup_index_present: {implemented: true, executable: true, passed: true}
+  test_generation_event_columns.py:
+    type: unit
+    status: promoted
+    functions:
+      test_agent_monitoring_index_present: {implemented: true, executable: true, passed: true}
+      test_agent_name_required_string: {implemented: true, executable: true, passed: true}
+      test_athlete_audit_index_present: {implemented: true, executable: true, passed: true}
+      test_athlete_id_cascade_fk_to_athletes: {implemented: true, executable: true, passed: true}
+      test_athlete_id_required_uuid: {implemented: true, executable: true, passed: true}
+      test_created_at_required_datetime: {implemented: true, executable: true, passed: true}
+      test_failure_dashboard_index_present: {implemented: true, executable: true, passed: true}
+      test_failure_reason_consistency_check_present: {implemented: true, executable: true, passed: true}
+      test_failure_reason_nullable_text: {implemented: true, executable: true, passed: true}
+      test_forbidden_columns_are_absent: {implemented: true, executable: true, passed: true}
+      test_id_column_uuid_primary_key: {implemented: true, executable: true, passed: true}
+      test_input_token_count_required_integer_with_default: {implemented: true, executable: true, passed: true}
+      test_latency_ms_required_integer_with_default: {implemented: true, executable: true, passed: true}
+      test_latency_non_negative_check_present: {implemented: true, executable: true, passed: true}
+      test_no_update_helper_methods: {implemented: true, executable: true, passed: true}
+      test_no_updated_at_column: {implemented: true, executable: true, passed: true}
+      test_output_token_count_required_integer_with_default: {implemented: true, executable: true, passed: true}
+      test_prompt_version_required_string: {implemented: true, executable: true, passed: true}
+      test_success_required_boolean_with_default: {implemented: true, executable: true, passed: true}
+      test_token_counts_non_negative_check_present: {implemented: true, executable: true, passed: true}
+      test_trigger_context_required_text: {implemented: true, executable: true, passed: true}
+  test_twin_state_columns.py:
+    type: unit
+    status: promoted
+    functions:
+      test_activity_id_nullable_uuid: {implemented: true, executable: true, passed: true}
+      test_activity_id_set_null_fk_to_activities: {implemented: true, executable: true, passed: true}
+      test_activity_lookup_index_present: {implemented: true, executable: true, passed: true}
+      test_athlete_activity_index_columns: {implemented: true, executable: true, passed: true}
+      test_athlete_activity_index_is_not_unique: {implemented: true, executable: true, passed: true}
+      test_athlete_activity_partial_index_present: {implemented: true, executable: true, passed: true}
+      test_athlete_activity_partial_predicate_is_activity_not_null: {implemented: true, executable: true, passed: true}
+      test_athlete_activity_partial_predicate_present: {implemented: true, executable: true, passed: true}
+      test_athlete_id_cascade_fk_to_athletes: {implemented: true, executable: true, passed: true}
+      test_athlete_id_required_uuid: {implemented: true, executable: true, passed: true}
+      test_confidence_level_required_enum: {implemented: true, executable: true, passed: true}
+      test_created_at_required_datetime: {implemented: true, executable: true, passed: true}
+      test_data_tier_required_integer: {implemented: true, executable: true, passed: true}
+      test_fatigue_required_float: {implemented: true, executable: true, passed: true}
+      test_fitness_required_float: {implemented: true, executable: true, passed: true}
+      test_forbidden_columns_are_absent: {implemented: true, executable: true, passed: true}
+      test_form_required_float: {implemented: true, executable: true, passed: true}
+      test_id_column_uuid_primary_key: {implemented: true, executable: true, passed: true}
+      test_latest_index_columns: {implemented: true, executable: true, passed: true}
+      test_latest_index_present: {implemented: true, executable: true, passed: true}
+      test_metric_confidence_required_jsonb: {implemented: true, executable: true, passed: true}
+      test_metric_confidence_server_default_empty_dict: {implemented: true, executable: true, passed: true}
+      test_model_version_required_string: {implemented: true, executable: true, passed: true}
+      test_no_class_level_session_methods: {implemented: true, executable: true, passed: true}
+      test_no_update_helper_methods: {implemented: true, executable: true, passed: true}
+      test_readiness_level_required_enum: {implemented: true, executable: true, passed: true}
+      test_threshold_columns_nullable_float: {implemented: true, executable: true, passed: true}
+      test_training_goal_id_cascade_fk_to_training_goals: {implemented: true, executable: true, passed: true}
+      test_training_goal_id_required_uuid: {implemented: true, executable: true, passed: true}
+      test_training_goal_lookup_index_present: {implemented: true, executable: true, passed: true}
+      test_trigger_required_enum: {implemented: true, executable: true, passed: true}
+      test_wellness_trend_nullable_enum: {implemented: true, executable: true, passed: true}
+  test_workout_step_columns.py:
+    type: unit
+    status: promoted
+    functions:
+      test_description_non_empty_check_present: {implemented: true, executable: true, passed: true}
+      test_description_required_text: {implemented: true, executable: true, passed: true}
+      test_duration_non_negative_check_present: {implemented: true, executable: true, passed: true}
+      test_duration_seconds_nullable_integer: {implemented: true, executable: true, passed: true}
+      test_forbidden_columns_are_absent: {implemented: true, executable: true, passed: true}
+      test_generated_workout_id_cascade_fk_to_generated_workouts: {implemented: true, executable: true, passed: true}
+      test_generated_workout_id_required_uuid: {implemented: true, executable: true, passed: true}
+      test_id_column_uuid_primary_key: {implemented: true, executable: true, passed: true}
+      test_no_update_helper_methods: {implemented: true, executable: true, passed: true}
+      test_no_updated_at_column: {implemented: true, executable: true, passed: true}
+      test_ordered_read_index_present: {implemented: true, executable: true, passed: true}
+      test_physiological_intent_required_enum: {implemented: true, executable: true, passed: true}
+      test_session_purpose_required_enum_default_general: {implemented: true, executable: true, passed: true}
+      test_session_type_required_enum: {implemented: true, executable: true, passed: true}
+      test_step_order_positive_check_present: {implemented: true, executable: true, passed: true}
+      test_step_order_required_integer: {implemented: true, executable: true, passed: true}
+      test_step_order_unique_constraint_columns: {implemented: true, executable: true, passed: true}
+      test_step_order_unique_constraint_present: {implemented: true, executable: true, passed: true}
+      test_step_type_required_enum: {implemented: true, executable: true, passed: true}
+      test_target_required_jsonb: {implemented: true, executable: true, passed: true}
 
-# Execution groups for this sub-phase only
-execution_groups:
-  smoke-phase-1-2c:
-    scope: smoke
-    phase: "phase-1"
-    tests:
-      - "tests/unit/test_enum_values.py"
-      - "tests/unit/test_twin_state_columns.py"
-      - "tests/unit/test_athlete_physiology_columns.py"
-      - "tests/unit/test_athlete_fitness_columns.py"
-      - "tests/unit/test_coaching_message_columns.py"
-      - "tests/unit/test_generation_event_columns.py"
-      - "tests/unit/test_generated_workout_columns.py"
-      - "tests/unit/test_workout_step_columns.py"
-    depends_on: []
-
-  feature-phase-1-2c:
-    scope: feature
-    phase: "phase-1"
-    tests:
-      - "tests/unit/test_enum_values.py"
-      - "tests/unit/test_twin_state_columns.py"
-      - "tests/unit/test_athlete_physiology_columns.py"
-      - "tests/unit/test_athlete_fitness_columns.py"
-      - "tests/unit/test_coaching_message_columns.py"
-      - "tests/unit/test_generation_event_columns.py"
-      - "tests/unit/test_generated_workout_columns.py"
-      - "tests/unit/test_workout_step_columns.py"
-      - "tests/integration/test_twin_state_schema.py"
-      - "tests/integration/test_athlete_physiology_schema.py"
-      - "tests/integration/test_athlete_fitness_schema.py"
-      - "tests/integration/test_coaching_message_schema.py"
-      - "tests/integration/test_generation_event_schema.py"
-      - "tests/integration/test_generated_workout_schema.py"
-      - "tests/integration/test_workout_step_schema.py"
-      - "tests/integration/test_migration_phase_1_2c.py"
-    depends_on:
-      - "feature-phase-1-2b"
-
-# Coverage for this sub-phase only — index.yaml holds the cross-phase view
 coverage:
-  routes:
-    covered: []
-    partial: []
-    missing:
-      - "All Phase-1.2c entities are schema-only — no API routes built yet (deferred to Phase 1.3, 1.5, 1.6, 4-6)"
-
   events:
     covered: []
-    partial: []
-    missing:
-      - "twin_recalibrated (NOT PRODUCED in Phase-1.2c — schema-only, deferred to Phase 1.3)"
-      - "twin_confidence_upgraded (NOT PRODUCED in Phase-1.2c — schema-only)"
-      - "twin_model_ready (NOT PRODUCED in Phase-1.2c — schema-only)"
-      - "physiology_updated (NOT PRODUCED in Phase-1.2c — schema-only, deferred to Phase 1.6)"
-      - "fitness_updated (NOT PRODUCED in Phase-1.2c — schema-only, deferred to Phase 1.6)"
-      - "coaching_message_generated (NOT PRODUCED in Phase-1.2c — schema-only, deferred to Phase 1.5)"
-      - "workout_generated (NOT PRODUCED in Phase-1.2c — schema-only, deferred to Phase 1.5b)"
-
   invariants:
     covered:
-      # Enums
       - "TwinTrigger values are exactly questionnaire, activity_sync, calibration, physiology_input, wellness_update"
       - "TwinConfidenceLevel values are exactly low, medium, high"
       - "MessageType values are exactly first_message, post_workout, wellness_alert, phase_transition, plan_regeneration, confidence_upgrade, cycle_check_in, weekly_summary"
@@ -460,7 +472,6 @@ coverage:
       - "MeasurementSource values are exactly questionnaire_estimate, training_hr_deflection, training_rr_inflection, training_power_hr_ratio, field_test, lab_test"
       - "SignalType values are exactly power, gap, hr, description"
       - "SessionPurpose values are exactly general, race_specific, calibration"
-      # TwinState
       - "twin_states carries the documented column set"
       - "TwinState partial unique index on (athlete_id, activity_id) WHERE activity_id IS NOT NULL"
       - "Two TwinStates with same non-null activity_id raise IntegrityError"
@@ -469,13 +480,11 @@ coverage:
       - "TwinState FKs to athletes (CASCADE), training_goals (CASCADE), activities (SET NULL)"
       - "TwinState idx_twin_states_latest on (athlete_id, created_at)"
       - "TwinState metric_confidence defaults to '{}'::jsonb"
-      # AthletePhysiology
       - "athlete_physiology unique on athlete_id"
       - "Two AthletePhysiology rows for same athlete raise IntegrityError"
       - "athlete_physiology.lt1 and lt2 NOT NULL; cp/vo2max/max_hr nullable"
       - "AthletePhysiology FK to athletes CASCADES"
       - "AthletePhysiology mutable — posterior updates succeed"
-      # AthleteFitness
       - "athlete_fitness unique on athlete_id"
       - "Two AthleteFitness rows for same athlete raise IntegrityError"
       - "AthleteFitness.aggregate NOT NULL; dimensional blocks nullable"
@@ -483,7 +492,6 @@ coverage:
       - "AthleteFitness time_constants.source bounded to population_default|individual_fitted"
       - "Invalid form value in aggregate raises IntegrityError"
       - "AthleteFitness FK to athletes CASCADES, last_activity_id SET NULL on activity deletion"
-      # CoachingMessage
       - "CoachingMessage partial unique on (athlete_id) WHERE message_type = 'first_message'"
       - "Two first_message rows for same athlete raise IntegrityError"
       - "CoachingMessage partial unique on (activity_id) WHERE message_type = 'post_workout' AND activity_id IS NOT NULL"
@@ -491,19 +499,16 @@ coverage:
       - "CoachingMessage content must be non-empty (CHECK)"
       - "CoachingMessage FKs to athletes/twin_states CASCADE, activity_id SET NULL"
       - "CoachingMessage append-only — no update()/delete() helpers on the mapper"
-      # GenerationEvent
       - "GenerationEvent failure_reason IS NOT NULL iff success=false (CHECK)"
       - "GenerationEvent token counts and latency_ms non-negative (CHECK)"
       - "GenerationEvent FK to athletes CASCADES"
       - "GenerationEvent append-only — no update()/delete() helpers on the mapper"
-      # GeneratedWorkout
       - "generated_workouts UNIQUE on (planned_session_id, generation_date)"
       - "Duplicate (planned_session, generation_date) raises IntegrityError"
       - "GeneratedWorkout CHECK enforces theoretical_targets and adjusted_targets are JSONB objects"
       - "GeneratedWorkout recovery_modifier_level bounded to green|amber|red (CHECK)"
       - "GeneratedWorkout FKs to planned_sessions/twin_states CASCADE"
       - "GeneratedWorkout append-only — no update()/delete() helpers on the mapper"
-      # WorkoutStep
       - "workout_steps UNIQUE on (generated_workout_id, step_order)"
       - "Duplicate (workout, step_order) raises IntegrityError"
       - "WorkoutStep step_order >= 1 (CHECK)"
@@ -512,7 +517,6 @@ coverage:
       - "WorkoutStep physiological_intent NOT NULL"
       - "WorkoutStep session_purpose defaults to 'general'"
       - "WorkoutStep FK to generated_workouts CASCADES"
-      # Migration
       - "alembic upgrade head on a fresh database succeeds (rc=0)"
       - "Phase-1.2c migration down_revision chains from Phase-1.2b head (1b9e9026db1e)"
       - "Phase-1.2c migration revision equals 79dc97d4e433"
@@ -521,97 +525,3 @@ coverage:
       - "Migration emits all partial unique indexes (TwinState activity, CoachingMessage first_message/post_workout)"
       - "Migration emits all CHECK constraints (form invariants, failure_reason consistency, target objects, step constraints)"
       - "training_plans.twin_state_id gains FK to twin_states.id"
-    partial:
-      - "Append-only repository contracts (full repository validation deferred to Phase 1.3 / 1.5 / 1.5b — only model-level absence of update/delete helpers is verified at schema level)"
-    missing:
-      - "TwinState.confidence_level derivation as min(AthletePhysiology.lt1.hr.prior_weight, AthletePhysiology.lt2.hr.prior_weight) — service-layer concern, Phase 1.3"
-      - "AthleteFitness update semantics (Banister rolling scores) — service-layer concern, Phase 1.6"
-      - "AthletePhysiology.max_hr bootstrapped from 220 - age — service-layer concern, Phase 1.3"
-      - "CoachingMessage frequency guards (wellness_alert / cycle_check_in / weekly_summary dedup) — service-layer concern, Phase 1.5"
-
-history:
-  - date: "2026-07-19"
-    plan: "phase-1-2c-p1-twin-fitness-coaching-workouts"
-    tests_added: 0
-    tests_modified: 2
-    tests_removed: 0
-    result: "PENDING — Fix Mode (RC3). DevOps oneoff_regression_validation pass 1 routed 4 TwinState index schema test failures to p-test-architect. Migration 21f955c743cb (Phase 2.3 P3) intentionally dropped uq_twin_states_athlete_activity (unique) and replaced it with ix_twin_states_athlete_activity (non-unique). Updated tests/integration/test_twin_state_schema.py: renamed TestTwinStatePartialUniqueIndexDB -> TestTwinStatePartialActivityIndexDB, _partial_unique_index -> _partial_activity_index (removed unique filter), test_partial_unique_index_present -> test_partial_activity_index_present, test_duplicate_activity_rejected -> test_duplicate_activity_accepted (duplicates now permitted at DB layer). Updated tests/integration/test_migration_phase_1_2c.py: test_twin_state_partial_unique_index_present -> test_twin_state_partial_activity_index_present (queries ix_twin_states_athlete_activity instead of uq_twin_states_athlete_activity). Production code unchanged. validation.executable and validation.passed reset to false — DevOps will re-verify."
-    coverage_delta: >
-      Updated phase-1-2c-twin-state-schema feature description and protect list
-      to reflect non-unique index (uniqueness moved to service layer in Phase 2.3 P3).
-      No new tests added — assertions corrected to match current schema state.
-  - date: "2026-07-18"
-    plan: "phase-1-2c-p1-twin-fitness-coaching-workouts"
-    tests_added: 0
-    tests_modified: 1
-    tests_removed: 0
-    result: "FIXED-PENDING-REVERIFY"
-    coverage_delta: >
-      DevOps one-off unitary validation report (reports/oneoff_unitary_validation_20260718.md,
-      RC2 — Test Suite category) flagged 5 schema/contract drift failures
-      in tests/unit/test_twin_state_columns.py::
-      TestTwinStatePartialUniqueIndex that originated from the TwinState
-      DB-level unique index being dropped in Phase 2.3 P3 (uniqueness
-      moved to the service layer to support dedup short-circuit and
-      per-trigger re-entry). Fix: the class was renamed from
-      TestTwinStatePartialUniqueIndex to TestTwinStateAthleteActivityPartialIndex
-      and all 5 test methods were updated to assert the new contract:
-      (1) test_athlete_activity_partial_index_present — asserts the
-      non-unique "ix_twin_states_athlete_activity" index exists (was
-      asserting the unique "uq_..." name); (2) test_athlete_activity_index_is_not_unique
-      — asserts idx.unique is False (was True); (3-4) the two predicate
-      tests still assert the postgresql_where="activity_id IS NOT NULL"
-      predicate (the predicate survived the index relaxation); (5)
-      test_athlete_activity_index_columns unchanged in logic, only
-      updated to look up the new index name. Module docstring and class
-      docstring updated to document the new contract and the rationale
-      for moving uniqueness to the service layer. validation.executable
-      and validation.passed set to false on phase-1-2c-twin-state-schema
-      so DevOps re-verifies the fix in the next execution cycle. No
-      production code changes. The original Phase-1.2c migration
-      79dc97d4e433 still emits the unique index at the time of its
-      upgrade (it has not been retroactively edited), and the
-      phase-1-2c-migration feature's protects field is unchanged — the
-      later drop lives in a follow-up migration.
-  - date: "2026-06-25"
-    plan: "phase-1-2c-p1-twin-fitness-coaching-workouts"
-    tests_added: 0
-    tests_modified: 0
-    tests_removed: 0
-    result: "PASS — promotion — DevOps report PASS (1127/1127, 0 failures, 157.10s). All 9 Phase-1.2c features advanced status: generated -> promoted. Round-4 cross-schema pg_constraint fix (test_training_plans_twin_state_id_column_exists_no_fk) unblocked the Phase-1.2b regression run. selection.regression and selection.release rebuilt in index.yaml to include all 9 Phase-1.2c features. cross_phase_history updated with promotion entry."
-  - date: "2026-06-24"
-    plan: "phase-1-2c-p1-twin-fitness-coaching-workouts"
-    tests_added: 0
-    tests_modified: 1
-    tests_removed: 0
-    result: "FAIL -> fix-round-4 — DevOps round-4 report flagged 1 prior-phase failure: cross-schema pg_constraint leak in tests/integration/test_migration_phase_1_2b.py::test_training_plans_twin_state_id_column_exists_no_fk. The FK count query was scoping by table name only — it picked up fk_training_plans_twin_state from the public schema (where Phase-1.2c correctly added it) instead of inspecting the isolated Phase-1.2b test schema. Fix: added pg_namespace JOIN + :schema parameter to both the column query and the FK count query; updated docstring to document why schema scoping is required (so future readers don't strip it). Production code unchanged."
-  - date: "2026-06-24"
-    plan: "phase-1-2c-p1-twin-fitness-coaching-workouts"
-    tests_added: 0
-    tests_modified: 3
-    tests_removed: 0
-    result: "FAIL -> fix-round-3 — DevOps report FAIL with 5 remaining failures across 3 root causes. Test Architect patched 3 test files (reports/phase-1-2c-P1_devops.md). Fixes: (1) tests/unit/test_training_plan_columns.py::test_twin_state_id_nullable_uuid_no_fk -> test_twin_state_id_nullable_uuid_with_set_null_fk — Phase-1.2c migration d1579f4430e7 now wires the FK with ON DELETE SET NULL, so the test asserts the FK is present and declared SET NULL rather than asserting its absence. (2) tests/integration/test_migration_phase_1_2b.py::phase_1_2b_schema fixture now pins `alembic upgrade PHASE_1_2B_REVISION` (1b9e9026db1e) instead of `head`, isolating Phase-1.2b assertions from later sub-phases. Added PHASE_1_2B_REVISION alias for PHASE_1_2B_DELIVERED_REVISION at module bottom to resolve the NameError flagged in test_downgrade_returns_schema_to_phase_1_2a_baseline. (3) tests/integration/test_athlete_physiology_schema.py::TestAthletePhysiologyNotNullConstraintsDB — test_missing_lt1_rejected and test_missing_lt2_rejected redesigned to use raw SQL INSERT with literal SQL NULL instead of ORM ``lt1=None`` assignment. SQLAlchemy converts Python None to JSON 'null' (a valid JSONB value, NOT SQL NULL), so the NOT NULL constraint was never triggered. The raw INSERT bypasses the JSONB None->JSON null mapping and exercises the true SQL NOT NULL constraint. Production code unchanged."
-  - date: "2026-06-24"
-    plan: "phase-1-2c-p1-twin-fitness-coaching-workouts"
-    tests_added: 17
-    tests_modified: 1
-    tests_removed: 0
-    result: "PENDING — first DevOps run"
-  - date: "2026-06-24"
-    plan: "phase-1-2c-p1-twin-fitness-coaching-workouts"
-    tests_added: 0
-    tests_modified: 7
-    tests_removed: 0
-    result: "FAIL -> fix-round — DevOps report FAIL; Test Architect patched 7 files (collection error in test_twin_state_schema.py, _check_text helper scope in 4 unit files, UniqueConstraint.get() misuse in 2 unit files, Phase-1.2c enum_map gaps in test_enum_values.py, Phase-1.2b downgrade target in test_migration_phase_1_2b.py). Awaiting Coder/Architect amendment of migration 79dc97d4e433 to add training_plans.twin_state_id FK before next DevOps run."
-  - date: "2026-06-24"
-    plan: "phase-1-2c-p1-twin-fitness-coaching-workouts"
-    tests_added: 0
-    tests_modified: 6
-    tests_removed: 0
-    result: "FAIL -> fix-round-2 — DevOps round-2 report FAIL with 16 remaining failures across 4 categories. Test Architect patched 6 test files (Phase-1.2c-P1_devops_round2). Fixes: (1) Activity NOT NULL activity_date added to _new_activity helpers in test_twin_state_schema.py + test_coaching_message_schema.py + the inline Activity() in test_athlete_fitness_schema.py (7 test methods affected; root cause was one missing column in 3 source edits). (2) pg_constraint.confdeltype codes for SET NULL corrected from 'r' to 'n' in 3 sites (test_athlete_fitness_schema.test_last_activity_fk_ondelete_is_set_null, test_training_plan_schema.test_twin_state_fk_ondelete_in_pg_catalog, test_coaching_message_schema.test_activity_fk_ondelete_is_set_null). (3) test_migration_phase_1_2c.test_migration_wires_training_plans_twin_state_fk now scans the cumulative Phase-1.2c lineage (primary + follow-up migrations chained via down_revision walk) instead of only the primary slug-matched file. (4) test_downgrade_returns_to_phase_12b_baseline uses downgrade -2 (reverts both 79dc97d4e433 and d1579f4430e7) instead of -1 (which only reverted the FK follow-up, leaving the seven tables in place). (5) New test_followup_drops_training_plans_twin_state_fk verifies the FK removal lives somewhere in the lineage. (6) Stale -1 docstrings updated to -2 throughout. Production code unchanged."
-  - date: "2026-07-11"
-    plan: "phase-1-2c-p1-twin-fitness-coaching-workouts"
-    tests_added: 0
-    tests_modified: 0
-    tests_removed: 1
-    result: "PASS -> test-removed — DevOps full regression run flagged test_downgrade_returns_to_phase_12b_baseline as a pre-existing failure (Phase-1.2c downgrade cannot fully reverse after later sub-phases have built on top). Test Architect deleted the test (and its enclosing TestPhase12cDowngradeFunctional class) from tests/integration/test_migration_phase_1_2c.py. The static-structure downgrade checks (test_downgrade_drops_new_objects_only, test_followup_drops_training_plans_twin_state_fk) remain — they verify the migration downgrade body without running alembic downgrade end-to-end. Removed the corresponding 'alembic downgrade -1 returns the schema to the Phase-1.2b baseline' protect line from the phase-1-2c-migration feature and from coverage.invariants.covered. Production code unchanged. Lesson recorded in tests/README.md (2026-07-11) and tests/MOCKING_CONTRACT.md Known Anti-Patterns."

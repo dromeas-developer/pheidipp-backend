@@ -169,6 +169,8 @@ def insert_if_not_exists(athlete_id, activity_id, trigger, snapshot_data) -> Twi
 | `twin_confidence_upgraded` | confidence_level increased | v1 | `{athlete_id, from_level, to_level, twin_state_id}` |
 | `twin_model_ready` | first TwinState created (onboarding complete) | v1 | `{athlete_id, twin_state_id, data_tier, confidence_level}` |
 
+**Note:** `twin_model_ready` is produced by `OnboardingService` (via `TwinBootstrapService` during onboarding), while `twin_recalibrated` and `twin_confidence_upgraded` are produced by `TwinRecalibrationService` for subsequent recalibrations.
+
 ### Consumed
 
 | Event | Action | Version |

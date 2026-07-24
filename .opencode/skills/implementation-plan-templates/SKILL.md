@@ -152,8 +152,10 @@ self-contained — a coder invoked with only this file can implement the
 batch correctly. The coder never reads `overview.md` or any other batch's
 BRD.
 
-Load the `coder-handoff-blocks` skill when producing BRDs — it governs
-content rules for Context Needed tiers and Batch Success Criteria.
+Load the `implementation-handoff-blocks` skill when producing BRDs and
+architecture handoffs — it governs content rules for Context Needed
+tiers, Batch Success Criteria, and architecture documentation handoff
+conventions.
 
 ```markdown
 # Batch BRD: [Sub-Phase ID] — Batch N — [Theme]
@@ -204,12 +206,12 @@ Bad step (no owner tag):
 
 ## Context Needed
 Per-step: Primary, Secondary, Fallback, and Forbidden tiers for every
-step in this batch. Follow the `coder-handoff-blocks` skill exactly.
+step in this batch. Follow the `implementation-handoff-blocks` skill exactly.
 Close with the completeness statement.
 
 ## Batch Success Criteria
 Specific, checkable conditions that hold when this batch is complete.
-Follow the `coder-handoff-blocks` skill exactly. Later batches assume
+Follow the `implementation-handoff-blocks` skill exactly. Later batches assume
 these hold — reference the batch number as a precondition in later
 BRDs; do not restate criteria.
 
@@ -267,6 +269,10 @@ Test scenarios for this batch go in a companion file
 `batch-N-<theme>-tests.md` — see Template 3. The coder never loads it;
 it is for the test architect only.
 
+Architecture documentation updates for this batch go in a companion file
+`batch-N-architecture.md` — see Template 4. The coder never loads it;
+it is for `p-vision-and-architect-author` only.
+
 ---
 
 ## Template 3: `batch-N-<theme>-tests.md`
@@ -308,6 +314,50 @@ Rules:
   doesn't state, the step is incomplete — fix the step first.
 - Omit this file for batches with no behavioural changes. The test
   architect handles those from contracts alone.
+
+---
+
+## Template 4: `batch-N-architecture.md`
+
+Written alongside each BRD at
+`docs/implementation/phase-N/phase-N-M/batch-N-architecture.md`.
+
+This file is loaded by `p-vision-and-architect-author` (or routed to it
+by `p-technical-advisor`), never by the coder. It tells the architect
+exactly which architecture documents need updating after this batch's
+implementation changes. Omit this file if the batch does not change any
+event flow, event catalogue entry, or architecture contract.
+
+```markdown
+# Architecture Documentation Updates — Phase N.M — Batch N: <theme>
+
+## <file path relative to docs/>
+### <section name>
+- <specific change: add/update/remove entry X, change producer Y to Z>
+- ...
+
+## <file path relative to docs/>
+...
+```
+
+Rules:
+- One `##` heading per file to update (e.g. `docs/architecture/04-platform/event-topology.md`).
+  Multiple files get multiple `##` headings.
+- Under each file, one `###` heading per section to modify. Be specific: name the
+  exact section header as it appears in the file.
+- Each bullet is a concrete instruction: "Add consumer: `generate_plan` procrastinate
+  task" not "Update the event flow."
+- Include a reference to the coder's BRD so the architect can read it for context:
+  "See `batch-3-event-flow-plan-router.md` for the implemented flow."
+- Omit this file if the batch has no architecture documentation impact. Purely
+  structural changes (file relocation, import rewiring, naming) do not need
+  architecture doc updates — this is for behavioural changes that alter event
+  flows, catalogue entries, or contracts.
+
+The coder BRD should reference this file in its `## Relevant Notes` section
+(e.g. "Architecture documentation updates are in `batch-3-architecture.md` —
+routed to p-vision-and-architect-author") so the batch's scope boundary is
+explicit.
 
 ---
 

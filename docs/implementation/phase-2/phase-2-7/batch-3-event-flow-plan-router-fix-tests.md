@@ -1,5 +1,13 @@
 # Test Scenarios — Phase 2.7 — Batch 3: Event-Flow, Plan-Router & Cleanups
 
+> **STATUS — Post-Shipping Review (TA Review) — RESOLVED via ADR-012:** Scenarios 1–6 (twin_model_ready event production), 24 (docstring fix), and 25–26 (TrainingGoalRepository verification) test behaviour that was affected by the post-shipping review documented in the companion BRD. The producer-semantic disagreement is now **resolved** — the Vision & Architecture Author chose Path B (amend the catalogue to match the implemented behaviour) via **ADR-012** (`docs/adr/012-twin-model-ready-producer-amendment.md`, status: `accepted`). Specifically:
+> - **Scenarios 1–6** test the bootstrap-`OnboardingService` producer semantic, which is now the ratified contract per ADR-012. These scenarios stand as written — the catalogue now names `OnboardingService` as the producer with the trigger firing immediately after the bootstrap TwinState insert for all tiers.
+> - **Scenario 24** tests the docstring edit that TA review determined should not have been prescribed (filed at wrong layer). The shipped edit, if benign, may pass this scenario as written.
+> - **Scenarios 25–26** test the verification of `TrainingGoalRepository_unique_violation` that TA review determined was filed at the wrong layer (the symbol is not an architecture contract).
+> - **Scenarios 27–28** test catalogue amendments that are now ratified by ADR-012 — they stand as written.
+> Scenarios 7–23 (worker tasks, `PlanQueryService`, plan-router layer fix) test behaviour that shipped correctly and is not affected by the review.
+
+
 ## Steps 1-2 — `twin_model_ready` event production and onboarding change
 
 | # | Scenario | Input | Expected |

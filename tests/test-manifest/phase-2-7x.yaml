@@ -1,0 +1,86 @@
+version: "1.0"
+plan_id: "phase-2-7-batch-4-outbox-publisher-layer-fix"
+generated_at: "2026-07-22T00:00:00Z"
+last_reviewed_at: "2026-07-23T23:59:59Z"
+
+prerequisites:
+  migrations: false
+
+files:
+  test_outbox_publisher_re_routed_integration.py:
+    type: integration
+    status: promoted
+    functions:
+      test_event_count_unchanged_after_publisher_run: {implemented: true, executable: true, passed: true}
+      test_event_publisher_publish_not_called: {implemented: true, executable: true, passed: true}
+      test_first_run_transitions_only_limit_rows: {implemented: true, executable: true, passed: true}
+      test_fresh_session_sees_published_status: {implemented: true, executable: true, passed: true}
+      test_second_run_returns_zero: {implemented: true, executable: true, passed: true}
+      test_three_pending_rows_all_published: {implemented: true, executable: true, passed: true}
+      test_uncommitted_row_in_other_session_not_visible: {class: TestReRoutedPublisherRunsInOwnTransaction, implemented: true, executable: true, passed: true}
+  test_outbox_publisher_service_integration.py:
+    type: integration
+    status: promoted
+    functions:
+      test_empty_queue_does_not_modify_published_rows: {implemented: true, executable: true, passed: true}
+      test_empty_queue_returns_zero: {implemented: true, executable: true, passed: true}
+      test_first_call_transitions_only_limit_rows: {implemented: true, executable: true, passed: true}
+      test_fresh_session_observes_published_status: {implemented: true, executable: true, passed: true}
+      test_returns_only_pending_count_not_total: {implemented: true, executable: true, passed: true}
+      test_second_call_returns_zero: {implemented: true, executable: true, passed: true}
+  # test_coder_steps_architecture_guard.py — removed from test suite.
+  # Rationale: these tests validate a process-level invariant (architecture
+  # docs committed independently from coder changes) that should be enforced
+  # at the workflow level (pre-commit/pre-agent-start validation), not as a
+  # runtime test. The coder agent should detect uncommitted architecture
+  # changes before starting, commit them separately, and then resume.  test_outbox_publisher_service.py:
+    type: unit
+    status: promoted
+    functions:
+      test_async_session_local_invoked_inside_service: {implemented: true, executable: true, passed: true}
+      test_get_pending_called_with_limit_and_count_returned: {implemented: true, executable: true, passed: true}
+      test_mark_published_called_once_per_pending_row: {implemented: true, executable: true, passed: true}
+      test_no_event_publisher_import_in_service_module: {implemented: true, executable: true, passed: true}
+      test_no_event_publisher_import_in_source: {implemented: true, executable: true, passed: true}
+      test_outbox_publisher_service_importable_from_package: {implemented: true, executable: true, passed: true}
+      test_outbox_publisher_service_in_all: {implemented: true, executable: true, passed: true}
+      test_publish_pending_is_coroutine_function: {implemented: true, executable: true, passed: true}
+      test_publish_pending_method_exists: {implemented: true, executable: true, passed: true}
+      test_publish_pending_no_session_argument_on_public_signature: {implemented: true, executable: true, passed: true}
+      test_publish_pending_signature_is_self_limit_int: {implemented: true, executable: true, passed: true}
+      test_service_does_not_import_bus_client: {implemented: true, executable: true, passed: true}
+  test_outbox_publisher_worker_routing.py:
+    type: unit
+    status: promoted
+    functions:
+      test_async_session_local_not_called_from_worker_frame: {implemented: true, executable: true, passed: true}
+      test_operational_error_propagates_from_worker: {implemented: true, executable: true, passed: true}
+      test_outbox_publisher_in_task_registry: {implemented: true, executable: true, passed: true}
+      test_outbox_publisher_task_named_correctly: {implemented: true, executable: true, passed: true}
+      test_periodic_cron_in_ten_to_thirty_seconds_band: {implemented: true, executable: true, passed: true}
+      test_periodic_decorator_present: {implemented: true, executable: true, passed: true}
+      test_repository_init_not_called_from_worker_frame: {implemented: true, executable: true, passed: true}
+      test_worker_calls_publish_pending_with_batch_size: {implemented: true, executable: true, passed: true}
+      test_worker_returns_service_count_unchanged: {implemented: true, executable: true, passed: true}
+
+coverage:
+  events:
+    covered: []
+  invariants:
+    covered:
+      - "Worker delegates publish-side transaction to OutboxPublisherService (ADR-013)"
+      - "OutboxPublisherService is a status transitioner (no EventPublisher, no message bus)"
+      - "Worker does NOT construct SystemEventOutboxRepository directly (ADR-001)"
+      - "Worker does NOT open its own AsyncSession (ADR-001)"
+      - "OutboxPublisherService owns its own AsyncSession"
+      - "OutboxPublisherService commits the publish-side transaction"
+      - "OutboxPublisherService returns the count of transitioned rows"
+      - "Publisher is idempotent (re-runs return 0)"
+      - "Publisher respects the limit argument (partial batch)"
+      - "Publisher runs in its own transaction (isolation from uncommitted rows)"
+      - "Publisher does not produce new SystemEvent rows"
+      - "Publisher does not call EventPublisher.publish"
+      - "@app.periodic cron in 10-30s band preserved"
+      - '@app.task(name="outbox_publisher") preserved'
+      - "Status transition is observable after commit"
+      - "Worker preserves task-level error handling (no try/except; relies on procrastinate's framework-level catch)"

@@ -43,7 +43,7 @@ from app.services.context_budget_service import (
     PlanOverview,
     ProfileSummary,
 )
-from app.services.first_message_agent import (
+from app.agents.first_message_agent import (
     FirstMessageAgent,
     FirstMessageAlreadyExistsError,
     LLMServiceUnavailableError,

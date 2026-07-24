@@ -1,388 +1,201 @@
-version: '1.0'
-plan_id: phase-2-1-fit-ingestion-pipeline-expansion
-generated_at: '2026-07-02T00:00:00Z'
-last_reviewed_at: '2026-07-07T21:28:19Z'
-features:
-  calibration_eligibility_five_rule_gate:
-    status: generated
-    plan: docs/release-plan/phase-2/phase-2-1-fit-ingestion-pipeline-expansion.md
-    owned_by_plan:
-    - phase-2-1-fit-ingestion-pipeline-expansion
-    description: 'CalibrationEligibilityService evaluates the five-rule gate: has_hr
-      AND source != manual_entry AND duration >= 1200s AND hr_dropout_pct <= 0.20
-      AND NOT gps_loss AND NOT sensor_malfunction. Tier 5-6 activities are never calibration-eligible.
+version: "1.0"
+plan_id: "phase-2-1-fit-ingestion-pipeline-expansion"
+generated_at: "2026-07-07T00:00:00Z"
+last_reviewed_at: "2026-07-07T00:00:00Z"
 
-      '
-    protects:
-    - calibration_eligible is set by CalibrationEligibilityService and never manually
-      overridden
-    - fit_file_key always set for source != manual_entry
-    impacts:
-    - threshold_detection
-    - signal_cleaning
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_calibration_eligibility_service.py
-        owner: phase-2-1-fit-ingestion-pipeline-expansion
-  power_based_load_tier_1_2:
-    status: generated
-    plan: docs/release-plan/phase-2/phase-2-1-fit-ingestion-pipeline-expansion.md
-    owned_by_plan:
-    - phase-2-1-fit-ingestion-pipeline-expansion
-    description: 'LoadComputationService computes power-based aerobic load for Tier
-      1-2 athletes using (watts/CP)^4 intensity factor formula.
+prerequisites:
+  migrations: false
 
-      '
-    protects:
-    - No averaged fields on Activity
-    - Load scores null at initial creation, populated by LoadComputationService
-    impacts:
-    - power_profile_computation
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_load_computation_service.py
-        owner: phase-2-1-fit-ingestion-pipeline-expansion
-  neuromuscular_load:
-    status: generated
-    plan: docs/release-plan/phase-2/phase-2-1-fit-ingestion-pipeline-expansion.md
-    owned_by_plan:
-    - phase-2-1-fit-ingestion-pipeline-expansion
-    description: 'LoadComputationService computes neuromuscular load for Tier 1-4:
-      variability_index * duration_hours + time_above_vo2_hours * 2.5
+files:
+  test_activity_endpoints.py:
+    type: integration
+    status: promoted
+    functions:
+      test_analyse_activity_not_found: {implemented: true, executable: true, passed: true}
+      test_analyse_idempotent: {implemented: true, executable: true, passed: true}
+      test_analyse_returns_coaching_message: {implemented: true, executable: true, passed: true}
+      test_get_activity_calibration_eligible_flag: {implemented: true, executable: true, passed: true}
+      test_get_activity_not_found: {implemented: true, executable: true, passed: true}
+      test_get_activity_returns_activity: {implemented: true, executable: true, passed: true}
+      test_get_activity_returns_all_signal_flags: {implemented: true, executable: true, passed: true}
+      test_get_activity_returns_sport_type: {implemented: true, executable: true, passed: true}
+      test_get_activity_returns_sport_type_cycling: {implemented: true, executable: true, passed: true}
+      test_get_activity_returns_sport_type_unknown: {implemented: true, executable: true, passed: true}
+      test_get_activity_with_gps_only: {implemented: true, executable: true, passed: true}
+      test_get_activity_with_power_only: {implemented: true, executable: true, passed: true}
+      test_get_activity_with_rr_intervals_only: {implemented: true, executable: true, passed: true}
+      test_get_analysis_not_found: {implemented: true, executable: true, passed: true}
+      test_get_analysis_returns_message: {implemented: true, executable: true, passed: true}
+      test_list_activities_returns_signal_flags: {implemented: true, executable: true, passed: true}
+      test_list_activities_returns_sport_type: {implemented: true, executable: true, passed: true}
+      test_list_requires_auth: {implemented: true, executable: true, passed: true}
+      test_list_returns_activities: {implemented: true, executable: true, passed: true}
+      test_list_returns_empty_initially: {implemented: true, executable: true, passed: true}
+      test_manual_entry_has_unknown_sport_type: {implemented: true, executable: true, passed: true}
+      test_upload_empty_file_returns_422: {implemented: true, executable: true, passed: true}
+      test_upload_file_too_large_returns_413: {implemented: true, executable: true, passed: true}
+      test_upload_requires_auth: {implemented: true, executable: true, passed: true}
+      test_upload_returns_202_with_task_id: {implemented: true, executable: true, passed: true}
+  test_activity_ingestion_service.py:
+    type: unit
+    status: promoted
+    functions:
+      test_calibration_eligibility_updated_when_changed: {implemented: true, executable: true, passed: true}
+      test_equality: {implemented: true, executable: true, passed: true}
+      test_frozen: {implemented: true, executable: true, passed: true}
+      test_gps_loss_false_ignores_negative_deltas: {implemented: true, executable: true, passed: true}
+      test_gps_loss_false_when_all_gaps_are_under_30_seconds: {implemented: true, executable: true, passed: true}
+      test_gps_loss_false_when_has_gps_is_false: {implemented: true, executable: true, passed: true}
+      test_gps_loss_false_when_largest_gap_is_exactly_30_seconds: {implemented: true, executable: true, passed: true}
+      test_gps_loss_false_when_single_gps_record: {implemented: true, executable: true, passed: true}
+      test_gps_loss_true_when_any_single_gap_exceeds_30_seconds: {implemented: true, executable: true, passed: true}
+      test_gps_loss_true_when_has_gps_true_but_no_records: {implemented: true, executable: true, passed: true}
+      test_gps_loss_true_when_single_gap_exceeds_30_seconds: {implemented: true, executable: true, passed: true}
+      test_gps_spike_count_is_preserved: {implemented: true, executable: true, passed: true}
+      test_has_gps_true_when_gps_data_in_fit: {implemented: true, executable: true, passed: true}
+      test_has_power_true_when_power_data_in_fit: {implemented: true, executable: true, passed: true}
+      test_has_rr_intervals_true_when_rr_data_in_fit: {implemented: true, executable: true, passed: true}
+      test_ignores_none_hr_and_power_samples_when_flagging_sensor_malfunction: {implemented: true, executable: true, passed: true}
+      test_ingest_async_publishes_event: {implemented: true, executable: true, passed: true}
+      test_ingest_async_updates_activity: {implemented: true, executable: true, passed: true}
+      test_is_ingestion_error_subclass: {implemented: true, executable: true, passed: true}
+      test_raised_for_upload_error: {implemented: true, executable: true, passed: true}
+      test_returns_false_when_profile_does_not_exist: {implemented: true, executable: true, passed: true}
+      test_returns_false_when_profile_exists_but_flag_is_none: {implemented: true, executable: true, passed: true}
+      test_returns_false_when_profile_has_structural_risk_flag_false: {implemented: true, executable: true, passed: true}
+      test_returns_true_when_profile_has_structural_risk_flag_true: {implemented: true, executable: true, passed: true}
+      test_run_ingestion_pipeline_parses_and_computes_load: {implemented: true, executable: true, passed: true}
+      test_signal_flags_set_on_activity: {implemented: true, executable: true, passed: true}
+      test_sport_type_cycling_activity_is_not_eligible: {implemented: true, executable: true, passed: true}
+      test_sport_type_detected_event_fires_for_non_manual_entry: {implemented: true, executable: true, passed: true}
+      test_sport_type_running_activity_is_eligible_when_passes_gate: {implemented: true, executable: true, passed: true}
+      test_sport_type_unknown_sets_calibration_eligible_false: {implemented: true, executable: true, passed: true}
+      test_stage_upload_conflict_raises_activity_ingestion_error: {implemented: true, executable: true, passed: true}
+      test_stage_upload_sets_calibration_eligible_false: {implemented: true, executable: true, passed: true}
+      test_stage_upload_sets_fit_file_key: {implemented: true, executable: true, passed: true}
+      test_stage_upload_sets_load_scores_null: {implemented: true, executable: true, passed: true}
+      test_stage_upload_storage_failure_raises_no_activity_created: {implemented: true, executable: true, passed: true}
+      test_stage_upload_uploads_to_object_storage_first: {implemented: true, executable: true, passed: true}
+  test_calibration_eligibility_service.py:
+    type: unit
+    status: promoted
+    functions:
+      test_cycling_returns_false_regardless_of_hr: {implemented: true, executable: true, passed: true}
+      test_exactly_20_minutes_is_eligible: {implemented: true, executable: true, passed: true}
+      test_gps_loss_returns_false: {implemented: true, executable: true, passed: true}
+      test_hr_dropout_at_20_percent_is_eligible: {implemented: true, executable: true, passed: true}
+      test_hr_dropout_below_20_percent_is_eligible: {implemented: true, executable: true, passed: true}
+      test_hr_dropout_exceeds_20_percent_returns_false: {implemented: true, executable: true, passed: true}
+      test_ideal_activity_passes_all_rules: {implemented: true, executable: true, passed: true}
+      test_intervals_icu_source_is_eligible_when_otherwise_valid: {implemented: true, executable: true, passed: true}
+      test_intervals_icu_with_long_duration_and_no_quality_issues: {implemented: true, executable: true, passed: true}
+      test_manual_entry_returns_false: {implemented: true, executable: true, passed: true}
+      test_manual_upload_source_is_eligible_when_otherwise_valid: {implemented: true, executable: true, passed: true}
+      test_missing_hr_returns_false: {implemented: true, executable: true, passed: true}
+      test_multiple_quality_issues_are_all_checked: {implemented: true, executable: true, passed: true}
+      test_other_returns_false: {implemented: true, executable: true, passed: true}
+      test_running_passes_when_all_other_rules_met: {implemented: true, executable: true, passed: true}
+      test_sensor_malfunction_returns_false: {implemented: true, executable: true, passed: true}
+      test_service_does_not_have_tier_check: {implemented: true, executable: true, passed: true}
+      test_short_duration_returns_false: {implemented: true, executable: true, passed: true}
+      test_sport_check_runs_before_other_rules: {implemented: true, executable: true, passed: true}
+      test_strength_returns_false: {implemented: true, executable: true, passed: true}
+      test_swimming_returns_false: {implemented: true, executable: true, passed: true}
+      test_unknown_sport_returns_false: {implemented: true, executable: true, passed: true}
+      test_yoga_mobility_returns_false: {implemented: true, executable: true, passed: true}
+  test_fit_parser_service.py:
+    type: unit
+    status: promoted
+    functions:
+      test_close: {implemented: true, executable: true, passed: true}
+      test_cycling_fit_parses_to_sport_type_cycling: {implemented: true, executable: true, passed: true}
+      test_default_fields: {implemented: true, executable: true, passed: true}
+      test_detection_version_is_v1: {implemented: true, executable: true, passed: true}
+      test_equality: {implemented: true, executable: true, passed: true}
+      test_frozen_dataclass: {implemented: true, executable: true, passed: true}
+      test_generic_sport_missing_returns_unknown: {implemented: true, executable: true, passed: true}
+      test_indoor_cycling_parses_to_cycling: {implemented: true, executable: true, passed: true}
+      test_parse_empty_hr_records_raises_fit_parse_empty_error: {implemented: true, executable: true, passed: true}
+      test_parse_fit_parse_error_raised: {implemented: true, executable: true, passed: true}
+      test_parse_has_power_flag_true: {implemented: true, executable: true, passed: true}
+      test_parse_has_rr_intervals_flag_true: {implemented: true, executable: true, passed: true}
+      test_parse_os_error_raised_as_fit_parse_error: {implemented: true, executable: true, passed: true}
+      test_parse_returns_parsed_fit_data: {implemented: true, executable: true, passed: true}
+      test_parse_runs_in_executor: {implemented: true, executable: true, passed: true}
+      test_parse_value_error_raised_as_fit_parse_error: {implemented: true, executable: true, passed: true}
+      test_read_after_partial_read: {implemented: true, executable: true, passed: true}
+      test_read_full_buffer: {implemented: true, executable: true, passed: true}
+      test_read_partial: {implemented: true, executable: true, passed: true}
+      test_running_fit_parses_to_sport_type_running: {implemented: true, executable: true, passed: true}
+      test_seek_from_current: {implemented: true, executable: true, passed: true}
+      test_seek_from_end: {implemented: true, executable: true, passed: true}
+      test_seek_from_start: {implemented: true, executable: true, passed: true}
+      test_swimming_fit_parses_to_sport_type_swimming: {implemented: true, executable: true, passed: true}
+      test_tell: {implemented: true, executable: true, passed: true}
+      test_trail_running_sub_sport_does_not_override_running: {implemented: true, executable: true, passed: true}
+      test_unrecognized_sport_returns_other_low_confidence: {implemented: true, executable: true, passed: true}
+  test_load_computation_service.py:
+    type: unit
+    status: promoted
+    functions:
+      test_aerobic_load_is_never_none_when_hr_present: {implemented: true, executable: true, passed: true}
+      test_all_none_load_scores_possible: {implemented: true, executable: true, passed: true}
+      test_birthday_not_yet_reached: {implemented: true, executable: true, passed: true}
+      test_default_today: {implemented: true, executable: true, passed: true}
+      test_empty_hr_records_raises: {implemented: true, executable: true, passed: true}
+      test_equality: {implemented: true, executable: true, passed: true}
+      test_exact_age_calculation: {implemented: true, executable: true, passed: true}
+      test_frozen: {implemented: true, executable: true, passed: true}
+      test_full_tier_1_session_has_all_three: {implemented: true, executable: true, passed: true}
+      test_hour_at_lt1: {implemented: true, executable: true, passed: true}
+      test_hour_at_max_hr: {implemented: true, executable: true, passed: true}
+      test_hour_at_rest: {implemented: true, executable: true, passed: true}
+      test_hrr_pct_above_max_clamped: {implemented: true, executable: true, passed: true}
+      test_hrr_pct_below_rest_clamped: {implemented: true, executable: true, passed: true}
+      test_minimum_max_hr_is_120: {implemented: true, executable: true, passed: true}
+      test_neuromuscular_load_high_variability: {implemented: true, executable: true, passed: true}
+      test_neuromuscular_load_low_variability: {implemented: true, executable: true, passed: true}
+      test_neuromuscular_load_tier_1_4_computed: {implemented: true, executable: true, passed: true}
+      test_neuromuscular_load_tier_5_6_is_none: {implemented: true, executable: true, passed: true}
+      test_neuromuscular_load_without_power_is_none: {implemented: true, executable: true, passed: true}
+      test_one_hr_sample: {implemented: true, executable: true, passed: true}
+      test_one_hr_sample_at_max: {implemented: true, executable: true, passed: true}
+      test_power_above_cp_produces_high_load: {implemented: true, executable: true, passed: true}
+      test_power_based_load_no_power_falls_back_to_hr: {implemented: true, executable: true, passed: true}
+      test_power_based_load_requires_cp_estimate: {implemented: true, executable: true, passed: true}
+      test_power_based_load_tier_1_with_power: {implemented: true, executable: true, passed: true}
+      test_power_based_load_tier_2_with_power: {implemented: true, executable: true, passed: true}
+      test_power_below_cp_produces_low_load: {implemented: true, executable: true, passed: true}
+      test_returns_integer: {implemented: true, executable: true, passed: true}
+      test_short_activity_still_computes: {implemented: true, executable: true, passed: true}
+      test_structural_load_density_penalty: {implemented: true, executable: true, passed: true}
+      test_structural_load_density_penalty_cap: {implemented: true, executable: true, passed: true}
+      test_structural_load_gradient_cost: {implemented: true, executable: true, passed: true}
+      test_structural_load_structural_risk_flag: {implemented: true, executable: true, passed: true}
+      test_structural_load_with_gps: {implemented: true, executable: true, passed: true}
+      test_structural_load_without_gps_is_none: {implemented: true, executable: true, passed: true}
+      test_structural_load_zero_distance_is_none: {implemented: true, executable: true, passed: true}
+      test_tier_4_session_has_aerobic_and_structural: {implemented: true, executable: true, passed: true}
+      test_tier_5_6_null_load_scores: {implemented: true, executable: true, passed: true}
+      test_varied_hr_produces_intermediate_load: {implemented: true, executable: true, passed: true}
 
-      '
-    protects:
-    - neuromuscular_load null for Tier 5-6
-    impacts: []
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_load_computation_service.py
-        owner: phase-2-1-fit-ingestion-pipeline-expansion
-  structural_load:
-    status: generated
-    plan: docs/release-plan/phase-2/phase-2-1-fit-ingestion-pipeline-expansion.md
-    owned_by_plan:
-    - phase-2-1-fit-ingestion-pipeline-expansion
-    description: 'LoadComputationService computes structural load from GPS data: base
-      + gradient_cost + density_penalty
-
-      '
-    protects:
-    - structural_load null when no GPS data
-    impacts: []
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_load_computation_service.py
-        owner: phase-2-1-fit-ingestion-pipeline-expansion
-  signal_flags_populated:
-    status: generated
-    plan: docs/release-plan/phase-2/phase-2-1-fit-ingestion-pipeline-expansion.md
-    owned_by_plan:
-    - phase-2-1-fit-ingestion-pipeline-expansion
-    description: 'ActivityIngestionService sets has_power, has_rr_intervals, has_gps
-      flags on Activity from parsed FIT data.
-
-      '
-    protects:
-    - Signal availability flags set during ingestion pipeline
-    impacts:
-    - calibration_eligibility_five_rule_gate
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_activity_ingestion_service.py
-        owner: phase-2-1-fit-ingestion-pipeline-expansion
-      integration:
-      - path: tests/integration/test_activity_endpoints.py
-        owner: phase-2-1-fit-ingestion-pipeline-expansion
-  fit_parser_expansion:
-    status: generated
-    plan: docs/release-plan/phase-2/phase-2-1-fit-ingestion-pipeline-expansion.md
-    owned_by_plan:
-    - phase-2-1-fit-ingestion-pipeline-expansion
-    description: 'FitParserService extracts power, GPS, RR interval data from FIT
-      files and exposes has_power, has_rr_intervals, has_gps flags.
-
-      '
-    protects:
-    - FitParserService preserves raw records for LoadComputationService
-    impacts:
-    - power_based_load_tier_1_2
-    - signal_flags_populated
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_fit_parser_service.py
-        owner: phase-2-1-fit-ingestion-pipeline-expansion
-  gps_loss_continuous_gap_detection:
-    status: generated
-    plan: docs/implementation/phase-2/phase-2-1-p2-validation-remediation.md
-    owned_by_plan:
-    - phase-2-1-p2-validation-remediation
-    description: 'ActivityIngestionService._compute_quality_flags uses continuous-gap
-      detection for gps_loss: flag=True only when any single continuous gap between
-      consecutive GPS records exceeds 30 seconds.
-
-      '
-    protects:
-    - gps_loss computed by continuous-gap detection, not coverage ratio
-    - 'quality_flags JSONB shape stable (gps_loss: boolean)'
-    impacts:
-    - calibration_eligibility_five_rule_gate
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_activity_ingestion_service.py
-        owner: phase-2-1-p2-validation-remediation
-  structural_risk_flag_repository:
-    status: generated
-    plan: docs/implementation/phase-2/phase-2-1-p2-validation-remediation.md
-    owned_by_plan:
-    - phase-2-1-p2-validation-remediation
-    description: 'ActivityIngestionService._read_structural_risk_flag uses AthleteProfileRepository
-      instead of raw SQL query.
-
-      '
-    protects:
-    - Repository pattern consistency in ingestion service
-    - structural_risk_flag defaults to False when profile missing
-    impacts:
-    - structural_load
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_activity_ingestion_service.py
-        owner: phase-2-1-p2-validation-remediation
-  sport_type_filtering:
-    status: generated
-    plan: docs/implementation/phase-2/phase-2-1-p3-sport-type-filtering.md
-    owned_by_plan:
-    - phase-2-1-p3-sport-type-filtering
-    description: "CalibrationEligibilityService evaluates sport-type as the first\
-      \ gate check: sport_type != 'running' \u2192 calibration_eligible = false. Non-running\
-      \ activities are excluded from twin calibration per architecture principle #8.\n"
-    protects:
-    - Non-running activities are excluded from twin calibration
-    - sport_type check runs before all other calibration rules
-    impacts:
-    - twin_recalibration
-    - threshold_detection
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_calibration_eligibility_service.py
-        owner: phase-2-1-p3-sport-type-filtering
-      integration:
-      - path: tests/integration/test_activity_endpoints.py
-        owner: phase-2-1-p3-sport-type-filtering
-  sport_type_detection_pipeline:
-    status: generated
-    plan: docs/implementation/phase-2/phase-2-1-p3-sport-type-filtering.md
-    owned_by_plan:
-    - phase-2-1-p3-sport-type-filtering
-    description: 'FitParserService extracts sport type from FIT session message (sport
-      field mapping: 1=running, 2=cycling, 3=other, 4=strength, 5=swimming, 14=other;
-      0/254/missing=unknown). Detection confidence is ''high'' for FIT-declared sports,
-      ''unknown'' for missing, ''low'' for unrecognized integers.
-
-      '
-    protects:
-    - sport_type populated from FIT file, not heuristic
-    - sport_type = 'unknown' when detection fails
-    impacts:
-    - sport_type_filtering
-    - sport_type_detection_event
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_fit_parser_service.py
-        owner: phase-2-1-p3-sport-type-filtering
-  sport_type_detection_event:
-    status: generated
-    plan: docs/implementation/phase-2/phase-2-1-p3-sport-type-filtering.md
-    owned_by_plan:
-    - phase-2-1-p3-sport-type-filtering
-    description: 'ActivityIngestionService fires sport_type_detected event after Activity
-      update flush and before activity_calibration_eligible. Payload: {activity_id,
-      sport_type, detection_confidence, detection_version}. Does NOT fire for manual_entry
-      sources.
-
-      '
-    protects:
-    - sport_type_detected event fires for all non-manual-entry sources
-    - sport_type_detected fires before activity_calibration_eligible
-    impacts:
-    - twin_recalibration
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      unit:
-      - path: tests/unit/test_activity_ingestion_service.py
-        owner: phase-2-1-p3-sport-type-filtering
-  sport_type_api_response:
-    status: generated
-    plan: docs/implementation/phase-2/phase-2-1-p3-sport-type-filtering.md
-    owned_by_plan:
-    - phase-2-1-p3-sport-type-filtering
-    description: 'GET /athletes/{id}/activities/{aid} and GET /athletes/{id}/activities
-      return sport_type and sport_type_detection_version fields in the response body.
-
-      '
-    protects:
-    - sport_type visible in API responses
-    impacts: []
-    execution_prerequisites:
-      migrations: true
-      seed_data: false
-      external_services: []
-    validation:
-      implemented: true
-      executable: true
-      passed: true
-    tests:
-      integration:
-      - path: tests/integration/test_activity_endpoints.py
-        owner: phase-2-1-p3-sport-type-filtering
-execution_groups:
-  phase_2_1_smoke:
-    scope: smoke
-    phase: 2
-    tests:
-    - tests/unit/test_calibration_eligibility_service.py
-    - tests/unit/test_load_computation_service.py
-    depends_on: []
-  phase_2_1_feature:
-    scope: feature
-    phase: 2
-    tests:
-    - tests/unit/test_calibration_eligibility_service.py
-    - tests/unit/test_load_computation_service.py
-    - tests/unit/test_activity_ingestion_service.py
-    - tests/unit/test_fit_parser_service.py
-    - tests/integration/test_activity_endpoints.py
-    depends_on: []
 coverage:
-  routes:
-    covered:
-    - POST /athletes/{id}/activities/upload
-    - GET /athletes/{id}/activities
-    - GET /athletes/{id}/activities/{aid}
-    partial: []
-    missing: []
   events:
     covered:
-    - activity_ingested
-    - activity_calibration_eligible
-    - sport_type_detected
-    partial: []
-    missing: []
+      - "activity_ingested"
+      - "activity_calibration_eligible"
+      - "sport_type_detected"
   invariants:
     covered:
-    - "calibration_eligible = false for all sessions (Phase 1.6) \u2014 REPLACED by\
-      \ five-rule gate"
-    - calibration_eligible set by CalibrationEligibilityService and never manually
-      overridden
-    - fit_file_key always set for source != manual_entry
-    - Load scores null at initial creation, populated by LoadComputationService
-    - Signal availability flags set during ingestion pipeline
-    - Object storage upload BEFORE Activity record creation
-    - activity_ingested event published AFTER commit
-    - Non-running activities are excluded from twin calibration
-    - sport_type check runs before all other calibration rules
-    - sport_type = 'unknown' when detection fails
-    - gps_loss computed by continuous-gap detection, not coverage ratio
-    - structural_risk_flag defaults to False when profile missing
-    partial: []
-    missing:
-    - Tier 5-6 activities are never calibration-eligible (requires Tier inference
-      in tests)
-history:
-- date: '2026-07-07'
-  plan: phase-2-1-p1-p2-p3-final-fix
-  tests_added: 0
-  tests_modified: 15
-  tests_removed: 0
-  result: PASS
-  coverage_delta: 'Fixed 25 test failures across 3 categories: (A) repository mocking
-    for scalar_one_or_none, (B) power-based load assertion values, (C) sport_type
-    field and enum value fixes in calibration eligibility and ingestion pipeline tests.'
+      - "calibration_eligible = false for all sessions (Phase 1.6) — REPLACED by five-rule gate"
+      - "calibration_eligible set by CalibrationEligibilityService and never manually overridden"
+      - "fit_file_key always set for source != manual_entry"
+      - "Load scores null at initial creation, populated by LoadComputationService"
+      - "Signal availability flags set during ingestion pipeline"
+      - "Object storage upload BEFORE Activity record creation"
+      - "activity_ingested event published AFTER commit"
+      - "Non-running activities are excluded from twin calibration"
+      - "sport_type check runs before all other calibration rules"
+      - "sport_type = 'unknown' when detection fails"
+      - "gps_loss computed by continuous-gap detection, not coverage ratio"
+      - "structural_risk_flag defaults to False when profile missing"

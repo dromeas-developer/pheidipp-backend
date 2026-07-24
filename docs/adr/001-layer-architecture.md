@@ -14,7 +14,7 @@ superseded-by: ~
 **BusinessLogic**: All business logic must reside in the `services` layer.
 **RepositoryAccess**: Repository access is exclusively permitted from the `services` layer.
 **AgentIntegration**: Agents must interact with the system exclusively through the `services` layer.
-**WorkerIntegration**: Background jobs must interact with the system exclusively through the `services` layer.
+**WorkerIntegration**: Background jobs must interact with the system exclusively through the `services` layer. Infrastructure-plumbing worker tasks (polling daemons, status transitioners, retention pruners, DLQ replayers) are NOT an exception — they still route through a service. See ADR-013.
 
 ## Decision
 The layer architecture `api → services → repositories → models` was adopted to enforce strict separation of concerns and maintainability. This structure ensures that business logic is centralized in the `services` layer, preventing scattered logic and enabling consistent testability and reusability.

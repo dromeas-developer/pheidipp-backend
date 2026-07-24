@@ -394,7 +394,7 @@ type OnboardingCompletedPayload = {
 ```
 
 **Producer:** `OnboardingService`
-**Consumers:** `TwinBootstrapService` (starts twin model build). Note: plan generation is triggered by `twin_model_ready`, NOT by `onboarding_completed`. For Tier 1 athletes, `twin_model_ready` fires after historical data ingestion completes.
+**Consumers:** `TwinBootstrapService` (starts twin model build). Note: plan generation is triggered by `twin_model_ready`, NOT by `onboarding_completed`.
 
 ---
 
@@ -570,13 +570,15 @@ type TwinModelReadyPayload = {
 }
 ```
 
-**Producer:** `TwinRecalibrationService` (fires once after onboarding when twin has sufficient data)
+**Producer:** `OnboardingService` (fires after bootstrap TwinState insert in the onboarding transaction)
 **Consumers:** `PlanGenerationService` (triggers initial plan generation + first WeeklyPlan)
 
 Trigger criteria by onboarding tier:
-- **Tier 1** (imported history): Fires after historical data ingestion completes and first `activity_sync` or `calibration` TwinState is created
+- **Tier 1** (imported history): Fires immediately after twin bootstrap. The plan is generated from questionnaire-only data; it will be regenerated later via `twin_confidence_upgraded` when historical data is ingested and recalibrates the twin.
 - **Tier 2** (peer-similar or lab test): Fires immediately after twin bootstrap
 - **Tier 3** (questionnaire only): Fires immediately after twin bootstrap
+
+**Note:** For Tier 1 athletes, plan regeneration after historical ingestion is handled by the `twin_confidence_upgraded` event, not by deferring `twin_model_ready`. This ensures all athletes receive an initial plan at onboarding while maintaining the ability to refine it as more data arrives.
 
 ---
 

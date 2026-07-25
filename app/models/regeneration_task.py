@@ -29,7 +29,6 @@ import uuid
 from datetime import date, datetime, timezone
 
 from sqlalchemy import (
-    CheckConstraint,
     Date,
     DateTime,
     ForeignKey,
@@ -38,10 +37,13 @@ from sqlalchemy import (
     func,
     text,
 )
+from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
+from app.models._enum_helpers import enum_str_values
+from app.models.enums import RegenerationTaskStatus, RegenerationTrigger
 
 
 class RegenerationTask(Base):
@@ -76,11 +78,27 @@ class RegenerationTask(Base):
 
     proposed_date: Mapped[date] = mapped_column(Date, nullable=False)
     rationale: Mapped[str] = mapped_column(Text, nullable=False)
-    # Inline-unioned values from the architecture contract:
-    # trajectory_ahead | trajectory_at_risk | coach_conversation.
-    trigger: Mapped[str] = mapped_column(Text, nullable=False)
+    trigger: Mapped[RegenerationTrigger] = mapped_column(
+        SAEnum(
+            RegenerationTrigger,
+            name="regeneration_trigger",
+            native_enum=False,
+            length=32,
+            values_callable=enum_str_values,
+        ),
+        nullable=False,
+    )
 
-    status: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[RegenerationTaskStatus] = mapped_column(
+        SAEnum(
+            RegenerationTaskStatus,
+            name="regeneration_task_status",
+            native_enum=False,
+            length=32,
+            values_callable=enum_str_values,
+        ),
+        nullable=False,
+    )
 
     proposed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -96,10 +114,6 @@ class RegenerationTask(Base):
     )
 
     __table_args__ = (
-        CheckConstraint(
-            "status IN ('pending_confirmation', 'confirmed', 'declined', 'expired')",
-            name="ck_regeneration_tasks_status_valid",
-        ),
         # Partial index on pending proposals per goal — the
         # "Stagnant Proposals" alert query path.
         Index(

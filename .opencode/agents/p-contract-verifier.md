@@ -6,7 +6,7 @@ description: >-
   entity or event name and verifies its contracts against the architecture.
   Never writes or edits anything.
 mode: subagent
-model: opencode-go/deepseek-v4-flash
+model: openrouter/inclusionai/ling-3.0-flash:free
 temperature: 0.1
 
 permission:

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any
+from typing import TypedDict
 
 import procrastinate
 from procrastinate.contrib.psycopg2 import Psycopg2Connector
@@ -17,6 +17,46 @@ from app.services.activity_ingestion_service import (
 )
 from app.services.object_storage_client import ObjectStorageClient
 from app.services.plan_generation_service import PlanGenerationService
+
+
+class FitIngestResult(TypedDict):
+    activity_id: str
+    twin_state_id: str
+
+
+class RecalibrateTwinResult(TypedDict):
+    twin_state_id: str
+    updated_form: float
+
+
+class SignalCleanResult(TypedDict):
+    activity_id: str
+    raw_sensor_stream_id: str | None
+    created: bool
+
+
+class ThresholdDetectionResult(TypedDict):
+    activity_id: str
+    twin_state_id: str | None
+    observations_count: int
+    shifted: bool
+    confidence_upgraded: bool
+
+
+class GeneratePlanResult(TypedDict):
+    training_plan_id: str
+    athlete_id: str
+
+
+class GenerateFirstMessageResult(TypedDict):
+    coaching_message_id: str | None
+    athlete_id: str
+    already_existed: bool
+
+
+class OutboxPublisherResult(TypedDict):
+    published_count: int
+    scheduled_at: int
 
 
 
@@ -34,7 +74,7 @@ app = procrastinate.App(connector=Psycopg2Connector(dsn=get_procrastinate_dsn())
 
 
 @app.task(name="fit_ingest")
-async def fit_ingest(*, activity_id: str, athlete_id: str) -> dict[str, Any]:
+async def fit_ingest(*, activity_id: str, athlete_id: str) -> FitIngestResult:
     """Ingest a previously uploaded FIT file into the activity pipeline."""
     athlete_uuid = uuid.UUID(athlete_id)
     activity_uuid = uuid.UUID(activity_id)
@@ -81,7 +121,7 @@ async def fit_ingest(*, activity_id: str, athlete_id: str) -> dict[str, Any]:
 
 
 @app.task()
-async def recalibrate_twin(*, athlete_id: str, activity_id: str) -> dict[str, Any]:
+async def recalibrate_twin(*, athlete_id: str, activity_id: str) -> RecalibrateTwinResult:
     """Recalibrate the Banister twin model after a manual load update."""
     from app.services.twin_recalibration_service import (
         TwinRecalibrationService,
@@ -120,7 +160,7 @@ async def recalibrate_twin(*, athlete_id: str, activity_id: str) -> dict[str, An
 
 
 @app.task(name="signal_clean")
-async def signal_clean(*, activity_id: str) -> dict[str, Any]:
+async def signal_clean(*, activity_id: str) -> SignalCleanResult:
     """Run the signal-cleaning pipeline for a previously ingested activity."""
     activity_uuid = uuid.UUID(activity_id)
 
@@ -185,7 +225,7 @@ async def signal_clean(*, activity_id: str) -> dict[str, Any]:
 
 
 @app.task(name="threshold_detection")
-async def threshold_detection(*, activity_id: str) -> dict[str, Any]:
+async def threshold_detection(*, activity_id: str) -> ThresholdDetectionResult:
     """Orchestrate threshold detection, physiology update, and twin recalibration in one transaction."""
     from app.services.threshold_detection_service import (
         ThresholdDetectionService,
@@ -297,7 +337,7 @@ async def threshold_detection(*, activity_id: str) -> dict[str, Any]:
 
 
 @app.task(name="generate_plan")
-async def generate_plan(*, athlete_id: str) -> dict[str, Any]:
+async def generate_plan(*, athlete_id: str) -> GeneratePlanResult:
     """Generate the active TrainingPlan for *athlete_id* on demand.
 
     Triggered by ``OnboardingService.complete_onboarding`` via
@@ -341,7 +381,7 @@ async def generate_plan(*, athlete_id: str) -> dict[str, Any]:
 
 
 @app.task(name="generate_first_message")
-async def generate_first_message(*, athlete_id: str) -> dict[str, Any]:
+async def generate_first_message(*, athlete_id: str) -> GenerateFirstMessageResult:
     """Generate the first coach message for *athlete_id* on demand.
 
     Triggered after plan generation completes (from the
@@ -451,7 +491,7 @@ OUTBOX_PUBLISHER_BATCH_SIZE = 100
 
 @app.periodic(cron="*/15 * * * * *")
 @app.task(name="outbox_publisher")
-async def outbox_publisher(timestamp: int) -> dict[str, Any]:
+async def outbox_publisher(timestamp: int) -> OutboxPublisherResult:
     """Transition ``pending`` outbox rows to ``published``.
 
     Delegates the publish-side transaction to

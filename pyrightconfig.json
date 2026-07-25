@@ -4,5 +4,13 @@
   "typeCheckingMode": "strict",
   "pythonVersion": "3.11",
   "venvPath": ".",
-  "venv": ".venv"
+  "venv": ".venv",
+  "executionEnvironments": [
+    {
+      "root": "tests",
+      "reportPrivateUsage": "none",
+      "reportUnusedFunction": "none",
+      "reportMissingParameterType": "none"
+    }
+  ]
 }

@@ -5,7 +5,7 @@ description: >-
   Takes a file path or module name and returns structural information:
   classes, functions, imports, and relationships. Never writes or edits.
 mode: subagent
-model: opencode-go/deepseek-v4-flash
+model: openrouter/inclusionai/ling-3.0-flash:free
 temperature: 0.1
 
 permission:

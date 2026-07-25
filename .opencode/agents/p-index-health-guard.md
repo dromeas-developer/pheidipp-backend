@@ -6,7 +6,7 @@ description: >-
   p-test-architect, p-devops). Checks index health and refreshes only
   the domains relevant to the caller.
 mode: subagent
-model: opencode-go/deepseek-v4-flash
+model: openrouter/inclusionai/ling-3.0-flash:free
 temperature: 0.1
 
 permission:

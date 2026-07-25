@@ -77,3 +77,4 @@ logs/
 .plans_implemented/
 .reports_backup/
 .archive/
+.test_archive/

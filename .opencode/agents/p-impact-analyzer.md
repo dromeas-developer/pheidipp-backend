@@ -6,7 +6,7 @@ description: >-
   depends on it, what it depends on, and what would break if changed.
   Never writes or edits anything.
 mode: subagent
-model: opencode-go/deepseek-v4-flash
+model: openrouter/inclusionai/ling-3.0-flash:free
 temperature: 0.1
 
 permission:

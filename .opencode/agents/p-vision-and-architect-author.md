@@ -5,7 +5,7 @@ description: >-
   usable standalone for direct vision/architecture authoring. The only
   agent allowed to modify docs/architecture/ and docs/vision/.
 mode: subagent
-model: poolside/poolside/laguna-m.1
+model: opencode-go/hy3
 temperature: 0.3
 
 permission:

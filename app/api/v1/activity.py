@@ -47,6 +47,7 @@ from app.services.activity_ingestion_service import (
     ObjectStorageFailureError,
 )
 from app.services.compliance_service import ComplianceService
+from app.core.prompt_registry import PromptRegistry
 from app.worker.app import app as procrastinate_app
 
 
@@ -92,7 +93,7 @@ def build_coaching_message_repository(
     return CoachingMessageRepository(session=session)
 
 
-def _shared_prompt_registry():
+def _shared_prompt_registry() -> PromptRegistry:
     # Lazy import to avoid a top-level cycle between the activity
     # router and the agent module.
     from app.core.prompt_registry import get_default_prompt_registry

@@ -12,7 +12,7 @@ description: >-
   decisions, and never writes or edits anything. Pattern detection is
   the caller's responsibility.
 mode: subagent
-model: opencode-go/deepseek-v4-flash
+model: openrouter/inclusionai/ling-3.0-flash:free
 temperature: 0.1
 
 permission:

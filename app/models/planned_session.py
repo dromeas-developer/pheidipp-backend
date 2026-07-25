@@ -54,6 +54,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.db.base import Base
 from app.models._enum_helpers import enum_str_values
 from app.models.enums import (
+    BlockPosition,
     CheckpointType,
     PhaseLabel,
     PlannedSessionStatus,
@@ -188,7 +189,16 @@ class PlannedSession(Base):
     )
 
     block_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    block_position: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    block_position: Mapped[BlockPosition | None] = mapped_column(
+        SAEnum(
+            BlockPosition,
+            name="block_position",
+            native_enum=False,
+            length=16,
+            values_callable=enum_str_values,
+        ),
+        nullable=True,
+    )
     block_session_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     is_suggested: Mapped[bool] = mapped_column(
@@ -214,10 +224,6 @@ class PlannedSession(Base):
             "target_date",
             "session_slot",
             name="uq_planned_sessions_plan_date_slot",
-        ),
-        CheckConstraint(
-            "block_position IS NULL OR block_position IN ('first', 'middle', 'last')",
-            name="ck_planned_sessions_block_position_valid",
         ),
         CheckConstraint(
             "approximate_duration_minutes > 0",

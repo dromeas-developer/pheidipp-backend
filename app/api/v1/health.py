@@ -8,7 +8,7 @@ from app.services.health_service import check_database
 health_router = APIRouter(prefix="/health")
 
 @health_router.get("/live")
-async def live():
+async def live() -> dict[str, str]:
     return {
         "status": "ok",
         "service": settings.APP_NAME,
@@ -16,7 +16,7 @@ async def live():
     }
 
 @health_router.get("/ready")
-async def ready(db: AsyncSession = Depends(get_db)):
+async def ready(db: AsyncSession = Depends(get_db)) -> dict[str, str]:
     try:
         database_status = await check_database(db)
         if database_status:

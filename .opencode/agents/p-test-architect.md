@@ -321,8 +321,11 @@ Load in this order, in a single batched `get_files` call where possible:
 2. **Test scenarios companion file** — if the batch BRD has a companion
    `-tests.md` file at `docs/implementation/phase-N/phase-N-M/batch-N-<theme>-tests.md`,
    load it in the same batched call. Each scenario in this file is a
-   concrete input/output pair that must become at least one test case.
-   If the file does not exist (purely structural batch, no behavioural
+   concrete input/output pair that must become at least one test case,
+   classified by Enforcement layer (type-system / database / application-logic)
+   and Mock Boundary (none / external-only / db-session). Consume both
+   classifications in Step 6 — they determine what to test and what to
+   mock. If the file does not exist (purely structural batch, no behavioural
    changes), skip — the test architect derives tests from contracts alone.
 3. Validator report for this plan (if available — do not block if missing)
 4. DevOps report from the most recent execution cycle for this plan or
@@ -419,6 +422,13 @@ yet — extracting everything that needs testing:
 * Events (produced events, payload fields, ordering requirements)
 * Invariants (from the plan's Invariants section)
 * Acceptance criteria (from the plan's Testing Requirements section)
+* **RETIRE/REWRITE entries** — if the plan's Testing Requirements section
+  lists existing tests to RETIRE (delete — capability no longer exists)
+  or REWRITE (update — capability changed), record them in the inventory.
+  RETIRE entries are acted on in Step 4 (Load Existing Suite): the listed
+  test files are deleted, not classified KEEP/MODIFY/EXTEND. REWRITE
+  entries are acted on in Step 6: the listed test files are updated to
+  match the new behaviour, not regenerated from scratch.
 
 **If the plan doesn't state a detail, the inventory doesn't contain it.**
 Do not open the implementation to fill the gap — not "just to check," not
@@ -641,6 +651,51 @@ Rules (apply across all stages):
   as positive paths — the brief's error-branch detail in Test Architect
   Mode exists specifically to make these visible before you write, not
   just the positive path
+
+**Enforcement-layer consumption (from the `-tests.md` scenarios).** The
+test scenarios companion file now classifies each scenario with an
+Enforcement layer and a Mock Boundary. Consume both:
+
+* **`type-system` enforcement** — the invalid input is rejected by
+  Pydantic, `Literal`, `Enum`, or a type hint at the schema boundary,
+  before the service sees it. **Skip this scenario.** The framework
+  enforces it; testing it tests Pydantic, not your code. Exception:
+  custom `@field_validator` functions are your logic — test those.
+  One schema-level integration test confirming the schema exists is
+  enough; do not write per-field tests for type-enforced inputs.
+* **`database` enforcement** — the invalid input is rejected by a
+  PostgreSQL constraint (NOT NULL, UNIQUE, CHECK, FK) on commit. Write
+  **one integration test per constraint** confirming it fires. Do not
+  write one test per invalid value — the constraint rejects all of them
+  the same way.
+* **`application-logic` enforcement** — the invalid input passes the
+  schema and the database constraints but is rejected by service-layer
+  validation or a business rule. **Write full branch coverage.** Every
+  branch, every boundary value, every error condition. This is where
+  bugs live.
+
+**Mock Boundary consumption.** The scenario's Mock Boundary tells you
+what to mock:
+
+* **`none`** — pure function, mock nothing. Let everything run real.
+* **`external-only`** — mock only out-of-process dependencies (HTTP
+  calls to external services, S3/MinIO, LLM proxy). Let all internal
+  code run real — services calling repositories, models being
+  persisted, event emission. The test should exercise the maximum
+  amount of production code.
+* **`db-session`** — unit test. Mock the DB session (AsyncSession)
+  so the test doesn't need a live database. Let the service logic run
+  real — the mock is for the session, not for the service's internal
+  collaborators.
+
+**The principle: mock at the external boundary, not the internal
+boundary.** Mock things that leave the process. Do not mock things
+inside the process. A test that mocks a repository to test a service
+is testing the mock, not the service-repository interaction. A test
+that mocks the DB session to test a service is testing the service
+logic in isolation, which is the point of a unit test. The difference
+is what you mock: the *transport* (session) vs. the *collaborator*
+(repository). Mock the transport; let the collaborator run real.
 
 Extending an existing test file still requires fetching that file yourself
 before editing it — `p-code-explorer` never touches `tests/`, and its brief

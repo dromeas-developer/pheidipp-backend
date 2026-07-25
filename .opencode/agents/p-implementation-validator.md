@@ -119,11 +119,11 @@ file delta is the ground truth for Step 5's deviation detection.
 
 ## Todo List Discipline
 
-Load the `todowrite-discipline` skill. Protocol source: the steps in the
-Validation Protocol below (Steps 0-7). Surfaced work: files to verify,
-subagent calls to make, findings to classify. Update the tasklist at the
-end of every step — this prevents losing track across the full validation
-chain.
+Load the `todowrite-discipline` skill. Protocol source: the steps in
+the Validation Protocol below (Steps 0-7, including Step 6b). Surfaced
+work: files to verify, subagent calls to make, findings to classify.
+Update the tasklist at the end of every step — this prevents losing
+track across the full validation chain.
 
 ---
 
@@ -319,6 +319,53 @@ test before routing — do not assume Architecture Rules violations
 automatically route to `p-implementation-architect` just because the
 category name says "Architecture." MINOR findings route directly to
 `p-coder` without Resolution Path assessment.
+
+### Step 6b — Type-Enforcement Conformance
+
+Load the `type-enforcement-conformance` skill now — it contains the
+check definitions, severity mappings, and classification rules for
+Layer 4 (Type-Enforcement Conformance). This layer audits the code's
+type discipline itself: visibility correctness (public/private), type
+strictness (`Literal` vs `str`, `Enum` vs `str`, concrete types vs
+`Any`), enforcement-layer placement (is validation at the layer the
+plan's RC6 classification states?), and custom validator presence.
+
+Audit every file loaded in Step 2 (the plan's scope files) against the
+four checks defined in the skill:
+1. **Visibility correctness** — public symbols only called internally
+   should be private; private symbols referenced cross-module should be
+   public. Delegate to `p-code-structure-explorer` for signatures and
+   cross-module reference detection — it has `get_importers` and
+   `get_module_deps`, which the validator does not hold directly.
+2. **Type strictness** — `str` where `Literal` or `Enum` is implied,
+   `Any` where a concrete type is inferable, missing annotations on
+   public functions. Delegate to `p-code-structure-explorer` for
+   signatures; cross-reference `str`-typed fields against architecture
+   enums via `p-contract-verifier`.
+3. **Enforcement layer placement** — if the plan has RC6 enforcement-
+   layer classifications (from the `-tests.md` scenarios or the plan's
+   Invariants section), verify the code enforces at the stated layer.
+   If the plan has no RC6 classification for an input the code validates,
+   flag as Plan Gap.
+4. **Custom validator presence** — validation rules that cannot be
+   expressed by a type annotation alone should have a `@field_validator`
+   or `@model_validator`. Missing or incomplete validators are MAJOR.
+   Delegate to `p-code-structure-explorer` to find `@field_validator`
+   and `@model_validator` decorators in schema files.
+
+All findings from this layer feed Step 7's classification and routing.
+MAJOR findings get Resolution Path assessment (most route to `p-coder`
+as Implementation Fix; enforcement-layer Plan Gaps route to
+`p-implementation-architect`). MINOR findings route directly to
+`p-coder`.
+
+**Retrospective audit mode.** When invoked to audit an existing
+codebase with no plan (no `docs/implementation/` path provided), skip
+Steps 0–6 and run only Step 6b. The codebase itself is the subject;
+Checks 1, 2, and 4 apply (Check 3 — enforcement layer placement —
+requires a plan's RC6 classification and is skipped). Produce a
+standalone report at `reports/type-enforcement-audit-<scope>.md` with
+all findings routing to `p-coder`.
 
 ### Step 7 — Classify All Findings
 

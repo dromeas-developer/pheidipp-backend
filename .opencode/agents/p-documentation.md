@@ -6,7 +6,7 @@ description: >-
   comment noise), Summarize (moves bloated inline docs to READMEs,
   compacts docstrings).
 mode: subagent
-model: opencode-go/deepseek-v4-flash
+model: poolside/poolside/laguna-s-2.1
 temperature: 0.5
 
 permission:

@@ -17,6 +17,7 @@
     "ollama-cloud",
     "opencode",
     "opencode-go",
+    "openrouter",
     "poolside",
     "litellm-proxy"
   ],
@@ -32,6 +33,12 @@
         "qwen/qwen3.5-397b-a17b",
         "stepfun-ai/step-3.7-flash",
         "thinkingmachines/inkling"
+      ]
+    },
+    "openrouter": {
+      "name": "OpenRouter",
+      "whitelist": [
+        "inclusionai/ling-3.0-flash:free"
       ]
     },
     "poolside": {

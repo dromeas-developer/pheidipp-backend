@@ -462,6 +462,23 @@ Every architecture entity, event, and invariant the Doc Explorer returned
 Contracts section or be explicitly excluded from scope. If a returned
 contract is absent from the plan and not excluded, flag as GAP.
 
+**Computational invariant fixture gate.** A computational invariant — any
+invariant whose enforcement is a formula, decay, threshold, ratio, or
+numeric transformation rather than a structural constraint (append-only,
+ownership boundary, layer separation) — must ship with a concrete numeric
+fixture in the plan: a specific input, the expected output, and a tolerance.
+Qualitative description alone is a GAP, same severity as a missing event
+contract. The fixture must be precise enough that a test assertion can be
+written directly from it — a concrete numeric triple (input, expected
+output, tolerance), not a prose approximation of the behaviour.
+
+This gate lives in the architect's own RC1 reasoning, not in
+`p-contract-verifier`'s output — the contract verifier returns invariant
+type and enforcement mechanism, not fixtures. The architect is the one
+who knows whether an invariant is computational (and thus needs a fixture)
+versus structural, because that judgment requires reading the invariant's
+prose, not just its metadata.
+
 For entities the plan touches, delegate contract retrieval to
 `p-contract-verifier` for structured comparison — it returns schema,
 events (with payload fields), invariants (with type and enforcement),
@@ -524,6 +541,21 @@ application check (service-layer validation before commit), API validation
 (Pydantic validator on the request schema), or architectural convention
 ("append-only by construction — no UPDATE path exists"). Flag any invariant
 whose enforcement mechanism is unspecified or unclear.
+
+**Input validation enforcement layer.** For every input the plan's
+capabilities accept, the plan should state which layer rejects invalid
+input. This classification determines what the test architect must test
+and what it can safely skip:
+
+| Enforcement Layer | What rejects invalid input | Test needed? |
+|---|---|---|
+| **Type system** (Pydantic validator, `Literal`, type hint, `Enum`, `@field_validator`) | Schema boundary, before service logic | No — unless it is a custom `@field_validator` (your logic, test it). One schema-level integration test confirms the schema exists. |
+| **Database constraint** (NOT NULL, UNIQUE, CHECK, FK) | PostgreSQL, on commit | Integration only — one test per constraint confirms it fires, not one per invalid value. |
+| **Application logic** (service-layer validation, business rule, conditional branch) | Your code, in the service | Yes — every branch, every boundary value, every error condition. |
+
+Flag any input whose enforcement layer is unspecified. An input with no
+stated enforcement layer is a GAP — the test architect cannot know
+whether to write a test for it or skip it as framework-enforced.
 
 #### RC7 — ADR Re-Check
 
@@ -588,6 +620,28 @@ Ask for each scenario:
 Scenarios that expose contract gaps → Minor gap, resolve inline. Scenarios
 that expose missing contracts → Significant gap, escalate.
 
+**Scenarios for computational invariants must use the fixtures pinned in
+RC1** — same input, same expected output, same tolerance. Do not re-derive
+approximations in the scenario; the RC1 fixture is the authoritative
+expected value. If RC1 did not pin a fixture for a computational invariant
+this scenario depends on, go back and fix RC1 first — the grill cannot
+produce a concrete scenario without a concrete fixture.
+
+**Classify each scenario's enforcement layer** (from the RC6 table above)
+and its mocking boundary before writing it into the `-tests.md` file:
+
+| Field | Values | Purpose |
+|---|---|---|
+| **Enforcement** | `type-system` / `database` / `application-logic` | Tells the test architect whether to write a test for this scenario at all. `type-system` scenarios are skipped (framework-enforced). `database` scenarios get one integration test per constraint. `application-logic` scenarios get full branch coverage. |
+| **Mock Boundary** | `none` / `external-only` / `db-session` | Tells the test architect what to mock. `none` — pure function, mock nothing. `external-only` — mock only out-of-process dependencies (HTTP, S3, LLM proxy), let all internal code run real. `db-session` — unit test, mock the DB session but let the service logic run real. |
+
+The principle for Mock Boundary: **mock at the external boundary, not the
+internal boundary.** Mock things that leave the process (HTTP calls to
+external services, S3/MinIO, LLM proxy). Do not mock things inside the
+process (services calling repositories, models being persisted). The test
+should exercise the maximum amount of production code; mocks exist to
+isolate the test from *external* dependencies, not from *internal* ones.
+
 Draft scenarios are not written to disk yet — they're notes for Step 9
 where they become the `-tests.md` companion file.
 
@@ -644,6 +698,36 @@ After code retrieval, adjust the tentative plan where the implemented reality
 requires it — for file placement, pattern reuse, or completed contracts.
 Apply the Architecture Authority rule: code informs execution details,
 it does not redefine architecture.
+
+**Existing test impact assessment.** When the tentative plan *modifies*
+an existing capability (not CREATE — CREATE has no prior tests to
+affect), check whether existing tests for that capability are still
+valid. Use `grep_files` or `search_symbols` to find test files that
+reference the modified capability's function names, service names, or
+entity names. For each existing test file found:
+
+- If the test validates behaviour the plan *changes* → mark it
+  **REWRITE** — the test must be updated to match the new behaviour.
+  List it in the plan's Testing Requirements section with the reason.
+- If the test validates behaviour the plan *removes or replaces* →
+  mark it **RETIRE** — the test should be deleted because the
+  capability it tests no longer exists in this form. List it in the
+  plan's Testing Requirements section with the reason.
+- If the test validates behaviour the plan *does not touch* → leave
+  it alone. Do not list it.
+
+This assessment prevents stale test accumulation: tests that were
+correct for a prior phase but are no longer valid after this plan's
+changes are explicitly retired or rewritten, not left to drift in
+the regression suite where they either fail silently (if the old
+code path still exists as a fallback) or fail noisily on the next
+devops run (requiring a reactive fix that doesn't ask whether the
+test should still exist).
+
+The test architect reads the Testing Requirements section and acts
+on RETIRE/REWRITE entries. Tests not listed are left untouched —
+the architect does not scan the entire test suite, only the tests
+that reference the modified capability.
 
 ### Step 7 — Determine How Many Plans Are Needed
 

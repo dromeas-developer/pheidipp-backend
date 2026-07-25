@@ -548,6 +548,67 @@ class SignalType(str, Enum):
     DESCRIPTION = "description"
 
 
+class BlockPosition(str, Enum):
+    """Position of a session within a training block.
+
+    Used by ``PlannedSession.block_position`` and
+    ``WeeklySession.block_position`` for compound-stimulation
+    adaptation windows.
+    """
+
+    FIRST = "first"
+    MIDDLE = "middle"
+    LAST = "last"
+
+
+class TrajectoryStatus(str, Enum):
+    """Trajectory validation status for target_performance plans.
+
+    Set only on ``Checkpoint.trajectory_status`` when coach-driven
+    trajectory tracking is active.
+    """
+
+    AHEAD = "ahead"
+    ON_TRACK = "on_track"
+    BEHIND = "behind"
+    AT_RISK = "at_risk"
+
+
+class RegenerationTaskStatus(str, Enum):
+    """Lifecycle status of a ``RegenerationTask``.
+
+    pending_confirmation ← proposed, awaiting athlete decision
+    confirmed            ← athlete accepted; plan regeneration cascades
+    declined             ← athlete rejected the proposal
+    expired              ← 14-day proposal TTL elapsed without confirmation
+    """
+
+    PENDING_CONFIRMATION = "pending_confirmation"
+    CONFIRMED = "confirmed"
+    DECLINED = "declined"
+    EXPIRED = "expired"
+
+
+class RegenerationTrigger(str, Enum):
+    """Coach's rationale axis for a ``RegenerationTask`` proposal."""
+
+    TRAJECTORY_AHEAD = "trajectory_ahead"
+    TRAJECTORY_AT_RISK = "trajectory_at_risk"
+    COACH_CONVERSATION = "coach_conversation"
+
+
+class WeeklySessionStatus(str, Enum):
+    """Lifecycle status of a ``WeeklySession``.
+
+    Distinct from ``PlannedSessionStatus`` — different lifecycle.
+    """
+
+    SCHEDULED = "scheduled"
+    COMPLETED = "completed"
+    SKIPPED = "skipped"
+    MISSED = "missed"
+
+
 class SessionPurpose(str, Enum):
     """Why the session is being run — distinct from ``PhysiologicalIntent`` /
     ``SessionType``. ``race_specific`` is NOT a ``SessionType`` and

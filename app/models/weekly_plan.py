@@ -34,7 +34,6 @@ from sqlalchemy import (
     Index,
     Integer,
     String,
-    Text,
     UniqueConstraint,
     func,
 )
@@ -45,9 +44,11 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.db.base import Base
 from app.models._enum_helpers import enum_str_values
 from app.models.enums import (
+    BlockPosition,
     CheckpointType,
     SessionType,
     WeeklyPlanStatus,
+    WeeklySessionStatus,
 )
 
 
@@ -205,11 +206,16 @@ class WeeklySession(Base):
     # ------------------------------------------------------------------
     # Lifecycle.
     # ------------------------------------------------------------------
-    # Inline-union: 'scheduled' | 'completed' | 'skipped' | 'missed'
-    # — string column with CHECK enforcement. The architecture
-    # documents this as an inline union distinct from
-    # ``WeeklyPlanStatus``.
-    status: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[WeeklySessionStatus] = mapped_column(
+        SAEnum(
+            WeeklySessionStatus,
+            name="weekly_session_status",
+            native_enum=False,
+            length=16,
+            values_callable=enum_str_values,
+        ),
+        nullable=False,
+    )
 
     # Lazy FK to ``planned_sessions``. Unique when non-null so one
     # WeeklySession maps to at most one PlannedSession.
@@ -218,20 +224,20 @@ class WeeklySession(Base):
     )
 
     block_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    # 'first' | 'middle' | 'last' — inline union; CHECK constraint
-    # enforces membership.
-    block_position: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    block_position: Mapped[BlockPosition | None] = mapped_column(
+        SAEnum(
+            BlockPosition,
+            name="block_position",
+            native_enum=False,
+            length=16,
+            values_callable=enum_str_values,
+            create_type=False,
+        ),
+        nullable=True,
+    )
     block_session_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     __table_args__ = (
-        CheckConstraint(
-            "status IN ('scheduled', 'completed', 'skipped', 'missed')",
-            name="ck_weekly_sessions_status_valid",
-        ),
-        CheckConstraint(
-            "block_position IS NULL OR block_position IN ('first', 'middle', 'last')",
-            name="ck_weekly_sessions_block_position_valid",
-        ),
         CheckConstraint(
             "approximate_duration_minutes > 0",
             name="ck_weekly_sessions_duration_positive",

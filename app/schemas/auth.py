@@ -6,7 +6,7 @@ from datetime import date, datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from app.models.enums import Sex
 
@@ -23,6 +23,13 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
     profile: RegisterProfileIn
+
+    @field_validator("password")
+    @classmethod
+    def _validate_password_not_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("password must not be blank or whitespace-only")
+        return value
 
 
 class LoginRequest(BaseModel):

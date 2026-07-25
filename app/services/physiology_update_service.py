@@ -218,30 +218,25 @@ class PhysiologyUpdateResult:
 # ---------------------------------------------------------------------------
 
 
-def parse_iso_date(value: Any) -> date:
+def parse_iso_date(value: str | date | datetime) -> date:
     """Parse the ISO-8601 ``last_observation_date`` JSONB string.
 
     Accepts the full ``datetime.isoformat()`` form
     (``"2024-05-12T08:30:00+00:00"``) produced by
     :func:`OnboardingService._bootstrap_signal` and the bare
     ``"YYYY-MM-DD"`` form produced by the Bayesian update return
-    value. Anything else raises ``TypeError`` — the service caller
-    is responsible for keeping the JSONB shape consistent.
+    value.
     """
     if isinstance(value, date) and not isinstance(value, datetime):
         return value
     if isinstance(value, datetime):
         return value.date()
-    if isinstance(value, str):
-        # ISO-8601 strings may include a time component; ``fromisoformat``
-        # handles both bare-date and full-datetime forms in Python 3.11+.
-        return datetime.fromisoformat(value).date()
-    raise TypeError(
-        f"unsupported last_observation_date type: {type(value).__name__}"
-    )
+    # ISO-8601 strings may include a time component; ``fromisoformat``
+    # handles both bare-date and full-datetime forms in Python 3.11+.
+    return datetime.fromisoformat(value).date()
 
 
-def coerce_observation_date(value: Any) -> date:
+def coerce_observation_date(value: date | datetime) -> date:
     """Coerce an observation ``date`` value to a ``datetime.date``.
 
     The ``PhysiologyMeasurement.measurement_date`` column is
@@ -250,14 +245,10 @@ def coerce_observation_date(value: Any) -> date:
     """
     if isinstance(value, datetime):
         return value.date()
-    if isinstance(value, date):
-        return value
-    raise TypeError(
-        f"unsupported observation date type: {type(value).__name__}"
-    )
+    return value
 
 
-def source_value(source: Any) -> str:
+def source_value(source: MeasurementSource | str) -> str:
     """Return the ``MeasurementSource.value`` string for ``source``.
 
     Accepts either a ``MeasurementSource`` enum member (preferred

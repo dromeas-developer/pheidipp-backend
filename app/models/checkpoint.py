@@ -41,7 +41,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
 from app.models._enum_helpers import enum_str_values
-from app.models.enums import CheckpointStatus, CheckpointType
+from app.models.enums import CheckpointStatus, CheckpointType, TrajectoryStatus
 
 
 class Checkpoint(Base):
@@ -122,7 +122,16 @@ class Checkpoint(Base):
     # ------------------------------------------------------------------
     # Trajectory validation — target_performance mode only.
     # ------------------------------------------------------------------
-    trajectory_status: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    trajectory_status: Mapped[TrajectoryStatus | None] = mapped_column(
+        SAEnum(
+            TrajectoryStatus,
+            name="trajectory_status",
+            native_enum=False,
+            length=16,
+            values_callable=enum_str_values,
+        ),
+        nullable=True,
+    )
     proposal: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
@@ -148,11 +157,6 @@ class Checkpoint(Base):
         Index(
             "ix_checkpoints_planned_session",
             "planned_session_id",
-        ),
-        CheckConstraint(
-            "trajectory_status IS NULL OR "
-            "trajectory_status IN ('ahead', 'on_track', 'behind', 'at_risk')",
-            name="ck_checkpoints_trajectory_status_valid",
         ),
         # Status must be one of three canonical values.
         CheckConstraint(

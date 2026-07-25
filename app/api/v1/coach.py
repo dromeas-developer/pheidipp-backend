@@ -6,11 +6,9 @@ import uuid
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db, require_self
-from app.models.coaching_message import CoachingMessage
 from app.models.enums import MessageType
 from app.repositories.athlete_preferences_repository import (
     AthletePreferencesRepository,
@@ -114,34 +112,17 @@ async def get_coach_messages(
     coaching_messages: CoachingMessageRepository = Depends(
         build_coaching_message_repository
     ),
-    session: AsyncSession = Depends(get_db),
-    message_type: Optional[str] = Query(default=None),
+    message_type: Optional[MessageType] = Query(default=None),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
 ) -> MessagesListResponse:
-    mt: Optional[MessageType] = None
-    if message_type:
-        try:
-            mt = MessageType(message_type)
-        except ValueError:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"Invalid message_type: {message_type}",
-            )
-
     messages = await coaching_messages.get_by_athlete_id(
-        athlete_id, message_type=mt, limit=limit, offset=offset
+        athlete_id, message_type=message_type, limit=limit, offset=offset
     )
 
-    count_stmt = select(func.count()).where(
-        CoachingMessage.athlete_id == athlete_id
+    total = await coaching_messages.get_all_count(
+        athlete_id, message_type=message_type
     )
-    if mt is not None:
-        count_stmt = count_stmt.where(
-            CoachingMessage.message_type == mt
-        )
-    result = await session.execute(count_stmt)
-    total = result.scalar_one()
 
     return MessagesListResponse(
         messages=[CoachingMessageResponse.model_validate(m) for m in messages],

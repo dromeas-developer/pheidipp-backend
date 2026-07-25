@@ -137,12 +137,6 @@ The truncation uses SQLAlchemy's `Base.metadata.sorted_tables` to automatically 
 
 ### ⚠️ FK Cycles and the `Cannot correctly sort tables` Warning
 
-The Phase-1.2c schema introduces a deliberate FK cycle:
-
-```
-twin_states → activities → planned_sessions → weekly_plans → training_plans → twin_states
-```
-
 SQLAlchemy's `sorted_tables` cannot topologically sort this and emits `SAWarning: Cannot correctly sort tables; there are unresolvable cycles between tables`. PostgreSQL's `TRUNCATE ... CASCADE` handles the cycle natively (one statement truncates the whole SCC), so the warning is informational only.
 
 `tests/conftest.py` installs a targeted `warnings.filterwarnings("ignore", message=r"Cannot correctly sort tables.*", category=SAWarning)` filter so the warning does not flood test output. Any *other* `SAWarning` from the same code path remains visible — the filter is intentionally narrow.

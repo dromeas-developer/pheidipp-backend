@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional, cast
+from typing import Any, Dict, List, Literal, Mapping, Optional, cast
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -20,7 +20,9 @@ from app.models.enums import (
     PowerSource,
     PrimaryTrainingPlatform,
     RecoveryModifierLevel,
+    Sex,
     SportBackground,
+    TrainingTimeOfDay,
     TwinConfidenceLevel,
     TwinTrigger,
     WellnessTrend,
@@ -45,6 +47,13 @@ class WeeklyScheduleDayPatchIn(BaseModel):
     doubles_eligible: Optional[bool] = None
 
 
+class TrainingWindowIn(BaseModel):
+    """Athlete's preferred daily training time window."""
+
+    start: str = Field(min_length=1, max_length=5, pattern=r"^\d{2}:\d{2}$")
+    end: str = Field(min_length=1, max_length=5, pattern=r"^\d{2}:\d{2}$")
+
+
 WeeklyScheduleIn = Dict[
     Literal[
         "monday",
@@ -59,7 +68,9 @@ WeeklyScheduleIn = Dict[
 ]
 
 
-def _validate_weekly_schedule_keys(value: Dict[str, Any]) -> Dict[str, Any]:
+def _validate_weekly_schedule_keys(
+    value: Mapping[str, WeeklyScheduleDayIn | dict[str, Any]],
+) -> Dict[str, WeeklyScheduleDayIn]:
     expected = {
         "monday",
         "tuesday",
@@ -82,12 +93,14 @@ def _validate_weekly_schedule_keys(value: Dict[str, Any]) -> Dict[str, Any]:
             f"({'; '.join(problems)})"
         )
     return {
-        day: WeeklyScheduleDayIn.model_validate(day_cfg).model_dump()
+        day: WeeklyScheduleDayIn.model_validate(day_cfg)
         for day, day_cfg in value.items()
     }
 
 
-def _validate_weekly_schedule_patch(value: Dict[str, Any]) -> Dict[str, Any]:
+def _validate_weekly_schedule_patch(
+    value: Mapping[str, WeeklyScheduleDayPatchIn | dict[str, Any]],
+) -> Dict[str, WeeklyScheduleDayPatchIn]:
     canonical = {
         "monday",
         "tuesday",
@@ -106,9 +119,7 @@ def _validate_weekly_schedule_patch(value: Dict[str, Any]) -> Dict[str, Any]:
             f"(unexpected: {sorted(extra)})"
         )
     return {
-        day: WeeklyScheduleDayPatchIn.model_validate(day_cfg).model_dump(
-            exclude_unset=True
-        )
+        day: WeeklyScheduleDayPatchIn.model_validate(day_cfg)
         for day, day_cfg in value.items()
     }
 
@@ -141,7 +152,7 @@ class OnboardingProfileIn(BaseModel):
     """Subset of ``AthleteProfile`` fields the onboarding transaction writes."""
 
     timezone: str = Field(min_length=1, max_length=64)
-    training_window: Optional[Dict[str, Any]] = None
+    training_window: Optional[TrainingWindowIn] = None
     height_cm: Optional[float] = Field(default=None, ge=50, le=300)
 
     @field_validator("timezone")
@@ -160,7 +171,7 @@ class OnboardingPreferencesIn(BaseModel):
     sport_background: SportBackground
     years_structured_training: int = Field(ge=0, le=80)
     training_time_of_day: Literal["morning", "afternoon", "evening", "variable"]
-    weekly_schedule: Dict[str, Any]
+    weekly_schedule: Dict[str, WeeklyScheduleDayIn]
     gps_source: GpsSource
     hr_source: HrSource
     power_source: PowerSource
@@ -190,6 +201,15 @@ class OnboardingTrainingGoalIn(BaseModel):
     injury_severity: Optional[InjurySeverity] = None
     target_distance_km: Optional[float] = Field(default=None, gt=0)
     target_time_minutes: Optional[int] = Field(default=None, gt=0)
+
+    @field_validator("goal_event_date")
+    @classmethod
+    def _validate_event_date_in_future(
+        cls, value: Optional[date], info: Any
+    ) -> Optional[date]:
+        if value is not None and value <= date.today():
+            raise ValueError("goal_event_date must be in the future")
+        return value
 
     @model_validator(mode="after")
     def _validate_required_fields(self) -> "OnboardingTrainingGoalIn":
@@ -242,7 +262,7 @@ class AthleteProfilePatchIn(BaseModel):
     height_cm: Optional[float] = Field(default=None, ge=50, le=300)
     location_lat: Optional[float] = Field(default=None, ge=-90, le=90)
     location_lng: Optional[float] = Field(default=None, ge=-180, le=180)
-    training_window: Optional[Dict[str, Any]] = None
+    training_window: Optional[TrainingWindowIn] = None
 
     @model_validator(mode="before")
     @classmethod
@@ -268,7 +288,7 @@ class AthletePreferencesPatchIn(BaseModel):
     training_time_of_day: Optional[
         Literal["morning", "afternoon", "evening", "variable"]
     ] = None
-    weekly_schedule: Optional[Dict[str, Any]] = None
+    weekly_schedule: Optional[Dict[str, WeeklyScheduleDayPatchIn]] = None
     gps_source: Optional[GpsSource] = None
     hr_source: Optional[HrSource] = None
     power_source: Optional[PowerSource] = None
@@ -314,12 +334,12 @@ class AthleteProfileResponse(BaseModel):
 
     athlete_id: UUID
     date_of_birth: date
-    sex: str
+    sex: Sex
     height_cm: Optional[float]
     location_lat: Optional[float]
     location_lng: Optional[float]
     timezone: Optional[str]
-    training_window: Optional[Dict[str, Any]]
+    training_window: Optional[TrainingWindowIn]
     structural_risk_flag: Optional[bool]
     updated_at: datetime
 
@@ -362,7 +382,7 @@ class AthletePreferencesResponse(BaseModel):
     athlete_id: UUID
     sport_background: SportBackground
     years_structured_training: int
-    training_time_of_day: str
+    training_time_of_day: TrainingTimeOfDay
     weekly_schedule: Dict[str, WeeklyScheduleDayOut]
     gps_source: GpsSource
     hr_source: HrSource

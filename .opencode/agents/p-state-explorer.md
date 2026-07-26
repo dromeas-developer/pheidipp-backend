@@ -42,6 +42,9 @@ permission:
 
   # MCP — entity-to-code bridging
   pheidipp-codebase-context_get_code_for_entity: allow
+
+  # MCP — batched code-domain lookups (symbols, imports, deps, function/class context)
+  pheidipp-codebase-context_multi_code_query: allow
 ---
 
 # Pheidipp — State Explorer
@@ -136,9 +139,17 @@ for alternative names unless the task explicitly asks for that.
    - **Transaction boundaries**: where `session.commit()` appears in
      services, and whether events are fired before or after commit
 
-4. **Batch your queries.** Use `search_symbols` with all entity names in
-   one call. Use `grep_files` with all relevant patterns in one call per
-    pattern type. Never call sequentially for independent items.
+  4. **Batch your queries.** Use `search_symbols` with all entity names in
+     one call. Use `grep_files` with all relevant patterns in one call per
+     pattern type. When you need to combine independent code-domain lookups
+      (e.g. confirming multiple entity symbols AND checking their module
+      imports), prefer `multi_code_query` to batch them in a single call —
+      each query is keyed as `query_0`, `query_1`, etc. Never call
+      sequentially for independent items.
+
+      **Batch size limit:** `multi_code_query` accepts at most 20 queries
+      per call. If you have more than 20 independent lookups, split them
+      into batches of 20 or fewer.
 
 5. **Flag missing registrations.** If an entity exists in `app/models/`
    but is not exported in `app/models/__init__.py`, flag it. This is a

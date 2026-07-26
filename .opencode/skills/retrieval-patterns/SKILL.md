@@ -96,6 +96,7 @@ maximising bulk tool usage.
 | Find specific function or class signatures | N/A (no subagent) | `search_symbols([symbols])` — batch all symbols, one call |
 | Find specific patterns across known files | N/A (no subagent) | `grep_files(pattern, paths?)` |
 | Semantic search when file location unknown | N/A (no subagent) | `search_codebase(query)` — last resort; targeted query only |
+| Batch multiple code-domain lookups (imports, deps, symbols, function/class context) | N/A (no subagent) | `multi_code_query(queries[])` — max 20 queries per call; split into batches if needed |
 
 **Retrieval pattern:**
 - Impact analysis → delegate to `p-impact-analyzer`

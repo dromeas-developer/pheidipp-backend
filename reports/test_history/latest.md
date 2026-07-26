@@ -1,9 +1,9 @@
-date: 2026-07-24T12:00:00Z
-plan: phase-2-7
-execution_group: feature
-total: 9
-passed: 9
+date: 2026-07-25T20:30:00Z
+plan: GAP-PHASE-1-TESTS
+execution_group: testpack
+total: 2
+passed: 2
 failed: 0
 skipped: 0
-duration_seconds: 4
+duration_seconds: 0
 failures: []

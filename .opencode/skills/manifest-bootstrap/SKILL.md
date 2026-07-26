@@ -3,10 +3,13 @@ name: manifest-bootstrap
 description: >
   Load this when the test manifest does not exist (index.yaml is missing).
   Contains the initial file creation logic for the test manifest system:
-  MOCKING_CONTRACT.md template, creation order, and initial values. The
-  manifest structure (index.yaml and phase file schema) is defined in
-  tests/test-manifest/SCHEMA.md — this skill references it rather than
-  duplicating it. Loaded by p-test-architect only when
+  conftest.py, MOCKING_CONTRACT.md template, creation order, and initial
+  values. The manifest structure (index.yaml and phase file schema) is
+  defined in tests/test-manifest/SCHEMA.md — this skill references it
+  rather than duplicating it. The conftest.py patterns come from the
+  test-infrastructure skill — load that skill before creating conftest.py
+  for the canonical fixture patterns, then resolve production imports via
+  p-code-explorer. Loaded by p-test-architect only when
   tests/test-manifest/index.yaml is absent.
 location: .opencode/skills/manifest-bootstrap/SKILL.md
 ---
@@ -16,7 +19,7 @@ location: .opencode/skills/manifest-bootstrap/SKILL.md
 Load this skill only when `tests/test-manifest/index.yaml` does not exist.
 This is the initial creation path — everything else (test generation,
 phase file updates, diagnostics) proceeds normally per the Generate
-protocol. This skill covers only the three infrastructure files that
+protocol. This skill covers only the four infrastructure files that
 must exist before any test generation can begin.
 
 The manifest structure (index.yaml schema, phase file schema, ownership
@@ -31,11 +34,19 @@ structure.
 
 ## What Gets Created
 
-1. **`tests/MOCKING_CONTRACT.md`** — The fixture and mock-boundary contract
-   with the initial layer-boundary table (template below)
-2. **`tests/test-manifest/index.yaml`** — The cross-phase registry with
+1. **`tests/conftest.py`** — Root conftest with the four canonical fixtures
+   (`test_engine`, `test_session_local`, `db_session`, `client`) and the
+   session-scoped `_prepare_database` schema setup. Load the
+   `test-infrastructure` skill for the canonical fixture patterns (engine
+   lifecycle, NullPool, truncation, client wiring), then use
+   `p-code-explorer` to resolve the production imports (model classes, app
+   factory, session factory, Base metadata) and write the file.
+2. **`tests/MOCKING_CONTRACT.md`** — The fixture and mock-boundary contract
+   with the initial layer-boundary table and canonical fixtures table
+   (template below)
+3. **`tests/test-manifest/index.yaml`** — The cross-phase registry with
    empty selection groups (structure per SCHEMA.md)
-3. **`tests/test-manifest/phase-N-Mx.yaml`** — The first sub-phase file
+4. **`tests/test-manifest/phase-N-Mx.yaml`** — The first sub-phase file
    with the full schema (structure per SCHEMA.md), `files` block empty,
    `prerequisites.migrations` set from the plan
 
@@ -45,14 +56,26 @@ structure.
 
 **Before creating anything:** Read `tests/test-manifest/SCHEMA.md` via
 `get_files` to get the authoritative schema structure for `index.yaml`
-and `phase-N-Mx.yaml`. This skill provides the creation logic only —
-the schema structure lives in SCHEMA.md.
+and `phase-N-Mx.yaml`. Load the `test-infrastructure` skill for the
+canonical conftest.py patterns. This skill provides the creation logic
+only — the schema structure lives in SCHEMA.md and the fixture patterns
+live in test-infrastructure.
 
-1. **Create `tests/MOCKING_CONTRACT.md` first** — it must exist before any
+1. **Create `tests/conftest.py` first** — it must exist before any test
+   file is written, as every integration/api/behaviour test depends on
+   `db_session` and `client`. Load the `test-infrastructure` skill for the
+   canonical fixture patterns (engine lifecycle, NullPool, truncation,
+   client wiring), then delegate to `p-code-explorer` to resolve the
+   production imports (model classes from `app.models`, app factory from
+   `app.main`, session factory from `app.db.session`, Base metadata from
+   `app.db.base`). The skill provides the structural patterns; the explorer
+   provides the specific import paths. Write the file yourself — the
+   explorer does not write code.
+2. **Create `tests/MOCKING_CONTRACT.md`** — it must exist before any
    test file is written, as every generated test must conform to it
-2. **Create `tests/test-manifest/index.yaml`** — the cross-phase registry
+3. **Create `tests/test-manifest/index.yaml`** — the cross-phase registry
    with empty selection groups (structure from SCHEMA.md)
-3. **Create `tests/test-manifest/phase-N-Mx.yaml`** — the first sub-phase
+4. **Create `tests/test-manifest/phase-N-Mx.yaml`** — the first sub-phase
    file with empty `files` block and `prerequisites.migrations` from the
    plan (structure from SCHEMA.md)
 
@@ -80,18 +103,28 @@ meant to be scanned in seconds, not read as prose.
 
 | Fixture Name | Location | Scope | What it is for |
 |---|---|---|---|
-| `db_session` | `tests/conftest.py` | function | Provides an isolated AsyncSession against test_pheidipp |
-| `client` | `tests/conftest.py` | function | Provides an httpx.AsyncClient with the FastAPI app |
-| `token_service` | `tests/conftest.py` | function | Provides TokenService for auth header generation |
-| `test_session_local` | `tests/conftest.py` | function | Provides a session factory for worker task tests |
+| `test_engine` | `tests/conftest.py` | function | Per-test AsyncEngine with NullPool (avoids loop errors) |
+| `test_session_local` | `tests/conftest.py` | function | async_sessionmaker[AsyncSession] bound to test_engine |
+| `db_session` | `tests/conftest.py` | function | Isolated AsyncSession with auto-rollback and post-test truncation |
+| `client` | `tests/conftest.py` | function | httpx.AsyncClient wired to FastAPI app with db_session override |
+| *(per-directory fixtures added here as they are created)* | `tests/<layer>/conftest.py` | varies | Layer-specific fixtures (unit mock helpers, integration factory imports, api auth builders, behaviour journey helpers) |
+| *(factory helpers added here as they are created)* | `tests/utils/factories.py` | function | Async model factories — import directly, not through conftest |
+| *(assertion helpers added here as they are created)* | `tests/utils/assertions.py` | function | Reusable assertion functions |
+| *(model helpers added here as they are created)* | `tests/utils/model_helpers.py` | function | ORM introspection (no DB required) |
+| *(schema helpers added here as they are created)* | `tests/utils/schema_helpers.py` | function | DB schema introspection (sync psycopg2 engine) |
+| *(HTTP helpers added here as they are created)* | `tests/utils/http_helpers.py` | function | HTTP client helpers for api/behaviour tests |
 
 ### Known Anti-Patterns
 
 | Pattern | Symptom | Correct Approach |
 |---|---|---|
 | Opening a second AsyncSession | `InterfaceError: another operation is in progress` | Use the `db_session` fixture; monkey-patch `AsyncSessionLocal` in worker tests |
-| Mocking at the wrong boundary | Integration test mocks a repository | Mock only external APIs at the service boundary |
-| Eager connection at import time | Collection fails with connection error | Use lazy fixture initialization |
+| Mocking at the wrong boundary | Integration test mocks a repository | Mock only external APIs at the service boundary; mock the transport (session), not the collaborator (repository) |
+| Eager connection at import time | Collection fails with connection error | Use lazy fixture initialization; no database access at import time |
+| `create_async_engine` without `poolclass=NullPool` | `MissingGreenlet` at teardown | Always use `poolclass=NullPool` in test engines |
+| Schema introspection with async session | `MissingGreenlet` from `inspect()` | Use a sync psycopg2 engine (see `test-infrastructure` skill) |
+| Duplicated fixture with different name/scope | Two tests use separate-but-identical fixtures | Check MOCKING_CONTRACT.md Canonical Fixtures before writing; reuse existing fixtures |
+| Factory inline in test file when 2+ tests need it | Same object construction repeated across files | Extract to `tests/utils/factories.py`; register in Canonical Fixtures table |
 
 ---
 

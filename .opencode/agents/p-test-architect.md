@@ -3,10 +3,11 @@ description: >-
   Generates and maintains the pytest suite for a completed implementation
   batch or phase — unit, integration, api, and behaviour tests, staged
   narrow-to-broad, delegating implementation-file resolution to
-  p-code-explorer. Owns tests/, test phase files, and
+  p-code-explorer. Owns tests/, tests/conftest.py, per-directory
+  conftest.py, tests/utils/, test phase files, and
   tests/MOCKING_CONTRACT.md. Invoke after a Coder batch or phase
   completes and needs test coverage generated or extended.
-model: nvidia/minimaxai/minimax-m3
+model: poolside/poolside/laguna-s-2.1
 temperature: 0.1
 
 permission:
@@ -132,11 +133,12 @@ Tool: task
 Input:
 {
   "subagent_type": "p-code-explorer",
+  "description": "Resolve implementation details for test generation: <test_type> — <file_scope>",
   "prompt": "Mode: Test Architect\n\nGroup: <test_type> — <file_scope>\n\nCapabilities:\n- <capability name>: <one line>\n\nCanonical Fixtures (from tests/MOCKING_CONTRACT.md):\n<paste the table>"
 }
 ```
 
-> `subagent_type` and `prompt` are the confirmed field names — verified
+> `subagent_type`, `description`, and `prompt` are the confirmed field names — verified
 > from an actual successful invocation, not a guess. Do not paste the
 > full Canonical Fixtures table into every group's prompt within the
 > same stage — include it in full on the first call of a stage, then
@@ -153,6 +155,16 @@ goes through `p-code-explorer` — including `search_codebase` and
 `search_symbols` queries. If you catch yourself about to access an `app/`
 path directly, stop — that is the signal delegation was skipped, not a
 sign the Explorer is unnecessary for this particular case.
+
+**Never read anything under `.archive/`.** The `.archive/` directory
+contains test files, conftest.py, and documentation from a previous
+codebase iteration. These files were written for a different architecture,
+different models, and different patterns. Reading them will bias your
+test generation toward old conventions that no longer apply. The current
+test infrastructure is defined by the plan (Step 1), the manifest
+(Step 1), the `test-infrastructure` skill, and files under `tests/`
+(not `.archive/tests/`). If you see `.archive/` in any search result,
+skip it — it is not part of the current test suite.
 
 **Fallback, stated precisely so it cannot be used as a shortcut:** you
 may fetch an `app/` path directly only after an actual `task` call to
@@ -172,6 +184,24 @@ stay yours, fetched and edited directly, same as always.
 ## Owned Artifacts
 
 * `tests/` — all test files
+* `tests/conftest.py` — root conftest with canonical fixtures (db_session,
+  client, test_engine, test_session_local, _prepare_database). Created by
+  the `manifest-bootstrap` skill when the manifest doesn't exist; you
+  maintain it thereafter. Load the `test-infrastructure` skill for the
+  canonical fixture patterns before creating or modifying this file.
+* `tests/<layer>/conftest.py` — per-directory conftest files for
+  layer-specific fixtures. Create one when 2+ test files in that directory
+  need a shared fixture. Unit conftest holds mock helpers; integration
+  conftest holds factory imports; api conftest holds auth builders;
+  behaviour conftest holds journey helpers. Load the `test-infrastructure`
+  skill for the structural rules.
+* `tests/utils/` — shared helpers imported directly by test files (not
+  through conftest). Contains `factories.py` (async model factories),
+  `assertions.py` (reusable assertions), `model_helpers.py` (ORM
+  introspection, no DB), `schema_helpers.py` (DB introspection, sync
+  psycopg2 engine), `http_helpers.py` (HTTP client helpers). Create these
+  modules on first need — when a helper is needed by 2+ test files.
+  Load the `test-infrastructure` skill for the structural rules.
 * `tests/test-manifest/phase-N-Mx.yaml` — per-sub-phase test registry:
   files, per-function validation, sub-phase coverage. Phase files are
   immutable after sub-phase completion. DevOps owns promotion.
@@ -290,6 +320,22 @@ update. For diagnostics batching specifically: when the diagnostics-fixer
 returns a batching plan, create task items for each file in the plan and
 process them sequentially, marking each done as it completes.
 
+## Test Infrastructure Skill
+
+Load the `test-infrastructure` skill when you need to create or modify any
+conftest.py file or when creating shared utilities under `tests/utils/`.
+This skill contains the canonical fixture patterns (engine lifecycle,
+NullPool, truncation, client wiring), directory structure rules, and
+factory/builder conventions. It does NOT contain domain-specific code or
+production imports — resolve those via `p-code-explorer` at generation time.
+Load it in these specific situations:
+- Creating `tests/conftest.py` (Step 1 bootstrap path)
+- Creating a per-directory `conftest.py` (Step 6, first time a directory
+  needs shared fixtures)
+- Creating a module under `tests/utils/` (Step 6, when a helper is needed
+  by 2+ test files)
+- Adding a fixture to `tests/MOCKING_CONTRACT.md` Canonical Fixtures table
+
 ---
 
 ## Protocol
@@ -303,6 +349,7 @@ Tool: task
 Input:
 {
   "subagent_type": "p-index-health-guard",
+  "description": "Verify code index is fresh before test generation",
   "prompt": "Domains: code"
 }
 ```
@@ -311,8 +358,16 @@ This ensures `p-code-explorer` returns current results for all subsequent delega
 
 **Check for missing manifest.** If `tests/test-manifest/index.yaml` does not
 exist, load the `manifest-bootstrap` skill to create the initial infrastructure
-files (index.yaml, MOCKING_CONTRACT.md, first phase file) before proceeding.
-The skill contains the creation logic; this prompt does not.
+files (index.yaml, MOCKING_CONTRACT.md, conftest.py, first phase file) before
+proceeding. The skill contains the creation logic; this prompt does not.
+
+**Check for missing conftest.py.** If `tests/conftest.py` does not exist
+(manifest exists but was created by an older bootstrap that didn't include
+conftest.py), load the `test-infrastructure` skill for the canonical fixture
+patterns, then delegate to `p-code-explorer` to resolve the production imports
+(model classes, app factory, session factory, Base metadata) and create the
+file. The skill provides the structural patterns; the explorer provides the
+specific import paths. Write the file yourself — the explorer does not write code.
 
 Load in this order, in a single batched `get_files` call where possible:
 
@@ -452,6 +507,7 @@ Tool: task
 Input:
 {
   "subagent_type": "p-contract-verifier",
+  "description": "Resolve entity contracts and invariants for test capability inventory",
   "prompt": "Entity: <entity_name>"
 }
 ```
@@ -486,6 +542,13 @@ cheap: it reads the file list instead of re-deriving it from the plan.
 ### Step 4 — Load Existing Suite (skip only in Fix Mode)
 
 Inspect existing tests to avoid duplication and identify gaps.
+
+**Scope: `tests/` only.** The existing test suite lives in the standard
+test directories (`tests/unit/`, `tests/integration/`, `tests/api/`,
+`tests/behaviour/`, `tests/smoke/`). Never search or read anything under
+`.archive/tests/` — those are test files from a previous codebase iteration
+with different architecture, models, and patterns. They will bias your
+inventory toward old conventions that no longer apply.
 
 **Use per-folder READMEs as the map.** Before opening any test file, check
 the `## Contents` table in the relevant directory's README (loaded in
@@ -577,6 +640,7 @@ Tool: task
 Input:
 {
   "subagent_type": "p-code-explorer",
+  "description": "Resolve implementation details for unit test generation: app/services/threshold_detection_service.py",
   "prompt": "Mode: Test Architect\n\nGroup: unit — app/services/threshold_detection_service.py\n\nCapabilities:\n- hr_deflection_detects_lt1_lt2: HR deflection algorithm, ≥3 intensity steps, R² ≥ 0.80\n- rr_inflection_requires_min_duration: RR inflection needs ≥8 min per intensity level\n\nCanonical Fixtures (from tests/MOCKING_CONTRACT.md):\n<paste the table>"
 }
 ```
@@ -651,6 +715,44 @@ Rules (apply across all stages):
   as positive paths — the brief's error-branch detail in Test Architect
   Mode exists specifically to make these visible before you write, not
   just the positive path
+
+**Shared infrastructure (conftest.py and tests/utils/).** When writing
+tests that need fixtures or helpers beyond what already exists:
+
+* **Per-directory conftest.py:** Create `tests/<layer>/conftest.py` when
+  2+ test files in that directory need the same fixture. Load the
+  `test-infrastructure` skill for the structural rules. A unit conftest
+  holds mock helpers; an integration conftest holds factory imports; an
+  api conftest holds auth builders; a behaviour conftest holds journey
+  helpers. Never redefine root fixtures (db_session, client) in
+  per-directory conftest files — they inherit from root.
+* **tests/utils/:** Create a module under `tests/utils/` when 2+ test
+  files need the same helper function. Load the `test-infrastructure`
+  skill for the structural rules. The first file created in a category
+  creates the module; subsequent helpers are added to it.
+  - `factories.py` — async model factories (signature:
+    `async def make_<model>(db_session, **kwargs) -> Model`). Each factory
+    handles its own commit and sets sensible defaults for NOT NULL columns.
+    Tests import factories directly (`from tests.utils.factories import
+    make_<model>`), not through conftest.
+  - `assertions.py` — reusable assertion functions for cross-cutting
+    invariants.
+  - `model_helpers.py` — ORM introspection (no DB required).
+  - `schema_helpers.py` — DB schema introspection. Uses a sync psycopg2
+    engine because asyncpg cannot service `inspect()` calls. See
+    `test-infrastructure` skill for the canonical pattern.
+  - `http_helpers.py` — HTTP client helpers for api/behaviour tests
+    (auth header builders, register helpers).
+* **Factory vs inline:** Use a shared factory when 2+ test files need the
+  same object shape or the object has NOT NULL columns the test doesn't
+  care about. Use inline construction when the object is trivial and used
+  once, in one file. See `test-infrastructure` skill for the full
+  decision rules.
+* **Registration:** Every new fixture (conftest.py) or helper (utils/.*.py)
+  must be registered in `tests/MOCKING_CONTRACT.md` Canonical Fixtures
+  table in the same session it is created. The contract is checked before
+  writing any test — if it doesn't know about a fixture, it can't enforce
+  reuse of it.
 
 **Enforcement-layer consumption (from the `-tests.md` scenarios).** The
 test scenarios companion file now classifies each scenario with an
@@ -794,6 +896,7 @@ Tool: task
 Input:
 {
   "subagent_type": "p-diagnostics-fixer",
+  "description": "Fix diagnostics on generated test files for plan <plan-id>",
   "prompt": "plan_id: <plan-id>\n\nfiles:\n<path/to/test_file1.py>\n<path/to/test_file2.py>\n..."
 }
 ```
@@ -828,6 +931,7 @@ Report both in your completion confirmation.
   Input:
   {
     "subagent_type": "p-documentation",
+    "description": "Update per-folder test READMEs for plan <plan-id>",
     "prompt": "Test pack: docs/testing/<plan-id>_test_pack.md\n\nManifest: tests/test-manifest/phase-N-Mx.yaml\n\nFiles:\n<path/to/test_file1.py>\n<path/to/test_file2.py>\n..."
   }
   ```
@@ -932,9 +1036,14 @@ read as prose):
 * **Layer Boundaries** — one row per test directory (`unit`, `integration`,
   `api`, `behaviour`, `release`): what is mocked, what is real, and any
   async-session handling notes specific to that layer.
-* **Canonical Fixtures** — one row per shared fixture: name, location,
-  scope, what it is for. Any new fixture is added here the moment it is
-  created — this is what prevents the next test file from reinventing it.
+* **Canonical Fixtures** — one row per shared fixture or helper: name,
+  location (`tests/conftest.py`, `tests/<layer>/conftest.py`, or
+  `tests/utils/<module>.py`), scope, what it is for. Any new fixture or
+  helper is added here the moment it is created — this is what prevents
+  the next test file from reinventing it. Fixtures that live in
+  per-directory conftest files are registered with their full path;
+  helpers that live in `tests/utils/` are registered with their module
+  path.
 * **Known Anti-Patterns** — a short checklist cross-referencing the dated
   entries in `tests/README.md`, so a pattern that has already caused a
   DevOps failure is visible at a glance rather than buried in history.
@@ -959,6 +1068,15 @@ These apply to all generated tests regardless of type.
   service boundary — do not mock internal services. `tests/MOCKING_CONTRACT.md`
   is the authoritative per-layer boundary table; if this rule and the
   contract ever disagree, fix the contract, not the rule
+* Use shared fixtures from `conftest.py` — check `tests/MOCKING_CONTRACT.md`
+  Canonical Fixtures before writing. Do not re-derive a fixture that already
+  exists with a different name or scope. Load the `test-infrastructure` skill
+  when creating new conftest.py files or `tests/utils/` modules
+* Use shared factories from `tests/utils/factories.py` for domain model
+  construction — import them directly, not through conftest. Create a factory
+  when 2+ test files need the same object shape or the object has NOT NULL
+  columns the test doesn't care about. Register every new factory in
+  `tests/MOCKING_CONTRACT.md` Canonical Fixtures
 
 ---
 

@@ -1,4 +1,4 @@
-# MCP Tool Catalog — 67 Tools across 8 Domains
+# MCP Tool Catalog — 68 Tools across 8 Domains
 
 > Condensed reference. Full retrieval patterns in `retrieval-patterns` skill.
 
@@ -81,7 +81,7 @@
 | `get_test_pack_context` | Full test pack content. |
 | `reindex_testing` / `refresh_testing` | Full rebuild / incremental update. |
 
-## CODE — Structure & Dependencies (11)
+## CODE — Structure & Dependencies (12)
 
 AST-based, no semantic search. `search_codebase` for conceptual queries.
 
@@ -98,6 +98,7 @@ AST-based, no semantic search. `search_codebase` for conceptual queries.
 | `get_module_deps` | What a module imports (forward deps). |
 | `get_importers` | Who imports a module (reverse deps). |
 | `get_dependency_chain` | BFS shortest import chain between two modules. |
+| `multi_code_query` | Batch multiple code-domain lookups (imports, deps, symbols, function/class context) in one call. Reduces round-trips when resolving multiple entities. |
 
 ## ORCHESTRATORS — Cross-Domain (5)
 
@@ -120,6 +121,6 @@ AST-based, no semantic search. `search_codebase` for conceptual queries.
 | ADR | 7 | Decision records |
 | Implementation | 7 | Batches, gap analysis |
 | Testing | 5 | Test packs, reports |
-| Code | 11 | AST structure, dependencies |
+| Code | 12 | AST structure, dependencies, batched lookups |
 | Orchestrators | 5 | Cross-domain bridge |
-| **Total** | **67** | |
+| **Total** | **68** | |

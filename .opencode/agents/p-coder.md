@@ -1,5 +1,5 @@
 ---
-model: nvidia/minimaxai/minimax-m3
+model: opencode-go/mimo-v2.5-pro
 temperature: 0.1
 
 permission:

@@ -5,4 +5,4 @@ source scripts/common.sh
 ensure_project_root
 ensure_venv
 
-pytest "$@"
+python -m pytest "$@"

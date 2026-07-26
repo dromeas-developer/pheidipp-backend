@@ -57,6 +57,18 @@ manifest updates to write. For Feature and Release scopes, the manifest
 update steps are especially important — promotion state changes spread across
 multiple files.
 
+## Test Infrastructure Skill
+
+Load the `test-infrastructure` skill when editing any conftest.py file
+(`tests/conftest.py` or `tests/<layer>/conftest.py`) or any module under
+`tests/utils/`. This skill contains the canonical fixture patterns (engine
+lifecycle, NullPool, truncation, client wiring), directory structure rules,
+and factory/builder conventions. It ensures infrastructure edits stay
+consistent with the ecosystem's structural conventions. Load it before
+making any edit to these files — the skill is the pattern authority;
+without it, an edit that seems correct locally may break the fixture chain
+for other test layers.
+
 ---
 
 ## Mode Selection
@@ -435,15 +447,11 @@ assertion failure, which never goes through 5a at all) goes through Step 5b.
 If the test run failed, classify each failure before stopping.
 
 DevOps MAY edit the following test infrastructure files:
-- `tests/conftest.py` — fixture wiring, db session scope, client setup
+- `tests/conftest.py` — root fixture wiring, db session scope, client setup, schema bootstrap
+- `tests/<layer>/conftest.py` — per-directory fixtures for unit, integration, api, behaviour, smoke
+- `tests/utils/**` — shared test utilities (factories, assertions, schema helpers, HTTP helpers)
 - `pytest.ini` — test runner configuration
-- `tests/payloads.py` — payload factories (no assertions)
 - `tests/*/__init__.py` — package init files
-- `tests/fixtures/**` — shared fixtures
-- `tests/helpers/**` — test helpers
-- `tests/utils/**` — test utilities
-- `tests/bootstrap/**` — test environment bootstrap
-- `tests/db/**` — test database wiring
 
 DevOps MUST NOT modify:
 - Any `tests/**/test_*.py` file — assertions belong to the Test Architect
@@ -485,14 +493,16 @@ Remediation is allowed ONLY when the failure is caused by:
 - Schema reflection issues
 - Test database wiring
 - **NOT NULL constraint violations on model columns** — when a test helper
-  creates a model instance without setting a NOT NULL column, and the
-  `conftest.py` already has a `before_insert` listener pattern for other
-  models (e.g. `WeeklyPlan`, `AthleteProfile`, `AthleteFitness`,
-  `AthletePhysiology`, `AthletePreferences`, `TrainingGoal`), extend that
-  pattern by adding a new `before_insert` listener for the missing model.
-  This is infrastructure wiring (providing schema-level defaults for test
-  plumbing), not changing what a test helper computes. Do NOT modify the
-  test helper itself — it lives in a `test_*.py` file which is off-limits.
+  creates a model instance without setting a NOT NULL column. This is a
+  content bug, not a wiring bug: the factory function in
+  `tests/utils/factories.py` (or the inline construction in the test file)
+  is missing a required default. Do NOT add `before_insert` event listeners
+  to `conftest.py` to paper over this — that pattern masks real schema
+  requirements and accumulates technical debt. Route the failure to
+  `p-test-architect` as a Test Suite RC with the missing column name
+  and the affected factory or test file. The Test Architect will add the
+  default to the factory function following the conventions in the
+  `test-infrastructure` skill.
 
 Remediation is NOT allowed for:
 - Assertion failures (`assert result == expected`)

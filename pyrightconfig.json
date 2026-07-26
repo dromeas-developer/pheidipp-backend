@@ -8,6 +8,7 @@
   "executionEnvironments": [
     {
       "root": "tests",
+      "extraPaths": ["."],
       "reportPrivateUsage": "none",
       "reportUnusedFunction": "none",
       "reportMissingParameterType": "none"

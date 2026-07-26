@@ -1,223 +1,204 @@
 version: "1.0"
-plan_id: "phase-1-1-p1-p2-p3-email-password-auth"
-generated_at: "2026-06-20T00:00:00Z"
-last_reviewed_at: "2026-06-20T00:00:00Z"
-
+plan_id: "GAP-PHASE-1-TESTS"
+sub_phase: "1.1"
+generated_at: "2026-07-25T00:00:00Z"
+last_reviewed_at: "2026-07-26T00:00:00Z"
 prerequisites:
   migrations: false
-
 files:
-  test_auth_endpoints.py:
+  tests/unit/test_auth_service.py:
+    type: unit
+    status: promoted
+    functions:
+      test_register_creates_athlete_auth_profile_token_atomically:
+        class: TestRegister
+        implemented: true
+        executable: true
+        passed: true
+      test_register_rollback_on_mid_transaction_failure:
+        class: TestRegister
+        implemented: true
+        executable: true
+        passed: true
+      test_login_successful_returns_token_pair:
+        class: TestLogin
+        implemented: true
+        executable: true
+        passed: true
+      test_login_wrong_password_returns_401:
+        class: TestLogin
+        implemented: true
+        executable: true
+        passed: true
+      test_login_nonexistent_email_returns_401_constant_time:
+        class: TestLogin
+        implemented: true
+        executable: true
+        passed: true
+      test_refresh_valid_token_rotates_atomically:
+        class: TestRefreshToken
+        implemented: true
+        executable: true
+        passed: true
+      test_refresh_old_token_invalid_after_rotation:
+        class: TestRefreshToken
+        implemented: true
+        executable: true
+        passed: true
+      test_refresh_expired_token_rejected:
+        class: TestRefreshToken
+        implemented: true
+        executable: true
+        passed: true
+      test_refresh_unknown_token_rejected:
+        class: TestRefreshToken
+        implemented: true
+        executable: true
+        passed: true
+      test_refresh_rotation_atomicity_rollback:
+        class: TestRefreshToken
+        implemented: true
+        executable: true
+        passed: true
+  tests/unit/test_auth_schemas.py:
+    type: unit
+    status: promoted
+    functions:
+      test_register_password_blank_whitespace_rejected:
+        class: TestRegisterPasswordValidation
+        implemented: true
+        executable: true
+        passed: true
+      test_auth_response_excludes_token_hash:
+        class: TestTokenHashExclusion
+        implemented: true
+        executable: true
+        passed: true
+      test_token_pair_response_excludes_token_hash:
+        class: TestTokenHashExclusion
+        implemented: true
+        executable: true
+        passed: true
+  tests/unit/test_ip_utils.py:
+    type: unit
+    status: promoted
+    functions:
+      test_truncate_ipv4_to_24:
+        class: TestTruncateIp
+        implemented: true
+        executable: true
+        passed: true
+      test_truncate_ipv6_to_64:
+        class: TestTruncateIp
+        implemented: true
+        executable: true
+        passed: true
+      test_truncate_ip_none_returns_none:
+        class: TestTruncateIp
+        implemented: true
+        executable: true
+        passed: true
+      test_truncate_ip_empty_string_returns_none:
+        class: TestTruncateIp
+        implemented: true
+        executable: true
+        passed: true
+      test_truncate_ip_whitespace_string_returns_none:
+        class: TestTruncateIp
+        implemented: true
+        executable: true
+        passed: true
+      test_truncate_ip_unparseable_string_returns_none:
+        class: TestTruncateIp
+        implemented: true
+        executable: true
+        passed: true
+      test_truncate_ip_non_string_type_returns_none:
+        class: TestTruncateIp
+        implemented: true
+        executable: true
+        passed: true
+  tests/unit/test_token_security.py:
+    type: unit
+    status: promoted
+    functions:
+      test_token_hash_blocked_by_forbidden_keys:
+        class: TestSafeExtraFiltersSensitiveKeys
+        implemented: true
+        executable: true
+        passed: true
+      test_hashed_password_blocked_by_forbidden_keys:
+        class: TestSafeExtraFiltersSensitiveKeys
+        implemented: true
+        executable: true
+        passed: true
+      test_ip_address_blocked_by_forbidden_keys:
+        class: TestSafeExtraFiltersSensitiveKeys
+        implemented: true
+        executable: true
+        passed: true
+      test_unknown_keys_excluded:
+        class: TestSafeExtraFiltersSensitiveKeys
+        implemented: true
+        executable: true
+        passed: true
+      test_discard_old_ips_sets_ip_address_to_none:
+        class: TestDiscardOldIps
+        implemented: true
+        executable: true
+        passed: true
+      test_discard_old_ips_returns_zero_when_no_rows:
+        class: TestDiscardOldIps
+        implemented: true
+        executable: true
+        passed: true
+  tests/integration/test_auth_db.py:
+    type: integration
+    status: promoted
+    functions:
+      test_duplicate_email_rejected_with_integrity_error:
+        class: TestEmailUniqueness
+        implemented: true
+        executable: true
+        passed: true
+      test_case_insensitive_email_uniqueness:
+        class: TestEmailUniqueness
+        implemented: true
+        executable: true
+        passed: true
+  tests/api/test_require_self.py:
     type: api
     status: promoted
     functions:
-      test_login_incorrect_message_is_identical_to_unknown: {implemented: true, executable: true, passed: true}
-      test_login_invalidates_request_body_for_email: {implemented: true, executable: true, passed: true}
-      test_login_returns_token_pair: {implemented: true, executable: true, passed: true}
-      test_login_unknown_email_returns_401: {implemented: true, executable: true, passed: true}
-      test_login_wrong_password_returns_401: {implemented: true, executable: true, passed: true}
-      test_refresh_response_excludes_secrets: {implemented: true, executable: true, passed: true}
-      test_refresh_returns_new_token_pair: {implemented: true, executable: true, passed: true}
-      test_refresh_with_revoked_token_returns_401: {implemented: true, executable: true, passed: true}
-      test_refresh_with_unknown_token_returns_401: {implemented: true, executable: true, passed: true}
-      test_register_duplicate_email_returns_409: {implemented: true, executable: true, passed: true}
-      test_register_normalises_email_in_response: {implemented: true, executable: true, passed: true}
-      test_register_response_excludes_secrets: {implemented: true, executable: true, passed: true}
-      test_register_returns_201_with_token_pair: {implemented: true, executable: true, passed: true}
-      test_register_validates_email_format: {implemented: true, executable: true, passed: true}
-      test_register_validates_password_min_length: {implemented: true, executable: true, passed: true}
-      test_register_validates_profile_height_range: {implemented: true, executable: true, passed: true}
-      test_require_self_distinguishes_401_from_403: {implemented: true, executable: true, passed: true}
-      test_require_self_returns_200_for_matching_athlete: {implemented: true, executable: true, passed: true}
-      test_require_self_returns_401_for_expired_token: {implemented: true, executable: true, passed: true}
-      test_require_self_returns_401_for_malformed_bearer: {implemented: true, executable: true, passed: true}
-      test_require_self_returns_401_without_authorization_header: {implemented: true, executable: true, passed: true}
-      test_require_self_returns_403_on_athlete_mismatch: {implemented: true, executable: true, passed: true}
-  test_auth_user_journey.py:
-    type: behaviour
-    status: promoted
-    functions:
-      test_audit_logs_never_carry_secrets: {implemented: true, executable: true, passed: true}
-      test_crafted_expired_access_token_is_rejected: {implemented: true, executable: true, passed: true}
-      test_no_secrets_in_register_response: {implemented: true, executable: true, passed: true}
-      test_refresh_event_payload_contains_truncated_ip_only: {implemented: true, executable: true, passed: true}
-      test_register_then_login_then_refresh_chain: {implemented: true, executable: true, passed: true}
-  test_athlete_auth_primary_enforcement.py:
-    type: integration
-    status: promoted
-    functions:
-      test_first_primary_succeeds: {implemented: true, executable: true, passed: true}
-      test_index_rejects_primary_after_demoting_existing: {implemented: true, executable: true, passed: true}
-      test_multiple_non_primaries_succeed: {implemented: true, executable: true, passed: true}
-      test_one_primary_plus_one_non_primary_succeeds: {implemented: true, executable: true, passed: true}
-      test_second_primary_raises_integrity_error: {implemented: true, executable: true, passed: true}
-  test_athlete_repositories.py:
-    type: integration
-    status: promoted
-    functions:
-      test_email_exists_returns_true_for_match: {implemented: true, executable: true, passed: true}
-      test_get_by_athlete_and_provider: {implemented: true, executable: true, passed: true}
-      test_get_by_id_returns_none_when_missing: {implemented: true, executable: true, passed: true}
-      test_get_email_auth_by_normalized_email: {implemented: true, executable: true, passed: true}
-      test_get_email_auth_returns_none_for_missing: {implemented: true, executable: true, passed: true}
-      test_lookup_canonicalised_email: {implemented: true, executable: true, passed: true}
-      test_lowercase_email_is_uniquely_enforced: {implemented: true, executable: true, passed: true}
-      test_touch_last_login_sets_field: {implemented: true, executable: true, passed: true}
-  test_auth_service.py:
-    type: integration
-    status: promoted
-    functions:
-      test_duplicate_email_does_not_emit_event: {implemented: true, executable: true, passed: true}
-      test_duplicate_email_raises_and_rolls_back: {implemented: true, executable: true, passed: true}
-      test_email_stored_lowercase: {implemented: true, executable: true, passed: true}
-      test_failed_login_does_not_emit_athlete_logged_in: {implemented: true, executable: true, passed: true}
-      test_known_email_wrong_password_does_not_update_last_login: {implemented: true, executable: true, passed: true}
-      test_login_does_not_swap_existing_token: {implemented: true, executable: true, passed: true}
-      test_login_emits_access_token_event: {implemented: true, executable: true, passed: true}
-      test_login_returns_valid_token_pair: {implemented: true, executable: true, passed: true}
-      test_login_updates_last_login_at: {implemented: true, executable: true, passed: true}
-      test_old_token_cannot_be_used_twice: {implemented: true, executable: true, passed: true}
-      test_old_token_is_revoked_after_rotation: {implemented: true, executable: true, passed: true}
-      test_password_never_appears_in_response_payload: {implemented: true, executable: true, passed: true}
-      test_register_creates_athlete: {implemented: true, executable: true, passed: true}
-      test_register_creates_email_auth_with_bcrypt_hash: {implemented: true, executable: true, passed: true}
-      test_register_creates_first_refresh_token: {implemented: true, executable: true, passed: true}
-      test_register_creates_minimal_profile: {implemented: true, executable: true, passed: true}
-      test_register_emits_athlete_registered_event: {implemented: true, executable: true, passed: true}
-      test_register_result_has_no_credentials: {implemented: true, executable: true, passed: true}
-      test_register_returns_decodable_access_token: {implemented: true, executable: true, passed: true}
-      test_rotation_emits_athlete_logged_in: {implemented: true, executable: true, passed: true}
-      test_rotation_rejects_expired_token: {implemented: true, executable: true, passed: true}
-      test_rotation_returns_new_token_pair: {implemented: true, executable: true, passed: true}
-      test_two_independent_tokens_rotate_independently: {implemented: true, executable: true, passed: true}
-      test_unknown_email_raises_invalid_credentials: {implemented: true, executable: true, passed: true}
-      test_unknown_refresh_token_rejected: {implemented: true, executable: true, passed: true}
-      test_wrong_password_raises_invalid_credentials: {implemented: true, executable: true, passed: true}
-  test_discard_refresh_token_ips.py:
-    type: integration
-    status: promoted
-    functions:
-      test_task_discards_ips_older_than_seven_days: {implemented: true, executable: true, passed: true}
-      test_task_honours_custom_retention_days: {implemented: true, executable: true, passed: true}
-      test_task_is_idempotent: {implemented: true, executable: true, passed: true}
-      test_task_preserves_ip_freshly: {implemented: true, executable: true, passed: true}
-  test_refresh_token_repository.py:
-    type: integration
-    status: promoted
-    functions:
-      test_add_populates_primary_key: {implemented: true, executable: true, passed: true}
-      test_brand_new_token_is_active: {implemented: true, executable: true, passed: true}
-      test_discard_custom_retention_window: {implemented: true, executable: true, passed: true}
-      test_discard_is_idempotent: {implemented: true, executable: true, passed: true}
-      test_expired_token_is_inactive: {implemented: true, executable: true, passed: true}
-      test_ip_discarded_after_seven_days: {implemented: true, executable: true, passed: true}
-      test_ip_preserved_at_six_days: {implemented: true, executable: true, passed: true}
-      test_returns_all_tokens_for_athlete: {implemented: true, executable: true, passed: true}
-      test_revoked_token_is_inactive: {implemented: true, executable: true, passed: true}
-  test_ip_utils.py:
-    type: unit
-    status: promoted
-    functions:
-      test_drops_interface_id: {implemented: true, executable: true, passed: true}
-      test_invalid_returns_none: {implemented: true, executable: true, passed: true}
-      test_ipv4_prefix_is_24: {implemented: true, executable: true, passed: true}
-      test_ipv6_prefix_is_64: {implemented: true, executable: true, passed: true}
-      test_preserves_class_a_through_c: {implemented: true, executable: true, passed: true}
-      test_strips_leading_zeros: {implemented: true, executable: true, passed: true}
-      test_strips_whitespace: {implemented: true, executable: true, passed: true}
-      test_truncates_to_slash_sixty_four: {implemented: true, executable: true, passed: true}
-      test_zero_address: {implemented: true, executable: true, passed: true}
-      test_zeroes_host_octet: {implemented: true, executable: true, passed: true}
-  test_logging_utils.py:
-    type: unit
-    status: promoted
-    functions:
-      test_allowed_keys_does_not_include_secrets: {implemented: true, executable: true, passed: true}
-      test_empty_payload_returns_empty_dict: {implemented: true, executable: true, passed: true}
-      test_forbidden_keys_is_superset_of_secrets: {implemented: true, executable: true, passed: true}
-      test_keep_only_allowed_keys: {implemented: true, executable: true, passed: true}
-      test_known_metric_is_recorded: {implemented: true, executable: true, passed: true}
-      test_log_event_strips_forbidden_fields: {implemented: true, executable: true, passed: true}
-      test_snapshot_is_defensive_copy: {implemented: true, executable: true, passed: true}
-      test_strip_forbidden_keys: {implemented: true, executable: true, passed: true}
-      test_unknown_metric_is_silently_ignored: {implemented: true, executable: true, passed: true}
-  test_password_hasher.py:
-    type: unit
-    status: promoted
-    functions:
-      test_72_byte_inputs_compare_equal: {implemented: true, executable: true, passed: true}
-      test_72_byte_password_round_trip: {implemented: true, executable: true, passed: true}
-      test_correct_password_verifies: {implemented: true, executable: true, passed: true}
-      test_cost_factor_meets_phase_1_1_minimum: {implemented: true, executable: true, passed: true}
-      test_empty_password_rejected: {implemented: true, executable: true, passed: true}
-      test_hash_distinguishes_similar_passwords: {implemented: true, executable: true, passed: true}
-      test_hash_rejects_empty_string: {implemented: true, executable: true, passed: true}
-      test_hash_rejects_non_string_types: {implemented: true, executable: true, passed: true}
-      test_hash_returns_bcypt_string: {implemented: true, executable: true, passed: true}
-      test_malformed_hash_returns_false_without_raising: {implemented: true, executable: true, passed: true}
-      test_non_string_hash_returns_false: {implemented: true, executable: true, passed: true}
-      test_verify_rejects_invalid_password_type: {implemented: true, executable: true, passed: true}
-      test_wrong_password_rejected: {implemented: true, executable: true, passed: true}
-  test_token_service.py:
-    type: unit
-    status: promoted
-    functions:
-      test_contains_required_claims: {implemented: true, executable: true, passed: true}
-      test_default_access_ttl_is_fifteen_minutes: {implemented: true, executable: true, passed: true}
-      test_default_expiry_is_thirty_days: {implemented: true, executable: true, passed: true}
-      test_different_inputs_produce_different_hashes: {implemented: true, executable: true, passed: true}
-      test_expiry_matches_refresh_ttl_property: {implemented: true, executable: true, passed: true}
-      test_expiry_uses_current_time_when_unanchored: {implemented: true, executable: true, passed: true}
-      test_generated_token_is_opaque: {implemented: true, executable: true, passed: true}
-      test_generated_token_is_unique: {implemented: true, executable: true, passed: true}
-      test_hash_is_deterministic: {implemented: true, executable: true, passed: true}
-      test_hash_is_sha256_hex_digest: {implemented: true, executable: true, passed: true}
-      test_hash_rejects_invalid_input: {implemented: true, executable: true, passed: true}
-      test_includes_auth_provider_claim_when_provided: {implemented: true, executable: true, passed: true}
-      test_jti_is_parseable_as_uuid: {implemented: true, executable: true, passed: true}
-      test_jti_present_when_auth_provider_is_provided: {implemented: true, executable: true, passed: true}
-      test_newly_issued_token_contains_jti_claim: {implemented: true, executable: true, passed: true}
-      test_old_token_without_jti_still_verifies: {implemented: true, executable: true, passed: true}
-      test_omits_auth_provider_when_none: {implemented: true, executable: true, passed: true}
-      test_raises_runtime_when_secret_missing: {implemented: true, executable: true, passed: true}
-      test_rejects_expired_token: {implemented: true, executable: true, passed: true}
-      test_rejects_non_string_input: {implemented: true, executable: true, passed: true}
-      test_rejects_token_missing_athlete_id_claim: {implemented: true, executable: true, passed: true}
-      test_rejects_token_signed_with_wrong_secret: {implemented: true, executable: true, passed: true}
-      test_rejects_token_with_wrong_issuer: {implemented: true, executable: true, passed: true}
-      test_returns_future_expiry: {implemented: true, executable: true, passed: true}
-      test_returns_typed_claims: {implemented: true, executable: true, passed: true}
-      test_two_tokens_same_second_have_distinct_jti_and_jwt: {implemented: true, executable: true, passed: true}
-      test_verifies_issued_token: {implemented: true, executable: true, passed: true}
-
+      test_authenticated_own_jwt_succeeds:
+        class: TestRequireSelf
+        implemented: true
+        executable: true
+        passed: true
+      test_authenticated_different_athlete_jwt_returns_403:
+        class: TestRequireSelf
+        implemented: true
+        executable: true
+        passed: true
+      test_expired_access_token_returns_401:
+        class: TestRequireSelf
+        implemented: true
+        executable: true
+        passed: true
+      test_missing_authorization_header_returns_401:
+        class: TestRequireSelf
+        implemented: true
+        executable: true
+        passed: true
 coverage:
   events:
     covered:
-      - "athlete_registered"
-      - "athlete_logged_in (token_type=access)"
-      - "athlete_logged_in (token_type=refresh)"
+      - athlete_registered
+      - athlete_logged_in
   invariants:
     covered:
-      - "Email uniqueness (case-insensitive via functional index)"
-      - "hashed_password never returned in responses"
-      - "hashed_password never logged"
-      - "token_hash never returned in responses"
-      - "token_hash never logged"
-      - "provider_tokens not exposed"
-      - "provider_user_id not exposed"
-      - "Atomic registration (transaction rollback on duplicate)"
-      - "Append-only refresh-token ledger (rotation preserves old row)"
-      - "30-day refresh-token expiry"
-      - "AthleteProfile uniqueness per athlete"
-      - "One primary AthleteAuth per athlete (DB-enforced)"
-      - "require_self returns 403 on athlete mismatch"
-      - "require_self returns 401 on token problem"
-      - "Login does not leak missing-vs-wrong credential distinction"
-      - "ip_address truncated to /24 (IPv4) before logging/event emission"
-      - "ip_address truncated to /64 (IPv6) before logging/event emission"
-      - "ip_address discarded after 7 days"
-      - "discard_refresh_token_ips task idempotent"
-      - "athlete_registered payload shape"
-      - "athlete_logged_in payload shape (login + refresh)"
-      - "Multi-device refresh tokens coexist"
-      - "Replay of revoked refresh token returns 401"
+      - I1: Athlete.email unique via functional lower(email) index
+      - I26: Refresh token rotation atomicity
+      - I27: token_hash never returned by any API endpoint
+      - I28: IP truncated before logging; discarded after 7 days
+      - I29: Registration atomically creates 4 entities + outbox event

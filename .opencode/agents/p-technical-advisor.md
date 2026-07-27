@@ -121,15 +121,16 @@ produced by the Implementation Architect alongside a coder BRD.
    - Conflicts with release-plan sequencing or phase scope
 
 4. **Delegate to `p-vision-and-architect-author`** via `task`:
-   ```
-   Tool: task
-   Input:
-   {
-     "subagent_type": "p-vision-and-architect-author",
-     "prompt": "Update the following architecture documents per the handoff at <handoff path>:\n\n<summary of changes, with any consistency flags noted>"
-   }
-   ```
-   If consistency flags were found in step 3, include them as caveats in the
+    ```
+    Tool: task
+    Input:
+    {
+      "subagent_type": "p-vision-and-architect-author",
+      "description": "Update architecture documents per handoff",
+      "prompt": "Update the following architecture documents per the handoff at <handoff path>:\n\n<summary of changes, with any consistency flags noted>"
+    }
+    ```
+    If consistency flags were found in step 3, include them as caveats in the
    prompt — the architect applies the changes with those caveats noted.
 
 5. **Report.** Summarise what was delegated, any consistency flags raised, and
@@ -172,6 +173,7 @@ Tool: task
 Input:
 {
   "subagent_type": "p-doc-explorer",
+  "description": "Retrieve documentation context for architecture review",
   "prompt": "Task: <one-line task description>\n\nConcepts:\n- <concept name>\n- ...\n\nDomains: all"
 }
 ``` Its Brief returns the current architecture contracts,

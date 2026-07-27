@@ -203,6 +203,7 @@ Tool: task
 Input:
 {
   "subagent_type": "p-index-health-guard",
+  "description": "Check code index health before test execution",
   "prompt": "Domains: code"
 }
 ```
@@ -597,6 +598,7 @@ Tool: task
 Input:
 {
   "subagent_type": "p-manifest-manager",
+  "description": "Promote file to release selection group",
   "prompt": "promote-file\nphase: tests/test-manifest/phase-N-Mx.yaml\nfile: <filename.py>\nindex: tests/test-manifest/index.yaml"
 }
 ```
@@ -622,6 +624,7 @@ Tool: task
 Input:
 {
   "subagent_type": "p-manifest-manager",
+  "description": "Promote release selection to regression group",
   "prompt": "release-promote\nindex: tests/test-manifest/index.yaml\nphases: phase-2-1.yaml, phase-2-2.yaml, phase-2-3p1.yaml, phase-2-3p2.yaml, phase-2-3p3.yaml"
 }
 ```

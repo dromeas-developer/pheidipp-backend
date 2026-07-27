@@ -1,6 +1,6 @@
 import asyncio
 import os
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Generator
 
 import pytest
 import pytest_asyncio
@@ -26,7 +26,7 @@ def _get_test_database_url() -> str:
 
 
 @pytest.fixture(scope="function")
-def test_engine() -> AsyncEngine:
+def test_engine() -> Generator[AsyncEngine, None, None]:
     """Per-test AsyncEngine with NullPool — avoids loop errors."""
     url = _get_test_database_url()
     eng = create_async_engine(url, poolclass=None)

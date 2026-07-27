@@ -204,6 +204,7 @@ Tool: task
 Input:
 {
   "subagent_type": "p-index-health-guard",
+  "description": "Check documentation index health before sub-phase planning",
   "prompt": "Domains: architecture, vision, release_plan"
 }
 ```
@@ -237,6 +238,7 @@ Tool: task
 Input:
 {
   "subagent_type": "p-doc-explorer",
+  "description": "Retrieve documentation context for phase challenge",
   "prompt": "Task: <one-line task description>\n\nConcepts:\n- <capability-A>\n- <capability-B>\n- ...\n\nDomains: all"
 }
 ```
@@ -264,6 +266,7 @@ Tool: task
 Input:
 {
   "subagent_type": "p-impact-analyzer",
+  "description": "Analyze blast radius for sub-phase sequencing review",
   "prompt": "Concept: <entity_name>"
 }
 ```
@@ -295,6 +298,7 @@ Tool: task
 Input:
 {
   "subagent_type": "p-doc-explorer",
+  "description": "Retrieve documentation context for sub-phase detailing",
   "prompt": "Task: <one-line task description>\n\nConcepts:\n- <capability-A>\n- <capability-B>\n- ...\n\nDomains: all"
 }
 ```

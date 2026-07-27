@@ -1,0 +1,291 @@
+version: "1.0"
+plan_id: "GAP-PHASE-1-TESTS"
+sub_phase: "1.2"
+generated_at: "2026-07-26T00:00:00Z"
+last_reviewed_at: "2026-07-26T23:00:00Z"
+prerequisites:
+  migrations: true
+files:
+  tests/unit/test_model_repository_contracts.py:
+    type: unit
+    status: promoted
+    functions:
+      test_no_avg_hr_or_summary_columns:
+        class: TestActivityModelColumns
+        implemented: true
+        executable: true
+        passed: true
+      test_no_lap_data_columns:
+        class: TestActivityModelColumns
+        implemented: true
+        executable: true
+        passed: true
+      test_exposes_exactly_six_methods:
+        class: TestTwinStateRepositoryContract
+        implemented: true
+        executable: true
+        passed: true
+      test_exposes_insert_get_latest_get_by_id_get_by_activity_get_by_activity_and_trigger_get_history:
+        class: TestTwinStateRepositoryContract
+        implemented: true
+        executable: true
+        passed: true
+      test_no_update_delete_or_mutation_methods:
+        class: TestTwinStateRepositoryContract
+        implemented: true
+        executable: true
+        passed: true
+      test_exposes_exactly_six_coaching_message_methods:
+        class: TestCoachingMessageRepositoryContract
+        implemented: true
+        executable: true
+        passed: true
+      test_coaching_message_exposes_insert_get_by_athlete_id_get_by_athlete_and_type_get_existing_first_message_get_by_activity_and_type_get_all_count:
+        class: TestCoachingMessageRepositoryContract
+        implemented: true
+        executable: true
+        passed: true
+      test_coaching_message_no_update_delete_or_mutation_methods:
+        class: TestCoachingMessageRepositoryContract
+        implemented: true
+        executable: true
+        passed: true
+      test_exposes_only_add_method:
+        class: TestSystemEventRepositoryContract
+        implemented: true
+        executable: true
+        passed: true
+      test_no_read_update_or_delete_methods:
+        class: TestSystemEventRepositoryContract
+        implemented: true
+        executable: true
+        passed: true
+      test_method_count_is_exactly_one:
+        class: TestSystemEventRepositoryContract
+        implemented: true
+        executable: true
+        passed: true
+  tests/integration/test_profile_preferences_activity_db.py:
+    type: integration
+    status: promoted
+    functions:
+      test_duplicate_athlete_id_raises_integrity_error:
+        class: TestAthleteProfileUniqueAthleteId
+        implemented: true
+        executable: true
+        passed: true
+      test_duplicate_preferences_athlete_id_raises_integrity_error:
+        class: TestAthletePreferencesUniqueAthleteId
+        implemented: true
+        executable: true
+        passed: true
+      test_negative_years_structured_training_raises_integrity_error:
+        class: TestAthletePreferencesYearsStructuredTrainingCheck
+        implemented: true
+        executable: true
+        passed: true
+      test_duplicate_external_id_raises_integrity_error:
+        class: TestActivityDedupExternalId
+        implemented: true
+        executable: true
+        passed: true
+      test_null_external_id_duplicates_succeed:
+        class: TestActivityDedupExemptManualEntry
+        implemented: true
+        executable: true
+        passed: true
+  tests/integration/test_training_goal_plan_db.py:
+    type: integration
+    status: promoted
+    functions:
+      test_duplicate_active_goal_raises_integrity_error:
+        class: TestTrainingGoalActiveUnique
+        implemented: true
+        executable: true
+        passed: true
+      test_multiple_inactive_goals_succeed:
+        class: TestTrainingGoalInactiveMultiple
+        implemented: true
+        executable: true
+        passed: true
+      test_fitness_level_6_raises_integrity_error:
+        class: TestTrainingGoalFitnessLevelRange
+        implemented: true
+        executable: true
+        passed: true
+      test_negative_weekly_volume_hours_raises_integrity_error:
+        class: TestTrainingGoalWeeklyVolumeHoursCheck
+        implemented: true
+        executable: true
+        passed: true
+      test_negative_weekly_volume_km_raises_integrity_error:
+        class: TestTrainingGoalWeeklyVolumeKmCheck
+        implemented: true
+        executable: true
+        passed: true
+      test_duplicate_plan_week_raises_integrity_error:
+        class: TestWeeklyPlanUniquePlanWeek
+        implemented: true
+        executable: true
+        passed: true
+      test_duplicate_planned_session_id_raises_integrity_error:
+        class: TestCheckpointUniquePlannedSession
+        implemented: true
+        executable: true
+        passed: true
+  tests/integration/test_fitness_physiology_db.py:
+    type: integration
+    status: promoted
+    functions:
+      test_duplicate_athlete_id_raises_integrity_error:
+        class: TestAthleteFitnessUniqueAthleteId
+        implemented: true
+        executable: true
+        passed: true
+      test_valid_aggregate_form_succeeds:
+        class: TestAthleteFitnessFormInvariant
+        implemented: true
+        executable: true
+        passed: true
+      test_invalid_aggregate_form_raises_integrity_error:
+        class: TestAthleteFitnessFormInvariant
+        implemented: true
+        executable: true
+        passed: true
+      test_valid_aerobic_form_succeeds:
+        class: TestAthleteFitnessDimensionalFormInvariant
+        implemented: true
+        executable: true
+        passed: true
+      test_invalid_aerobic_form_raises_integrity_error:
+        class: TestAthleteFitnessDimensionalFormInvariant
+        implemented: true
+        executable: true
+        passed: true
+      test_null_aerobic_skips_check:
+        class: TestAthleteFitnessDimensionalFormInvariant
+        implemented: true
+        executable: true
+        passed: true
+      test_invalid_source_raises_integrity_error:
+        class: TestAthleteFitnessTimeConstantsSource
+        implemented: true
+        executable: true
+        passed: true
+      test_population_default_source_succeeds:
+        class: TestAthleteFitnessTimeConstantsSource
+        implemented: true
+        executable: true
+        passed: true
+      test_individual_fitted_source_succeeds:
+        class: TestAthleteFitnessTimeConstantsSource
+        implemented: true
+        executable: true
+        passed: true
+      test_duplicate_physiology_athlete_id_raises_integrity_error:
+        class: TestAthletePhysiologyUniqueAthleteId
+        implemented: true
+        executable: true
+        passed: true
+  tests/integration/test_coaching_workout_db.py:
+    type: integration
+    status: promoted
+    functions:
+      test_duplicate_first_message_raises_integrity_error:
+        class: TestCoachingMessageFirstMessageSingleton
+        implemented: true
+        executable: true
+        passed: true
+      test_duplicate_post_workout_raises_integrity_error:
+        class: TestCoachingMessagePostWorkoutSingleton
+        implemented: true
+        executable: true
+        passed: true
+      test_duplicate_post_workout_null_activity_succeeds:
+        class: TestCoachingMessagePostWorkoutNullActivity
+        implemented: true
+        executable: true
+        passed: true
+      test_empty_content_raises_integrity_error:
+        class: TestCoachingMessageContentCheck
+        implemented: true
+        executable: true
+        passed: true
+      test_duplicate_plan_date_raises_integrity_error:
+        class: TestGeneratedWorkoutUniquePlanDate
+        implemented: true
+        executable: true
+        passed: true
+      test_theoretical_targets_not_object_raises_integrity_error:
+        class: TestGeneratedWorkoutTargetsCheck
+        implemented: true
+        executable: true
+        passed: true
+      test_adjusted_targets_null_raises_integrity_error:
+        class: TestGeneratedWorkoutTargetsCheck
+        implemented: true
+        executable: true
+        passed: true
+      test_invalid_recovery_modifier_raises_integrity_error:
+        class: TestGeneratedWorkoutRecoveryModifierCheck
+        implemented: true
+        executable: true
+        passed: true
+      test_duplicate_step_order_raises_integrity_error:
+        class: TestWorkoutStepUniqueWorkoutOrder
+        implemented: true
+        executable: true
+        passed: true
+      test_null_physiological_intent_raises_integrity_error:
+        class: TestWorkoutStepPhysiologicalIntentNotNull
+        implemented: true
+        executable: true
+        passed: true
+      test_step_order_zero_raises_integrity_error:
+        class: TestWorkoutStepStepOrderCheck
+        implemented: true
+        executable: true
+        passed: true
+      test_empty_description_raises_integrity_error:
+        class: TestWorkoutStepDescriptionCheck
+        implemented: true
+        executable: true
+        passed: true
+      test_negative_duration_raises_integrity_error:
+        class: TestWorkoutStepDurationSecondsCheck
+        implemented: true
+        executable: true
+        passed: true
+      test_null_duration_succeeds:
+        class: TestWorkoutStepDurationSecondsCheck
+        implemented: true
+        executable: true
+        passed: true
+  tests/integration/test_system_event_db.py:
+    type: integration
+    status: promoted
+    functions:
+      test_null_athlete_id_raises_integrity_error:
+        class: TestSystemEventAthleteIdNotNull
+        implemented: true
+        executable: true
+        passed: true
+coverage:
+  events:
+    covered: []
+  invariants:
+    covered:
+      - "I4: AthleteProfile.athlete_id UNIQUE"
+      - "I5: AthletePreferences.athlete_id UNIQUE; years_structured_training >= 0 CHECK"
+      - "I6: Activity dedup partial unique (athlete_id, external_id, source) WHERE external_id IS NOT NULL"
+      - "I7: TrainingGoal partial unique (athlete_id) WHERE status='active'; fitness_level 1-5 CHECK; weekly_volume_hours/volume_km >= 0 CHECK"
+      - "I8: AthleteFitness.athlete_id UNIQUE; form = fitness - fatigue CHECK on aggregate + dimensions; time_constants.source IN (population_default, individual_fitted)"
+      - "I9: CoachingMessage first_message singleton (partial unique); post_workout singleton per activity (partial unique); content non-empty CHECK"
+      - "I10: GeneratedWorkout unique (planned_session_id, generation_date); theoretical_targets + adjusted_targets JSONB objects CHECK; recovery_modifier_level IN (green, amber, red) CHECK"
+      - "I11: WorkoutStep unique (generated_workout_id, step_order); physiological_intent NOT NULL; step_order >= 1 CHECK; description non-empty CHECK; duration_seconds >= 0 CHECK"
+      - "I12: Checkpoint.planned_session_id UNIQUE"
+      - "I13: SystemEvent.athlete_id NOT NULL"
+      - "I14: TwinStateRepository append-only — no update/delete/save/merge methods"
+      - "I15: CoachingMessageRepository append-only — no update/delete/save/merge methods"
+      - "I16: SystemEventRepository single write method (add only)"
+      - "I17: Activity model has no avg_hr, avg_pace, avg_power, avg_cadence, or lap-data columns"

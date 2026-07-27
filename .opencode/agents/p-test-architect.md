@@ -885,11 +885,13 @@ Then confirm the sub-phase file, `tests/README.md`, and
 `tests/MOCKING_CONTRACT.md` were saved (as applicable).
 
 **Post-generation diagnostics:** Invoke `p-diagnostics-fixer` via the
-`task` tool — batch test files in groups of up to 5 per invocation, one
-invocation per group. The fixer's own batching gate will stop and return
-a batching plan if any group is too large — if that happens, split per
-the plan and re-invoke. Group by proximity where possible (files in the
-same test directory together). Invoke groups in order:
+`task` tool — batch **test files only** (files matching `test_*.py`) in groups
+of up to 5 per invocation, one invocation per group. Do NOT include utility files
+(`tests/utils/*.py`) or infrastructure files (`tests/conftest.py`) in these
+batches — those are handled separately if needed. The fixer's own batching gate
+will stop and return a batching plan if any group is too large — if that happens,
+split per the plan and re-invoke. Group by proximity where possible (files in
+the same test directory together). Invoke groups in order:
 
 ```
 Tool: task
@@ -917,6 +919,11 @@ plan becomes one task item. Process sequentially — invoke the fixer for one
 file, confirm the report was saved, mark the task complete, then start the
 next. Do NOT launch all invocations in parallel — the batching plan exists
 specifically because the workload is too large for concurrent processing.
+
+**Important:** Count files correctly before invoking. The batching gate is
+triggered at 6+ files for plan-based multi-file mode. If you need to include
+utility files (`tests/utils/*.py`) or infrastructure files, invoke them
+separately in single-file mode, not as part of a multi-file batch.
 
 After all tasks are complete, count successful reports vs failures.
 Report both in your completion confirmation.

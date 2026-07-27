@@ -94,10 +94,10 @@ index: <path to index.yaml>
     - With `class`: `filename.py::ClassName::function_name`
     - Without `class`: `filename.py::function_name`
 
-6. Update `index.yaml` `last_reviewed_at`.
+ 6. Update `index.yaml` `last_reviewed_at`.
 
-7. Report: which functions were added to release, whether a split occurred
-   and which functions it affected.
+ 7. Report: which functions were added to release, whether a split occurred
+    and which functions it affected.
 
 ---
 
@@ -150,6 +150,7 @@ Tool: task
 Input:
 {
   "subagent_type": "p-manifest-manager",
+  "description": "Promote file to release selection group",
   "prompt": "promote-file\nphase: tests/test-manifest/phase-2-3p2.yaml\nfile: test_physiology_update_service_bayesian.py\nindex: tests/test-manifest/index.yaml"
 }
 ```
@@ -159,6 +160,7 @@ Tool: task
 Input:
 {
   "subagent_type": "p-manifest-manager",
+  "description": "Promote release selection to regression group",
   "prompt": "release-promote\nindex: tests/test-manifest/index.yaml\nphases: phase-2-1.yaml, phase-2-2.yaml, phase-2-3p1.yaml, phase-2-3p2.yaml, phase-2-3p3.yaml"
 }
 ```

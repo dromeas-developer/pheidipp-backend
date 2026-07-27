@@ -104,6 +104,7 @@ Tool: task
 Input:
 {
   "subagent_type": "p-state-explorer",
+  "description": "Get current codebase registry for validation",
   "prompt": "Domain: <domain description>\n\nEntities: <entity list from plan scope>\n\nAspects: all"
 }
 ```
@@ -166,6 +167,7 @@ Tool: task
 Input:
 {
   "subagent_type": "p-state-explorer",
+  "description": "Get codebase registry for plan validation",
   "prompt": "Domain: <domain from plan>\n\nEntities: <entity list from plan scope>\n\nAspects: all"
 }
 ```
@@ -213,6 +215,7 @@ Tool: task
 Input:
 {
   "subagent_type": "p-contract-verifier",
+  "description": "Verify entity contract for validation",
   "prompt": "Entity: <entity_name>\n\nAspects: events, invariants"
 }
 ```
@@ -250,6 +253,7 @@ Tool: task
 Input:
 {
   "subagent_type": "p-index-health-guard",
+  "description": "Check code index health before deviation detection",
   "prompt": "Domains: code"
 }
 ```
@@ -277,6 +281,7 @@ Tool: task
 Input:
 {
   "subagent_type": "p-code-structure-explorer",
+  "description": "Analyze file structure for deviation detection",
   "prompt": "Module: <file path>\n\nAspects: classes, imports"
 }
 ```

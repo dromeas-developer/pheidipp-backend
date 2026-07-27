@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "pheidipp-codebase-context": {
+      "command": "/home/ruimendes/projects/mcp-server/.venv/bin/python",
+      "args": ["/home/ruimendes/projects/mcp-server/server.py"],
+      "env": {
+        "PYTHONPATH": "/home/ruimendes/projects/mcp-server",
+        "PROJECT_PATH": "/home/ruimendes/projects/pheidipp/backend"
+      }
+    }
+  }
+}

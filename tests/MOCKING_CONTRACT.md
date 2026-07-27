@@ -19,7 +19,7 @@
 | `client` | `tests/conftest.py` | function | httpx.AsyncClient wired to FastAPI app with db_session override |
 | `_prepare_database` | `tests/conftest.py` | session | Creates all tables once at session start |
 | *(per-directory fixtures added here as they are created)* | `tests/<layer>/conftest.py` | varies | Layer-specific fixtures |
-| *(factory helpers added here as they are created)* | `tests/utils/factories.py` | function | Async model factories |
+| `make_athlete` | `tests/utils/factories.py` | function | Async factory: creates Athlete row with unique email (commits) |
 | *(assertion helpers added here as they are created)* | `tests/utils/assertions.py` | function | Reusable assertion functions |
 | *(model helpers added here as they are created)* | `tests/utils/model_helpers.py` | function | ORM introspection (no DB required) |
 | *(schema helpers added here as they are created)* | `tests/utils/schema_helpers.py` | function | DB schema introspection (sync psycopg2 engine) |

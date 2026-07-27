@@ -122,6 +122,7 @@ Tool: task
 Input:
 {
   "subagent_type": "p-state-explorer",
+  "description": "Get codebase registry for consistency validation",
   "prompt": "Domain: <domain or phase scope>\n\nAspects: all"
 }
 ```
@@ -238,6 +239,7 @@ Tool: task
 Input:
 {
   "subagent_type": "p-state-explorer",
+  "description": "Get codebase registry for consistency validation",
   "prompt": "Domain: <phase scope>\n\nAspects: all"
 }
 ```
@@ -295,6 +297,7 @@ Tool: task
 Input:
 {
   "subagent_type": "p-index-health-guard",
+  "description": "Check code index health before import survey",
   "prompt": "Domains: code"
 }
 ```
@@ -313,6 +316,7 @@ Tool: task
 Input:
 {
   "subagent_type": "p-code-structure-explorer",
+  "description": "Analyze module structure for import tangle detection",
   "prompt": "Module: <file path>\n\nAspects: classes, imports"
 }
 ```

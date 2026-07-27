@@ -13,6 +13,11 @@ collaborator services, and repositories.
 | `test_auth_service.py` | AuthService: register (atomic 4-entity creation + event, rollback on failure), login (success, wrong password 401, nonexistent email constant-time), rotate_refresh_token (rotation, old token rejected, expired rejected, unknown rejected, atomicity rollback) |
 | `test_auth_schemas.py` | RegisterRequest password blank/whitespace validation, AuthResponse and TokenPairResponse token_hash and hashed_password exclusion |
 
+### Models & Repositories
+| File | Covers |
+|---|---|
+| `test_model_repository_contracts.py` | TestActivityModelColumns (no avg_hr/summary/lap columns), TestTwinStateRepositoryContract (6 methods: insert, get_latest, get_by_id, get_by_activity, get_by_activity_and_trigger, get_history; no update/delete), TestCoachingMessageRepositoryContract (6 methods: insert, get_by_athlete_id, get_by_athlete_and_type, get_existing_first_message, get_by_activity_and_type, get_all_count; no update/delete), TestSystemEventRepositoryContract (only add method; no read/update/delete) |
+
 ### Utilities & Security
 | File | Covers |
 |---|---|

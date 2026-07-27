@@ -1,5 +1,5 @@
 version: "1.0"
-last_reviewed_at: "2026-07-26T00:00:00Z"
+last_reviewed_at: "2026-07-26T23:00:00Z"
 selection:
   release:
     unit:
@@ -29,9 +29,57 @@ selection:
       - tests/unit/test_token_security.py::TestSafeExtraFiltersSensitiveKeys::test_unknown_keys_excluded
       - tests/unit/test_token_security.py::TestDiscardOldIps::test_discard_old_ips_sets_ip_address_to_none
       - tests/unit/test_token_security.py::TestDiscardOldIps::test_discard_old_ips_returns_zero_when_no_rows
+      - tests/unit/test_model_repository_contracts.py::TestActivityModelColumns::test_no_avg_hr_or_summary_columns
+      - tests/unit/test_model_repository_contracts.py::TestActivityModelColumns::test_no_lap_data_columns
+      - tests/unit/test_model_repository_contracts.py::TestTwinStateRepositoryContract::test_exposes_exactly_six_methods
+      - tests/unit/test_model_repository_contracts.py::TestTwinStateRepositoryContract::test_exposes_insert_get_latest_get_by_id_get_by_activity_get_by_activity_and_trigger_get_history
+      - tests/unit/test_model_repository_contracts.py::TestTwinStateRepositoryContract::test_no_update_delete_or_mutation_methods
+      - tests/unit/test_model_repository_contracts.py::TestCoachingMessageRepositoryContract::test_exposes_exactly_six_coaching_message_methods
+      - tests/unit/test_model_repository_contracts.py::TestCoachingMessageRepositoryContract::test_coaching_message_exposes_insert_get_by_athlete_id_get_by_athlete_and_type_get_existing_first_message_get_by_activity_and_type_get_all_count
+      - tests/unit/test_model_repository_contracts.py::TestCoachingMessageRepositoryContract::test_coaching_message_no_update_delete_or_mutation_methods
+      - tests/unit/test_model_repository_contracts.py::TestSystemEventRepositoryContract::test_exposes_only_add_method
+      - tests/unit/test_model_repository_contracts.py::TestSystemEventRepositoryContract::test_no_read_update_or_delete_methods
+      - tests/unit/test_model_repository_contracts.py::TestSystemEventRepositoryContract::test_method_count_is_exactly_one
     integration:
       - tests/integration/test_auth_db.py::TestEmailUniqueness::test_duplicate_email_rejected_with_integrity_error
       - tests/integration/test_auth_db.py::TestEmailUniqueness::test_case_insensitive_email_uniqueness
+      - tests/integration/test_system_event_db.py::TestSystemEventAthleteIdNotNull::test_null_athlete_id_raises_integrity_error
+      - tests/integration/test_profile_preferences_activity_db.py::TestAthleteProfileUniqueAthleteId::test_duplicate_athlete_id_raises_integrity_error
+      - tests/integration/test_profile_preferences_activity_db.py::TestAthletePreferencesUniqueAthleteId::test_duplicate_preferences_athlete_id_raises_integrity_error
+      - tests/integration/test_profile_preferences_activity_db.py::TestAthletePreferencesYearsStructuredTrainingCheck::test_negative_years_structured_training_raises_integrity_error
+      - tests/integration/test_profile_preferences_activity_db.py::TestActivityDedupExternalId::test_duplicate_external_id_raises_integrity_error
+      - tests/integration/test_profile_preferences_activity_db.py::TestActivityDedupExemptManualEntry::test_null_external_id_duplicates_succeed
+      - tests/integration/test_fitness_physiology_db.py::TestAthleteFitnessUniqueAthleteId::test_duplicate_athlete_id_raises_integrity_error
+      - tests/integration/test_fitness_physiology_db.py::TestAthleteFitnessFormInvariant::test_valid_aggregate_form_succeeds
+      - tests/integration/test_fitness_physiology_db.py::TestAthleteFitnessFormInvariant::test_invalid_aggregate_form_raises_integrity_error
+      - tests/integration/test_fitness_physiology_db.py::TestAthleteFitnessDimensionalFormInvariant::test_valid_aerobic_form_succeeds
+      - tests/integration/test_fitness_physiology_db.py::TestAthleteFitnessDimensionalFormInvariant::test_invalid_aerobic_form_raises_integrity_error
+      - tests/integration/test_fitness_physiology_db.py::TestAthleteFitnessDimensionalFormInvariant::test_null_aerobic_skips_check
+      - tests/integration/test_fitness_physiology_db.py::TestAthleteFitnessTimeConstantsSource::test_invalid_source_raises_integrity_error
+      - tests/integration/test_fitness_physiology_db.py::TestAthleteFitnessTimeConstantsSource::test_population_default_source_succeeds
+      - tests/integration/test_fitness_physiology_db.py::TestAthleteFitnessTimeConstantsSource::test_individual_fitted_source_succeeds
+      - tests/integration/test_fitness_physiology_db.py::TestAthletePhysiologyUniqueAthleteId::test_duplicate_physiology_athlete_id_raises_integrity_error
+      - tests/integration/test_training_goal_plan_db.py::TestTrainingGoalActiveUnique::test_duplicate_active_goal_raises_integrity_error
+      - tests/integration/test_training_goal_plan_db.py::TestTrainingGoalInactiveMultiple::test_multiple_inactive_goals_succeed
+      - tests/integration/test_training_goal_plan_db.py::TestTrainingGoalFitnessLevelRange::test_fitness_level_6_raises_integrity_error
+      - tests/integration/test_training_goal_plan_db.py::TestTrainingGoalWeeklyVolumeHoursCheck::test_negative_weekly_volume_hours_raises_integrity_error
+      - tests/integration/test_training_goal_plan_db.py::TestTrainingGoalWeeklyVolumeKmCheck::test_negative_weekly_volume_km_raises_integrity_error
+      - tests/integration/test_training_goal_plan_db.py::TestWeeklyPlanUniquePlanWeek::test_duplicate_plan_week_raises_integrity_error
+      - tests/integration/test_training_goal_plan_db.py::TestCheckpointUniquePlannedSession::test_duplicate_planned_session_id_raises_integrity_error
+      - tests/integration/test_coaching_workout_db.py::TestCoachingMessageFirstMessageSingleton::test_duplicate_first_message_raises_integrity_error
+      - tests/integration/test_coaching_workout_db.py::TestCoachingMessagePostWorkoutSingleton::test_duplicate_post_workout_raises_integrity_error
+      - tests/integration/test_coaching_workout_db.py::TestCoachingMessagePostWorkoutNullActivity::test_duplicate_post_workout_null_activity_succeeds
+      - tests/integration/test_coaching_workout_db.py::TestCoachingMessageContentCheck::test_empty_content_raises_integrity_error
+      - tests/integration/test_coaching_workout_db.py::TestGeneratedWorkoutUniquePlanDate::test_duplicate_plan_date_raises_integrity_error
+      - tests/integration/test_coaching_workout_db.py::TestGeneratedWorkoutTargetsCheck::test_theoretical_targets_not_object_raises_integrity_error
+      - tests/integration/test_coaching_workout_db.py::TestGeneratedWorkoutTargetsCheck::test_adjusted_targets_null_raises_integrity_error
+      - tests/integration/test_coaching_workout_db.py::TestGeneratedWorkoutRecoveryModifierCheck::test_invalid_recovery_modifier_raises_integrity_error
+      - tests/integration/test_coaching_workout_db.py::TestWorkoutStepUniqueWorkoutOrder::test_duplicate_step_order_raises_integrity_error
+      - tests/integration/test_coaching_workout_db.py::TestWorkoutStepPhysiologicalIntentNotNull::test_null_physiological_intent_raises_integrity_error
+      - tests/integration/test_coaching_workout_db.py::TestWorkoutStepStepOrderCheck::test_step_order_zero_raises_integrity_error
+      - tests/integration/test_coaching_workout_db.py::TestWorkoutStepDescriptionCheck::test_empty_description_raises_integrity_error
+      - tests/integration/test_coaching_workout_db.py::TestWorkoutStepDurationSecondsCheck::test_negative_duration_raises_integrity_error
+      - tests/integration/test_coaching_workout_db.py::TestWorkoutStepDurationSecondsCheck::test_null_duration_succeeds
     api:
       - tests/api/test_require_self.py::TestRequireSelf::test_authenticated_own_jwt_succeeds
       - tests/api/test_require_self.py::TestRequireSelf::test_authenticated_different_athlete_jwt_returns_403

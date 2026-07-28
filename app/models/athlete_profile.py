@@ -78,9 +78,15 @@ class AthleteProfile(Base):
     # ``r_squared >= 0.70`` to upgrade ``current_effort_generation``).
     # ------------------------------------------------------------------
     gap_curve_model: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
-    weather_response_model: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
-    banister_constants: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
-    cycle_personal_model: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    weather_response_model: Mapped[dict[str, Any] | None] = mapped_column(
+        JSONB, nullable=True
+    )
+    banister_constants: Mapped[dict[str, Any] | None] = mapped_column(
+        JSONB, nullable=True
+    )
+    cycle_personal_model: Mapped[dict[str, Any] | None] = mapped_column(
+        JSONB, nullable=True
+    )
 
     # ------------------------------------------------------------------
     # ``timezone`` is validated at onboarding against the IANA tz
@@ -112,7 +118,9 @@ class AthleteProfile(Base):
         Integer, nullable=True
     )
     structural_risk_flag: Mapped[bool | None] = mapped_column(nullable=True)
-    objective_thresholds: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    objective_thresholds: Mapped[dict[str, Any] | None] = mapped_column(
+        JSONB, nullable=True
+    )
 
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

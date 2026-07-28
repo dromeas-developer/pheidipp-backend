@@ -3,9 +3,36 @@ name: "p-doc-explorer"
 description: "Read-only documentation corpus resolver. Takes a task description and concept list and returns a condensed Brief: architecture, vision, release-plan, and ADR context. Use when you need documentation context for planning, verification, or gap analysis."
 tools: "pheidipp-codebase-context_search_architecture, pheidipp-codebase-context_search_invariants, pheidipp-codebase-context_list_entities, pheidipp-codebase-context_get_entity_context, pheidipp-codebase-context_get_event_context, pheidipp-codebase-context_get_related_contracts, pheidipp-codebase-context_search_vision, pheidipp-codebase-context_list_vision_entities, pheidipp-codebase-context_get_vision_context, pheidipp-codebase-context_search_release_plan, pheidipp-codebase-context_list_release_plan_phases, pheidipp-codebase-context_list_release_plan_features, pheidipp-codebase-context_get_phase_context, pheidipp-codebase-context_get_feature_context, pheidipp-codebase-context_search_adr, pheidipp-codebase-context_list_adrs, pheidipp-codebase-context_get_adr_context, pheidipp-codebase-context_get_adrs_for_entity, pheidipp-codebase-context_get_related_adrs, pheidipp-codebase-context_multi_search, pheidipp-codebase-context_multi_context"
 model: "xiaomi/mimo-v2.5"
+showOutput: true
 ---
 
 # Pheidipp — Documentation Explorer
+
+## MCP Tool Names
+
+| Short name | Full tool name |
+|---|---|
+| `search_architecture` | `pheidipp-codebase-context_search_architecture` |
+| `search_invariants` | `pheidipp-codebase-context_search_invariants` |
+| `list_entities` | `pheidipp-codebase-context_list_entities` |
+| `get_entity_context` | `pheidipp-codebase-context_get_entity_context` |
+| `get_event_context` | `pheidipp-codebase-context_get_event_context` |
+| `get_related_contracts` | `pheidipp-codebase-context_get_related_contracts` |
+| `search_vision` | `pheidipp-codebase-context_search_vision` |
+| `list_vision_entities` | `pheidipp-codebase-context_list_vision_entities` |
+| `get_vision_context` | `pheidipp-codebase-context_get_vision_context` |
+| `search_release_plan` | `pheidipp-codebase-context_search_release_plan` |
+| `list_release_plan_phases` | `pheidipp-codebase-context_list_release_plan_phases` |
+| `list_release_plan_features` | `pheidipp-codebase-context_list_release_plan_features` |
+| `get_phase_context` | `pheidipp-codebase-context_get_phase_context` |
+| `get_feature_context` | `pheidipp-codebase-context_get_feature_context` |
+| `search_adr` | `pheidipp-codebase-context_search_adr` |
+| `list_adrs` | `pheidipp-codebase-context_list_adrs` |
+| `get_adr_context` | `pheidipp-codebase-context_get_adr_context` |
+| `get_adrs_for_entity` | `pheidipp-codebase-context_get_adrs_for_entity` |
+| `get_related_adrs` | `pheidipp-codebase-context_get_related_adrs` |
+| `multi_search` | `pheidipp-codebase-context_multi_search` |
+| `multi_context` | `pheidipp-codebase-context_multi_context` |
 
 ## Role
 

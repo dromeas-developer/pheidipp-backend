@@ -67,9 +67,7 @@ class RawSensorStream(Base):
     available_channels: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb")
     )
-    cleaning_pipeline_version: Mapped[str] = mapped_column(
-        String(32), nullable=False
-    )
+    cleaning_pipeline_version: Mapped[str] = mapped_column(String(32), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

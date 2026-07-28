@@ -67,9 +67,7 @@ class CoachingMessageRepository:
         )
         if message_type is not None:
             stmt = stmt.where(CoachingMessage.message_type == message_type)
-        stmt = (
-            stmt.limit(limit).offset(offset)
-        )
+        stmt = stmt.limit(limit).offset(offset)
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
@@ -150,9 +148,7 @@ class CoachingMessageRepository:
         Optional ``message_type`` filters the count. Used by the list
         endpoint to compute pagination totals.
         """
-        stmt = select(func.count()).where(
-            CoachingMessage.athlete_id == athlete_id
-        )
+        stmt = select(func.count()).where(CoachingMessage.athlete_id == athlete_id)
         if message_type is not None:
             stmt = stmt.where(CoachingMessage.message_type == message_type)
         result = await self.session.execute(stmt)

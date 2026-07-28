@@ -28,9 +28,7 @@ class PhysiologyMeasurementRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def insert(
-        self, measurement: PhysiologyMeasurement
-    ) -> PhysiologyMeasurement:
+    async def insert(self, measurement: PhysiologyMeasurement) -> PhysiologyMeasurement:
         """Add a PhysiologyMeasurement to the session without committing.
 
         Caller is responsible for committing the surrounding

@@ -28,13 +28,13 @@ TRAINING_LENGTH_GATE_DEFAULT_WEEKS: int = 24
 
 #: Per-(goal_event_type, experience_level) gate thresholds.
 GATE_THRESHOLDS: Dict[str, Dict[str, int]] = {
-    "marathon":      {"novice": 20, "intermediate": 24, "experienced": 30},
+    "marathon": {"novice": 20, "intermediate": 24, "experienced": 30},
     "half_marathon": {"novice": 16, "intermediate": 20, "experienced": 24},
-    "10k":           {"novice": 12, "intermediate": 16, "experienced": 20},
-    "5k":            {"novice": 8,  "intermediate": 12, "experienced": 16},
-    "ultra":         {"novice": 24, "intermediate": 30, "experienced": 36},
-    "trail_race":    {"novice": 20, "intermediate": 24, "experienced": 30},
-    "custom":        {"novice": 20, "intermediate": 24, "experienced": 30},
+    "10k": {"novice": 12, "intermediate": 16, "experienced": 20},
+    "5k": {"novice": 8, "intermediate": 12, "experienced": 16},
+    "ultra": {"novice": 24, "intermediate": 30, "experienced": 36},
+    "trail_race": {"novice": 20, "intermediate": 24, "experienced": 30},
+    "custom": {"novice": 20, "intermediate": 24, "experienced": 30},
 }
 
 #: ``SessionType`` values considered "quality" — never consecutive dates
@@ -125,9 +125,9 @@ def evaluate_training_length_gate(
     experience_level: str,
 ) -> TrainingLengthGateResult:
     """Apply the race-event training-length gate."""
-    threshold = GATE_THRESHOLDS.get(
-        goal_event_type, {}
-    ).get(experience_level, TRAINING_LENGTH_GATE_DEFAULT_WEEKS)
+    threshold = GATE_THRESHOLDS.get(goal_event_type, {}).get(
+        experience_level, TRAINING_LENGTH_GATE_DEFAULT_WEEKS
+    )
 
     if weeks_until_goal > threshold:
         return TrainingLengthGateResult(
@@ -169,9 +169,7 @@ def evaluate_training_length_gate(
     )
 
 
-def allocate_race_event_phases(
-    *, total_weeks: int
-) -> List[PhaseAllocation]:
+def allocate_race_event_phases(*, total_weeks: int) -> List[PhaseAllocation]:
     """Allocate the five-phase race_event template against total_weeks."""
     if total_weeks <= 0:
         raise ValueError("total_weeks must be positive")
@@ -200,9 +198,7 @@ def allocate_race_event_phases(
 
     flexible = total_weeks - RACE_EVENT_FIXED_TAIL_WEEKS
     proportion_scale = 0.85
-    base_w = _round_to_int(
-        flexible * RACE_EVENT_PROPORTIONS["base"] / proportion_scale
-    )
+    base_w = _round_to_int(flexible * RACE_EVENT_PROPORTIONS["base"] / proportion_scale)
     thresh_w = _round_to_int(
         flexible * RACE_EVENT_PROPORTIONS["threshold"] / proportion_scale
     )
@@ -229,9 +225,7 @@ def allocate_race_event_phases(
         PhaseAllocation(
             label=PhaseLabel.THRESHOLD_BUILD,
             weeks=thresh_w,
-            primary_focus=(
-                "threshold development with maintained aerobic volume"
-            ),
+            primary_focus=("threshold development with maintained aerobic volume"),
             objectives=["threshold_quality", "intensity_distribution"],
             distribution=_phase_distribution("threshold"),
             specificity=0.4,
@@ -269,21 +263,41 @@ def allocate_race_event_phases(
 
 def _phase_distribution(phase: str) -> Dict[str, float]:
     return {
-        "base":         {"low_aerobic": 0.75, "high_aerobic": 0.10,
-                         "threshold": 0.05,   "vo2max": 0.03,
-                         "neuromuscular": 0.02},
-        "threshold":    {"low_aerobic": 0.55, "high_aerobic": 0.15,
-                         "threshold": 0.20,   "vo2max": 0.05,
-                         "neuromuscular": 0.05},
-        "race_specific":{"low_aerobic": 0.45, "high_aerobic": 0.20,
-                         "threshold": 0.15,   "vo2max": 0.10,
-                         "neuromuscular": 0.10},
-        "taper":        {"low_aerobic": 0.65, "high_aerobic": 0.15,
-                         "threshold": 0.10,   "vo2max": 0.05,
-                         "neuromuscular": 0.05},
-        "race_week":    {"low_aerobic": 0.55, "high_aerobic": 0.20,
-                         "threshold": 0.10,   "vo2max": 0.05,
-                         "neuromuscular": 0.10},
+        "base": {
+            "low_aerobic": 0.75,
+            "high_aerobic": 0.10,
+            "threshold": 0.05,
+            "vo2max": 0.03,
+            "neuromuscular": 0.02,
+        },
+        "threshold": {
+            "low_aerobic": 0.55,
+            "high_aerobic": 0.15,
+            "threshold": 0.20,
+            "vo2max": 0.05,
+            "neuromuscular": 0.05,
+        },
+        "race_specific": {
+            "low_aerobic": 0.45,
+            "high_aerobic": 0.20,
+            "threshold": 0.15,
+            "vo2max": 0.10,
+            "neuromuscular": 0.10,
+        },
+        "taper": {
+            "low_aerobic": 0.65,
+            "high_aerobic": 0.15,
+            "threshold": 0.10,
+            "vo2max": 0.05,
+            "neuromuscular": 0.05,
+        },
+        "race_week": {
+            "low_aerobic": 0.55,
+            "high_aerobic": 0.20,
+            "threshold": 0.10,
+            "vo2max": 0.05,
+            "neuromuscular": 0.10,
+        },
     }[phase]
 
 
@@ -353,9 +367,7 @@ def schedule_checkpoints(
                 CheckpointRecord(
                     type=CheckpointType.CALIBRATION,
                     week_number=target_week,
-                    target_date=_phase_start_date(
-                        allocations, phase_starts, idx
-                    ),
+                    target_date=_phase_start_date(allocations, phase_starts, idx),
                     target_metric="LT2",
                     session_type=SessionType.THRESHOLD,
                     planner_message=(
@@ -378,9 +390,7 @@ def schedule_checkpoints(
                 ),
                 target_metric="aerobic_fitness",
                 session_type=SessionType.LONG_RUN,
-                planner_message=(
-                    "Check-in run to gauge aerobic progress vs baseline."
-                ),
+                planner_message=("Check-in run to gauge aerobic progress vs baseline."),
             )
         )
         already_scheduled_weeks.add(benchmark_week)
@@ -398,9 +408,7 @@ def schedule_checkpoints(
             CheckpointRecord(
                 type=CheckpointType.PROGRESS_REVIEW,
                 week_number=week,
-                target_date=_date_for_week(
-                    week, phase_starts[0], allocations
-                ),
+                target_date=_date_for_week(week, phase_starts[0], allocations),
                 target_metric="weekly_form",
                 session_type=SessionType.EASY_RUN,
                 planner_message=(
@@ -427,14 +435,10 @@ def schedule_checkpoints(
                 CheckpointRecord(
                     type=CheckpointType.RACE_SIMULATION,
                     week_number=sim_week,
-                    target_date=_date_for_week(
-                        sim_week, phase_starts[0], allocations
-                    ),
+                    target_date=_date_for_week(sim_week, phase_starts[0], allocations),
                     target_metric="race_pace",
                     session_type=SessionType.LONG_RUN,
-                    planner_message=(
-                        "Race-pace long run to confirm readiness."
-                    ),
+                    planner_message=("Race-pace long run to confirm readiness."),
                 )
             )
             already_scheduled_weeks.add(sim_week)
@@ -450,15 +454,10 @@ def _has_low_metric_confidence(
     """True if any of the listed twin metric confidences is ``low`` or ``None``."""
     if not metric_confidence:
         return True
-    return any(
-        metric_confidence.get(key) in (None, "low")
-        for key in keys
-    )
+    return any(metric_confidence.get(key) in (None, "low") for key in keys)
 
 
-def _phase_starting_week(
-    allocations: List[PhaseAllocation], phase_index: int
-) -> int:
+def _phase_starting_week(allocations: List[PhaseAllocation], phase_index: int) -> int:
     return 1 + sum(a.weeks for a in allocations[:phase_index])
 
 

@@ -33,20 +33,23 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", extra="allow")
 
+
 settings = Settings()
+
 
 def get_postgres_url(sync: bool = False) -> str:
     import socket
+
     url = settings.DATABASE_URL
-    
+
     if sync:
         url = url.replace("postgresql+asyncpg", "postgresql+psycopg2")
-    
+
     if "db" in url:
         try:
             s = socket.socket()
             s.settimeout(2)
-            result = s.connect_ex(('db', 5432))
+            result = s.connect_ex(("db", 5432))
             s.close()
             if result == 0:
                 return url

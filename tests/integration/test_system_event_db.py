@@ -6,7 +6,9 @@ from app.models.system_event import SystemEvent
 
 
 class TestSystemEventAthleteIdNotNull:
-    async def test_null_athlete_id_raises_integrity_error(self, db_session: AsyncSession):
+    async def test_null_athlete_id_raises_integrity_error(
+        self, db_session: AsyncSession
+    ):
         event = SystemEvent(
             event_type="test.event",
             athlete_id=None,

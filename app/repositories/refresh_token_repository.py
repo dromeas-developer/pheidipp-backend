@@ -28,9 +28,7 @@ class RefreshTokenRepository:
         )
         return result.scalar_one_or_none()
 
-    async def get_by_athlete_id(
-        self, athlete_id: uuid.UUID
-    ) -> list[RefreshToken]:
+    async def get_by_athlete_id(self, athlete_id: uuid.UUID) -> list[RefreshToken]:
         result = await self.session.execute(
             select(RefreshToken).where(RefreshToken.athlete_id == athlete_id)
         )
@@ -76,9 +74,7 @@ class RefreshTokenRepository:
         return cursor_result.rowcount
 
     @staticmethod
-    def is_active(
-        token: RefreshToken, now: Optional[datetime] = None
-    ) -> bool:
+    def is_active(token: RefreshToken, now: Optional[datetime] = None) -> bool:
         """True when token is un-revoked and not yet expired."""
         anchor = now or datetime.now(timezone.utc)
         if token.revoked_at is not None:

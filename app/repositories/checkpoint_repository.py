@@ -55,7 +55,9 @@ class CheckpointRepository:
         index ``ix_checkpoints_planned_session`` makes the join
         point-lookup fast.
         """
-        from app.models.planned_session import PlannedSession  # local import — avoid cycle
+        from app.models.planned_session import (
+            PlannedSession,
+        )  # local import — avoid cycle
         from app.models.weekly_plan import WeeklyPlan  # local import — avoid cycle
 
         result = await self.session.execute(
@@ -67,9 +69,7 @@ class CheckpointRepository:
         )
         return list(result.scalars().all())
 
-    async def get_by_id(
-        self, checkpoint_id: uuid.UUID
-    ) -> Optional[Checkpoint]:
+    async def get_by_id(self, checkpoint_id: uuid.UUID) -> Optional[Checkpoint]:
         result = await self.session.execute(
             select(Checkpoint).where(Checkpoint.id == checkpoint_id)
         )

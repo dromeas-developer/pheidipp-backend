@@ -47,11 +47,8 @@ files:
     type: unit | integration | api | behaviour
     status: pending | generated | promoted
     functions:
-      <function_name>:
-        class: <ClassName>    # optional — present for class-based tests only
-        implemented: true | false
-        executable: true | false
-        passed: true | false
+      <function_name>: { class: <ClassName>, implemented: true, executable: false, passed: false }   # class is optional — present for class-based tests only
+      <function_name>: { implemented: true, executable: false, passed: false }                        # module-level test (no class)
       ...
   ...
 coverage:

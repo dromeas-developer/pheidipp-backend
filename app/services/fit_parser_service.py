@@ -124,10 +124,13 @@ class FitParserService:
                     raw_start = message.get_value(self.SESSION_START_FIELD)  # type: ignore[attr-defined]
                     if isinstance(raw_start, datetime):
                         start_time = ensure_utc(raw_start)
-                raw_val: Any = cast(Any, (
-                    message.get_value(self.SESSION_TOTAL_TIMER_FIELD)  # type: ignore[attr-defined]
-                    or message.get_value(self.SESSION_TOTAL_ELAPSED_FIELD)  # type: ignore[attr-defined]
-                ))
+                raw_val: Any = cast(
+                    Any,
+                    (
+                        message.get_value(self.SESSION_TOTAL_TIMER_FIELD)  # type: ignore[attr-defined]
+                        or message.get_value(self.SESSION_TOTAL_ELAPSED_FIELD)  # type: ignore[attr-defined]
+                    ),
+                )
                 if isinstance(raw_val, (int, float)):
                     duration_seconds = coerce_duration_seconds(raw_val)
                 raw_dist = message.get_value(self.SESSION_TOTAL_DISTANCE_FIELD)  # type: ignore[attr-defined]
@@ -142,8 +145,12 @@ class FitParserService:
                 sport_int_raw = message.get_value("sport")  # type: ignore[attr-defined]
                 sub_sport_int_raw = message.get_value("sub_sport")  # type: ignore[attr-defined]
                 sport_int = sport_int_raw if isinstance(sport_int_raw, int) else None
-                sub_sport_int = sub_sport_int_raw if isinstance(sub_sport_int_raw, int) else None
-                sport_type, detection_confidence = _map_fit_sport_to_enum(sport_int, sub_sport_int)
+                sub_sport_int = (
+                    sub_sport_int_raw if isinstance(sub_sport_int_raw, int) else None
+                )
+                sport_type, detection_confidence = _map_fit_sport_to_enum(
+                    sport_int, sub_sport_int
+                )
                 continue
 
             if message.name != "record":  # type: ignore[attr-defined]
@@ -166,11 +173,21 @@ class FitParserService:
                 else:
                     rr_records.append(float(raw_rr))
 
-            raw_lat: Optional[float] = cast(Optional[float], message.get_value("position_lat"))  # type: ignore[attr-defined]
-            raw_long: Optional[float] = cast(Optional[float], message.get_value("position_long"))  # type: ignore[attr-defined]
-            raw_dist: Optional[float] = cast(Optional[float], message.get_value("distance"))  # type: ignore[attr-defined]
-            raw_alt: Optional[float] = cast(Optional[float], message.get_value("altitude"))  # type: ignore[attr-defined]
-            raw_speed: Optional[float] = cast(Optional[float], message.get_value("speed"))  # type: ignore[attr-defined]
+            raw_lat: Optional[float] = cast(
+                Optional[float], message.get_value("position_lat")
+            )  # type: ignore[attr-defined]
+            raw_long: Optional[float] = cast(
+                Optional[float], message.get_value("position_long")
+            )  # type: ignore[attr-defined]
+            raw_dist: Optional[float] = cast(
+                Optional[float], message.get_value("distance")
+            )  # type: ignore[attr-defined]
+            raw_alt: Optional[float] = cast(
+                Optional[float], message.get_value("altitude")
+            )  # type: ignore[attr-defined]
+            raw_speed: Optional[float] = cast(
+                Optional[float], message.get_value("speed")
+            )  # type: ignore[attr-defined]
 
             if raw_lat is not None or raw_long is not None:
                 has_gps = True
@@ -185,14 +202,18 @@ class FitParserService:
                 if isinstance(raw_speed, (int, float)):
                     raw_speed = float(raw_speed)  # m/s
 
-                gps_records.append(GpsRecord(
-                    timestamp=message.timestamp if hasattr(message, 'timestamp') else start_time or datetime.now(timezone.utc),  # type: ignore[attr-defined]
-                    position_lat=raw_lat,
-                    position_long=raw_long,
-                    distance=raw_dist,
-                    altitude=raw_alt,
-                    speed=raw_speed,
-                ))
+                gps_records.append(
+                    GpsRecord(
+                        timestamp=message.timestamp
+                        if hasattr(message, "timestamp")
+                        else start_time or datetime.now(timezone.utc),  # type: ignore[attr-defined]
+                        position_lat=raw_lat,
+                        position_long=raw_long,
+                        distance=raw_dist,
+                        altitude=raw_alt,
+                        speed=raw_speed,
+                    )
+                )
 
             if start_time is None:
                 raw_ts = message.get_value(self.TIMESTAMP_FIELD)  # type: ignore[attr-defined]
@@ -288,7 +309,9 @@ def coerce_duration_seconds(value: float | int) -> int:
     return int(round(numeric))
 
 
-def _map_fit_sport_to_enum(sport: Optional[int], sub_sport: Optional[int]) -> tuple[SportType, str]:
+def _map_fit_sport_to_enum(
+    sport: Optional[int], sub_sport: Optional[int]
+) -> tuple[SportType, str]:
     """Map FIT sport and sub_sport integers to SportType and confidence.
 
     Uses the Garmin/Ant+ sport mapping table from

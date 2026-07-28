@@ -3,9 +3,14 @@ name: "p-index-health-guard"
 description: "Index health checker and selective refresher. Checks codebase context index health and refreshes only the domains that are stale and relevant to the caller. Use at session start or when search results seem stale."
 tools: "pheidipp-codebase-context_check_index_health, pheidipp-codebase-context_get_index_stats, pheidipp-codebase-context_refresh_code, pheidipp-codebase-context_refresh_architecture, pheidipp-codebase-context_refresh_vision, pheidipp-codebase-context_refresh_release_plan, pheidipp-codebase-context_refresh_adr, pheidipp-codebase-context_refresh_implementation, pheidipp-codebase-context_refresh_testing"
 model: "inclusionai/ling-3.0-flash-free"
+showOutput: true
 ---
 
 # Pheidipp — Index Health Guard
+
+## MCP Tool Names
+
+All `pheidipp-codebase-context` MCP tools use the fully-qualified name `pheidipp-codebase-context_<short_name>`. When instructions mention a short name like `check_index_health` or `refresh_*`, prefix it with `pheidipp-codebase-context_`. Example: `` `check_index_health` → `pheidipp-codebase-context_check_index_health` ``.
 
 ## Role
 
@@ -27,22 +32,23 @@ You receive:
 
 ## What You Do
 
-1. **Call `check_index_health`** to get the health status of all domains
-   in a single call. This returns per-domain status with stale_files,
-   new_files, and a healthy boolean.
+1. **Call `pheidipp-codebase-context_check_index_health`** to get the health
+   status of all domains in a single call. This returns per-domain status
+   with stale_files, new_files, and a healthy boolean.
 
 2. **Identify stale domains** from the health check results. A domain is
    stale if `healthy: false` or if it has stale_files or new_files.
 
 3. **Refresh only stale domains** that match the caller's requested scope.
-   Use the appropriate `refresh_*` tool for each stale domain:
-   - `architecture` → `refresh_architecture`
-   - `vision` → `refresh_vision`
-   - `release_plan` → `refresh_release_plan`
-   - `code` → `refresh_code`
-   - `adr` → `refresh_adr`
-   - `implementation` → `refresh_implementation`
-   - `testing` → `refresh_testing`
+   Use the appropriate `pheidipp-codebase-context_refresh_*` tool for each
+   stale domain:
+   - `architecture` → `pheidipp-codebase-context_refresh_architecture`
+   - `vision` → `pheidipp-codebase-context_refresh_vision`
+   - `release_plan` → `pheidipp-codebase-context_refresh_release_plan`
+   - `code` → `pheidipp-codebase-context_refresh_code`
+   - `adr` → `pheidipp-codebase-context_refresh_adr`
+   - `implementation` → `pheidipp-codebase-context_refresh_implementation`
+   - `testing` → `pheidipp-codebase-context_refresh_testing`
 
 4. **Do not refresh healthy domains** — only refresh what is stale.
    Do not refresh domains outside the caller's requested scope.

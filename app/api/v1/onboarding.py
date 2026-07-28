@@ -51,14 +51,21 @@ async def complete_onboarding(
 ) -> OnboardingResponse:
     profile_input = ProfileInput(
         timezone=payload.profile.timezone,
-        training_window=payload.profile.training_window,
+        training_window=(
+            payload.profile.training_window.model_dump()
+            if payload.profile.training_window is not None
+            else None
+        ),
         height_cm=payload.profile.height_cm,
     )
     prefs_input = PreferencesInput(
         sport_background=payload.preferences.sport_background,
         years_structured_training=payload.preferences.years_structured_training,
         training_time_of_day=payload.preferences.training_time_of_day,
-        weekly_schedule=payload.preferences.weekly_schedule,
+        weekly_schedule={
+            day: cfg.model_dump()
+            for day, cfg in payload.preferences.weekly_schedule.items()
+        },
         gps_source=payload.preferences.gps_source,
         hr_source=payload.preferences.hr_source,
         power_source=payload.preferences.power_source,
@@ -178,7 +185,11 @@ async def patch_profile(
             height_cm=payload.height_cm,
             location_lat=payload.location_lat,
             location_lng=payload.location_lng,
-            training_window=payload.training_window,
+            training_window=(
+                payload.training_window.model_dump()
+                if payload.training_window is not None
+                else None
+            ),
         )
     except AthleteNotFoundError:
         raise HTTPException(
@@ -201,10 +212,7 @@ async def get_preferences(
     if row is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=(
-                "Athlete preferences not yet created. Complete onboarding "
-                "first."
-            ),
+            detail=("Athlete preferences not yet created. Complete onboarding first."),
         )
     return AthletePreferencesResponse.model_validate(row)
 
@@ -225,10 +233,7 @@ async def patch_preferences(
     except AthleteNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=(
-                "Athlete preferences not yet created. Complete onboarding "
-                "first."
-            ),
+            detail=("Athlete preferences not yet created. Complete onboarding first."),
         )
     return AthletePreferencesResponse.model_validate(row)
 

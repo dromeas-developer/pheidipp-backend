@@ -39,6 +39,7 @@ _CONFIDENCE_DESCRIPTORS: dict[TwinConfidenceLevel, str] = {
     TwinConfidenceLevel.HIGH: "high confidence in your thresholds — multiple calibration data points received",
 }
 
+
 def _form_descriptor(form: float) -> str:
     """Return a narrative phrase for a Banister form score."""
     if form < -5.0:
@@ -71,18 +72,12 @@ class AthleteTwinContext:
 class TwinContextAssembler:
     """Translate TwinState + AthletePreferences into coaching language."""
 
-    def assemble_twin_context(
-        self, twin_state: TwinState
-    ) -> TwinContextSummary:
+    def assemble_twin_context(self, twin_state: TwinState) -> TwinContextSummary:
         """Return TwinContextSummary for twin_state."""
         return TwinContextSummary(
             readiness_level=twin_state.readiness_level,
-            readiness_descriptor=_READINESS_DESCRIPTORS[
-                twin_state.readiness_level
-            ],
-            confidence_descriptor=_CONFIDENCE_DESCRIPTORS[
-                twin_state.confidence_level
-            ],
+            readiness_descriptor=_READINESS_DESCRIPTORS[twin_state.readiness_level],
+            confidence_descriptor=_CONFIDENCE_DESCRIPTORS[twin_state.confidence_level],
             fitness_form_descriptor=_form_descriptor(twin_state.form),
             data_tier=DataTier(twin_state.data_tier),
             confidence_level=twin_state.confidence_level,

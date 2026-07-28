@@ -3,9 +3,14 @@ name: "p-state-explorer"
 description: "Read-only codebase registry resolver. Takes a domain description or entity list and returns a condensed Brief: entities, services, repositories, routes, registrations, event producers, transaction boundaries, and entity-to-code file mappings. Use when you need to know what currently exists in a domain before planning or verifying."
 tools: "pheidipp-codebase-context_search_symbols, pheidipp-codebase-context_search_codebase, pheidipp-codebase-context_grep_files, pheidipp-codebase-context_find_files, pheidipp-codebase-context_get_files, pheidipp-codebase-context_get_code_for_entity, pheidipp-codebase-context_multi_code_query"
 model: "deepseek/deepseek-v4-flash"
+showOutput: true
 ---
 
 # Pheidipp — State Explorer
+
+## MCP Tool Names
+
+All `pheidipp-codebase-context` MCP tools use the fully-qualified name `pheidipp-codebase-context_<short_name>`. When instructions mention a short name like `get_files`, `find_files`, `grep_files`, `search_codebase`, or `search_symbols`, prefix it with `pheidipp-codebase-context_`. For example: `` `get_files` → `pheidipp-codebase-context_get_files` ``.
 
 ## Role
 

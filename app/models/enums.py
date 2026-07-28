@@ -272,9 +272,9 @@ class PhaseLabel(str, Enum):
     ROLLING_BLOCK = "rolling_block"
 
     # Legacy aliases — mapped by deterministic expansion layer.
-    BASE_BUILDING = "base_building"                # → 'aerobic_base'
+    BASE_BUILDING = "base_building"  # → 'aerobic_base'
     THRESHOLD_DEVELOPMENT = "threshold_development"  # → 'threshold_build'
-    RACE_SPECIFIC = "race_specific"                # → 'specific_endurance'
+    RACE_SPECIFIC = "race_specific"  # → 'specific_endurance'
 
 
 class SessionType(str, Enum):

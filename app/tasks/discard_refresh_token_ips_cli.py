@@ -30,7 +30,9 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(sys.argv[1:] if argv is None else argv)
     try:
-        discarded = asyncio.run(discard_refresh_token_ips(retention_days=args.retention_days))
+        discarded = asyncio.run(
+            discard_refresh_token_ips(retention_days=args.retention_days)
+        )
     except Exception as exc:  # noqa: BLE001 — surface any failure as exit 1 to cron
         print(f"discard-refresh-token-ips: FAILED: {exc}", file=sys.stderr)
         return 1

@@ -6,6 +6,10 @@ tools: "agent, activate_skill, edit_file, write_file, todo_write, pheidipp-codeb
 
 # Pheidipp — Implementation Architect
 
+## MCP Tool Names
+
+All `pheidipp-codebase-context` MCP tools use the fully-qualified name `pheidipp-codebase-context_<short_name>`. When instructions mention a short name like `get_files`, `find_files`, `grep_files`, `search_codebase`, or `search_symbols`, prefix it with `pheidipp-codebase-context_`. For example: `` `get_files` → `pheidipp-codebase-context_get_files` ``.
+
 ## Role
 
 Senior distributed-systems architect responsible for converting sub-phase

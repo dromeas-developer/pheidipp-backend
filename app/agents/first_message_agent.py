@@ -108,9 +108,7 @@ class FirstMessageAgent:
                 f"expected 4 paragraphs, got {len(paragraphs)}"
             )
 
-    async def generate(
-        self, athlete_id: uuid.UUID
-    ) -> CoachingMessageResponse:
+    async def generate(self, athlete_id: uuid.UUID) -> CoachingMessageResponse:
         """Generate the first coach message for ``athlete_id``.
 
         Raises:
@@ -121,9 +119,7 @@ class FirstMessageAgent:
         # -----------------------------------------------------------------
         # Pre-condition: no existing first message.
         # -----------------------------------------------------------------
-        existing = await self._coaching_messages.get_existing_first_message(
-            athlete_id
-        )
+        existing = await self._coaching_messages.get_existing_first_message(athlete_id)
         if existing:
             raise FirstMessageAlreadyExistsError(existing.id)
 
@@ -163,9 +159,7 @@ class FirstMessageAgent:
         # -----------------------------------------------------------------
         # Assemble context.
         # -----------------------------------------------------------------
-        context = await self._context_budget.build_first_message_context(
-            athlete_id
-        )
+        context = await self._context_budget.build_first_message_context(athlete_id)
         context_dict = context.to_dict()
 
         # -----------------------------------------------------------------
@@ -186,9 +180,7 @@ class FirstMessageAgent:
                 latency_ms=0,
                 failure_reason="prompt_not_found",
             )
-            raise LLMServiceUnavailableError(
-                "coach configuration unavailable"
-            ) from exc
+            raise LLMServiceUnavailableError("coach configuration unavailable") from exc
 
         # -----------------------------------------------------------------
         # Call LLM via proxy.
@@ -204,9 +196,7 @@ class FirstMessageAgent:
             ),
         ]
 
-        input_tokens = self._context_budget.estimate_tokens(
-            {"messages": messages}
-        )
+        input_tokens = self._context_budget.estimate_tokens({"messages": messages})
 
         try:
             response = await llm_client.chat.completions.create(
@@ -292,7 +282,9 @@ class FirstMessageAgent:
             latency_ms = int(
                 (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
             )
-            failure_reason = "timeout" if isinstance(exc, APITimeoutError) else "proxy_unavailable"
+            failure_reason = (
+                "timeout" if isinstance(exc, APITimeoutError) else "proxy_unavailable"
+            )
             await self._write_generation_event_failure(
                 athlete_id=athlete_id,
                 prompt_version=prompt_version,
@@ -331,9 +323,7 @@ class FirstMessageAgent:
                 latency_ms=latency_ms,
                 failure_reason="invalid_output_format",
             )
-            raise LLMServiceUnavailableError(
-                "coach response format invalid"
-            )
+            raise LLMServiceUnavailableError("coach response format invalid")
 
     async def _write_generation_event_failure(
         self,

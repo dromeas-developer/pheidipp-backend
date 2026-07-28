@@ -22,6 +22,13 @@ the `db_session` fixture.
 |---|---|
 | `test_fitness_physiology_db.py` | AthleteFitness (unique athlete_id, aggregate form invariant valid/invalid, dimensional form invariant valid/invalid/null-skips, time_constants.source validation), AthletePhysiology (unique athlete_id) |
 
+### Onboarding & Profile Patch
+| File | Covers |
+|---|---|
+| `test_onboarding_rollback.py` | TestOnboardingMidTransactionRollback (failure after physiology insert or fitness insert rolls back all entities + no outbox event; pre-onboarding profile state preserved) |
+| `test_onboarding_service.py` | TestOnboardingAtomicCreate (6-entity transaction, onboarding_complete flag, data_tier on TwinState, profile enrichment, structural_risk_flag, goal ACTIVE), TestOnboardingTwinBootstrapValues (trigger=QUESTIONNAIRE, confidence=LOW, model_version=v1-questionnaire-bootstrap, fitness/fatigue/form=0, lt1<lt2<max_hr=184, metric_confidence only lt1/lt2_hr low, physiology max_hr=184, lt1/lt2 prior_weight=0.5, cp/vo2max null, time_constants population_default 42/7 21/3 56/14), TestOnboardingFailurePaths (re-onboarding 409, athlete not found 404, second active goal 409), TestOnboardingEventsPublished (onboarding_completed + twin_model_ready payloads, outbox PENDING, same transaction, generate_plan defer failure tolerated) |
+| `test_profile_preferences_patch.py` | TestProfilePatchMutable (height_cm/location_lat_lng/training_window update, no-args no-op), TestProfilePatchImmutability (date_of_birth/sex/timezone/unknown rejected), TestPreferencesPatchMerge (day-level weekly_schedule merge, top-level overwrite, idempotent, unknown key silently ignored), TestPreferencesPatchSchema (partial weekday accepted, non-canonical weekday rejected, empty weekly_schedule accepted) |
+
 ### Profile, Preferences & Activity
 | File | Covers |
 |---|---|

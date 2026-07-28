@@ -256,14 +256,11 @@ class ActivityRepository:
         Used by the structural load density-penalty calculation.
         Returns 0.0 when no qualifying activities exist.
         """
-        stmt = (
-            select(func.coalesce(func.sum(Activity.structural_load), 0.0))
-            .where(
-                Activity.athlete_id == athlete_id,
-                Activity.calibration_eligible.is_(True),
-                Activity.structural_load.isnot(None),
-                Activity.activity_date >= since_date,
-            )
+        stmt = select(func.coalesce(func.sum(Activity.structural_load), 0.0)).where(
+            Activity.athlete_id == athlete_id,
+            Activity.calibration_eligible.is_(True),
+            Activity.structural_load.isnot(None),
+            Activity.activity_date >= since_date,
         )
         result = await self.session.execute(stmt)
         total = result.scalar_one()

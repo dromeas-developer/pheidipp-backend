@@ -13,8 +13,10 @@ from jose import JWTError, jwt
 
 from app.config import settings
 
+
 class TokenVerificationError(Exception):
     """Raised when a JWT is missing, malformed, expired, or unverifiable."""
+
 
 @dataclass(frozen=True)
 class AccessTokenClaims:
@@ -24,6 +26,7 @@ class AccessTokenClaims:
     auth_provider: str | None
     issued_at: datetime
     expires_at: datetime
+
 
 class TokenService:
     """Issue and verify JWT access tokens and opaque refresh tokens."""
@@ -104,7 +107,9 @@ class TokenService:
 
         iat_raw = payload.get("iat")
         exp_raw = payload.get("exp")
-        if not isinstance(iat_raw, (int, float)) or not isinstance(exp_raw, (int, float)):
+        if not isinstance(iat_raw, (int, float)) or not isinstance(
+            exp_raw, (int, float)
+        ):
             raise TokenVerificationError("missing iat/exp claim")
         issued_at = datetime.fromtimestamp(int(iat_raw), tz=timezone.utc)
         expires_at = datetime.fromtimestamp(int(exp_raw), tz=timezone.utc)

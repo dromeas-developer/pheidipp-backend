@@ -252,9 +252,7 @@ class WorkoutGenerationAgent:
         )
         if existing is not None:
             if not allow_existing:
-                raise WorkoutAlreadyGeneratedError(
-                    existing_workout_id=existing.id
-                )
+                raise WorkoutAlreadyGeneratedError(existing_workout_id=existing.id)
             return existing
 
         # -----------------------------------------------------------------
@@ -271,13 +269,9 @@ class WorkoutGenerationAgent:
         # -----------------------------------------------------------------
         # Pre-condition: PlannedSession exists.
         # -----------------------------------------------------------------
-        planned_session = await self._planned_sessions.get_by_id(
-            planned_session_id
-        )
+        planned_session = await self._planned_sessions.get_by_id(planned_session_id)
         if planned_session is None:
-            raise PlannedSessionNotFoundError(
-                planned_session_id=planned_session_id
-            )
+            raise PlannedSessionNotFoundError(planned_session_id=planned_session_id)
 
         # -----------------------------------------------------------------
         # Assemble context (token-budget enforced).
@@ -293,9 +287,7 @@ class WorkoutGenerationAgent:
         # -----------------------------------------------------------------
         prompt_version = self.PROMPT_VERSION
         try:
-            prompt = self._prompt_registry.get_prompt(
-                "workout_gen", prompt_version
-            )
+            prompt = self._prompt_registry.get_prompt("workout_gen", prompt_version)
         except PromptNotFoundError as exc:
             await self._write_generation_event_failure(
                 athlete_id=athlete_id,
@@ -323,9 +315,7 @@ class WorkoutGenerationAgent:
             ),
         ]
 
-        input_tokens = self._context_budget.estimate_tokens(
-            {"messages": messages}
-        )
+        input_tokens = self._context_budget.estimate_tokens({"messages": messages})
 
         try:
             response = await llm_client.chat.completions.create(
@@ -454,9 +444,7 @@ class WorkoutGenerationAgent:
                 (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
             )
             failure_reason = (
-                "timeout"
-                if isinstance(exc, APITimeoutError)
-                else "proxy_unavailable"
+                "timeout" if isinstance(exc, APITimeoutError) else "proxy_unavailable"
             )
             await self._write_generation_event_failure(
                 athlete_id=athlete_id,
@@ -473,11 +461,7 @@ class WorkoutGenerationAgent:
             latency_ms = int(
                 (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
             )
-            failure_reason = (
-                "rate_limit"
-                if exc.status_code == 429
-                else "api_error"
-            )
+            failure_reason = "rate_limit" if exc.status_code == 429 else "api_error"
             await self._write_generation_event_failure(
                 athlete_id=athlete_id,
                 prompt_version=prompt_version,
@@ -493,9 +477,7 @@ class WorkoutGenerationAgent:
     # Public helpers used by the API layer.
     # ------------------------------------------------------------------
 
-    async def load_steps(
-        self, generated_workout_id: uuid.UUID
-    ) -> List[WorkoutStep]:
+    async def load_steps(self, generated_workout_id: uuid.UUID) -> List[WorkoutStep]:
         """Return the ordered ``WorkoutStep[]`` for a generated workout.
 
         Convenience wrapper around
@@ -544,9 +526,7 @@ class WorkoutGenerationAgent:
         """
         raw = generated_content.strip()
         if not raw:
-            raise WorkoutGenerationContractError(
-                "LLM returned empty output"
-            )
+            raise WorkoutGenerationContractError("LLM returned empty output")
 
         try:
             payload = json.loads(raw)
@@ -591,8 +571,7 @@ class WorkoutGenerationAgent:
                 step_type = StepType(step_type_value)
             except ValueError as exc:
                 raise WorkoutGenerationContractError(
-                    f"step {step_order} has invalid step_type="
-                    f"{step_type_value!r}"
+                    f"step {step_order} has invalid step_type={step_type_value!r}"
                 ) from exc
 
             intent_value = step_raw.get("physiological_intent")
@@ -626,9 +605,7 @@ class WorkoutGenerationAgent:
             duration_seconds = _coerce_optional_int(
                 step_raw.get("target_duration_seconds")
             )
-            target_hr_zone = _coerce_optional_int(
-                step_raw.get("target_hr_zone")
-            )
+            target_hr_zone = _coerce_optional_int(step_raw.get("target_hr_zone"))
             target_power_watts = step_raw.get("target_power_watts")
             target_gap_sec_per_km = step_raw.get("target_gap_sec_per_km")
             description = step_raw.get("description")
@@ -706,15 +683,13 @@ class WorkoutGenerationAgent:
         # First-step = warmup invariant.
         if parsed[0]["step_type"] != StepType.WARMUP:
             raise WorkoutGenerationContractError(
-                f"first step must be warmup, got "
-                f"{parsed[0]['step_type'].value!r}"
+                f"first step must be warmup, got {parsed[0]['step_type'].value!r}"
             )
 
         # Last-step = cooldown invariant.
         if parsed[-1]["step_type"] != StepType.COOLDOWN:
             raise WorkoutGenerationContractError(
-                f"last step must be cooldown, got "
-                f"{parsed[-1]['step_type'].value!r}"
+                f"last step must be cooldown, got {parsed[-1]['step_type'].value!r}"
             )
 
         return parsed
@@ -743,9 +718,7 @@ class WorkoutGenerationAgent:
         * ``description`` — plain English; non-empty.
         """
         description_text = (
-            description.strip()
-            if description.strip()
-            else f"{step_type.value} step"
+            description.strip() if description.strip() else f"{step_type.value} step"
         )
 
         if target_type == "power":
@@ -787,9 +760,7 @@ class WorkoutGenerationAgent:
             "description": description_text,
         }
 
-    def _build_target_set(
-        self, parsed_steps: List[dict[str, Any]]
-    ) -> dict[str, Any]:
+    def _build_target_set(self, parsed_steps: List[dict[str, Any]]) -> dict[str, Any]:
         """Build the ``TargetSet`` JSONB shape for ``theoretical_targets``
         and ``adjusted_targets``.
 
@@ -806,11 +777,7 @@ class WorkoutGenerationAgent:
         """
         targets = [step["target"] for step in parsed_steps]
         step_count = len(parsed_steps)
-        work_steps = [
-            s
-            for s in parsed_steps
-            if s["step_type"] == StepType.WORK
-        ]
+        work_steps = [s for s in parsed_steps if s["step_type"] == StepType.WORK]
         work_count = len(work_steps)
         summary = (
             f"{step_count} steps total"

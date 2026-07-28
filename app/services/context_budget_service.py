@@ -32,9 +32,6 @@ MAX_TOKENS = {
 }
 
 
-
-
-
 @dataclass(frozen=True)
 class ContextSection:
     """One section of the context with its priority weight."""
@@ -64,9 +61,6 @@ FIRST_MESSAGE_PRIORITY_PROFILE: tuple[ContextSection, ...] = (
         name="first_block_preview", priority_weight=75, token_budget=400
     ),  # session types weeks 1-2
 )
-
-
-
 
 
 @dataclass(frozen=True)
@@ -173,44 +167,30 @@ class WorkoutGenerationContext:
         """Serialize to a plain dict for token estimation and prompt rendering."""
         return {
             "session": {
-                "session_type": self.session.session_type
-                if self.session
-                else None,
-                "phase_label": self.session.phase_label
-                if self.session
-                else None,
-                "week_number": self.session.week_number
-                if self.session
-                else None,
+                "session_type": self.session.session_type if self.session else None,
+                "phase_label": self.session.phase_label if self.session else None,
+                "week_number": self.session.week_number if self.session else None,
                 "intent_description": self.session.intent_description
                 if self.session
                 else None,
                 "approximate_duration_minutes": (
-                    self.session.approximate_duration_minutes
-                    if self.session
-                    else None
+                    self.session.approximate_duration_minutes if self.session else None
                 ),
             }
             if self.session
             else None,
             "readiness": {
                 "recovery_modifier_level": (
-                    self.readiness.recovery_modifier_level
-                    if self.readiness
-                    else None
+                    self.readiness.recovery_modifier_level if self.readiness else None
                 ),
                 "recovery_modifier_reason": (
-                    self.readiness.recovery_modifier_reason
-                    if self.readiness
-                    else None
+                    self.readiness.recovery_modifier_reason if self.readiness else None
                 ),
                 "confidence_level": self.readiness.confidence_level
                 if self.readiness
                 else None,
                 "fitness_form_descriptor": (
-                    self.readiness.fitness_form_descriptor
-                    if self.readiness
-                    else None
+                    self.readiness.fitness_form_descriptor if self.readiness else None
                 ),
                 "threshold_target_description": (
                     self.readiness.threshold_target_description
@@ -295,9 +275,7 @@ class FirstMessageContext:
             "data_tier": self.data_tier,
             "computed_observations": self.computed_observations,
             "plan_overview": {
-                "phases": self.plan_overview.phases
-                if self.plan_overview
-                else None,
+                "phases": self.plan_overview.phases if self.plan_overview else None,
                 "total_weeks": self.plan_overview.total_weeks
                 if self.plan_overview
                 else None,
@@ -324,9 +302,6 @@ class FirstMessageContext:
             if self.first_block_preview
             else None,
         }
-
-
-
 
 
 class ContextBudgetService:
@@ -372,7 +347,6 @@ class ContextBudgetService:
         active_plan = await self.plans.get_active_for_athlete(athlete_id)
         await self._profiles.get_by_athlete_id(athlete_id)
         preferences = await self._preferences.get_by_athlete_id(athlete_id)
-
 
         computed_observations: dict[str, Any] | None = None
         if twin_state and preferences:
@@ -443,8 +417,16 @@ class ContextBudgetService:
             )
 
             if active_plan.weekly_distributions:
-                week1: dict[str, Any] = active_plan.weekly_distributions[0] if len(active_plan.weekly_distributions) > 0 else {}
-                week2: dict[str, Any] = active_plan.weekly_distributions[1] if len(active_plan.weekly_distributions) > 1 else {}
+                week1: dict[str, Any] = (
+                    active_plan.weekly_distributions[0]
+                    if len(active_plan.weekly_distributions) > 0
+                    else {}
+                )
+                week2: dict[str, Any] = (
+                    active_plan.weekly_distributions[1]
+                    if len(active_plan.weekly_distributions) > 1
+                    else {}
+                )
                 first_block_preview = FirstBlockPreview(
                     session_types_in_week_1=week1.get("session_types", []),
                     session_types_in_week_2=week2.get("session_types", []),
@@ -465,12 +447,10 @@ class ContextBudgetService:
                 if twin_state and twin_state.form >= 0
                 else "balancing recovery and load"
             ),
-            data_tier=(
-                int(twin_state.data_tier) if twin_state else 3
-            ),
+            data_tier=(int(twin_state.data_tier) if twin_state else 3),
             computed_observations=computed_observations,
             plan_overview=plan_overview,
-first_block_preview=first_block_preview,
+            first_block_preview=first_block_preview,
         )
 
         context_dict = context.to_dict()
@@ -510,9 +490,7 @@ first_block_preview=first_block_preview,
                 phase_label=session.phase_label.value,
                 week_number=session.week_number,
                 intent_description=session.intent_description,
-                approximate_duration_minutes=(
-                    session.approximate_duration_minutes
-                ),
+                approximate_duration_minutes=(session.approximate_duration_minutes),
             )
 
         readiness: WorkoutReadinessDigest | None = None
@@ -527,9 +505,7 @@ first_block_preview=first_block_preview,
             )
 
             data_tier = data_tier_value
-            target_type = DATA_TIER_TARGET_TYPE.get(
-                twin_state.data_tier, "description"
-            )
+            target_type = DATA_TIER_TARGET_TYPE.get(twin_state.data_tier, "description")
             readiness = self._compose_readiness_digest(twin_state)
 
         # ``relevant_objectives`` is intentionally empty at this phase
@@ -570,7 +546,6 @@ first_block_preview=first_block_preview,
 
         assembler = TwinContextAssembler()
         twin_summary = assembler.assemble_twin_context(twin_state)
-
 
         if twin_state.confidence_level.value == "low":
             threshold_desc = (

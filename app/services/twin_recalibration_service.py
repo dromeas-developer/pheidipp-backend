@@ -129,9 +129,7 @@ class TwinRecalibrationService:
                 f"no athlete_fitness row for athlete {athlete_id}"
             )
 
-        physiology_row = await self.athlete_physiology.get_by_athlete_id(
-            athlete_id
-        )
+        physiology_row = await self.athlete_physiology.get_by_athlete_id(athlete_id)
 
         updated = self.apply_banister_update(
             fitness_row=fitness_row,
@@ -149,9 +147,7 @@ class TwinRecalibrationService:
             training_goal_id=goal_row.id,
             activity_id=activity_id,
             data_tier=(
-                DataTier(latest.data_tier)
-                if latest is not None
-                else DataTier.TIER_3
+                DataTier(latest.data_tier) if latest is not None else DataTier.TIER_3
             ),
             confidence_level=(
                 latest.confidence_level
@@ -166,16 +162,12 @@ class TwinRecalibrationService:
             lt1_pace_sec_per_km=(
                 latest.lt1_pace_sec_per_km if latest is not None else None
             ),
-            lt1_power_watts=(
-                latest.lt1_power_watts if latest is not None else None
-            ),
+            lt1_power_watts=(latest.lt1_power_watts if latest is not None else None),
             lt1_hr_bpm=latest.lt1_hr_bpm if latest is not None else None,
             lt2_pace_sec_per_km=(
                 latest.lt2_pace_sec_per_km if latest is not None else None
             ),
-            lt2_power_watts=(
-                latest.lt2_power_watts if latest is not None else None
-            ),
+            lt2_power_watts=(latest.lt2_power_watts if latest is not None else None),
             lt2_hr_bpm=latest.lt2_hr_bpm if latest is not None else None,
             cp_watts=latest.cp_watts if latest is not None else None,
             readiness_level=(
@@ -221,9 +213,7 @@ class TwinRecalibrationService:
         # this activity. If one exists and the incoming trigger is not
         # calibration, this is a duplicate non-calibration trigger and
         # must be skipped.
-        existing = await self.twin_states.get_by_activity(
-            activity_id=activity_id
-        )
+        existing = await self.twin_states.get_by_activity(activity_id=activity_id)
         if existing is not None and trigger != TwinTrigger.CALIBRATION:
             return existing
 
@@ -304,9 +294,7 @@ class TwinRecalibrationService:
         #    using the 4.0 / 8.0 thresholds. Monotonic ratchet:
         #    keep the higher of (previous, computed).
         # -------------------------------------------------------------
-        computed_level = derive_confidence_level(
-            physiology_result.physiology
-        )
+        computed_level = derive_confidence_level(physiology_result.physiology)
         old_level = (
             previous.confidence_level
             if previous is not None
@@ -346,9 +334,7 @@ class TwinRecalibrationService:
         physiology = physiology_result.physiology
         lt1_hr_bpm = extract_param_value(physiology.lt1, "hr")
         lt2_hr_bpm = extract_param_value(physiology.lt2, "hr")
-        cp_watts = (
-            float(physiology.cp["value"]) if physiology.cp else None
-        )
+        cp_watts = float(physiology.cp["value"]) if physiology.cp else None
 
         new_state = TwinState(
             athlete_id=athlete_id,
@@ -385,9 +371,7 @@ class TwinRecalibrationService:
                 if previous is not None
                 else RecoveryModifierLevel.GREEN
             ),
-            wellness_trend=(
-                previous.wellness_trend if previous is not None else None
-            ),
+            wellness_trend=(previous.wellness_trend if previous is not None else None),
             metric_confidence=metric_confidence,
         )
 
@@ -448,11 +432,9 @@ class TwinRecalibrationService:
         #    transaction; outbox insertion order is
         #    ``twin_recalibrated`` → ``twin_confidence_upgraded``.
         # -------------------------------------------------------------
-        confidence_upgraded = (
-            previous is not None
-            and confidence_rank(inserted.confidence_level)
-            > confidence_rank(old_level)
-        )
+        confidence_upgraded = previous is not None and confidence_rank(
+            inserted.confidence_level
+        ) > confidence_rank(old_level)
         if confidence_upgraded:
             await self.events.publish(
                 event_type="twin_confidence_upgraded",
@@ -532,9 +514,6 @@ class TwinRecalibrationService:
         )
 
 
-
-
-
 def read_time_constants(fitness_row: AthleteFitness) -> Dict[str, Any]:
     """Extract the Banister time constants from ``fitness_row``.
 
@@ -547,15 +526,9 @@ def read_time_constants(fitness_row: AthleteFitness) -> Dict[str, Any]:
     if not fitness_row.time_constants:
         return dict(POPULATION_TIME_CONSTANTS)
     return {
-        "fitness_tau_days": int(
-            fitness_row.time_constants.get("fitness_tau_days", 42)
-        ),
-        "fatigue_tau_days": int(
-            fitness_row.time_constants.get("fatigue_tau_days", 7)
-        ),
-        "source": str(
-            fitness_row.time_constants.get("source", "population_default")
-        ),
+        "fitness_tau_days": int(fitness_row.time_constants.get("fitness_tau_days", 42)),
+        "fatigue_tau_days": int(fitness_row.time_constants.get("fatigue_tau_days", 7)),
+        "source": str(fitness_row.time_constants.get("source", "population_default")),
     }
 
 

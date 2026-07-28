@@ -7,13 +7,15 @@ from app.services.health_service import check_database
 
 health_router = APIRouter(prefix="/health")
 
+
 @health_router.get("/live")
 async def live() -> dict[str, str]:
     return {
         "status": "ok",
         "service": settings.APP_NAME,
-        "environment": settings.ENVIRONMENT
+        "environment": settings.ENVIRONMENT,
     }
+
 
 @health_router.get("/ready")
 async def ready(db: AsyncSession = Depends(get_db)) -> dict[str, str]:

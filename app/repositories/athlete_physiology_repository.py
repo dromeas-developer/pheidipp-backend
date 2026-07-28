@@ -41,15 +41,11 @@ class AthletePhysiologyRepository:
         self, athlete_id: uuid.UUID
     ) -> Optional[AthletePhysiology]:
         result = await self.session.execute(
-            select(AthletePhysiology).where(
-                AthletePhysiology.athlete_id == athlete_id
-            )
+            select(AthletePhysiology).where(AthletePhysiology.athlete_id == athlete_id)
         )
         return result.scalar_one_or_none()
 
-    async def add(
-        self, physiology: AthletePhysiology
-    ) -> AthletePhysiology:
+    async def add(self, physiology: AthletePhysiology) -> AthletePhysiology:
         """Add a physiology row to the session without committing."""
         self.session.add(physiology)
         await self.session.flush()
@@ -98,24 +94,16 @@ class AthletePhysiologyRepository:
         """
         row = await self.get_by_athlete_id(athlete_id)
         if row is None:
-            raise RuntimeError(
-                f"no AthletePhysiology row for athlete {athlete_id}"
-            )
+            raise RuntimeError(f"no AthletePhysiology row for athlete {athlete_id}")
         if lt1 is not None:
             row.lt1 = dict(lt1)
         if lt2 is not None:
             row.lt2 = dict(lt2)
         if cp is not _UNSET:
-            row.cp = (
-                dict(cast(Mapping[str, object], cp))
-                if cp is not None
-                else None
-            )
+            row.cp = dict(cast(Mapping[str, object], cp)) if cp is not None else None
         if max_hr is not _UNSET:
             row.max_hr = (
-                dict(cast(Mapping[str, object], max_hr))
-                if max_hr is not None
-                else None
+                dict(cast(Mapping[str, object], max_hr)) if max_hr is not None else None
             )
         await self.session.flush()
         return row

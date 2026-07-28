@@ -8,7 +8,9 @@ from tests.utils.factories import make_athlete
 
 
 class TestAthleteFitnessUniqueAthleteId:
-    async def test_duplicate_athlete_id_raises_integrity_error(self, db_session: AsyncSession):
+    async def test_duplicate_athlete_id_raises_integrity_error(
+        self, db_session: AsyncSession
+    ):
         athlete = await make_athlete(db_session)
         fitness = AthleteFitness(
             athlete_id=athlete.id,
@@ -40,7 +42,9 @@ class TestAthleteFitnessFormInvariant:
         db_session.add(fitness)
         await db_session.commit()
 
-    async def test_invalid_aggregate_form_raises_integrity_error(self, db_session: AsyncSession):
+    async def test_invalid_aggregate_form_raises_integrity_error(
+        self, db_session: AsyncSession
+    ):
         athlete = await make_athlete(db_session)
         fitness = AthleteFitness(
             athlete_id=athlete.id,
@@ -65,7 +69,9 @@ class TestAthleteFitnessDimensionalFormInvariant:
         db_session.add(fitness)
         await db_session.commit()
 
-    async def test_invalid_aerobic_form_raises_integrity_error(self, db_session: AsyncSession):
+    async def test_invalid_aerobic_form_raises_integrity_error(
+        self, db_session: AsyncSession
+    ):
         athlete = await make_athlete(db_session)
         fitness = AthleteFitness(
             athlete_id=athlete.id,
@@ -91,7 +97,9 @@ class TestAthleteFitnessDimensionalFormInvariant:
 
 
 class TestAthleteFitnessTimeConstantsSource:
-    async def test_invalid_source_raises_integrity_error(self, db_session: AsyncSession):
+    async def test_invalid_source_raises_integrity_error(
+        self, db_session: AsyncSession
+    ):
         athlete = await make_athlete(db_session)
         fitness = AthleteFitness(
             athlete_id=athlete.id,
@@ -125,7 +133,9 @@ class TestAthleteFitnessTimeConstantsSource:
 
 
 class TestAthletePhysiologyUniqueAthleteId:
-    async def test_duplicate_physiology_athlete_id_raises_integrity_error(self, db_session: AsyncSession):
+    async def test_duplicate_physiology_athlete_id_raises_integrity_error(
+        self, db_session: AsyncSession
+    ):
         athlete = await make_athlete(db_session)
         phys = AthletePhysiology(
             athlete_id=athlete.id,

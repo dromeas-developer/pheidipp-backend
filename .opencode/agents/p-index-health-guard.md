@@ -90,51 +90,12 @@ You receive:
 
 ## Output Contract
 
-Every response starts with a **Header block**:
+Return a single-line text response. Exactly one line, no prose, no sections:
 
-```
-Mode: Index Health Guard
-
-Verification:
-[x] All requested domains checked
-[ ] No stale indexes found
-[ ] All stale indexes refreshed
-
-Domains checked: <list>
-Domains refreshed: <list>
-```
-
-**Health Report:**
-
-```
-## Index Health Report
-
-### Architecture
-- Status: <healthy | stale | missing>
-- Stale files: <count>
-- New files: <count>
-- Refreshed: <yes | no | N/A>
-
-### Vision
-- Status: <healthy | stale | missing>
-- Stale files: <count>
-- New files: <count>
-- Refreshed: <yes | no | N/A>
-
-### Code
-- Status: <healthy | stale | missing>
-- Stale files: <count>
-- New files: <count>
-- Refreshed: <yes | no | N/A>
-
-... (one block per domain)
-
-### Summary
-- Total domains checked: <count>
-- Stale domains found: <count>
-- Domains refreshed: <count>
-- Recommendation: <none | refresh again | reindex needed>
-```
+- All healthy: `✅ Indexes fresh: <domain-list>.`
+- Some stale, refreshed: `⚠️ Refreshed <domain>: <N> stale files. Others fresh.`
+- All stale, refreshed: `⚠️ Refreshed <N> domains: <domain-list>.`
+- Refresh failed: `❌ Refresh failed for <domain>. <error-detail>.`
 
 ## Escalation
 

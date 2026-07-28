@@ -183,9 +183,7 @@ class WeeklySession(Base):
         nullable=False,
     )
     intent_description: Mapped[str] = mapped_column(String(512), nullable=False)
-    approximate_duration_minutes: Mapped[int] = mapped_column(
-        Integer, nullable=False
-    )
+    approximate_duration_minutes: Mapped[int] = mapped_column(Integer, nullable=False)
 
     is_checkpoint: Mapped[bool] = mapped_column(
         nullable=False, default=False, server_default="false"

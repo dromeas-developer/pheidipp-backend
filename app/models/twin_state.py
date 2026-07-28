@@ -146,14 +146,10 @@ class TwinState(Base):
     # GAP values are stored as ``seconds_per_km`` floats; raw pace is
     # never persisted.
     # ------------------------------------------------------------------
-    lt1_pace_sec_per_km: Mapped[float | None] = mapped_column(
-        Float, nullable=True
-    )
+    lt1_pace_sec_per_km: Mapped[float | None] = mapped_column(Float, nullable=True)
     lt1_power_watts: Mapped[float | None] = mapped_column(Float, nullable=True)
     lt1_hr_bpm: Mapped[float | None] = mapped_column(Float, nullable=True)
-    lt2_pace_sec_per_km: Mapped[float | None] = mapped_column(
-        Float, nullable=True
-    )
+    lt2_pace_sec_per_km: Mapped[float | None] = mapped_column(Float, nullable=True)
     lt2_power_watts: Mapped[float | None] = mapped_column(Float, nullable=True)
     lt2_hr_bpm: Mapped[float | None] = mapped_column(Float, nullable=True)
     cp_watts: Mapped[float | None] = mapped_column(Float, nullable=True)

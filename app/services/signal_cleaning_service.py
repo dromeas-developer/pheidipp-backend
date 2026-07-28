@@ -363,9 +363,7 @@ class SignalCleaningService:
         """
         activity = await self.activities.get_by_id(activity_id)
         if activity is None:
-            raise SignalCleaningNotFoundError(
-                f"activity {activity_id} does not exist"
-            )
+            raise SignalCleaningNotFoundError(f"activity {activity_id} does not exist")
 
         # Defence-in-depth: manual entries have no FIT.
         if activity.source == ActivitySource.MANUAL_ENTRY:
@@ -385,9 +383,7 @@ class SignalCleaningService:
                 activity_id=str(activity_id),
                 outcome="already_cleaned",
             )
-            return CleaningResult(
-                created=False, reason="already_cleaned"
-            )
+            return CleaningResult(created=False, reason="already_cleaned")
 
         # Stale queue entries must not corrupt state.
         if (
@@ -406,9 +402,7 @@ class SignalCleaningService:
             # the ingestion contract. Treat a missing key as a
             # worker-retryable state — the upload may not have
             # committed yet.
-            raise SignalCleaningError(
-                f"activity {activity_id} has no fit_file_key"
-            )
+            raise SignalCleaningError(f"activity {activity_id} has no fit_file_key")
 
         fit_bytes = await self._object_storage.download_fit(fit_key)
         parsed: ParsedFitData = await self.fit_parser.parse(fit_bytes)
@@ -432,9 +426,7 @@ class SignalCleaningService:
         # is the explicit no-row signal: the activity stays with
         # ``cleaning_pipeline_version = null`` and segmentation will
         # skip it.
-        non_null_hr_count = sum(
-            1 for v in artifact_free.hr if v is not None
-        )
+        non_null_hr_count = sum(1 for v in artifact_free.hr if v is not None)
         if non_null_hr_count < MIN_NON_NULL_HR_SECONDS:
             log_event(
                 event="signal_cleaning.short_stream",
@@ -607,9 +599,7 @@ class SignalCleaningService:
     # fraction evaluation that runs AFTER artifact removal.
     # ------------------------------------------------------------------
 
-    def _remove_artifacts(
-        self, resampled: _ResampledChannel
-    ) -> _ResampledChannel:
+    def _remove_artifacts(self, resampled: _ResampledChannel) -> _ResampledChannel:
         """Apply artifact-removal thresholds from signal-cleaning.md.
 
         Two-stage RR artifact removal:
@@ -670,9 +660,7 @@ class SignalCleaningService:
                 continue
             window_start = max(0, t - POWER_ROLLING_WINDOW_S + 1)
             window_values = [
-                v
-                for v in resampled.power[window_start : t + 1]
-                if v is not None
+                v for v in resampled.power[window_start : t + 1] if v is not None
             ]
             if not window_values:
                 # No context to judge — keep the sample.
@@ -699,9 +687,7 @@ class SignalCleaningService:
             # Trailing samples BEFORE index t (half-open slice).
             # The candidate at t is excluded from the window.
             window_values = [
-                v
-                for v in artifact_free.rr[window_start:t]
-                if v is not None
+                v for v in artifact_free.rr[window_start:t] if v is not None
             ]
             if len(window_values) < 2:
                 # Not enough context — keep the sample, consistent
@@ -774,19 +760,13 @@ class SignalCleaningService:
         # sample; otherwise the smoothing is skipped and the
         # smoothed.power channel mirrors the artifact_free power
         # channel.
-        if n >= SAVGOL_WINDOW and any(
-            v is not None for v in resampled.power
-        ):
+        if n >= SAVGOL_WINDOW and any(v is not None for v in resampled.power):
             present = [v for v in resampled.power if v is not None]
             mean_value = sum(present) / len(present)
-            filled = [
-                v if v is not None else mean_value for v in resampled.power
-            ]
+            filled = [v if v is not None else mean_value for v in resampled.power]
             filtered = cast(
                 List[float],
-                savgol_filter(
-                    filled, SAVGOL_WINDOW, SAVGOL_POLYORDER, mode="nearest"
-                ),
+                savgol_filter(filled, SAVGOL_WINDOW, SAVGOL_POLYORDER, mode="nearest"),
             )
             for t in range(n):
                 if resampled.power[t] is None:
@@ -854,13 +834,19 @@ class SignalCleaningService:
 
             grade = smoothed.grade_pct[t]
             if grade is None:
-                grade = artifact_free.grade_pct[t] if t < len(artifact_free.grade_pct) else None
+                grade = (
+                    artifact_free.grade_pct[t]
+                    if t < len(artifact_free.grade_pct)
+                    else None
+                )
             if grade is None:
                 grade = 0.0
 
             pace = raw_pace[t]
             if pace is not None:
-                correction = 1.0 + GAP_COEFFICIENT_A * grade + GAP_COEFFICIENT_B * (grade ** 2)
+                correction = (
+                    1.0 + GAP_COEFFICIENT_A * grade + GAP_COEFFICIENT_B * (grade**2)
+                )
                 if correction == 0.0:
                     # Pathological grade (e.g. very large negative);
                     # fall back to raw pace.
@@ -882,9 +868,7 @@ class SignalCleaningService:
             ]
             filtered = cast(
                 List[float],
-                savgol_filter(
-                    filled, SAVGOL_WINDOW, SAVGOL_POLYORDER, mode="nearest"
-                ),
+                savgol_filter(filled, SAVGOL_WINDOW, SAVGOL_POLYORDER, mode="nearest"),
             )
             for t in range(n):
                 if derived.gap_sec_per_km[t] is None:

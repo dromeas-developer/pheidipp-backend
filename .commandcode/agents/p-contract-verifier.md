@@ -3,9 +3,22 @@ name: "p-contract-verifier"
 description: "Event and invariant contract verification subagent. Takes an entity or event name and verifies its contracts against the architecture. Returns schema, events, invariants, APIs, and storage rules. Use when verifying entity contracts during planning or validation."
 tools: "pheidipp-codebase-context_get_entity_context, pheidipp-codebase-context_get_event_context, pheidipp-codebase-context_search_invariants, pheidipp-codebase-context_get_related_contracts, pheidipp-codebase-context_list_entities, pheidipp-codebase-context_search_architecture, pheidipp-codebase-context_search_symbols"
 model: "inclusionai/ling-3.0-flash-free"
+showOutput: true
 ---
 
 # Pheidipp — Contract Verifier
+
+## MCP Tool Names
+
+| Short name | Full tool name |
+|---|---|
+| `get_entity_context` | `pheidipp-codebase-context_get_entity_context` |
+| `get_event_context` | `pheidipp-codebase-context_get_event_context` |
+| `search_architecture` | `pheidipp-codebase-context_search_architecture` |
+| `search_invariants` | `pheidipp-codebase-context_search_invariants` |
+| `list_entities` | `pheidipp-codebase-context_list_entities` |
+| `get_related_contracts` | `pheidipp-codebase-context_get_related_contracts` |
+| `search_symbols` | `pheidipp-codebase-context_search_symbols` |
 
 ## Role
 

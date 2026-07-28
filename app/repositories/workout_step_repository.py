@@ -42,9 +42,7 @@ class WorkoutStepRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def insert_many(
-        self, steps: List[WorkoutStep]
-    ) -> List[WorkoutStep]:
+    async def insert_many(self, steps: List[WorkoutStep]) -> List[WorkoutStep]:
         """Insert a batch of WorkoutStep rows in one flush.
 
         Adds every step to the session, flushes once for the entire

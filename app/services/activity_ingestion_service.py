@@ -139,11 +139,11 @@ class ActivityIngestionService:
         self.session = session
         self.activities = ActivityRepository(session)
         self.athlete_profiles = athlete_profiles or AthleteProfileRepository(session)
-        self.athlete_preferences = (
-            athlete_preferences or AthletePreferencesRepository(session)
+        self.athlete_preferences = athlete_preferences or AthletePreferencesRepository(
+            session
         )
-        self.athlete_physiology = (
-            athlete_physiology or AthletePhysiologyRepository(session)
+        self.athlete_physiology = athlete_physiology or AthletePhysiologyRepository(
+            session
         )
         self.object_storage = object_storage or ObjectStorageClient()
         self.fit_parser = fit_parser or FitParserService()
@@ -256,9 +256,7 @@ class ActivityIngestionService:
                 f"object storage upload failed: {exc}"
             ) from exc
         except ObjectStorageError as exc:
-            raise ObjectStorageFailureError(
-                f"object storage error: {exc}"
-            ) from exc
+            raise ObjectStorageFailureError(f"object storage error: {exc}") from exc
 
         activity = Activity(
             athlete_id=athlete_id,
@@ -440,26 +438,21 @@ class ActivityIngestionService:
         """
         activity = await self.activities.get_by_id(activity_id)
         if activity is None:
-            raise ActivityIngestionError(
-                f"Activity {activity_id} not found"
-            )
+            raise ActivityIngestionError(f"Activity {activity_id} not found")
 
         # Fetch athlete profile for date of birth (max HR estimation)
-        athlete_profile_birth_date = await self._read_profile_date_of_birth(
-            athlete_id
-        )
-        
+        athlete_profile_birth_date = await self._read_profile_date_of_birth(athlete_id)
+
         # Fetch athlete preferences for data tier inference
         athlete_preferences = await self._read_athlete_preferences(athlete_id)
-        
+
         # Fetch athlete physiology for CP estimate
         athlete_physiology = await self._read_athlete_physiology(athlete_id)
-        
+
         # Fetch recent structural load for density penalty computation
         seventy_two_hours_ago = datetime.now(timezone.utc) - timedelta(hours=72)
         recent_structural_load = await self.activities.get_recent_structural_load(
-            athlete_id=athlete_id,
-            since_date=seventy_two_hours_ago.date()
+            athlete_id=athlete_id, since_date=seventy_two_hours_ago.date()
         )
 
         try:
@@ -469,35 +462,33 @@ class ActivityIngestionService:
                 f"parsed FIT contains no HR records: {exc}"
             ) from exc
         except FitParseError as exc:
-            raise ActivityIngestionError(
-                f"FIT parse failed: {exc}"
-            ) from exc
+            raise ActivityIngestionError(f"FIT parse failed: {exc}") from exc
 
         # Set sport_type on the activity from parsed FIT data
         # (Phase-2.1-P3 — sport type detection from FIT sport message)
         activity.sport_type = parsed.sport_type
         activity.sport_type_detection_version = parsed.detection_version
-        
+
         # Infer data tier from athlete preferences
         data_tier = self._infer_data_tier(athlete_preferences)
-        
+
         # Override data_tier to TIER_6 for non-running activities
         # (architecture invariant: sport_type != 'running' → data_tier = 6)
         # This takes precedence over the hardware-based tier inference
         if parsed.sport_type != SportType.RUNNING:
             data_tier = DataTier.TIER_6
-        
+
         # Estimate max HR from age
         max_hr_estimate = self._resolve_max_hr_estimate(
             athlete_birth_date=athlete_profile_birth_date,
         )
-        
+
         # Get CP estimate from physiology or use population default
         cp_estimate = self._resolve_cp_estimate(athlete_physiology)
-        
+
         # Get structural risk flag from profile
         structural_risk_flag = await self.read_structural_risk_flag(athlete_id)
-        
+
         # Create comprehensive load computation inputs
         load_inputs = LoadComputationInputs(
             parsed_fit=parsed,
@@ -511,13 +502,11 @@ class ActivityIngestionService:
             sport_type=parsed.sport_type,
             sport_type_detection_version=parsed.detection_version,
         )
-        
+
         try:
             scores = self.load_computation.compute_aerobic_load(load_inputs)
         except Exception as exc:
-            raise ActivityIngestionError(
-                f"load computation failed: {exc}"
-            ) from exc
+            raise ActivityIngestionError(f"load computation failed: {exc}") from exc
 
         # Update activity with load scores and signal flags
         await self.activities.update_load_scores(
@@ -536,11 +525,11 @@ class ActivityIngestionService:
         # sport_type and sport_type_detection_version were set earlier
         # (right after parse), but we ensure they are explicitly set here
         # for clarity (they may have been set directly on the object already)
-        
+
         # Compute quality flags
         quality_flags = self.compute_quality_flags(parsed)
         activity.quality_flags = quality_flags
-        
+
         await self.session.flush()
 
         # Fire sport_type_detected event (Phase-2.1-P3) BEFORE activity_ingested.
@@ -564,10 +553,7 @@ class ActivityIngestionService:
         # Tier 5-6 activities are NEVER calibration eligible even if all
         # five rule criteria pass.
         eligible = self.calibration_eligibility.evaluate(activity)
-        if (
-            eligible
-            and data_tier in (DataTier.TIER_5, DataTier.TIER_6)
-        ):
+        if eligible and data_tier in (DataTier.TIER_5, DataTier.TIER_6):
             eligible = False
         if eligible != activity.calibration_eligible:
             await self.activities.update_calibration_eligibility(
@@ -707,11 +693,9 @@ class ActivityIngestionService:
         """
         return await self.athlete_preferences.get_by_athlete_id(athlete_id)
 
-    def _infer_data_tier(
-        self, preferences: Optional[AthletePreferences]
-    ) -> DataTier:
+    def _infer_data_tier(self, preferences: Optional[AthletePreferences]) -> DataTier:
         """Infer the data tier from athlete preferences.
-        
+
         Returns Tier 6 when preferences are missing.
         """
         if preferences is None:
@@ -734,7 +718,7 @@ class ActivityIngestionService:
         self, physiology: Optional[AthletePhysiology]
     ) -> Optional[int]:
         """Extract CP estimate from physiology JSONB.
-        
+
         Returns None when physiology or CP is missing.
         """
         if physiology is None or physiology.cp is None:
@@ -744,11 +728,9 @@ class ActivityIngestionService:
             return int(value)
         return None
 
-    async def read_structural_risk_flag(
-        self, athlete_id: uuid.UUID
-    ) -> bool:
+    async def read_structural_risk_flag(self, athlete_id: uuid.UUID) -> bool:
         """Look up the structural risk flag for crossover athletes.
-        
+
         Returns False when profile is missing.
         """
         profile = await self.athlete_profiles.get_by_athlete_id(athlete_id)
@@ -756,11 +738,9 @@ class ActivityIngestionService:
             return False
         return bool(profile.structural_risk_flag)
 
-    def compute_quality_flags(
-        self, parsed: ParsedFitData
-    ) -> dict[str, Any]:
+    def compute_quality_flags(self, parsed: ParsedFitData) -> dict[str, Any]:
         """Compute quality flags from parsed FIT data.
-        
+
         Returns dict with:
         - hr_dropout_pct: percentage of HR record gaps (>5s gaps)
         - gps_loss: whether GPS data has continuous loss (>30s)
@@ -769,7 +749,7 @@ class ActivityIngestionService:
         - has_rr_intervals: pass through to quality_flags
         """
         quality_flags: dict[str, Any] = {}
-        
+
         # HR dropout: percentage of gaps in HR records > 5 seconds
         if not parsed.hr_records:
             quality_flags["hr_dropout_pct"] = 1.0
@@ -783,12 +763,12 @@ class ActivityIngestionService:
                 quality_flags["hr_dropout_pct"] = dropout_pct
             else:
                 quality_flags["hr_dropout_pct"] = 0.0
-        
+
         # GPS loss detection: find continuous gaps > 30s with no GPS data
         if not parsed.has_gps:
-            gps_loss = False          # no GPS to lose; preserve current behaviour
+            gps_loss = False  # no GPS to lose; preserve current behaviour
         elif not parsed.gps_records:
-            gps_loss = True           # claimed GPS but zero records; preserve current behaviour
+            gps_loss = True  # claimed GPS but zero records; preserve current behaviour
         else:
             # Continuous-gap detection per Phase-2.1-P1 Handoff Note #2.
             # gps_records arrives in chronological order from FitParserService.
@@ -809,20 +789,21 @@ class ActivityIngestionService:
 
             # GPS spike detection (unchanged from original)
             spike_count = sum(
-                1 for r in parsed.gps_records
-                if r.speed is not None and r.speed > 25.0
+                1 for r in parsed.gps_records if r.speed is not None and r.speed > 25.0
             )
             quality_flags["gps_spike_count"] = spike_count
-            
+
         quality_flags["gps_loss"] = gps_loss
-        
+
         # Sensor malfunction: heuristic check for anomalous HR/power values
         # Already filtered in parsing, so flag if values are extreme
         sensor_malfunction = False
         if parsed.hr_records:
             # Check for sustained HR > 220 or < 30 (likely malfunction).
             # `ParsedFitData` preserves raw optional samples, so ignore None.
-            if any(hr is not None and (hr > 220 or hr < 30) for hr in parsed.hr_records):
+            if any(
+                hr is not None and (hr > 220 or hr < 30) for hr in parsed.hr_records
+            ):
                 sensor_malfunction = True
         if parsed.power_records:
             # Check for power > 2000W (impossible for running).
@@ -830,7 +811,7 @@ class ActivityIngestionService:
             if any(p is not None and p > 2000 for p in parsed.power_records):
                 sensor_malfunction = True
         quality_flags["sensor_malfunction"] = sensor_malfunction
-        
+
         return quality_flags
 
     @staticmethod

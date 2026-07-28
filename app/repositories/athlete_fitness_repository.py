@@ -30,9 +30,7 @@ class AthleteFitnessRepository:
         self, athlete_id: uuid.UUID
     ) -> Optional[AthleteFitness]:
         result = await self.session.execute(
-            select(AthleteFitness).where(
-                AthleteFitness.athlete_id == athlete_id
-            )
+            select(AthleteFitness).where(AthleteFitness.athlete_id == athlete_id)
         )
         return result.scalar_one_or_none()
 

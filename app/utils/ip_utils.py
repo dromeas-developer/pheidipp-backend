@@ -47,18 +47,14 @@ def truncate_ip(ip: Optional[str]) -> Optional[str]:
         return None
 
     if isinstance(address, ipaddress.IPv4Address):
-        network = ipaddress.ip_network(
-            f"0.0.0.0/{IPV4_PREFIX_BITS}", strict=False
-        )
+        network = ipaddress.ip_network(f"0.0.0.0/{IPV4_PREFIX_BITS}", strict=False)
         truncated = ipaddress.IPv4Network(
             (int(address) & int(network.netmask)), strict=False
         )
         return f"{truncated.network_address.compressed}/{IPV4_PREFIX_BITS}"
 
     # IPv6
-    v6_network = ipaddress.ip_network(
-        f"::/{IPV6_PREFIX_BITS}", strict=False
-    )
+    v6_network = ipaddress.ip_network(f"::/{IPV6_PREFIX_BITS}", strict=False)
     masked_int = int(address) & int(v6_network.netmask)
     truncated_v6 = ipaddress.IPv6Address(masked_int)
     return f"{truncated_v6.compressed}/{IPV6_PREFIX_BITS}"

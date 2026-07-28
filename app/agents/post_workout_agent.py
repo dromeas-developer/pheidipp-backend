@@ -59,11 +59,14 @@ class ActivityNotFoundError(PostWorkoutAgentError):
         super().__init__(f"activity {activity_id} not found")
         self.activity_id = activity_id
 
+
 class PostWorkoutLLMUnavailableError(PostWorkoutAgentError):
     """The LLM call failed (proxy / timeout / status / parse); mapped to HTTP 503."""
 
+
 class PostWorkoutContractError(PostWorkoutAgentError):
     """The LLM output violated the three-paragraph structural rule."""
+
 
 @dataclass
 class PostWorkoutContext:
@@ -90,6 +93,7 @@ class PostWorkoutContext:
             "load_scores": self.load_scores,
         }
 
+
 def describe_load(aerobic_load: Optional[float]) -> str:
     """Render a plain-language descriptor for the heuristic aerobic load (Phase-1.6 population-based thresholds)."""
     if aerobic_load is None:
@@ -102,6 +106,7 @@ def describe_load(aerobic_load: Optional[float]) -> str:
         return "steady aerobic load"
     return "heavy aerobic load"
 
+
 def format_phase_position(
     planned_session: Optional[PlannedSession],
     twin_state: TwinState,
@@ -113,6 +118,7 @@ def format_phase_position(
         f"week {planned_session.week_number} of the "
         f"{planned_session.phase_label.value.replace('_', ' ')} phase"
     )
+
 
 class PostWorkoutAgent:
     """Generate the post-workout coach message. Idempotent — returns existing message when present. The caller owns the commit boundary."""
@@ -140,7 +146,9 @@ class PostWorkoutAgent:
         self._planned_sessions: PlannedSessionRepository = planned_sessions
         self._twin_states: TwinStateRepository = twin_states
         self._prompt_registry: PromptRegistry = prompt_registry
-        self._compliance_service: ComplianceService = compliance_service or ComplianceService()
+        self._compliance_service: ComplianceService = (
+            compliance_service or ComplianceService()
+        )
         if events is None:
             self._events = _build_default_publisher(session)
         else:
@@ -318,9 +326,7 @@ class PostWorkoutAgent:
                 latency_ms=latency_ms,
                 failure_reason="invalid_output_format",
             )
-            raise PostWorkoutLLMUnavailableError(
-                "post-workout response format invalid"
-            )
+            raise PostWorkoutLLMUnavailableError("post-workout response format invalid")
 
     def _build_context(
         self,
@@ -415,6 +421,7 @@ class PostWorkoutAgent:
     def _estimate_tokens(messages: List[ChatCompletionMessageParam]) -> int:
         joined = json.dumps(messages, default=str)
         return (len(joined) + 3) // 4
+
 
 def _build_default_publisher(session: AsyncSession) -> EventPublisher:
     from app.repositories.system_event_outbox_repository import (

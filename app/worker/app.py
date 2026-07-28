@@ -59,13 +59,10 @@ class OutboxPublisherResult(TypedDict):
     scheduled_at: int
 
 
-
 # SQLAlchemy ``+driver`` suffixes are stripped inside
 # ``get_procrastinate_dsn`` so the call site doesn't have to know
 # the converter exists. See app.config for the rationale.
 app = procrastinate.App(connector=Psycopg2Connector(dsn=get_procrastinate_dsn()))
-
-
 
 
 # Use ``async_task`` for all tasks so they integrate with the async
@@ -91,9 +88,7 @@ async def fit_ingest(*, activity_id: str, athlete_id: str) -> FitIngestResult:
             raise ActivityIngestionError(f"Activity {activity_id} not found")
 
         if activity.fit_file_key is None:
-            raise ActivityIngestionError(
-                f"Activity {activity_id} has no fit_file_key"
-            )
+            raise ActivityIngestionError(f"Activity {activity_id} has no fit_file_key")
 
         # Download the raw FIT bytes from object storage so the
         # service can re-parse against the file the API endpoint
@@ -121,7 +116,9 @@ async def fit_ingest(*, activity_id: str, athlete_id: str) -> FitIngestResult:
 
 
 @app.task()
-async def recalibrate_twin(*, athlete_id: str, activity_id: str) -> RecalibrateTwinResult:
+async def recalibrate_twin(
+    *, athlete_id: str, activity_id: str
+) -> RecalibrateTwinResult:
     """Recalibrate the Banister twin model after a manual load update."""
     from app.services.twin_recalibration_service import (
         TwinRecalibrationService,
@@ -140,9 +137,7 @@ async def recalibrate_twin(*, athlete_id: str, activity_id: str) -> RecalibrateT
 
         aerobic_load = activity.aerobic_load
         if aerobic_load is None:
-            raise ActivityIngestionError(
-                f"Activity {activity_id} has no aerobic_load"
-            )
+            raise ActivityIngestionError(f"Activity {activity_id} has no aerobic_load")
 
         twin_service = TwinRecalibrationService(session)
         recalibration = await twin_service.recalibrate(
@@ -261,9 +256,7 @@ async def threshold_detection(*, activity_id: str) -> ThresholdDetectionResult:
         activities = ActivityRepository(session)
         activity = await activities.get_by_id(activity_uuid)
         if activity is None:
-            raise ActivityIngestionError(
-                f"Activity {activity_id} not found"
-            )
+            raise ActivityIngestionError(f"Activity {activity_id} not found")
 
         # Extract ``athlete_id`` from the loaded activity row —
         # the task signature only carries ``activity_id`` per the
@@ -275,9 +268,7 @@ async def threshold_detection(*, activity_id: str) -> ThresholdDetectionResult:
             object_storage=ObjectStorageClient(),
             raw_stream_repository=RawSensorStreamRepository(session),
             activity_repository=activities,
-            athlete_physiology_repository=AthletePhysiologyRepository(
-                session
-            ),
+            athlete_physiology_repository=AthletePhysiologyRepository(session),
             physiology_measurement_repository=(
                 PhysiologyMeasurementRepository(session)
             ),
@@ -521,9 +512,7 @@ async def outbox_publisher(timestamp: int) -> OutboxPublisherResult:
     from app.services.outbox_publisher_service import OutboxPublisherService
 
     service = OutboxPublisherService()
-    published_count = await service.publish_pending(
-        limit=OUTBOX_PUBLISHER_BATCH_SIZE
-    )
+    published_count = await service.publish_pending(limit=OUTBOX_PUBLISHER_BATCH_SIZE)
 
     return {
         "published_count": published_count,

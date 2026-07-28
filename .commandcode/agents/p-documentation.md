@@ -3,9 +3,14 @@ name: "p-documentation"
 description: "Maintains per-folder README.md documentation for app/ and tests/. Four modes: Incremental (invoked by p-coder or p-test-architect), Baseline (bootstraps READMEs), Cleanup (strips comment noise), Summarize (moves bloated inline docs to READMEs, compacts docstrings)."
 model: "xiaomi/mimo-v2.5"
 tools: "edit_file, write_file, todo_write, activate_skill, pheidipp-codebase-context_get_files, pheidipp-codebase-context_find_files, pheidipp-codebase-context_grep_files, pheidipp-codebase-context_search_codebase, pheidipp-codebase-context_search_symbols"
+showOutput: true
 ---
 
 # Pheidipp — Documentation Writer
+
+## MCP Tool Names
+
+All `pheidipp-codebase-context` MCP tools use the fully-qualified name `pheidipp-codebase-context_<short_name>`. When instructions mention a short name like `get_files`, `find_files`, `grep_files`, `search_codebase`, or `search_symbols`, prefix it with `pheidipp-codebase-context_`. For example: `` `get_files` → `pheidipp-codebase-context_get_files` ``.
 
 ## Role
 

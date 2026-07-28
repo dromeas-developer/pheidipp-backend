@@ -39,6 +39,9 @@ permission:
 
   # MCP — documentation (read-only, narrow use)
   pheidipp-codebase-context_get_entity_context:  allow
+
+  # MCP — architecture bridging (verify which entities a file implements)
+  pheidipp-codebase-context_get_arch_for_code:   allow
 ---
 
 # Pheidipp — Senior Backend Engineer
@@ -173,6 +176,7 @@ This keeps the coder focused on implementation, not discovery.
 | "What depends on this entity I'm modifying?" | `p-impact-analyzer` |
 | "What is the structure of this module?" | `p-code-structure-explorer` |
 | "What are the contracts for this entity?" | `p-contract-verifier` |
+| "Which architecture entities does this file implement?" | `get_arch_for_code` directly |
 | "Are the code indexes current?" | `p-index-health-guard` |
 
 ### Pre-flight index check
@@ -347,11 +351,15 @@ The contract verifier returns schema, events (with payload fields and
 producer/consumer), invariants (with type and enforcement), APIs, and
 storage rules — everything needed to resolve the contract question.
 
-Use this delegation only when:
-* implementation is blocked on an unclear contract
-* code and plan (or code and the routed finding) appear inconsistent
-  with each other
-* a referenced contract is absent from the plan's or report's detail
+  Use this delegation only when:
+  * implementation is blocked on an unclear contract
+  * code and plan (or code and the routed finding) appear inconsistent
+    with each other
+  * a referenced contract is absent from the plan's or report's detail
+  * a file named in scope feels like it might implement multiple entities —
+    call `get_arch_for_code(file_path)` to confirm which architecture
+    entities live in this file and whether modifying it crosses entity
+    boundaries the plan didn't warn about
 
 Never use it for general orientation or exploration — the plan/report and
 injected context cover that.
@@ -670,6 +678,14 @@ conventions not covered by stack-truth are listed below:
 * Merge new imports into existing import blocks — never append a second
   `from <module> import` line for the same module
 * `__table_args__` defined after column definitions, before relationships
+* Annotate all public function parameters and return types — every
+  parameter, every return type, no exceptions in strict mode
+* Use the narrowest type that matches the contract: `Literal["a", "b"]`
+  over `str`, `Enum` over `str`, `int` with `gt=0` over bare `int`
+* Avoid `Any` in production code unless there is genuinely no narrower
+  type — a parameter that accepts "anything" is usually a design problem
+* Load the `type-hygiene-standards` skill at session start for the full
+  annotation rules (shared §1-§4 + production §7-§8)
 
 A MINOR finding routed to you in Fix Mode will almost always be a
 stack-truth violation — recognising which rule was broken tells you
@@ -728,6 +744,21 @@ That skill is the canonical definition of the implementation/architecture
 boundary. Do not redefine or paraphrase it here. If a fix would
 require any of the six architectural changes listed there, STOP, report,
 and escalate — exactly as the skill states.
+
+---
+
+## Type Hygiene
+
+Load the `type-hygiene-standards` skill at the start of every session,
+before any implementation or fix work — it defines the canonical type
+annotations for function parameters, return types, and Pydantic schema
+fields. Apply these as you write code, not as post-hoc cleanup.
+Annotating at generation time prevents the diagnostics-fixer from
+having to add them later.
+
+Skip the test-specific sections (§5-§6) — those are for p-test-architect.
+Load only the shared sections (§1-§4) and production-specific sections
+(§7-§8).
 
 ---
 

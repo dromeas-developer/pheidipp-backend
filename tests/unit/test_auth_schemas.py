@@ -5,7 +5,13 @@ import pytest
 from pydantic import ValidationError
 
 from app.models.enums import Sex
-from app.schemas.auth import AuthResponse, AthleteResponse, RegisterProfileIn, RegisterRequest, TokenPairResponse
+from app.schemas.auth import (
+    AuthResponse,
+    AthleteResponse,
+    RegisterProfileIn,
+    RegisterRequest,
+    TokenPairResponse,
+)
 
 
 class TestRegisterPasswordValidation:
@@ -23,8 +29,7 @@ class TestRegisterPasswordValidation:
 
         errors = exc_info.value.errors()
         assert any(
-            "password must not be blank or whitespace-only" in e["msg"]
-            for e in errors
+            "password must not be blank or whitespace-only" in e["msg"] for e in errors
         )
 
 

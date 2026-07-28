@@ -23,30 +23,36 @@ get_db = _get_db_session
 
 _bearer_scheme = HTTPBearer(auto_error=False)
 
+
 def build_auth_service(
     session: AsyncSession = Depends(get_db),
 ) -> AuthService:
     return AuthService(session=session)
+
 
 def build_onboarding_service(
     session: AsyncSession = Depends(get_db),
 ) -> OnboardingService:
     return OnboardingService(session=session)
 
+
 def build_plan_service(
     session: AsyncSession = Depends(get_db),
 ) -> PlanGenerationService:
     return PlanGenerationService(session=session)
+
 
 def build_plan_repository(
     session: AsyncSession = Depends(get_db),
 ) -> TrainingPlanRepository:
     return TrainingPlanRepository(session=session)
 
+
 def build_plan_query_service(
     session: AsyncSession = Depends(get_db),
 ) -> PlanQueryService:
     return PlanQueryService(session=session)
+
 
 def _extract_bearer(credentials: HTTPAuthorizationCredentials | None) -> str:
     if credentials is None or not credentials.credentials:
@@ -56,6 +62,7 @@ def _extract_bearer(credentials: HTTPAuthorizationCredentials | None) -> str:
             headers={"WWW-Authenticate": "Bearer"},
         )
     return credentials.credentials
+
 
 def get_current_athlete_id(
     credentials: Annotated[
@@ -73,6 +80,7 @@ def get_current_athlete_id(
             headers={"WWW-Authenticate": "Bearer"},
         ) from exc
     return claims.athlete_id
+
 
 def require_self(
     path_athlete_id: Annotated[UUID, Path(alias="athlete_id")],

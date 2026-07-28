@@ -26,9 +26,7 @@ class TrainingGoalRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def get_active(
-        self, athlete_id: uuid.UUID
-    ) -> Optional[TrainingGoal]:
+    async def get_active(self, athlete_id: uuid.UUID) -> Optional[TrainingGoal]:
         result = await self.session.execute(
             select(TrainingGoal).where(
                 TrainingGoal.athlete_id == athlete_id,
@@ -37,9 +35,7 @@ class TrainingGoalRepository:
         )
         return result.scalar_one_or_none()
 
-    async def get_by_id(
-        self, goal_id: uuid.UUID
-    ) -> Optional[TrainingGoal]:
+    async def get_by_id(self, goal_id: uuid.UUID) -> Optional[TrainingGoal]:
         result = await self.session.execute(
             select(TrainingGoal).where(TrainingGoal.id == goal_id)
         )

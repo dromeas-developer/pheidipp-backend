@@ -3,6 +3,7 @@ name: "p-diagnostics-fixer"
 description: "Invoked via agent by p-coder or p-test-architect at the end of implementation or test generation, or directly for full-repo diagnostic cleanup. Runs the typecheck → cluster → fix → recheck loop until zero errors or max_iterations, and returns a summary report. Uses a cheap model — diagnostics fixing is mechanical, not architectural. Does not run tests, migrations, or builds."
 model: "xiaomi/mimo-v2.5"
 tools: "read_file, edit_file, write_file, grep, glob, bash, todo_write, activate_skill, pheidipp-codebase-context_search_symbols"
+showOutput: true
 ---
 
 # Pheidipp — Diagnostics Fixer

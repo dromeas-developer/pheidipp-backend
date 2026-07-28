@@ -112,9 +112,7 @@ async def post_upload_activity(
     planned_session_id: Optional[uuid.UUID] = Form(default=None),
     notes: Optional[str] = Form(default=None),
     auth_athlete_id: uuid.UUID = Depends(require_self),
-    service: ActivityIngestionService = Depends(
-        build_activity_ingestion_service
-    ),
+    service: ActivityIngestionService = Depends(build_activity_ingestion_service),
     session: AsyncSession = Depends(get_db),
 ) -> ActivityUploadResponse:
     file_bytes = await _read_upload_bytes(file)
@@ -260,9 +258,7 @@ async def post_analyse_activity(
 
     return PostWorkoutAnalysisResponse(
         activity=ActivityResponse.model_validate(activity),
-        coaching_message=CoachingMessageSummary.model_validate(
-            coaching_message
-        ),
+        coaching_message=CoachingMessageSummary.model_validate(coaching_message),
     )
 
 

@@ -3,9 +3,21 @@ name: "p-impact-analyzer"
 description: "Blast-radius and dependency analysis subagent. Takes a concept name and returns a structured impact report: what depends on it, what it depends on, and what would break if changed. Use before modifying an existing entity to understand downstream effects."
 tools: "pheidipp-codebase-context_get_change_impact, pheidipp-codebase-context_get_related_contracts, pheidipp-codebase-context_get_dependency_chain, pheidipp-codebase-context_get_importers, pheidipp-codebase-context_get_module_deps, pheidipp-codebase-context_search_symbols"
 model: "inclusionai/ling-3.0-flash-free"
+showOutput: true
 ---
 
 # Pheidipp — Impact Analyzer
+
+## MCP Tool Names
+
+| Short name | Full tool name |
+|---|---|
+| `get_change_impact` | `pheidipp-codebase-context_get_change_impact` |
+| `get_related_contracts` | `pheidipp-codebase-context_get_related_contracts` |
+| `get_dependency_chain` | `pheidipp-codebase-context_get_dependency_chain` |
+| `get_importers` | `pheidipp-codebase-context_get_importers` |
+| `get_module_deps` | `pheidipp-codebase-context_get_module_deps` |
+| `search_symbols` | `pheidipp-codebase-context_search_symbols` |
 
 ## Role
 

@@ -98,8 +98,7 @@ async def get_today(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=(
-                "No planned session scheduled for today on the "
-                "athlete's active plan."
+                "No planned session scheduled for today on the athlete's active plan."
             ),
         )
 
@@ -120,9 +119,7 @@ async def get_today(
 
     return TodayResponse(
         planned_session=PlannedSessionResponse.model_validate(planned_session),
-        generated_workout=GeneratedWorkoutResponse.model_validate(
-            generated_workout
-        ),
+        generated_workout=GeneratedWorkoutResponse.model_validate(generated_workout),
         steps=[WorkoutStepResponse.model_validate(s) for s in step_rows],
     )
 
@@ -187,8 +184,6 @@ async def post_generate_workout(
     step_rows = await agent.load_steps(generated_workout.id)
 
     return GenerateWorkoutResponse(
-        generated_workout=GeneratedWorkoutResponse.model_validate(
-            generated_workout
-        ),
+        generated_workout=GeneratedWorkoutResponse.model_validate(generated_workout),
         steps=[WorkoutStepResponse.model_validate(s) for s in step_rows],
     )

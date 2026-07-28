@@ -90,9 +90,7 @@ class AthletePreferences(Base):
         ),
         nullable=False,
     )
-    years_structured_training: Mapped[int] = mapped_column(
-        Integer, nullable=False
-    )
+    years_structured_training: Mapped[int] = mapped_column(Integer, nullable=False)
 
     # ------------------------------------------------------------------
     # ``training_time_of_day`` feeds the time-of-day modifier in
@@ -177,9 +175,7 @@ class AthletePreferences(Base):
     )
 
 
-def infer_data_tier(
-    hr_source: HrSource, power_source: PowerSource
-) -> DataTier:
+def infer_data_tier(hr_source: HrSource, power_source: PowerSource) -> DataTier:
     """Map an athlete's HR + power source to a hardware data tier.
 
     Implements the canonical inference rule from
@@ -196,16 +192,14 @@ def infer_data_tier(
     helper is invoked at read time by services that need the tier
     (e.g. ``PlanGenerationService``, ``WellnessModifierService``).
     """
+    if hr_source == HrSource.NONE:
+        return DataTier.TIER_5
     if power_source == PowerSource.RUNNING_POWER_METER:
         return (
-            DataTier.TIER_1
-            if hr_source == HrSource.CHEST_STRAP_RR
-            else DataTier.TIER_2
+            DataTier.TIER_1 if hr_source == HrSource.CHEST_STRAP_RR else DataTier.TIER_2
         )
     if hr_source == HrSource.CHEST_STRAP_RR:
         return DataTier.TIER_3
     if hr_source in {HrSource.CHEST_STRAP_NO_RR, HrSource.WRIST_OPTICAL}:
         return DataTier.TIER_4
-    if hr_source == HrSource.NONE:
-        return DataTier.TIER_5
     return DataTier.TIER_6

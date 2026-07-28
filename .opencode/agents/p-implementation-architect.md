@@ -50,6 +50,7 @@ permission:
 
   # Bulk / advanced retrieval
   pheidipp-codebase-context_get_agent_dependencies:   allow
+  pheidipp-codebase-context_get_computation_pipeline:  allow
 
   # Architecture maintenance
   pheidipp-codebase-context_refresh_architecture:     allow
@@ -417,11 +418,20 @@ The Impact Analyzer returns the full blast radius: affected entities, events,
 agents, and vision references. Use this for impact analysis instead of direct
 tool calls.
 
-For agent coupling awareness — which agents reference the entities this plan
-touches — call `get_agent_dependencies(agent_name)` for any agent that the
-Impact Analyzer's report names. This surfaces context budgets, entity
-dependencies, and computation dependencies that RC4 (Modification Safety)
-must account for.
+  For agent coupling awareness — which agents reference the entities this plan
+  touches — call `get_agent_dependencies(agent_name)` for any agent that the
+  Impact Analyzer's report names. This surfaces context budgets, entity
+  dependencies, and computation dependencies that RC4 (Modification Safety)
+  must account for.
+
+  **For computation coupling**, call `get_computation_pipeline(entity_name)`
+  for any computation entity the plan introduces or modifies. This traces the
+  full upstream/downstream computation graph — which computations feed into
+  this one and which depend on its output. Entity-level impact analysis
+  (p-impact-analyzer) catches entity and event couplings; the computation
+  pipeline catches computation-to-computation couplings that don't share an
+  entity boundary. Flag any downstream computation the plan does not account
+  for — this feeds RC4 (Modification Safety) for computation flow.
 
 ### Step 4 — Generate Tentative Plan From Docs
 
@@ -1055,3 +1065,11 @@ The skill contains the full Implementation Plan Anti-Patterns checklist
 and Plan Sizing Rules. Apply both during final review before handoff:
 every plan must pass the anti-patterns check and be correctly sized per
 the skill's rules.
+
+---
+
+## Output
+
+Write plan files and ADRs via tools only — never in response text. The
+response text is a single-line confirmation: which files were created or
+modified. The plan documents are the output — no prose summary.

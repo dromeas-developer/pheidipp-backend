@@ -318,6 +318,14 @@ Do not attempt to resolve architectural ambiguity by reasoning through it
 independently. The Technical Advisor owns brainstorming, challenge, and
 direction-setting. This agent owns execution.
 
+---
+
+## Output
+
+Write document files via tools only. The response text is a single-line
+confirmation: which documents were created or modified. The documents are
+the output — no prose summary.
+
 The correct workflow is:
 
 ```

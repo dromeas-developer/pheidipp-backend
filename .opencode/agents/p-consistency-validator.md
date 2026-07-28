@@ -24,6 +24,9 @@ permission:
   pheidipp-codebase-context_get_files:            allow
   pheidipp-codebase-context_find_files:           allow
   pheidipp-codebase-context_grep_files:           allow
+
+  # MCP tools — architecture bridging (code→entity reverse mapping)
+  pheidipp-codebase-context_get_arch_for_code:    allow
 ---
 
 # Pheidipp — Consistency Validator
@@ -363,10 +366,17 @@ different names. Focus on:
 **For ownership blur:**
 For each file in scope, verify that the logic it contains belongs to the
 layer the file represents. Flag any logic that has crossed a boundary:
-- Query logic in routes
-- Business rules in repositories
-- Events fired before transaction commit
-- Direct DB access outside the repository layer
+  - Query logic in routes
+  - Business rules in repositories
+  - Events fired before transaction commit
+  - Direct DB access outside the repository layer
+
+  When a layer violation is found, call `get_arch_for_code(file_path)` to
+  identify which architecture entity the file implements. This grounds the
+  finding in the architecture corpus: a route handling `athlete-auth` logic
+  vs a route handling `twin-state` logic carry different severity and routing.
+  Without this mapping, "ownership blur" is a structural observation; with it,
+  it's an architecture-grounded finding with a clear owner domain.
 
 **For pattern inconsistency:**
 Within each category (all repositories, all services, all routes), compare

@@ -25,14 +25,10 @@ class AthleteRepository:
         )
         return result.scalar_one_or_none()
 
-    async def get_by_normalized_email(
-        self, normalized_email: str
-    ) -> Optional[Athlete]:
+    async def get_by_normalized_email(self, normalized_email: str) -> Optional[Athlete]:
         """Look up an athlete by case-insensitive email match."""
         result = await self.session.execute(
-            select(Athlete).where(
-                Athlete.email == normalize_email(normalized_email)
-            )
+            select(Athlete).where(Athlete.email == normalize_email(normalized_email))
         )
         return result.scalar_one_or_none()
 
@@ -53,9 +49,7 @@ class AthleteRepository:
         the caller only cares about a uniqueness check.
         """
         result = await self.session.execute(
-            select(Athlete.id).where(
-                Athlete.email == normalize_email(normalized_email)
-            )
+            select(Athlete.id).where(Athlete.email == normalize_email(normalized_email))
         )
         return result.scalar_one_or_none() is not None
 

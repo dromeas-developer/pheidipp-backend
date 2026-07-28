@@ -52,9 +52,7 @@ async def get_plan(
     athlete_id_dep: uuid.UUID = Depends(require_self),
     plans: TrainingPlanRepository = Depends(build_plan_repository),
 ) -> TrainingPlanResponse:
-    plan_id = await _resolve_active_plan_id(
-        athlete_id=athlete_id, plans=plans
-    )
+    plan_id = await _resolve_active_plan_id(athlete_id=athlete_id, plans=plans)
     if plan_id is None:
         raise _plan_not_found()
 
@@ -74,9 +72,7 @@ async def get_plan_sessions(
     plans: TrainingPlanRepository = Depends(build_plan_repository),
     plan_query: PlanQueryService = Depends(build_plan_query_service),
 ) -> list[PlannedSessionResponse]:
-    plan_id = await _resolve_active_plan_id(
-        athlete_id=athlete_id, plans=plans
-    )
+    plan_id = await _resolve_active_plan_id(athlete_id=athlete_id, plans=plans)
     if plan_id is None:
         raise _plan_not_found()
 
@@ -94,15 +90,11 @@ async def get_upcoming_sessions(
     plans: TrainingPlanRepository = Depends(build_plan_repository),
     plan_query: PlanQueryService = Depends(build_plan_query_service),
 ) -> UpcomingSessionsResponse:
-    plan_id = await _resolve_active_plan_id(
-        athlete_id=athlete_id, plans=plans
-    )
+    plan_id = await _resolve_active_plan_id(athlete_id=athlete_id, plans=plans)
     if plan_id is None:
         raise _plan_not_found()
 
-    rows = await plan_query.get_upcoming_sessions(
-        plan_id=plan_id, limit=5
-    )
+    rows = await plan_query.get_upcoming_sessions(plan_id=plan_id, limit=5)
     return UpcomingSessionsResponse(
         sessions=[PlannedSessionResponse.model_validate(r) for r in rows],
     )
@@ -118,12 +110,9 @@ async def get_plan_checkpoints(
     plans: TrainingPlanRepository = Depends(build_plan_repository),
     plan_query: PlanQueryService = Depends(build_plan_query_service),
 ) -> list[CheckpointResponse]:
-    plan_id = await _resolve_active_plan_id(
-        athlete_id=athlete_id, plans=plans
-    )
+    plan_id = await _resolve_active_plan_id(athlete_id=athlete_id, plans=plans)
     if plan_id is None:
         raise _plan_not_found()
 
     rows = await plan_query.get_checkpoints_for_plan(plan_id)
     return [CheckpointResponse.model_validate(r) for r in rows]
-

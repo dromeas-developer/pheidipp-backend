@@ -169,7 +169,8 @@ class _WeekSynthesis:
         # week N". The phase label is the trailing label string.
         try:
             label_token = (
-                self.assignments[0].intent_description.rsplit("(", 1)[-1]
+                self.assignments[0]
+                .intent_description.rsplit("(", 1)[-1]
                 .split(",", 1)[0]
                 .strip()
             )
@@ -268,15 +269,11 @@ class PlanGenerationService:
         """
         athlete = await self.athletes.get_by_id(athlete_id)
         if athlete is None:
-            raise PlanGenerationError(
-                f"athlete {athlete_id} not found"
-            )
+            raise PlanGenerationError(f"athlete {athlete_id} not found")
 
         goal_row = await self.goals.get_active(athlete_id)
         if goal_row is None:
-            raise PlanGenerationError(
-                "no active training goal for athlete"
-            )
+            raise PlanGenerationError("no active training goal for athlete")
 
         if goal_row.goal_type not in ALLOWED_PLAN_GENERATION_GOAL_TYPES:
             raise InvalidGoalTypeError(
@@ -286,15 +283,11 @@ class PlanGenerationService:
 
         twin_state_row = await self.twin_states.get_latest(athlete_id)
         if twin_state_row is None:
-            raise PlanGenerationError(
-                "no twin state available for athlete"
-            )
+            raise PlanGenerationError("no twin state available for athlete")
 
         prefs_row = await self.preferences.get_by_athlete_id(athlete_id)
         if prefs_row is None:
-            raise PlanGenerationError(
-                "no athlete preferences available"
-            )
+            raise PlanGenerationError("no athlete preferences available")
 
         plan_start = datetime.now(timezone.utc).date()
         if goal_row.goal_type == GoalType.RACE_EVENT:
@@ -327,18 +320,13 @@ class PlanGenerationService:
         plan_start: date,
     ) -> PlanGenerationResult:
         """race_event-specific orchestration: gate → allocation → persist."""
-        if (
-            goal_row.goal_event_date is None
-            or goal_row.goal_event_type is None
-        ):
+        if goal_row.goal_event_date is None or goal_row.goal_event_type is None:
             raise PlanGenerationError(
                 "race_event requires goal_event_date and goal_event_type"
             )
 
         weeks_until_goal = _weeks_between(plan_start, goal_row.goal_event_date)
-        experience_level = derive_experience_level(
-            prefs_row.years_structured_training
-        )
+        experience_level = derive_experience_level(prefs_row.years_structured_training)
         fitness_level = _fitness_level_to_self_report(goal_row.fitness_level)
 
         gate_result: TrainingLengthGateResult = evaluate_training_length_gate(
@@ -441,9 +429,7 @@ class PlanGenerationService:
         allocations = allocate_race_event_phases(total_weeks=config.total_weeks)
 
         # Supersede any existing active plan for this goal.
-        previous_plan = await self.plans.get_active_for_goal(
-            config.training_goal_id
-        )
+        previous_plan = await self.plans.get_active_for_goal(config.training_goal_id)
         previous_plan_id: Optional[uuid.UUID] = None
         if previous_plan is not None:
             previous_plan_id = previous_plan.id
@@ -451,16 +437,12 @@ class PlanGenerationService:
 
         # PhaseDefinition + weekly distribution derivation.
         phase_definition_records: List[PhaseDefinitionRecord] = [
-            to_phase_definition_record(allocation)
-            for allocation in allocations
+            to_phase_definition_record(allocation) for allocation in allocations
         ]
         phase_definitions_json = [
-            _phase_definition_to_dict(rec)
-            for rec in phase_definition_records
+            _phase_definition_to_dict(rec) for rec in phase_definition_records
         ]
-        weekly_distributions = _expand_phases_to_weekly(
-            phase_definition_records
-        )
+        weekly_distributions = _expand_phases_to_weekly(phase_definition_records)
         weekly_distributions_json = [dict(row) for row in weekly_distributions]
 
         # Phase date ranges.
@@ -500,9 +482,7 @@ class PlanGenerationService:
                     "primary_focus": allocation.primary_focus,
                     "weekly_session_count": allocation.weekly_session_count,
                 }
-                for allocation, (start, end) in zip(
-                    allocations, phase_date_ranges
-                )
+                for allocation, (start, end) in zip(allocations, phase_date_ranges)
             ],
             phase_definitions=phase_definitions_json,
             weekly_distributions=weekly_distributions_json,
@@ -521,13 +501,11 @@ class PlanGenerationService:
             phase_start = phase_date_ranges[phase_index][0]
             week_start_date = phase_start + timedelta(days=week_index * 7)
             week_end_date = week_start_date + timedelta(days=6)
-            week_index_in_phase = (
-                week_index - _sum_weeks_before(allocations, phase_index)
+            week_index_in_phase = week_index - _sum_weeks_before(
+                allocations, phase_index
             )
             assigned_checkpoints = [
-                cp
-                for cp in checkpoint_records
-                if cp.week_number == week_index + 1
+                cp for cp in checkpoint_records if cp.week_number == week_index + 1
             ]
             assignments = self._synthesize_week(
                 week_number_in_plan=week_index + 1,
@@ -650,15 +628,11 @@ class PlanGenerationService:
                 if assignment.is_checkpoint and (
                     assignment.checkpoint_type is not None
                 ):
-                    planned_session_row = planned_session_rows[
-                        planned_session_idx
-                    ]
+                    planned_session_row = planned_session_rows[planned_session_idx]
                     checkpoint_row = Checkpoint(
                         planned_session_id=planned_session_row.id,
                         type=assignment.checkpoint_type,
-                        target_metric=(
-                            assignment.checkpoint_metric or "form"
-                        ),
+                        target_metric=(assignment.checkpoint_metric or "form"),
                         secondary_metrics=[],
                         twin_update_expected=(
                             assignment.checkpoint_type
@@ -668,8 +642,7 @@ class PlanGenerationService:
                             }
                         ),
                         replan_trigger=(
-                            assignment.checkpoint_type
-                            == CheckpointType.CALIBRATION
+                            assignment.checkpoint_type == CheckpointType.CALIBRATION
                         ),
                         status=CheckpointStatus.SCHEDULED,
                     )
@@ -740,9 +713,7 @@ class PlanGenerationService:
         """
         weekday_map = _normalise_weekly_schedule(weekly_schedule)
         long_workout_day = _pick_long_workout_day(weekday_map)
-        available_days = [
-            day for day in DAYS_OF_WEEK if weekday_map[day]["available"]
-        ]
+        available_days = [day for day in DAYS_OF_WEEK if weekday_map[day]["available"]]
         if not available_days:
             available_days = list(DAYS_OF_WEEK)
 
@@ -781,12 +752,8 @@ class PlanGenerationService:
                 phase_label=phase_label,
                 week_index_in_phase=week_index_in_phase,
             )
-            duration = DEFAULT_SESSION_TYPE_DURATION_MIN.get(
-                session_type, 60
-            )
-            target_date = week_start + timedelta(
-                days=DAYS_OF_WEEK.index(day)
-            )
+            duration = DEFAULT_SESSION_TYPE_DURATION_MIN.get(session_type, 60)
+            target_date = week_start + timedelta(days=DAYS_OF_WEEK.index(day))
             assignments_by_day[day] = SessionDayAssignment(
                 target_date=target_date,
                 session_type=session_type,
@@ -828,9 +795,8 @@ class PlanGenerationService:
 
         # 3. Fill remaining days with the easy-session rotation.
         idx = 0
-        while (
-            sum(1 for _ in assignments_by_day) < session_count_target
-            and idx < len(available_days)
+        while sum(1 for _ in assignments_by_day) < session_count_target and idx < len(
+            available_days
         ):
             day = available_days[idx]
             idx += 1
@@ -863,9 +829,7 @@ class PlanGenerationService:
                 session_type=cp.session_type,
                 intent_description=cp.planner_message,
                 approximate_duration_minutes=(
-                    DEFAULT_SESSION_TYPE_DURATION_MIN.get(
-                        cp.session_type, 60
-                    )
+                    DEFAULT_SESSION_TYPE_DURATION_MIN.get(cp.session_type, 60)
                 ),
                 is_checkpoint=True,
                 checkpoint_type=cp.type,
@@ -888,9 +852,7 @@ class PlanGenerationService:
         #     sides — rewriting the adjacent daily slots in place.
         ordered_assignments = sorted(
             assignments_by_day.values(),
-            key=lambda a: (
-                _weekday_index_for_date(a.target_date, week_start)
-            ),
+            key=lambda a: _weekday_index_for_date(a.target_date, week_start),
         )
         repaired = _repair_weekly_invariants(
             ordered_assignments,
@@ -900,9 +862,7 @@ class PlanGenerationService:
         # inserts a new earlier-dated or later-dated assignment.
         return sorted(
             repaired,
-            key=lambda a: (
-                _weekday_index_for_date(a.target_date, week_start)
-            ),
+            key=lambda a: _weekday_index_for_date(a.target_date, week_start),
         )
 
 
@@ -1012,9 +972,7 @@ def _classify_gap(gap_pct: float) -> str:
     return "very_large"
 
 
-def _estimate_weeks_to_target(
-    *, gap_classification: str, fitness_level: int
-) -> int:
+def _estimate_weeks_to_target(*, gap_classification: str, fitness_level: int) -> int:
     """Estimate training weeks for a target_performance plan."""
     base_low, base_high = {
         "small": (4, 6),
@@ -1036,9 +994,7 @@ def _normalise_weekly_schedule(
 
     Returns a seven-key dict; missing days default to ``available=False``.
     """
-    out: Dict[str, Dict[str, Any]] = {
-        day: {"available": False} for day in DAYS_OF_WEEK
-    }
+    out: Dict[str, Dict[str, Any]] = {day: {"available": False} for day in DAYS_OF_WEEK}
     for day, cfg_value in weekly_schedule.items():
         if day not in out:
             continue
@@ -1074,9 +1030,7 @@ def _phase_index_for_week(
     return len(allocations) - 1
 
 
-def _sum_weeks_before(
-    allocations: Sequence[PhaseAllocation], phase_index: int
-) -> int:
+def _sum_weeks_before(allocations: Sequence[PhaseAllocation], phase_index: int) -> int:
     return sum(a.weeks for a in allocations[:phase_index])
 
 
@@ -1207,9 +1161,7 @@ def _retype_assignment(
     The original assignment is a frozen dataclass; this helper
     allocates a new one rather than mutating state.
     """
-    phase_label = _extract_phase_label_from_intent(
-        assignment.intent_description
-    )
+    phase_label = _extract_phase_label_from_intent(assignment.intent_description)
     week_index_in_phase = _extract_week_in_phase_from_intent(
         assignment.intent_description
     )
@@ -1361,9 +1313,7 @@ def _repair_weekly_invariants(
             session_type=SessionType.RECOVERY_RUN,
             intent_description=_build_intent_description(
                 session_type=SessionType.RECOVERY_RUN,
-                phase_label=_extract_phase_label_from_intent(
-                    lr.intent_description
-                ),
+                phase_label=_extract_phase_label_from_intent(lr.intent_description),
                 week_index_in_phase=_extract_week_in_phase_from_intent(
                     lr.intent_description
                 ),
@@ -1394,20 +1344,14 @@ def _repair_weekly_invariants(
         prev_idx = t_idx - 1
         if prev_idx >= 0:
             prev = repaired[prev_idx]
-            if (
-                not prev.is_checkpoint
-                and prev.session_type not in _EASY_REST_TYPES
-            ):
+            if not prev.is_checkpoint and prev.session_type not in _EASY_REST_TYPES:
                 repaired[prev_idx] = _retype_assignment(
                     prev, new_session_type=SessionType.EASY_RUN
                 )
         next_idx = t_idx + 1
         if next_idx < len(repaired):
             nxt = repaired[next_idx]
-            if (
-                not nxt.is_checkpoint
-                and nxt.session_type not in _EASY_REST_TYPES
-            ):
+            if not nxt.is_checkpoint and nxt.session_type not in _EASY_REST_TYPES:
                 repaired[next_idx] = _retype_assignment(
                     nxt, new_session_type=SessionType.EASY_RUN
                 )
@@ -1445,8 +1389,7 @@ def _repair_weekly_invariants(
         if not repaired:
             break
         sandwich = next(
-            a for a in repaired
-            if a.session_type in SANDWICHED_SESSION_TYPES
+            a for a in repaired if a.session_type in SANDWICHED_SESSION_TYPES
         )
         replacement = SessionDayAssignment(
             target_date=padding_date,
@@ -1461,9 +1404,7 @@ def _repair_weekly_invariants(
                 ),
             ),
             approximate_duration_minutes=(
-                DEFAULT_SESSION_TYPE_DURATION_MIN.get(
-                    SessionType.RECOVERY_RUN, 30
-                )
+                DEFAULT_SESSION_TYPE_DURATION_MIN.get(SessionType.RECOVERY_RUN, 30)
             ),
             session_priority=SessionPriority.PRIMARY,
         )
@@ -1573,9 +1514,7 @@ def _build_strategic_rationale(
         return None
     phase_labels = [a.label.value for a in allocations]
     return {
-        "primary_driver": (
-            "deterministic periodisation from onboarding context"
-        ),
+        "primary_driver": ("deterministic periodisation from onboarding context"),
         "methodology_summary": (
             "Five-phase block progressing from aerobic base through "
             "threshold build, race-specific endurance, taper, and "

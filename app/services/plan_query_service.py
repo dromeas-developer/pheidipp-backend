@@ -30,9 +30,7 @@ class PlanQueryService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def get_sessions_for_plan(
-        self, plan_id: uuid.UUID
-    ) -> List[PlannedSession]:
+    async def get_sessions_for_plan(self, plan_id: uuid.UUID) -> List[PlannedSession]:
         """Return all ``PlannedSession`` rows for *plan_id*.
 
         Joins ``PlannedSession → WeeklyPlan`` on
@@ -86,9 +84,7 @@ class PlanQueryService:
         )
         return list(result.scalars().all())
 
-    async def get_checkpoints_for_plan(
-        self, plan_id: uuid.UUID
-    ) -> List[Checkpoint]:
+    async def get_checkpoints_for_plan(self, plan_id: uuid.UUID) -> List[Checkpoint]:
         """Return all ``Checkpoint`` rows attached to *plan_id*.
 
         Joins ``Checkpoint → PlannedSession → WeeklyPlan`` and

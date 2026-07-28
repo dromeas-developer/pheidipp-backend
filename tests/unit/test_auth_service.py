@@ -22,7 +22,10 @@ def mock_session() -> AsyncMock:
 @pytest.fixture
 def mock_token_service() -> MagicMock:
     svc = MagicMock()
-    svc.issue_access_token.return_value = ("access-token-xyz", datetime(2026, 8, 1, tzinfo=timezone.utc))
+    svc.issue_access_token.return_value = (
+        "access-token-xyz",
+        datetime(2026, 8, 1, tzinfo=timezone.utc),
+    )
     svc.refresh_expiry.return_value = datetime(2026, 8, 25, tzinfo=timezone.utc)
     return svc
 
@@ -114,7 +117,9 @@ class TestRegister:
         mock_athlete = MagicMock()
         mock_athlete.id = uuid.uuid4()
         auth_service.athletes.add.return_value = mock_athlete
-        auth_service.auths.add = AsyncMock(side_effect=RuntimeError("mid-transaction failure"))
+        auth_service.auths.add = AsyncMock(
+            side_effect=RuntimeError("mid-transaction failure")
+        )
 
         with pytest.raises(RuntimeError, match="mid-transaction failure"):
             await auth_service.register(
@@ -130,13 +135,18 @@ class TestRegister:
 
 class TestLogin:
     async def test_login_successful_returns_token_pair(
-        self, auth_service: Any, mock_session: AsyncMock, mock_password_hasher: MagicMock
+        self,
+        auth_service: Any,
+        mock_session: AsyncMock,
+        mock_password_hasher: MagicMock,
     ) -> None:
         _mock_repositories(auth_service)
         mock_auth_record = MagicMock()
         mock_auth_record.hashed_password = "$2b$12$hashedvalue"
         mock_auth_record.athlete_id = uuid.uuid4()
-        auth_service.auths.get_email_auth_by_normalized_email.return_value = mock_auth_record
+        auth_service.auths.get_email_auth_by_normalized_email.return_value = (
+            mock_auth_record
+        )
         mock_password_hasher.verify.return_value = True
         mock_athlete = MagicMock()
         mock_athlete.id = mock_auth_record.athlete_id
@@ -145,7 +155,9 @@ class TestLogin:
         mock_athlete.created_at = datetime(2026, 7, 25, tzinfo=timezone.utc)
         auth_service.athletes.get_by_id.return_value = mock_athlete
 
-        result = await auth_service.login(email="athlete@example.com", password="validpass123")
+        result = await auth_service.login(
+            email="athlete@example.com", password="validpass123"
+        )
 
         auth_service.events.publish.assert_called_once()
         mock_session.commit.assert_called_once()
@@ -157,11 +169,15 @@ class TestLogin:
         _mock_repositories(auth_service)
         mock_auth_record = MagicMock()
         mock_auth_record.hashed_password = "$2b$12$hashedvalue"
-        auth_service.auths.get_email_auth_by_normalized_email.return_value = mock_auth_record
+        auth_service.auths.get_email_auth_by_normalized_email.return_value = (
+            mock_auth_record
+        )
         mock_password_hasher.verify.return_value = False
 
         with pytest.raises(InvalidCredentialsError, match="invalid credentials"):
-            await auth_service.login(email="athlete@example.com", password="wrongpassword")
+            await auth_service.login(
+                email="athlete@example.com", password="wrongpassword"
+            )
 
         auth_service.events.publish.assert_not_called()
 
@@ -172,7 +188,9 @@ class TestLogin:
         auth_service.auths.get_email_auth_by_normalized_email.return_value = None
 
         with pytest.raises(InvalidCredentialsError, match="invalid credentials"):
-            await auth_service.login(email="nosuchuser@example.com", password="anypassword")
+            await auth_service.login(
+                email="nosuchuser@example.com", password="anypassword"
+            )
 
         mock_password_hasher.verify.assert_called_once()
         auth_service.events.publish.assert_not_called()
@@ -189,14 +207,18 @@ class TestRefreshToken:
             token.id = expected_token_id
             return token
 
-        auth_service.refresh_tokens.add = AsyncMock(side_effect=_mock_refresh_tokens_add)
+        auth_service.refresh_tokens.add = AsyncMock(
+            side_effect=_mock_refresh_tokens_add
+        )
         existing_token = MagicMock()
         existing_token.athlete_id = uuid.uuid4()
         existing_token.revoked_at = None
         existing_token.expires_at = datetime(2026, 8, 25, tzinfo=timezone.utc)
         auth_service.refresh_tokens.get_by_token_hash.return_value = existing_token
 
-        result = await auth_service.rotate_refresh_token(raw_refresh_token="valid-raw-token")
+        result = await auth_service.rotate_refresh_token(
+            raw_refresh_token="valid-raw-token"
+        )
 
         auth_service.refresh_tokens.add.assert_called_once()
         assert existing_token.revoked_at is not None
@@ -216,13 +238,13 @@ class TestRefreshToken:
         auth_service.refresh_tokens.get_by_token_hash.return_value = existing_token
 
         with pytest.raises(InvalidRefreshTokenError, match="invalid refresh token"):
-            await auth_service.rotate_refresh_token(raw_refresh_token="old-revoked-token")
+            await auth_service.rotate_refresh_token(
+                raw_refresh_token="old-revoked-token"
+            )
 
         auth_service.refresh_tokens.add.assert_not_called()
 
-    async def test_refresh_expired_token_rejected(
-        self, auth_service: Any
-    ) -> None:
+    async def test_refresh_expired_token_rejected(self, auth_service: Any) -> None:
         _mock_repositories(auth_service)
         existing_token = MagicMock()
         existing_token.revoked_at = None
@@ -234,14 +256,14 @@ class TestRefreshToken:
 
         auth_service.refresh_tokens.add.assert_not_called()
 
-    async def test_refresh_unknown_token_rejected(
-        self, auth_service: Any
-    ) -> None:
+    async def test_refresh_unknown_token_rejected(self, auth_service: Any) -> None:
         _mock_repositories(auth_service)
         auth_service.refresh_tokens.get_by_token_hash.return_value = None
 
         with pytest.raises(InvalidRefreshTokenError, match="invalid refresh token"):
-            await auth_service.rotate_refresh_token(raw_refresh_token="nonexistent-hash")
+            await auth_service.rotate_refresh_token(
+                raw_refresh_token="nonexistent-hash"
+            )
 
         auth_service.refresh_tokens.add.assert_not_called()
 

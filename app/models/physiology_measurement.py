@@ -104,17 +104,11 @@ class PhysiologyMeasurement(Base):
     )
     measurement_date: Mapped[date] = mapped_column(Date, nullable=False)
     # Nullable — manual entries have no algorithm.
-    algorithm_used: Mapped[str | None] = mapped_column(
-        String(64), nullable=True
-    )
+    algorithm_used: Mapped[str | None] = mapped_column(String(64), nullable=True)
     # Nullable — algorithm-specific confidence in the 0.0–1.0 range;
     # manual entries omit it.
-    confidence_weight: Mapped[float | None] = mapped_column(
-        Float, nullable=True
-    )
-    raw_data_reference: Mapped[str | None] = mapped_column(
-        String(512), nullable=True
-    )
+    confidence_weight: Mapped[float | None] = mapped_column(Float, nullable=True)
+    raw_data_reference: Mapped[str | None] = mapped_column(String(512), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

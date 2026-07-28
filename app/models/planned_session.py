@@ -122,9 +122,7 @@ class PlannedSession(Base):
         nullable=False,
     )
     intent_description: Mapped[str] = mapped_column(String(512), nullable=False)
-    approximate_duration_minutes: Mapped[int] = mapped_column(
-        Integer, nullable=False
-    )
+    approximate_duration_minutes: Mapped[int] = mapped_column(Integer, nullable=False)
 
     # ------------------------------------------------------------------
     # Checkpoint metadata — null when ``checkpoint_type is None``.

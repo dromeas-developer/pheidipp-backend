@@ -34,10 +34,10 @@ target_metadata = Base.metadata
 def include_object(obj, name, type_, reflected, compare_to):
     """
     Exclude procrastinate-managed objects from autogenerate.
-    
+
     Procrastinate owns its own schema (tables, indexes, enums, functions)
     installed via `procrastinate schema --install`, not via Alembic.
-    
+
     Without this filter, Alembic autogenerate sees these objects in the
     database but not in Base.metadata, and generates phantom drop/create
     operations for them in every migration.
@@ -65,7 +65,9 @@ def run_migrations_offline() -> None:
     """
     url = config.get_main_option("sqlalchemy.url")
     if not url:
-        url = str(settings.POSTGRES_DSN).replace("postgresql+asyncpg", "postgresql+psycopg2")
+        url = str(settings.POSTGRES_DSN).replace(
+            "postgresql+asyncpg", "postgresql+psycopg2"
+        )
     context.configure(
         url=url,
         target_metadata=target_metadata,

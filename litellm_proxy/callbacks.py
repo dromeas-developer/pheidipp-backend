@@ -20,9 +20,11 @@ _EMPTY_CONTENT_SENSITIVE_MODELS = (
     "command-",
 )
 
+
 def _is_empty_content_sensitive(model: str) -> bool:
     lower = model.lower()
     return any(pattern in lower for pattern in _EMPTY_CONTENT_SENSITIVE_MODELS)
+
 
 def _is_reasoning_sensitive(model: str) -> bool:
     lower = model.lower()
@@ -30,7 +32,6 @@ def _is_reasoning_sensitive(model: str) -> bool:
 
 
 class MessageHistoryCleaner(CustomLogger):
-
     async def async_pre_call_hook(self, user_api_key_dict, cache, data, call_type):
         try:
             model = data.get("model", "")
@@ -59,15 +60,21 @@ class MessageHistoryCleaner(CustomLogger):
                     elif isinstance(content, list):
                         # Filter out explicit Anthropic-style or OpenAI-style thinking blocks
                         msg_copy["content"] = [
-                            block for block in content
+                            block
+                            for block in content
                             if not (
-                                isinstance(block, dict) and
-                                block.get("type") in ("thinking", "redacted_thinking", "reasoning")
+                                isinstance(block, dict)
+                                and block.get("type")
+                                in ("thinking", "redacted_thinking", "reasoning")
                             )
                         ]
                         # Process text blocks wrapped within content arrays
                         for block in msg_copy["content"]:
-                            if isinstance(block, dict) and block.get("type") == "text" and isinstance(block.get("text"), str):
+                            if (
+                                isinstance(block, dict)
+                                and block.get("type") == "text"
+                                and isinstance(block.get("text"), str)
+                            ):
                                 block["text"] = self._strip_reasoning(block["text"])
 
                         # If content array is empty, fall back to None or empty string gracefully
@@ -88,7 +95,11 @@ class MessageHistoryCleaner(CustomLogger):
                 if fix_empty_content:
                     content = msg_copy.get("content")
                     has_tool_calls = bool(msg_copy.get("tool_calls"))
-                    content_empty = content is None or (isinstance(content, str) and not content.strip()) or content == []
+                    content_empty = (
+                        content is None
+                        or (isinstance(content, str) and not content.strip())
+                        or content == []
+                    )
 
                     if content_empty and not has_tool_calls:
                         # Drop the message entirely — provider will reject it
@@ -102,7 +113,7 @@ class MessageHistoryCleaner(CustomLogger):
             data["messages"] = cleaned_messages
         except Exception as e:
             print(f"[PHEIDIPP] Error pre-cleaning message history: {e}", flush=True)
-            
+
         return data
 
     async def async_log_success_event(self, kwargs, response_obj, start_time, end_time):
@@ -124,7 +135,9 @@ class MessageHistoryCleaner(CustomLogger):
             cached = getattr(usage, "prompt_tokens_details", None)
             cached_tokens = getattr(cached, "cached_tokens", 0) if cached else 0
             completion = getattr(usage, "completion_tokens_details", None)
-            reasoning_tokens = getattr(completion, "reasoning_tokens", 0) if completion else 0
+            reasoning_tokens = (
+                getattr(completion, "reasoning_tokens", 0) if completion else 0
+            )
 
             print(
                 f"[PHEIDIPP] ✓ {model} | "
@@ -190,7 +203,11 @@ class MessageHistoryCleaner(CustomLogger):
                 return
 
             is_func_dict = isinstance(func, dict)
-            arguments = func.get("arguments") if is_func_dict else getattr(func, "arguments", None)
+            arguments = (
+                func.get("arguments")
+                if is_func_dict
+                else getattr(func, "arguments", None)
+            )
             if not arguments:
                 return
 

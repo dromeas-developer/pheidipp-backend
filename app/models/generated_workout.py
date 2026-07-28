@@ -110,9 +110,7 @@ class GeneratedWorkout(Base):
         default=RecoveryModifierLevel.GREEN,
         server_default=RecoveryModifierLevel.GREEN.value,
     )
-    recovery_modifier_reason: Mapped[str | None] = mapped_column(
-        Text, nullable=True
-    )
+    recovery_modifier_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     generation_date: Mapped[date] = mapped_column(Date, nullable=False)
     generated_at: Mapped[datetime] = mapped_column(

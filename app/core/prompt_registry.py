@@ -7,6 +7,7 @@ import threading
 from pathlib import Path
 from typing import Dict
 
+
 class PromptNotFoundError(LookupError):
     """No prompt file exists at the expected path."""
 
@@ -46,9 +47,7 @@ class PromptRegistry:
         with self._cache_lock:
             self._cache.clear()
 
-    def load_prompt_from_disk(
-        self, agent_name: str, version: str
-    ) -> str:
+    def load_prompt_from_disk(self, agent_name: str, version: str) -> str:
         path = self.build_prompt_path(agent_name, version)
         if not path.is_file():
             raise PromptNotFoundError(
@@ -58,10 +57,9 @@ class PromptRegistry:
             )
         return path.read_text(encoding="utf-8")
 
-    def build_prompt_path(
-        self, agent_name: str, version: str
-    ) -> Path:
+    def build_prompt_path(self, agent_name: str, version: str) -> Path:
         return self.prompts_dir / f"{agent_name}_{version}.md"
+
 
 # Module-level singleton — used when no test override is provided.
 # Production code shares one registry across the process so the
@@ -69,6 +67,7 @@ class PromptRegistry:
 
 _default_registry: PromptRegistry | None = None
 _default_registry_lock = threading.Lock()
+
 
 def get_default_prompt_registry() -> PromptRegistry:
     """Return the process-wide default :class:`PromptRegistry`."""
@@ -79,11 +78,13 @@ def get_default_prompt_registry() -> PromptRegistry:
                 _default_registry = PromptRegistry()
     return _default_registry
 
+
 def reset_default_prompt_registry() -> None:
     """Test helper — drop the process-wide default registry."""
     global _default_registry
     with _default_registry_lock:
         _default_registry = None
+
 
 # Sentinel so the bare import does not look unused to linters.
 _ = asyncio

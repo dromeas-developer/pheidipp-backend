@@ -1,0 +1,205 @@
+version: "1.0"
+plan_id: "GAP-PHASE-1-TESTS"
+sub_phase: "1.3"
+generated_at: "2026-07-26T00:00:00Z"
+last_reviewed_at: "2026-07-27T23:47:00Z"
+prerequisites:
+  migrations: false
+files:
+  tests/unit/test_onboarding_schemas.py:
+    type: unit
+    status: promoted
+    functions:
+      test_invalid_timezone_rejected: { class: TestOnboardingProfileTimezone, implemented: true, executable: true, passed: true }
+      test_valid_europe_london_accepted: { class: TestOnboardingProfileTimezone, implemented: true, executable: true, passed: true }
+      test_valid_iana_timezone_accepted: { class: TestOnboardingProfileTimezone, implemented: true, executable: true, passed: true }
+      test_extra_day_rejected: { class: TestWeeklyScheduleCompleteness, implemented: true, executable: true, passed: true }
+      test_missing_and_extra_both_reported: { class: TestWeeklyScheduleCompleteness, implemented: true, executable: true, passed: true }
+      test_missing_day_rejected: { class: TestWeeklyScheduleCompleteness, implemented: true, executable: true, passed: true }
+      test_seven_days_accepted: { class: TestWeeklyScheduleCompleteness, implemented: true, executable: true, passed: true }
+      test_race_event_missing_goal_event_date_rejected: { class: TestGoalRequiredFieldsPerType, implemented: true, executable: true, passed: true }
+      test_race_event_missing_goal_event_name_rejected: { class: TestGoalRequiredFieldsPerType, implemented: true, executable: true, passed: true }
+      test_race_event_missing_goal_event_type_rejected: { class: TestGoalRequiredFieldsPerType, implemented: true, executable: true, passed: true }
+      test_race_event_with_all_fields_accepted: { class: TestGoalRequiredFieldsPerType, implemented: true, executable: true, passed: true }
+      test_target_performance_missing_target_distance_rejected: { class: TestGoalRequiredFieldsPerType, implemented: true, executable: true, passed: true }
+      test_target_performance_missing_target_time_rejected: { class: TestGoalRequiredFieldsPerType, implemented: true, executable: true, passed: true }
+      test_target_performance_with_all_fields_accepted: { class: TestGoalRequiredFieldsPerType, implemented: true, executable: true, passed: true }
+      test_future_date_accepted: { class: TestGoalEventDateInFuture, implemented: true, executable: true, passed: true }
+      test_past_date_rejected: { class: TestGoalEventDateInFuture, implemented: true, executable: true, passed: true }
+      test_today_rejected: { class: TestGoalEventDateInFuture, implemented: true, executable: true, passed: true }
+      test_fitness_level_six_rejected: { class: TestOnboardingFieldBounds, implemented: true, executable: true, passed: true }
+      test_fitness_level_zero_rejected: { class: TestOnboardingFieldBounds, implemented: true, executable: true, passed: true }
+      test_height_cm_above_300_rejected: { class: TestOnboardingFieldBounds, implemented: true, executable: true, passed: true }
+      test_height_cm_below_50_rejected: { class: TestOnboardingFieldBounds, implemented: true, executable: true, passed: true }
+      test_weekly_volume_hours_above_80_rejected: { class: TestOnboardingFieldBounds, implemented: true, executable: true, passed: true }
+      test_weekly_volume_km_above_500_rejected: { class: TestOnboardingFieldBounds, implemented: true, executable: true, passed: true }
+      test_years_structured_training_above_80_rejected: { class: TestOnboardingFieldBounds, implemented: true, executable: true, passed: true }
+      test_years_structured_training_zero_accepted: { class: TestOnboardingFieldBounds, implemented: true, executable: true, passed: true }
+      test_empty_patch_accepted: { class: TestProfileImmutability, implemented: true, executable: true, passed: true }
+      test_patch_date_of_birth_rejected: { class: TestProfileImmutability, implemented: true, executable: true, passed: true }
+      test_patch_height_cm_accepted: { class: TestProfileImmutability, implemented: true, executable: true, passed: true }
+      test_patch_multiple_immutable_rejected: { class: TestProfileImmutability, implemented: true, executable: true, passed: true }
+      test_patch_sex_rejected: { class: TestProfileImmutability, implemented: true, executable: true, passed: true }
+      test_patch_timezone_rejected: { class: TestProfileImmutability, implemented: true, executable: true, passed: true }
+      test_patch_unknown_field_rejected: { class: TestProfileImmutability, implemented: true, executable: true, passed: true }
+  tests/unit/test_data_tier.py:
+    type: unit
+    status: promoted
+    functions:
+      test_tier1_chest_strap_rr_with_running_power: { class: TestInferDataTier, implemented: true, executable: true, passed: true }
+      test_tier2_running_power_with_no_rr_hr_variant: { class: TestInferDataTier, implemented: true, executable: true, passed: true }
+      test_tier2_running_power_with_non_rr_hr: { class: TestInferDataTier, implemented: true, executable: true, passed: true }
+      test_tier3_chest_strap_rr_no_power: { class: TestInferDataTier, implemented: true, executable: true, passed: true }
+      test_tier4_chest_strap_no_rr_no_power: { class: TestInferDataTier, implemented: true, executable: true, passed: true }
+      test_tier4_wrist_optical_no_power: { class: TestInferDataTier, implemented: true, executable: true, passed: true }
+      test_tier5_no_hr_no_power: { class: TestInferDataTier, implemented: true, executable: true, passed: true }
+      test_tier6_unhandled_combination_falls_back: { class: TestInferDataTier, implemented: true, executable: true, passed: true }
+  tests/unit/test_goal_type_whitelist.py:
+    type: unit
+    status: promoted
+    functions:
+      test_fitness_improvement_rejected: { class: TestGoalTypeWhitelist, implemented: true, executable: true, passed: true }
+      test_maintenance_rejected: { class: TestGoalTypeWhitelist, implemented: true, executable: true, passed: true }
+      test_race_event_accepted: { class: TestGoalTypeWhitelist, implemented: true, executable: true, passed: true }
+      test_recovery_rejected: { class: TestGoalTypeWhitelist, implemented: true, executable: true, passed: true }
+      test_target_performance_accepted: { class: TestGoalTypeWhitelist, implemented: true, executable: true, passed: true }
+  tests/unit/test_structural_risk_flag.py:
+    type: unit
+    status: promoted
+    functions:
+      test_cycling_is_true: { class: TestStructuralRiskFlag, implemented: true, executable: true, passed: true }
+      test_cycling_primary_is_true: { class: TestStructuralRiskFlag, implemented: true, executable: true, passed: true }
+      test_gym_fitness_is_true: { class: TestStructuralRiskFlag, implemented: true, executable: true, passed: true }
+      test_none_sport_background_is_true: { class: TestStructuralRiskFlag, implemented: true, executable: true, passed: true }
+      test_only_running_primary_returns_false: { class: TestStructuralRiskFlag, implemented: true, executable: true, passed: true }
+      test_running_primary_is_false: { class: TestStructuralRiskFlag, implemented: true, executable: true, passed: true }
+      test_swimming_is_true: { class: TestStructuralRiskFlag, implemented: true, executable: true, passed: true }
+      test_swimming_primary_is_true: { class: TestStructuralRiskFlag, implemented: true, executable: true, passed: true }
+      test_team_sport_is_true: { class: TestStructuralRiskFlag, implemented: true, executable: true, passed: true }
+      test_triathlon_is_true: { class: TestStructuralRiskFlag, implemented: true, executable: true, passed: true }
+  tests/unit/test_bootstrap_helpers.py:
+    type: unit
+    status: promoted
+    functions:
+      test_age_36_with_dob_1990_jan_15_and_now_2026_jul_25: { class: TestAgeInYears, implemented: true, executable: true, passed: true }
+      test_age_increments_on_birthday: { class: TestAgeInYears, implemented: true, executable: true, passed: true }
+      test_age_zero_for_newborn: { class: TestAgeInYears, implemented: true, executable: true, passed: true }
+      test_cp_is_null: { class: TestBootstrapMetricConfidence, implemented: true, executable: true, passed: true }
+      test_lt1_hr_is_low: { class: TestBootstrapMetricConfidence, implemented: true, executable: true, passed: true }
+      test_lt1_pace_is_null: { class: TestBootstrapMetricConfidence, implemented: true, executable: true, passed: true }
+      test_lt1_power_is_null: { class: TestBootstrapMetricConfidence, implemented: true, executable: true, passed: true }
+      test_lt2_hr_is_low: { class: TestBootstrapMetricConfidence, implemented: true, executable: true, passed: true }
+      test_lt2_pace_is_null: { class: TestBootstrapMetricConfidence, implemented: true, executable: true, passed: true }
+      test_lt2_power_is_null: { class: TestBootstrapMetricConfidence, implemented: true, executable: true, passed: true }
+      test_only_lt1_hr_and_lt2_hr_are_low_rest_null: { class: TestBootstrapMetricConfidence, implemented: true, executable: true, passed: true }
+      test_dominant_source_is_questionnaire_estimate: { class: TestBootstrapSignal, implemented: true, executable: true, passed: true }
+      test_prior_weight_is_05: { class: TestBootstrapSignal, implemented: true, executable: true, passed: true }
+      test_returns_required_keys: { class: TestBootstrapSignal, implemented: true, executable: true, passed: true }
+      test_uncertainty_is_1: { class: TestBootstrapSignal, implemented: true, executable: true, passed: true }
+      test_value_passed_through: { class: TestBootstrapSignal, implemented: true, executable: true, passed: true }
+  tests/integration/test_onboarding_service.py:
+    type: integration
+    status: promoted
+    functions:
+      test_complete_onboarding_creates_all_entities: { class: TestOnboardingAtomicCreate, implemented: true, executable: true, passed: true }
+      test_data_tier_persisted_on_twin_state: { class: TestOnboardingAtomicCreate, implemented: true, executable: true, passed: true }
+      test_onboarding_complete_flag_flipped: { class: TestOnboardingAtomicCreate, implemented: true, executable: true, passed: true }
+      test_profile_enriched_with_timezone_and_height: { class: TestOnboardingAtomicCreate, implemented: true, executable: true, passed: true }
+      test_structural_risk_flag_set_from_sport_background_running: { class: TestOnboardingAtomicCreate, implemented: true, executable: true, passed: true }
+      test_structural_risk_flag_set_from_sport_background_triathlon: { class: TestOnboardingAtomicCreate, implemented: true, executable: true, passed: true }
+      test_training_goal_persisted_active: { class: TestOnboardingAtomicCreate, implemented: true, executable: true, passed: true }
+      test_fitness_bootstrap_zeroed: { class: TestOnboardingTwinBootstrapValues, implemented: true, executable: true, passed: true }
+      test_fitness_time_constants_population_default: { class: TestOnboardingTwinBootstrapValues, implemented: true, executable: true, passed: true }
+      test_physiology_cp_and_vo2max_null: { class: TestOnboardingTwinBootstrapValues, implemented: true, executable: true, passed: true }
+      test_physiology_lt1_lt2_questionnaire_source: { class: TestOnboardingTwinBootstrapValues, implemented: true, executable: true, passed: true }
+      test_physiology_max_hr_bootstrapped_from_age: { class: TestOnboardingTwinBootstrapValues, implemented: true, executable: true, passed: true }
+      test_twin_metric_confidence_only_lt1_lt2_hr_low: { class: TestOnboardingTwinBootstrapValues, implemented: true, executable: true, passed: true }
+      test_twin_state_bootstrap_trigger_and_confidence: { class: TestOnboardingTwinBootstrapValues, implemented: true, executable: true, passed: true }
+      test_twin_state_lt1_lt2_positive_and_lt1_lt_lt2_lt_max_hr: { class: TestOnboardingTwinBootstrapValues, implemented: true, executable: true, passed: true }
+      test_athlete_not_found_raises_404: { class: TestOnboardingFailurePaths, implemented: true, executable: true, passed: true }
+      test_re_onboarding_raises_409: { class: TestOnboardingFailurePaths, implemented: true, executable: true, passed: true }
+      test_second_active_goal_raises_conflict: { class: TestOnboardingFailurePaths, implemented: true, executable: true, passed: true }
+      test_both_events_persisted_in_same_transaction: { class: TestOnboardingEventsPublished, implemented: true, executable: true, passed: true }
+      test_generate_plan_defer_failure_does_not_break_onboarding: { class: TestOnboardingEventsPublished, implemented: true, executable: true, passed: true }
+      test_onboarding_completed_event_published: { class: TestOnboardingEventsPublished, implemented: true, executable: true, passed: true }
+      test_onboarding_completed_outbox_row_pending: { class: TestOnboardingEventsPublished, implemented: true, executable: true, passed: true }
+      test_twin_model_ready_event_published: { class: TestOnboardingEventsPublished, implemented: true, executable: true, passed: true }
+  tests/integration/test_onboarding_rollback.py:
+    type: integration
+    status: promoted
+    functions:
+      test_failure_after_fitness_insert_rolls_back: { class: TestOnboardingMidTransactionRollback, implemented: true, executable: true, passed: true }
+      test_failure_after_physiology_insert_rolls_back_all: { class: TestOnboardingMidTransactionRollback, implemented: true, executable: true, passed: true }
+      test_failure_keeps_profile_state_unchanged: { class: TestOnboardingMidTransactionRollback, implemented: true, executable: true, passed: true }
+  tests/integration/test_profile_preferences_patch.py:
+    type: integration
+    status: promoted
+    functions:
+      test_patch_height_cm_updates_profile: { class: TestProfilePatchMutable, implemented: true, executable: true, passed: true }
+      test_patch_location_lat_lng_updates_profile: { class: TestProfilePatchMutable, implemented: true, executable: true, passed: true }
+      test_patch_no_args_is_noop: { class: TestProfilePatchMutable, implemented: true, executable: true, passed: true }
+      test_patch_training_window_updates_profile: { class: TestProfilePatchMutable, implemented: true, executable: true, passed: true }
+      test_patch_schema_rejects_date_of_birth: { class: TestProfilePatchImmutability, implemented: true, executable: true, passed: true }
+      test_patch_schema_rejects_sex: { class: TestProfilePatchImmutability, implemented: true, executable: true, passed: true }
+      test_patch_schema_rejects_timezone: { class: TestProfilePatchImmutability, implemented: true, executable: true, passed: true }
+      test_patch_schema_rejects_unknown_field: { class: TestProfilePatchImmutability, implemented: true, executable: true, passed: true }
+      test_patch_idempotent_re_applying_same_patch: { class: TestPreferencesPatchMerge, implemented: true, executable: true, passed: true }
+      test_patch_saturday_available_flips_only_saturday: { class: TestPreferencesPatchMerge, implemented: true, executable: true, passed: true }
+      test_patch_schema_rejects_unknown_field: { class: TestPreferencesPatchMerge, implemented: true, executable: true, passed: true }
+      test_patch_top_level_field_overwrites: { class: TestPreferencesPatchMerge, implemented: true, executable: true, passed: true }
+      test_patch_unknown_key_silently_ignored: { class: TestPreferencesPatchMerge, implemented: true, executable: true, passed: true }
+      test_patch_schema_accepts_partial_weekday: { class: TestPreferencesPatchSchema, implemented: true, executable: true, passed: true }
+      test_patch_schema_empty_weekly_schedule_accepted: { class: TestPreferencesPatchSchema, implemented: true, executable: true, passed: true }
+      test_patch_schema_rejects_non_canonical_weekday: { class: TestPreferencesPatchSchema, implemented: true, executable: true, passed: true }
+  tests/api/test_onboarding_endpoints.py:
+    type: api
+    status: promoted
+    functions:
+      test_post_onboarding_201_returns_response: { class: TestPostOnboardingEndpoint, implemented: true, executable: true, passed: true }
+      test_post_onboarding_403_when_path_id_mismatches_jwt: { class: TestPostOnboardingEndpoint, implemented: true, executable: true, passed: true }
+      test_post_onboarding_404_when_athlete_missing: { class: TestPostOnboardingEndpoint, implemented: true, executable: true, passed: true }
+      test_post_onboarding_409_when_already_complete: { class: TestPostOnboardingEndpoint, implemented: true, executable: true, passed: true }
+      test_post_onboarding_422_when_goal_type_invalid: { class: TestPostOnboardingEndpoint, implemented: true, executable: true, passed: true }
+      test_post_onboarding_422_when_timezone_invalid: { class: TestPostOnboardingEndpoint, implemented: true, executable: true, passed: true }
+      test_get_status_after_onboarding_returns_true: { class: TestGetOnboardingStatusEndpoint, implemented: true, executable: true, passed: true }
+      test_get_status_before_onboarding_returns_false: { class: TestGetOnboardingStatusEndpoint, implemented: true, executable: true, passed: true }
+      test_get_preferences_404_before_onboarding: { class: TestGetPreferencesEndpoint, implemented: true, executable: true, passed: true }
+      test_get_preferences_returns_after_onboarding: { class: TestGetPreferencesEndpoint, implemented: true, executable: true, passed: true }
+      test_get_profile_403_on_cross_athlete: { class: TestGetProfileEndpoint, implemented: true, executable: true, passed: true }
+      test_get_profile_returns_registered_profile: { class: TestGetProfileEndpoint, implemented: true, executable: true, passed: true }
+      test_patch_preferences_merges_day_level: { class: TestPatchPreferencesEndpoint, implemented: true, executable: true, passed: true }
+      test_patch_preferences_rejects_unknown_field: { class: TestPatchPreferencesEndpoint, implemented: true, executable: true, passed: true }
+      test_patch_preferences_updates_top_level: { class: TestPatchPreferencesEndpoint, implemented: true, executable: true, passed: true }
+      test_patch_profile_rejects_immutable_date_of_birth: { class: TestPatchProfileEndpoint, implemented: true, executable: true, passed: true }
+      test_patch_profile_rejects_immutable_timezone: { class: TestPatchProfileEndpoint, implemented: true, executable: true, passed: true }
+      test_patch_profile_rejects_unknown_field: { class: TestPatchProfileEndpoint, implemented: true, executable: true, passed: true }
+      test_patch_profile_updates_height: { class: TestPatchProfileEndpoint, implemented: true, executable: true, passed: true }
+      test_get_twin_404_before_onboarding: { class: TestGetTwinEndpoints, implemented: true, executable: true, passed: true }
+      test_get_twin_history_returns_after_onboarding: { class: TestGetTwinEndpoints, implemented: true, executable: true, passed: true }
+      test_get_twin_returns_bootstrap_state: { class: TestGetTwinEndpoints, implemented: true, executable: true, passed: true }
+  tests/behaviour/test_onboarding_journey.py:
+    type: behaviour
+    status: promoted
+    functions:
+      test_cross_athlete_403_blocks_every_endpoint: { class: TestOnboardingJourney, implemented: true, executable: true, passed: true }
+      test_full_journey_register_to_get_twin: { class: TestOnboardingJourney, implemented: true, executable: true, passed: true }
+coverage:
+  events:
+    covered:
+      - onboarding_completed
+      - twin_model_ready
+  invariants:
+    covered:
+      - I18: OnboardingProfileIn.timezone IANA validity (type-system)
+      - I19: OnboardingPreferencesIn.weekly_schedule 7-day completeness (type-system)
+      - I20: OnboardingTrainingGoalIn.goal_event_date future (type-system)
+      - I21: per-goal-type required fields (type-system)
+      - I22: numeric Field bounds (type-system)
+      - I23: AthleteProfilePatchIn immutable fields rejected (type-system)
+      - I24: AthletePreferencesPatchIn extra=forbid (type-system)
+      - I37: Onboarding atomicity: 8 entities created in one transaction
+      - I38: Re-onboarding returns 409
+      - I39: Goal type whitelist: only race_event and target_performance at onboarding
+      - I40: structural_risk_flag computed from sport_background != RUNNING_PRIMARY
+      - I41: Data tier inferred from hr_source + power_source at read time
+      - I64: twin_model_ready produced by OnboardingService after bootstrap TwinState insert (ADR-012)

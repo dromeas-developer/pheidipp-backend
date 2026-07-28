@@ -71,9 +71,7 @@ class LoadComputationService:
     # constant itself.
     BANISTER_NORMALISATION = 148.0
 
-    def compute_aerobic_load(
-        self, inputs: LoadComputationInputs
-    ) -> LoadScores:
+    def compute_aerobic_load(self, inputs: LoadComputationInputs) -> LoadScores:
         """Return three-dimension LoadScores."""
         if not inputs.parsed_fit.hr_records:
             raise MissingHeartRateError(
@@ -88,9 +86,7 @@ class LoadComputationService:
             structural_load=structural,
         )
 
-    def _compute_aerobic_load(
-        self, inputs: LoadComputationInputs
-    ) -> float:
+    def _compute_aerobic_load(self, inputs: LoadComputationInputs) -> float:
         """HR-reserve integration with exponential weighting."""
         if (
             inputs.data_tier in [DataTier.TIER_1, DataTier.TIER_2]
@@ -136,7 +132,7 @@ class LoadComputationService:
             if watts is None or watts <= 0:
                 continue
             intensity = watts / cp
-            accumulator += (intensity**4)
+            accumulator += intensity**4
         # Normalise: 1 hour at CP (3600 seconds) should yield ~100 units
         # So divide by (3600 * 1^4) = 3600
         return accumulator / 3600.0
@@ -197,7 +193,11 @@ class LoadComputationService:
         self, inputs: LoadComputationInputs
     ) -> Optional[float]:
         """Structural load for activities with GPS data."""
-        if not inputs.has_gps or not inputs.total_distance_m or inputs.total_distance_m <= 0:
+        if (
+            not inputs.has_gps
+            or not inputs.total_distance_m
+            or inputs.total_distance_m <= 0
+        ):
             return None
 
         distance_km = inputs.total_distance_m / 1000.0
@@ -219,21 +219,19 @@ class LoadComputationService:
 
         return base + gradient_cost + density_penalty
 
-    def _estimate_cp_from_population(
-        self, inputs: LoadComputationInputs
-    ) -> int:
+    def _estimate_cp_from_population(self, inputs: LoadComputationInputs) -> int:
         """Estimate critical power from population defaults."""
         # Simple sex-based defaults (compatible with existing pattern)
         # This matches the existing max HR population estimation pattern
         return 200  # conservative default for Phase 2.1
 
 
-def estimate_max_hr_from_age(
-    date_of_birth: date, today: Optional[date] = None
-) -> int:
+def estimate_max_hr_from_age(date_of_birth: date, today: Optional[date] = None) -> int:
     """Return population 220 - age max-HR estimate."""
     today = today or date.today()
-    age = today.year - date_of_birth.year - (
-        (today.month, today.day) < (date_of_birth.month, date_of_birth.day)
+    age = (
+        today.year
+        - date_of_birth.year
+        - ((today.month, today.day) < (date_of_birth.month, date_of_birth.day))
     )
     return max(120, 220 - age)

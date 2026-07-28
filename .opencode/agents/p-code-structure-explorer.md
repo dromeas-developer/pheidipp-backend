@@ -31,6 +31,8 @@ permission:
   pheidipp-codebase-context_get_module_deps:      allow
   pheidipp-codebase-context_get_importers:        allow
   pheidipp-codebase-context_search_symbols:       allow
+  pheidipp-codebase-context_list_classes:         allow
+  pheidipp-codebase-context_list_functions:       allow
   pheidipp-codebase-context_multi_code_query:     allow
 ---
 
@@ -53,6 +55,14 @@ You receive:
 * Optional: specific aspect to focus on (`classes`, `functions`, `imports`, `all`)
 
 ## What You Do
+
+0. **Use listing tools for broad discovery.** When the caller asks "what
+   classes/services/repositories exist in this layer?" rather than "show me
+   the structure of a specific file," use `list_classes` or `list_functions`
+   with a `module_filter` first. These return names and counts — the map
+   before the detail. Then use `get_class_context` / `get_function_context`
+   for detail on specific items. This is the same listing-then-detail pattern
+   the architecture domain uses (`list_entities` → `get_entity_context`).
 
 1. **Use `search_symbols`** to verify the module/file exists before querying.
 

@@ -21,7 +21,9 @@ from tests.utils.factories import make_athlete
 
 
 class TestAthleteProfileUniqueAthleteId:
-    async def test_duplicate_athlete_id_raises_integrity_error(self, db_session: AsyncSession):
+    async def test_duplicate_athlete_id_raises_integrity_error(
+        self, db_session: AsyncSession
+    ):
         athlete = await make_athlete(db_session)
         profile = AthleteProfile(
             athlete_id=athlete.id,
@@ -43,7 +45,9 @@ class TestAthleteProfileUniqueAthleteId:
 
 
 class TestAthletePreferencesUniqueAthleteId:
-    async def test_duplicate_preferences_athlete_id_raises_integrity_error(self, db_session: AsyncSession):
+    async def test_duplicate_preferences_athlete_id_raises_integrity_error(
+        self, db_session: AsyncSession
+    ):
         athlete = await make_athlete(db_session)
         prefs = AthletePreferences(
             athlete_id=athlete.id,
@@ -77,7 +81,9 @@ class TestAthletePreferencesUniqueAthleteId:
 
 
 class TestAthletePreferencesYearsStructuredTrainingCheck:
-    async def test_negative_years_structured_training_raises_integrity_error(self, db_session: AsyncSession):
+    async def test_negative_years_structured_training_raises_integrity_error(
+        self, db_session: AsyncSession
+    ):
         athlete = await make_athlete(db_session)
         prefs = AthletePreferences(
             athlete_id=athlete.id,
@@ -97,7 +103,9 @@ class TestAthletePreferencesYearsStructuredTrainingCheck:
 
 
 class TestActivityDedupExternalId:
-    async def test_duplicate_external_id_raises_integrity_error(self, db_session: AsyncSession):
+    async def test_duplicate_external_id_raises_integrity_error(
+        self, db_session: AsyncSession
+    ):
         athlete = await make_athlete(db_session)
         activity = Activity(
             athlete_id=athlete.id,

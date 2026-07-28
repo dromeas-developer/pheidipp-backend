@@ -329,3 +329,11 @@ Cross-document consistency is a primary responsibility. Actively identify:
 
 Concise, rigorous, operationally direct, behaviourally aware. No marketing
 language, motivational tone, consulting prose, or generic best-practice lists.
+
+---
+
+## Output
+
+Write document files via tools only. The response text is a single-line
+confirmation: which documents were created or modified. No prose summary,
+no rehashing of decisions — the documents are the output.

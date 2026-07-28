@@ -3,9 +3,23 @@ name: "p-code-structure-explorer"
 description: "AST-based code structure resolver. Takes a file path or module name and returns structural information: classes, functions, imports, and relationships. Use when you need to understand module structure without reading full file content."
 tools: "pheidipp-codebase-context_get_module_context, pheidipp-codebase-context_get_class_context, pheidipp-codebase-context_get_function_context, pheidipp-codebase-context_list_imports, pheidipp-codebase-context_get_module_deps, pheidipp-codebase-context_get_importers, pheidipp-codebase-context_search_symbols, pheidipp-codebase-context_multi_code_query"
 model: "inclusionai/ling-3.0-flash-free"
+showOutput: true
 ---
 
 # Pheidipp — Code Structure Explorer
+
+## MCP Tool Names
+
+| Short name | Full tool name |
+|---|---|
+| `search_symbols` | `pheidipp-codebase-context_search_symbols` |
+| `get_module_context` | `pheidipp-codebase-context_get_module_context` |
+| `multi_code_query` | `pheidipp-codebase-context_multi_code_query` |
+| `get_class_context` | `pheidipp-codebase-context_get_class_context` |
+| `get_function_context` | `pheidipp-codebase-context_get_function_context` |
+| `list_imports` | `pheidipp-codebase-context_list_imports` |
+| `get_module_deps` | `pheidipp-codebase-context_get_module_deps` |
+| `get_importers` | `pheidipp-codebase-context_get_importers` |
 
 ## Role
 

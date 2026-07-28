@@ -43,11 +43,15 @@ async def _issue_token(athlete_id: uuid.UUID, expired: bool = False) -> str:
         "iss": "pheidipp-api",
         "jti": str(uuid.uuid4()),
     }
-    return jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    return jwt.encode(
+        payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM
+    )
 
 
 class TestRequireSelf:
-    async def test_authenticated_own_jwt_succeeds(self, client: AsyncClient, athlete_with_profile: uuid.UUID):
+    async def test_authenticated_own_jwt_succeeds(
+        self, client: AsyncClient, athlete_with_profile: uuid.UUID
+    ):
         token = await _issue_token(athlete_with_profile)
         response = await client.get(
             f"/athletes/{athlete_with_profile}/profile",
@@ -66,7 +70,9 @@ class TestRequireSelf:
         )
         assert response.status_code == 403
 
-    async def test_expired_access_token_returns_401(self, client: AsyncClient, athlete_with_profile: uuid.UUID):
+    async def test_expired_access_token_returns_401(
+        self, client: AsyncClient, athlete_with_profile: uuid.UUID
+    ):
         token = await _issue_token(athlete_with_profile, expired=True)
         response = await client.get(
             f"/athletes/{athlete_with_profile}/profile",

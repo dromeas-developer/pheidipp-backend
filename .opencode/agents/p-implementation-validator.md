@@ -32,6 +32,10 @@ permission:
 
   # MCP tools — release alignment (Step 0 only)
   pheidipp-codebase-context_get_phase_context:    allow
+
+  # MCP tools — architecture validation (computation-flow tracing, deviation classification)
+  pheidipp-codebase-context_get_computation_pipeline:  allow
+  pheidipp-codebase-context_get_arch_for_code:         allow
 ---
 
 # Pheidipp — Implementation Validator
@@ -233,7 +237,21 @@ verify whether the code satisfies it.
 **For each event contract in the plan:**
 - Is the event produced only after the stated precondition?
 - Does the payload contain all required fields?
-- Is the ordering assumption satisfied?
+  - Is the ordering assumption satisfied?
+
+  **For computation entities in the plan** (entities tagged as `computation`
+  in the architecture or whose primary purpose is formula/algorithm output):
+  call `get_computation_pipeline(entity_name)` for each. This reveals every
+  upstream and downstream computation in the pipeline. Verify:
+  - Each downstream computation receives its inputs in the format this
+    computation produces (output schema of producer matches input schema of
+    consumer)
+  - No downstream computation is broken by a change to this computation's
+    output (e.g. a formula change that alters the numeric range without the
+    consumer being updated)
+  Flag any broken computation chain. This is the computation-flow analog of
+  the event-flow check above — it catches pipeline breaks that entity-level
+  contract checks miss.
 
 **If a contract, invariant, or event requirement is missing from the plan:**
 
@@ -287,11 +305,20 @@ Input:
 ```
 
 A file that adds a class with `Base` parent and `sqlalchemy.orm` imports
-is identifiable as a new persistence model from structure alone — the
-structure explorer confirms this without reading the full file. Use
-`search_codebase`, `search_symbols`, `find_files`, or `grep_files` as
-*refinement* for questions the structure report doesn't answer — confirming
-registrations, verifying component wiring, and tracing symbol dependents.
+  is identifiable as a new persistence model from structure alone — the
+  structure explorer confirms this without reading the full file. Use
+  `search_codebase`, `search_symbols`, `find_files`, or `grep_files` as
+  *refinement* for questions the structure report doesn't answer — confirming
+  registrations, verifying component wiring, and tracing symbol dependents.
+
+  **For added files outside plan scope**, call `get_arch_for_code(file_path)`
+  before classifying. This maps the file back to the architecture entities it
+  implements. A new file that implements an entity the plan explicitly touches
+  is not a deviation — it's a split-out implementation detail (Acceptable).
+  A new file that implements an entity the plan does NOT name is a deviation
+  (DEVIATION or CRITICAL, depending on whether it introduces new architecture
+  boundaries). Without this reverse mapping, the classification is a
+  structural guess; with it, it's grounded in the architecture corpus.
 
 For each deviation found, classify it:
 - **Acceptable** — routine implementation detail within coder authority

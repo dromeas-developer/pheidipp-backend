@@ -20,6 +20,7 @@
 | `_prepare_database` | `tests/conftest.py` | session | Creates all tables once at session start |
 | *(per-directory fixtures added here as they are created)* | `tests/<layer>/conftest.py` | varies | Layer-specific fixtures |
 | `make_athlete` | `tests/utils/factories.py` | function | Async factory: creates Athlete row with unique email (commits) |
+| `make_athlete_with_profile` | `tests/utils/factories.py` | function | Async factory: creates Athlete + matching AthleteProfile row (commits) |
 | *(assertion helpers added here as they are created)* | `tests/utils/assertions.py` | function | Reusable assertion functions |
 | *(model helpers added here as they are created)* | `tests/utils/model_helpers.py` | function | ORM introspection (no DB required) |
 | *(schema helpers added here as they are created)* | `tests/utils/schema_helpers.py` | function | DB schema introspection (sync psycopg2 engine) |
@@ -36,3 +37,4 @@
 | Schema introspection with async session | `MissingGreenlet` from `inspect()` | Use a sync psycopg2 engine (see `test-infrastructure` skill) |
 | Duplicated fixture with different name/scope | Two tests use separate-but-identical fixtures | Check MOCKING_CONTRACT.md Canonical Fixtures before writing; reuse existing fixtures |
 | Factory inline in test file when 2+ tests need it | Same object construction repeated across files | Extract to `tests/utils/factories.py`; register in Canonical Fixtures table |
+| Monkeypatching repository `add` or `AsyncSession.flush` to raise after `await original` | `MissingGreenlet: greenlet_spawn has not been called; can't await_only() here` | Pre-insert a conflicting row (e.g., `AthletePreferences`) to trigger a natural `IntegrityError` on the unique constraint. **Critical:** capture all ORM PKs (`athlete.id`, `profile.id`) into plain UUID locals before the `pytest.raises(IntegrityError)` block — SQLAlchemy clears ORM `__dict__` on session failure, so any post-error attribute access triggers lazy-load → `MissingGreenlet` |

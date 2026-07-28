@@ -370,24 +370,18 @@ class OnboardingService:
         physio_row = AthletePhysiology(
             athlete_id=athlete_id,
             lt1={
-                "hr": bootstrap_signal(
-                    value=lt1_hr_est, observation_date=today
-                ),
+                "hr": bootstrap_signal(value=lt1_hr_est, observation_date=today),
                 "power": None,
                 "pace": None,
             },
             lt2={
-                "hr": bootstrap_signal(
-                    value=lt2_hr_est, observation_date=today
-                ),
+                "hr": bootstrap_signal(value=lt2_hr_est, observation_date=today),
                 "power": None,
                 "pace": None,
             },
             cp=None,
             vo2max=None,
-            max_hr=bootstrap_signal(
-                value=float(max_hr_est), observation_date=today
-            ),
+            max_hr=bootstrap_signal(value=float(max_hr_est), observation_date=today),
         )
         await self.physiology.add(physio_row)
 
@@ -487,7 +481,15 @@ class OnboardingService:
         #     commit is unaffected — the ``twin_model_ready`` row is
         #     in the outbox and a future publisher pass / manual
         #     retry can recover.
-        await self._defer_generate_plan(athlete_id)
+        try:
+            await self._defer_generate_plan(athlete_id)
+        except Exception as exc:
+            log_event(
+                event="generate_plan.defer.failure",
+                athlete_id=str(athlete_id),
+                outcome="failed",
+                error=str(exc),
+            )
 
         return OnboardingResult(
             twin_state=twin_state,
@@ -535,9 +537,7 @@ class OnboardingService:
     # Status + read endpoints.
     # ------------------------------------------------------------------
 
-    async def get_onboarding_status(
-        self, athlete_id: uuid.UUID
-    ) -> OnboardingStatus:
+    async def get_onboarding_status(self, athlete_id: uuid.UUID) -> OnboardingStatus:
         """Return the per-entity existence flags for an athlete.
 
         Used by ``GET /athletes/{id}/onboarding`` to render a status
@@ -559,9 +559,7 @@ class OnboardingService:
             has_twin_state=twin_row is not None,
         )
 
-    async def get_profile(
-        self, athlete_id: uuid.UUID
-    ) -> Optional[AthleteProfile]:
+    async def get_profile(self, athlete_id: uuid.UUID) -> Optional[AthleteProfile]:
         """Return the ``AthleteProfile`` row, or ``None``.
 
         A profile row always exists post-registration (Phase-1.1
@@ -681,9 +679,7 @@ class OnboardingService:
         await self.session.refresh(row)
         return row
 
-    async def get_twin_state(
-        self, athlete_id: uuid.UUID
-    ) -> Optional[TwinState]:
+    async def get_twin_state(self, athlete_id: uuid.UUID) -> Optional[TwinState]:
         """Return the latest TwinState for *athlete_id*, or ``None``.
 
         The repository guarantees ordering by ``created_at`` descending

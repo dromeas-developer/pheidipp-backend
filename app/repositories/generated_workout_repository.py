@@ -45,9 +45,7 @@ class GeneratedWorkoutRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def insert(
-        self, workout: GeneratedWorkout
-    ) -> GeneratedWorkout:
+    async def insert(self, workout: GeneratedWorkout) -> GeneratedWorkout:
         """Append a new GeneratedWorkout to the session without committing.
 
         This is the ONLY write method exposed by the repository. Per

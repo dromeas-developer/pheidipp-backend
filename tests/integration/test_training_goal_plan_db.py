@@ -25,7 +25,9 @@ from tests.utils.factories import make_athlete
 
 
 class TestTrainingGoalActiveUnique:
-    async def test_duplicate_active_goal_raises_integrity_error(self, db_session: AsyncSession):
+    async def test_duplicate_active_goal_raises_integrity_error(
+        self, db_session: AsyncSession
+    ):
         athlete = await make_athlete(db_session)
         goal = TrainingGoal(
             athlete_id=athlete.id,
@@ -79,7 +81,9 @@ class TestTrainingGoalInactiveMultiple:
 
 
 class TestTrainingGoalFitnessLevelRange:
-    async def test_fitness_level_6_raises_integrity_error(self, db_session: AsyncSession):
+    async def test_fitness_level_6_raises_integrity_error(
+        self, db_session: AsyncSession
+    ):
         athlete = await make_athlete(db_session)
         goal = TrainingGoal(
             athlete_id=athlete.id,
@@ -96,7 +100,9 @@ class TestTrainingGoalFitnessLevelRange:
 
 
 class TestTrainingGoalWeeklyVolumeHoursCheck:
-    async def test_negative_weekly_volume_hours_raises_integrity_error(self, db_session: AsyncSession):
+    async def test_negative_weekly_volume_hours_raises_integrity_error(
+        self, db_session: AsyncSession
+    ):
         athlete = await make_athlete(db_session)
         goal = TrainingGoal(
             athlete_id=athlete.id,
@@ -113,7 +119,9 @@ class TestTrainingGoalWeeklyVolumeHoursCheck:
 
 
 class TestTrainingGoalWeeklyVolumeKmCheck:
-    async def test_negative_weekly_volume_km_raises_integrity_error(self, db_session: AsyncSession):
+    async def test_negative_weekly_volume_km_raises_integrity_error(
+        self, db_session: AsyncSession
+    ):
         athlete = await make_athlete(db_session)
         goal = TrainingGoal(
             athlete_id=athlete.id,
@@ -130,7 +138,9 @@ class TestTrainingGoalWeeklyVolumeKmCheck:
 
 
 class TestWeeklyPlanUniquePlanWeek:
-    async def test_duplicate_plan_week_raises_integrity_error(self, db_session: AsyncSession):
+    async def test_duplicate_plan_week_raises_integrity_error(
+        self, db_session: AsyncSession
+    ):
         athlete = await make_athlete(db_session)
         goal = TrainingGoal(
             athlete_id=athlete.id,
@@ -176,7 +186,9 @@ class TestWeeklyPlanUniquePlanWeek:
 
 
 class TestCheckpointUniquePlannedSession:
-    async def test_duplicate_planned_session_id_raises_integrity_error(self, db_session: AsyncSession):
+    async def test_duplicate_planned_session_id_raises_integrity_error(
+        self, db_session: AsyncSession
+    ):
         athlete = await make_athlete(db_session)
         goal = TrainingGoal(
             athlete_id=athlete.id,

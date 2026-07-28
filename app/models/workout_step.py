@@ -138,9 +138,7 @@ class WorkoutStep(Base):
     # ------------------------------------------------------------------
     target: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
 
-    duration_seconds: Mapped[int | None] = mapped_column(
-        Integer, nullable=True
-    )
+    duration_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
     description: Mapped[str] = mapped_column(Text, nullable=False)
 
     __table_args__ = (

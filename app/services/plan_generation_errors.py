@@ -25,9 +25,7 @@ class TrainingLengthGateError(PlanGenerationError):
         message: str,
         gate_reason: str,
     ) -> None:
-        super().__init__(
-            f"training length gate rejected: {gate_reason} ({action})"
-        )
+        super().__init__(f"training length gate rejected: {gate_reason} ({action})")
         self.action = action
         self.message = message
         self.gate_reason = gate_reason

@@ -63,6 +63,7 @@ METRIC_KEYS: frozenset[str] = frozenset(
 _metrics_lock = threading.Lock()
 _metrics: dict[str, CollectionsCounter[str]] = {}
 
+
 def safe_extra(payload: Mapping[str, Any] | None) -> dict[str, Any]:
     """Return only the allow-listed keys from *payload*."""
     if not payload:
@@ -73,9 +74,11 @@ def safe_extra(payload: Mapping[str, Any] | None) -> dict[str, Any]:
         if k in ALLOWED_KEYS and k not in FORBIDDEN_KEYS
     }
 
+
 def get_auth_logger() -> logging.Logger:
     """Return the namespaced logger used by the auth surface."""
     return logging.getLogger("pheidipp.auth")
+
 
 def record_metric(
     name: str,
@@ -91,10 +94,12 @@ def record_metric(
         bucket = _metrics.setdefault(name, CollectionsCounter())
         bucket[label] += 1
 
+
 def snapshot_metrics() -> dict[str, dict[str, int]]:
     """Return a copy of the current metric counters (debug / tests only)."""
     with _metrics_lock:
         return {name: dict(bucket) for name, bucket in _metrics.items()}
+
 
 def log_event(event: str, **fields: Any) -> None:
     """Emit a structured log line with allow-listed fields only."""

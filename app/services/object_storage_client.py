@@ -73,39 +73,33 @@ class ObjectStorageClient:
         self._region = region or settings.S3_REGION
         self._access_key = access_key or settings.S3_ACCESS_KEY
         self._secret_key = secret_key or settings.S3_SECRET_KEY
-        self._use_ssl = (
-            use_ssl if use_ssl is not None else settings.S3_USE_SSL
-        )
+        self._use_ssl = use_ssl if use_ssl is not None else settings.S3_USE_SSL
         self._use_local_fallback = (
-            not self._endpoint_url
-            and not self._access_key
-            and not self._secret_key
+            not self._endpoint_url and not self._access_key and not self._secret_key
         )
         self._s3_client: Any = None
         if not self._use_local_fallback:
-            self._s3_client = cast(Any, boto3.client(  # type: ignore[reportUnknownMemberType]
-                "s3",
-                endpoint_url=self._endpoint_url or None,
-                region_name=self._region,
-                aws_access_key_id=self._access_key or None,
-                aws_secret_access_key=self._secret_key or None,
-                use_ssl=self._use_ssl,
-            ))
+            self._s3_client = cast(
+                Any,
+                boto3.client(  # type: ignore[reportUnknownMemberType]
+                    "s3",
+                    endpoint_url=self._endpoint_url or None,
+                    region_name=self._region,
+                    aws_access_key_id=self._access_key or None,
+                    aws_secret_access_key=self._secret_key or None,
+                    use_ssl=self._use_ssl,
+                ),
+            )
 
     @staticmethod
     def build_fit_key(
         athlete_id: uuid.UUID, activity_date: date, suffix_uuid: uuid.UUID
     ) -> str:
         """Build canonical object key for a FIT file."""
-        return (
-            f"fit-files/{athlete_id}/"
-            f"{activity_date.isoformat()}/{suffix_uuid}.fit"
-        )
+        return f"fit-files/{athlete_id}/{activity_date.isoformat()}/{suffix_uuid}.fit"
 
     @staticmethod
-    def build_cleaned_stream_key(
-        athlete_id: uuid.UUID, activity_id: uuid.UUID
-    ) -> str:
+    def build_cleaned_stream_key(athlete_id: uuid.UUID, activity_id: uuid.UUID) -> str:
         """Build deterministic object key for a cleaned sensor stream."""
         return f"cleaned-streams/{athlete_id}/{activity_id}/stream.gz"
 
@@ -124,9 +118,7 @@ class ObjectStorageClient:
         loop = asyncio.get_running_loop()
 
         if self._use_local_fallback:
-            return await loop.run_in_executor(
-                None, self._upload_local, key, file_bytes
-            )
+            return await loop.run_in_executor(None, self._upload_local, key, file_bytes)
 
         try:
             await loop.run_in_executor(
@@ -143,7 +135,9 @@ class ObjectStorageClient:
                 ),
             )
         except ClientError as exc:
-            code: str = cast(dict[str, Any], exc.response).get("Error", {}).get("Code", "")
+            code: str = (
+                cast(dict[str, Any], exc.response).get("Error", {}).get("Code", "")
+            )
             if code in {"PreconditionFailed", "x-amz-precondition-failed"}:
                 log_event(
                     event="object_storage.upload.conflict",
@@ -225,7 +219,9 @@ class ObjectStorageClient:
                 ),
             )
         except ClientError as exc:
-            code: str = cast(dict[str, Any], exc.response).get("Error", {}).get("Code", "")
+            code: str = (
+                cast(dict[str, Any], exc.response).get("Error", {}).get("Code", "")
+            )
             if code in {"PreconditionFailed", "x-amz-precondition-failed"}:
                 log_event(
                     event="object_storage.cleaned_stream.upload.conflict",
@@ -274,7 +270,9 @@ class ObjectStorageClient:
             )
             return True
         except ClientError as exc:
-            code: str = cast(dict[str, Any], exc.response).get("Error", {}).get("Code", "")
+            code: str = (
+                cast(dict[str, Any], exc.response).get("Error", {}).get("Code", "")
+            )
             if code in {"404", "NoSuchKey", "NotFound"}:
                 return False
             raise ObjectStorageUploadError(
@@ -285,9 +283,7 @@ class ObjectStorageClient:
         path = self.LOCAL_FALLBACK_ROOT / key
         path.parent.mkdir(parents=True, exist_ok=True)
         if path.exists():
-            raise ObjectStorageConflictError(
-                f"object already exists at {key}"
-            )
+            raise ObjectStorageConflictError(f"object already exists at {key}")
         with path.open("wb") as fh:
             fh.write(file_bytes)
         return StoredFitObject(
@@ -302,9 +298,7 @@ class ObjectStorageClient:
         path = self.LOCAL_FALLBACK_ROOT / key
         path.parent.mkdir(parents=True, exist_ok=True)
         if path.exists():
-            raise ObjectStorageConflictError(
-                f"object already exists at {key}"
-            )
+            raise ObjectStorageConflictError(f"object already exists at {key}")
         with path.open("wb") as fh:
             fh.write(file_bytes)
         return StoredCleanedStream(
@@ -316,9 +310,7 @@ class ObjectStorageClient:
     def _download_local(self, key: str) -> bytes:
         path = self.LOCAL_FALLBACK_ROOT / key
         if not path.is_file():
-            raise ObjectStorageUploadError(
-                f"object not found at {key}"
-            )
+            raise ObjectStorageUploadError(f"object not found at {key}")
         return path.read_bytes()
 
     def _exists_local(self, key: str) -> bool:

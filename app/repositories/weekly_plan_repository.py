@@ -29,9 +29,7 @@ class WeeklyPlanRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def add_many(
-        self, weekly_plans: List[WeeklyPlan]
-    ) -> List[WeeklyPlan]:
+    async def add_many(self, weekly_plans: List[WeeklyPlan]) -> List[WeeklyPlan]:
         """Insert multiple WeeklyPlan rows in one flush.
 
         ``PlanGenerationService`` synthesises a WeeklyPlan per week of

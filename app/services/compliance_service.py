@@ -64,9 +64,7 @@ class ComplianceService:
                     "no prescribed session — actual duration retained as-is"
                 ),
                 session_type_match=True,
-                session_type_descriptor=(
-                    "no prescribed session to compare against"
-                ),
+                session_type_descriptor=("no prescribed session to compare against"),
                 effort_delta=None,
                 athlete_notes=activity.notes,
                 has_prescribed_session=False,

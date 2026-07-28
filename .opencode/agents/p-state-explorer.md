@@ -43,6 +43,10 @@ permission:
   # MCP — entity-to-code bridging
   pheidipp-codebase-context_get_code_for_entity: allow
 
+  # MCP — structural discovery (listing tools — map the codebase without file-by-file reads)
+  pheidipp-codebase-context_list_modules:  allow
+  pheidipp-codebase-context_list_classes: allow
+
   # MCP — batched code-domain lookups (symbols, imports, deps, function/class context)
   pheidipp-codebase-context_multi_code_query: allow
 ---
@@ -95,6 +99,16 @@ named is not found in the codebase, flag it as unresolved. Do not search
 for alternative names unless the task explicitly asks for that.
 
 ## What You Do
+
+0. **Get the structural map first.** For broad domain queries (not explicit
+   entity lists), call `list_modules(source_type="app")` to get the complete
+   module map — every module, file count, class count, function count —
+   grouped by layer. This replaces scanning READMEs and searching broadly
+   for structure; it gives you the map directly. Use `list_classes` with
+   `module_filter` or `base_class` (e.g., `base_class="Base"` for all ORM
+   models) when the caller needs a specific class category. These are
+   listing tools — they return names and counts, not detail. Use Steps 1-2
+   below for detail.
 
 1. **Check for folder READMEs first.** Before broad searching, read
    `README.md` files in folders relevant to the caller's domain.

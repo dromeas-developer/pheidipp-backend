@@ -35,7 +35,9 @@ from tests.utils.factories import make_athlete
 
 
 class TestCoachingMessageFirstMessageSingleton:
-    async def test_duplicate_first_message_raises_integrity_error(self, db_session: AsyncSession):
+    async def test_duplicate_first_message_raises_integrity_error(
+        self, db_session: AsyncSession
+    ):
         athlete = await make_athlete(db_session)
         goal = TrainingGoal(
             athlete_id=athlete.id,
@@ -87,7 +89,9 @@ class TestCoachingMessageFirstMessageSingleton:
 
 
 class TestCoachingMessagePostWorkoutSingleton:
-    async def test_duplicate_post_workout_raises_integrity_error(self, db_session: AsyncSession):
+    async def test_duplicate_post_workout_raises_integrity_error(
+        self, db_session: AsyncSession
+    ):
         athlete = await make_athlete(db_session)
         goal = TrainingGoal(
             athlete_id=athlete.id,
@@ -152,7 +156,9 @@ class TestCoachingMessagePostWorkoutSingleton:
 
 
 class TestCoachingMessagePostWorkoutNullActivity:
-    async def test_duplicate_post_workout_null_activity_succeeds(self, db_session: AsyncSession):
+    async def test_duplicate_post_workout_null_activity_succeeds(
+        self, db_session: AsyncSession
+    ):
         athlete = await make_athlete(db_session)
         goal = TrainingGoal(
             athlete_id=athlete.id,
@@ -246,7 +252,9 @@ class TestCoachingMessageContentCheck:
 
 
 class TestGeneratedWorkoutUniquePlanDate:
-    async def test_duplicate_plan_date_raises_integrity_error(self, db_session: AsyncSession):
+    async def test_duplicate_plan_date_raises_integrity_error(
+        self, db_session: AsyncSession
+    ):
         athlete = await make_athlete(db_session)
         goal = TrainingGoal(
             athlete_id=athlete.id,
@@ -332,7 +340,9 @@ class TestGeneratedWorkoutUniquePlanDate:
 
 
 class TestGeneratedWorkoutTargetsCheck:
-    async def test_theoretical_targets_not_object_raises_integrity_error(self, db_session: AsyncSession):
+    async def test_theoretical_targets_not_object_raises_integrity_error(
+        self, db_session: AsyncSession
+    ):
         athlete = await make_athlete(db_session)
         goal = TrainingGoal(
             athlete_id=athlete.id,
@@ -405,7 +415,9 @@ class TestGeneratedWorkoutTargetsCheck:
             await db_session.commit()
         await db_session.rollback()
 
-    async def test_adjusted_targets_null_raises_integrity_error(self, db_session: AsyncSession):
+    async def test_adjusted_targets_null_raises_integrity_error(
+        self, db_session: AsyncSession
+    ):
         athlete = await make_athlete(db_session)
         goal = TrainingGoal(
             athlete_id=athlete.id,
@@ -480,7 +492,9 @@ class TestGeneratedWorkoutTargetsCheck:
 
 
 class TestGeneratedWorkoutRecoveryModifierCheck:
-    async def test_invalid_recovery_modifier_raises_integrity_error(self, db_session: AsyncSession):
+    async def test_invalid_recovery_modifier_raises_integrity_error(
+        self, db_session: AsyncSession
+    ):
         athlete = await make_athlete(db_session)
         goal = TrainingGoal(
             athlete_id=athlete.id,
@@ -556,7 +570,9 @@ class TestGeneratedWorkoutRecoveryModifierCheck:
 
 
 class TestWorkoutStepUniqueWorkoutOrder:
-    async def test_duplicate_step_order_raises_integrity_error(self, db_session: AsyncSession):
+    async def test_duplicate_step_order_raises_integrity_error(
+        self, db_session: AsyncSession
+    ):
         athlete = await make_athlete(db_session)
         goal = TrainingGoal(
             athlete_id=athlete.id,
@@ -655,7 +671,9 @@ class TestWorkoutStepUniqueWorkoutOrder:
 
 
 class TestWorkoutStepPhysiologicalIntentNotNull:
-    async def test_null_physiological_intent_raises_integrity_error(self, db_session: AsyncSession):
+    async def test_null_physiological_intent_raises_integrity_error(
+        self, db_session: AsyncSession
+    ):
         athlete = await make_athlete(db_session)
         goal = TrainingGoal(
             athlete_id=athlete.id,
@@ -742,7 +760,9 @@ class TestWorkoutStepPhysiologicalIntentNotNull:
 
 
 class TestWorkoutStepStepOrderCheck:
-    async def test_step_order_zero_raises_integrity_error(self, db_session: AsyncSession):
+    async def test_step_order_zero_raises_integrity_error(
+        self, db_session: AsyncSession
+    ):
         athlete = await make_athlete(db_session)
         goal = TrainingGoal(
             athlete_id=athlete.id,
@@ -829,7 +849,9 @@ class TestWorkoutStepStepOrderCheck:
 
 
 class TestWorkoutStepDescriptionCheck:
-    async def test_empty_description_raises_integrity_error(self, db_session: AsyncSession):
+    async def test_empty_description_raises_integrity_error(
+        self, db_session: AsyncSession
+    ):
         athlete = await make_athlete(db_session)
         goal = TrainingGoal(
             athlete_id=athlete.id,
@@ -916,7 +938,9 @@ class TestWorkoutStepDescriptionCheck:
 
 
 class TestWorkoutStepDurationSecondsCheck:
-    async def test_negative_duration_raises_integrity_error(self, db_session: AsyncSession):
+    async def test_negative_duration_raises_integrity_error(
+        self, db_session: AsyncSession
+    ):
         athlete = await make_athlete(db_session)
         goal = TrainingGoal(
             athlete_id=athlete.id,

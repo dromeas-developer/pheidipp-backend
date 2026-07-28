@@ -103,9 +103,7 @@ def bayesian_update(
     """
     current_date = parse_iso_date(current["last_observation_date"])
     observation_date = coerce_observation_date(observation["date"])
-    days_since_last = max(
-        0, (observation_date - current_date).days
-    )
+    days_since_last = max(0, (observation_date - current_date).days)
 
     decay_factor = math.exp(-days_since_last / DECAY_TIME_CONSTANT_DAYS)
     decayed_weight = float(current["prior_weight"]) * decay_factor
@@ -207,9 +205,9 @@ class PhysiologyUpdateResult:
     metric_confidence: Dict[str, Optional[str]] = field(
         default_factory=lambda: {}  # type: ignore[reportUnknownVariableType]
     )
-    confidence_transitions: Dict[str, tuple[Optional[str], Optional[str]]] = (
-        field(default_factory=lambda: {})  # type: ignore[reportUnknownVariableType]
-    )
+    confidence_transitions: Dict[str, tuple[Optional[str], Optional[str]]] = field(
+        default_factory=lambda: {}
+    )  # type: ignore[reportUnknownVariableType]
     measurements_written: int = 0
 
 
@@ -349,9 +347,7 @@ class PhysiologyUpdateService:
         self,
         session: AsyncSession,
         *,
-        athlete_physiology_repository: Optional[
-            AthletePhysiologyRepository
-        ] = None,
+        athlete_physiology_repository: Optional[AthletePhysiologyRepository] = None,
         physiology_measurement_repository: Optional[
             PhysiologyMeasurementRepository
         ] = None,
@@ -362,8 +358,7 @@ class PhysiologyUpdateService:
         # inject mocks.
         self.session = session
         self.athlete_physiology = (
-            athlete_physiology_repository
-            or AthletePhysiologyRepository(session)
+            athlete_physiology_repository or AthletePhysiologyRepository(session)
         )
         self.physiology_measurements = (
             physiology_measurement_repository
@@ -443,9 +438,7 @@ class PhysiologyUpdateService:
                 bootstrap always creates one — this is a
                 data-integrity failure.
         """
-        physiology = await self.athlete_physiology.get_by_athlete_id(
-            athlete_id
-        )
+        physiology = await self.athlete_physiology.get_by_athlete_id(athlete_id)
         if physiology is None:
             raise MissingAthletePhysiologyError(
                 f"no AthletePhysiology row for athlete {athlete_id}"
@@ -538,14 +531,8 @@ class PhysiologyUpdateService:
             # with an existing estimate, so this is correctly
             # suppressed by the ``current_state is None`` check.
             if current_state is not None:
-                shift = abs(
-                    float(new_state["value"])
-                    - float(current_state["value"])
-                )
-                if (
-                    shift > 1.0
-                    and obs.parameter not in shifted_parameters_set
-                ):
+                shift = abs(float(new_state["value"]) - float(current_state["value"]))
+                if shift > 1.0 and obs.parameter not in shifted_parameters_set:
                     shifted_parameters_set.add(obs.parameter)
                     shifted_parameters.append(obs.parameter)
 
@@ -572,22 +559,15 @@ class PhysiologyUpdateService:
             # a legitimate ``None`` clear. This satisfies Plan
             # Step 6's "minimise write amplification" requirement.
             touched_columns = {
-                _PARAMETER_PATH[parameter][0]
-                for parameter in working_state
+                _PARAMETER_PATH[parameter][0] for parameter in working_state
             }
             await self.athlete_physiology.update_in_place(
                 athlete_id=athlete_id,
                 lt1=physiology.lt1 if "lt1" in touched_columns else None,
                 lt2=physiology.lt2 if "lt2" in touched_columns else None,
-                cp=(
-                    physiology.cp
-                    if "cp" in touched_columns
-                    else UNSET_SENTINEL
-                ),
+                cp=(physiology.cp if "cp" in touched_columns else UNSET_SENTINEL),
                 max_hr=(
-                    physiology.max_hr
-                    if "max_hr" in touched_columns
-                    else UNSET_SENTINEL
+                    physiology.max_hr if "max_hr" in touched_columns else UNSET_SENTINEL
                 ),
             )
 
@@ -614,16 +594,12 @@ class PhysiologyUpdateService:
         if shifted_parameters:
             event_payload = {
                 "athlete_id": str(athlete_id),
-                "parameters_updated": [
-                    param.value for param in shifted_parameters
-                ],
+                "parameters_updated": [param.value for param in shifted_parameters],
                 "dominant_sources": {
-                    param.value: dominant_sources[param]
-                    for param in shifted_parameters
+                    param.value: dominant_sources[param] for param in shifted_parameters
                 },
                 "prior_weights": {
-                    param.value: prior_weights[param]
-                    for param in shifted_parameters
+                    param.value: prior_weights[param] for param in shifted_parameters
                 },
             }
             await self.events.publish(
@@ -659,9 +635,7 @@ class PhysiologyUpdateService:
         is fixed by the :data:`_PARAMETER_PATH` table.
         """
         if parameter not in _PARAMETER_PATH:
-            raise ValueError(
-                f"unsupported physiology parameter: {parameter!r}"
-            )
+            raise ValueError(f"unsupported physiology parameter: {parameter!r}")
         column_name, sub_key = _PARAMETER_PATH[parameter]
         column_value = getattr(physiology, column_name)
         if column_value is None:
@@ -943,18 +917,14 @@ def compute_metric_confidence(
     lt1 = physiology.lt1 or {}
     lt2 = physiology.lt2 or {}
     return {
-        "lt1_hr": confidence_level(
-            state_prior_weight(lt1.get("hr") if lt1 else None)
-        ),
+        "lt1_hr": confidence_level(state_prior_weight(lt1.get("hr") if lt1 else None)),
         "lt1_power": confidence_level(
             state_prior_weight(lt1.get("power") if lt1 else None)
         ),
         "lt1_pace": confidence_level(
             state_prior_weight(lt1.get("pace") if lt1 else None)
         ),
-        "lt2_hr": confidence_level(
-            state_prior_weight(lt2.get("hr") if lt2 else None)
-        ),
+        "lt2_hr": confidence_level(state_prior_weight(lt2.get("hr") if lt2 else None)),
         "lt2_power": confidence_level(
             state_prior_weight(lt2.get("power") if lt2 else None)
         ),

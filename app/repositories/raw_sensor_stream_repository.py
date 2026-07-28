@@ -52,9 +52,7 @@ class RawSensorStreamRepository:
         ``ix_raw_sensor_streams_activity`` index.
         """
         result = await self.session.execute(
-            select(RawSensorStream).where(
-                RawSensorStream.activity_id == activity_id
-            )
+            select(RawSensorStream).where(RawSensorStream.activity_id == activity_id)
         )
         return result.scalar_one_or_none()
 
@@ -67,8 +65,6 @@ class RawSensorStreamRepository:
         ``ix_raw_sensor_streams_activity`` index.
         """
         result = await self.session.execute(
-            select(RawSensorStream.id).where(
-                RawSensorStream.activity_id == activity_id
-            )
+            select(RawSensorStream.id).where(RawSensorStream.activity_id == activity_id)
         )
         return result.scalar_one_or_none() is not None

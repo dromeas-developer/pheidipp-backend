@@ -322,15 +322,13 @@ always stops before the fix loop.)
 
 ### 8. Return summary
 
-Return a text response — do NOT write a file. The caller reads your
-response directly and decides next steps.
+Return a single-line text response — do NOT write a file. The caller
+reads your response directly and decides next steps. Every response is
+exactly one line, no prose, no sections:
 
-Include:
-* Operation mode (plan-based)
-* Pre-existing diagnostics discarded by the scope filter (count)
-* Iteration log: diagnostics found → clusters → fix applied → remaining
-* Any unfixed diagnostics and why (architectural, false positive, max iterations)
-* Final `lint.sh` and `typecheck.sh` pass/fail status
+- Zero diagnostics: `✅ PASS — <file>: zero diagnostics`
+- Fixes applied: `✅ <N> fixed across <M> files. <K> pre-existing discarded. <L> remaining (<reason>).`
+- Batching plan (multi-file overflow only): `📋 <N> errors across <M> files. Invoke one file at a time:` followed by the batching table
 
 ## Tool Usage
 

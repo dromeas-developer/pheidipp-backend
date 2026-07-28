@@ -18,7 +18,8 @@ def _public_method_names(cls: type) -> set[str]:
     return {
         name
         for name, obj in cls.__dict__.items()
-        if not name.startswith("_") and (inspect.isfunction(obj) or inspect.iscoroutinefunction(obj))
+        if not name.startswith("_")
+        and (inspect.isfunction(obj) or inspect.iscoroutinefunction(obj))
     }
 
 
@@ -40,7 +41,9 @@ class TestTwinStateRepositoryContract:
         methods = _public_async_methods(TwinStateRepository)
         assert len(methods) == 6, f"Expected 6 methods, got {len(methods)}: {methods}"
 
-    def test_exposes_insert_get_latest_get_by_id_get_by_activity_get_by_activity_and_trigger_get_history(self):
+    def test_exposes_insert_get_latest_get_by_id_get_by_activity_get_by_activity_and_trigger_get_history(
+        self,
+    ):
         methods = _public_async_methods(TwinStateRepository)
         expected = {
             "insert",
@@ -64,7 +67,9 @@ class TestCoachingMessageRepositoryContract:
         methods = _public_async_methods(CoachingMessageRepository)
         assert len(methods) == 6, f"Expected 6 methods, got {len(methods)}: {methods}"
 
-    def test_coaching_message_exposes_insert_get_by_athlete_id_get_by_athlete_and_type_get_existing_first_message_get_by_activity_and_type_get_all_count(self):
+    def test_coaching_message_exposes_insert_get_by_athlete_id_get_by_athlete_and_type_get_existing_first_message_get_by_activity_and_type_get_all_count(
+        self,
+    ):
         methods = _public_async_methods(CoachingMessageRepository)
         expected = {
             "insert",
@@ -90,8 +95,19 @@ class TestSystemEventRepositoryContract:
 
     def test_no_read_update_or_delete_methods(self):
         names = _public_method_names(SystemEventRepository)
-        forbidden_patterns = {"update", "delete", "save", "merge", "get", "list", "find", "query"}
-        suspicious = {n for n in names if any(p in n.lower() for p in forbidden_patterns)}
+        forbidden_patterns = {
+            "update",
+            "delete",
+            "save",
+            "merge",
+            "get",
+            "list",
+            "find",
+            "query",
+        }
+        suspicious = {
+            n for n in names if any(p in n.lower() for p in forbidden_patterns)
+        }
         assert not suspicious, f"Forbidden method patterns found: {suspicious}"
 
     def test_method_count_is_exactly_one(self):

@@ -179,9 +179,7 @@ class OnboardingPreferencesIn(BaseModel):
 
     @model_validator(mode="after")
     def _validate_weekly_schedule(self) -> "OnboardingPreferencesIn":
-        self.weekly_schedule = _validate_weekly_schedule_keys(
-            self.weekly_schedule
-        )
+        self.weekly_schedule = _validate_weekly_schedule_keys(self.weekly_schedule)
         return self
 
 
@@ -222,9 +220,7 @@ class OnboardingTrainingGoalIn(BaseModel):
             if not self.goal_event_name:
                 missing.append("goal_event_name")
             if missing:
-                raise ValueError(
-                    "race_event goal requires: " + ", ".join(missing)
-                )
+                raise ValueError("race_event goal requires: " + ", ".join(missing))
         elif self.goal_type == GoalType.TARGET_PERFORMANCE:
             missing_tp: list[str] = []
             if self.target_distance_km is None:
@@ -233,8 +229,7 @@ class OnboardingTrainingGoalIn(BaseModel):
                 missing_tp.append("target_time_minutes")
             if missing_tp:
                 raise ValueError(
-                    "target_performance goal requires: "
-                    + ", ".join(missing_tp)
+                    "target_performance goal requires: " + ", ".join(missing_tp)
                 )
         return self
 
@@ -297,9 +292,7 @@ class AthletePreferencesPatchIn(BaseModel):
     @model_validator(mode="after")
     def _validate_weekly_schedule(self) -> "AthletePreferencesPatchIn":
         if self.weekly_schedule is not None:
-            self.weekly_schedule = _validate_weekly_schedule_patch(
-                self.weekly_schedule
-            )
+            self.weekly_schedule = _validate_weekly_schedule_patch(self.weekly_schedule)
         return self
 
 

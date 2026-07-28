@@ -66,3 +66,66 @@ Import only the enums your test file actually uses. Full reference:
 `SessionType`, `Sex`, `SportBackground`, `StepType`, `TrainingGoalStatus`,
 `TrainingPlanStatus`, `TrainingTimeOfDay`, `TwinConfidenceLevel`,
 `TwinTrigger`, `WeeklyPlanStatus`, `WellnessTrend`.
+
+---
+
+## 2026-07-27 — Don't monkeypatch to raise during async session operations
+
+**Symptom:** `sqlalchemy.exc.MissingGreenlet: greenlet_spawn has not been called; can't await_only() here`
+
+**Root cause:** Monkeypatching `RepoClass.add` or `AsyncSession.flush` to call the
+original method then raise corrupts SQLAlchemy's async greenlet context. The
+original method performs `session.add()` → `session.flush()` → `session.refresh()`,
+and calling it from within a monkeypatched method breaks the greenlet propagation
+that SQLAlchemy's async session relies on.
+
+**Also applies to:** Any monkeypatch on `AsyncSession.flush` — the async greenlet
+context is still corrupted regardless of where the monkeypatch is applied.
+
+**Failed pattern:**
+```python
+async def failing_add(self, physiology):
+    await original_add(self, physiology)
+    raise RuntimeError("simulated failure")
+
+monkeypatch.setattr(AthletePhysiologyRepository, "add", failing_add)
+```
+
+**Correct pattern:** Pre-insert a conflicting row to trigger a natural
+`IntegrityError` on a database unique constraint. SQLAlchemy handles
+`IntegrityError` through its normal async machinery — no greenlet corruption.
+
+**Critical subtlety:** When `IntegrityError` fires, SQLAlchemy moves the session
+into a failed-transaction state that **clears all ORM object `__dict__` entries**.
+Accessing `athlete.id` (even just reading the PK) on the cleared object triggers
+a lazy load → `MissingGreenlet`. **Capture all PKs into plain UUID locals before
+the `pytest.raises` block:**
+```python
+from sqlalchemy.exc import IntegrityError
+
+athlete, profile = await make_athlete_with_profile(db_session)
+athlete_id = athlete.id  # ← capture BEFORE pytest.raises
+profile_id = profile.id  # ← capture BEFORE pytest.raises
+
+db_session.add(_make_existing_preferences(athlete_id))
+await db_session.flush()
+
+with pytest.raises(IntegrityError):
+    await service.complete_onboarding(athlete_id=athlete_id, ...)
+
+await db_session.rollback()
+db_session.expire_all()
+# Use the captured UUIDs — NOT athlete.id or profile.id
+refreshed = await db_session.get(Athlete, athlete_id)
+```
+
+**Why:** The `IntegrityError` is raised by the database during the normal
+flush cycle. SQLAlchemy's async session handles it through the standard
+greenlet context — no monkeypatching, no corrupted state. The session
+enters an inactive state after the error, and `await db_session.rollback()`
+resets it cleanly. But the ORM objects' `__dict__` is wiped — all attribute
+access after the error must go through captured locals or fresh queries.
+
+**Scope:** Any integration test that needs to simulate a mid-transaction
+failure while exercising the real `AsyncSession`. Cross-referenced in
+`tests/MOCKING_CONTRACT.md` Known Anti-Patterns.

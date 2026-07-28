@@ -1,5 +1,5 @@
 version: "1.0"
-last_reviewed_at: "2026-07-26T23:00:00Z"
+last_reviewed_at: "2026-07-27T23:47:00Z"
 selection:
   release:
     unit:
@@ -40,7 +40,94 @@ selection:
       - tests/unit/test_model_repository_contracts.py::TestSystemEventRepositoryContract::test_exposes_only_add_method
       - tests/unit/test_model_repository_contracts.py::TestSystemEventRepositoryContract::test_no_read_update_or_delete_methods
       - tests/unit/test_model_repository_contracts.py::TestSystemEventRepositoryContract::test_method_count_is_exactly_one
+      - tests/unit/test_bootstrap_helpers.py::TestAgeInYears::test_age_36_with_dob_1990_jan_15_and_now_2026_jul_25
+      - tests/unit/test_bootstrap_helpers.py::TestAgeInYears::test_age_increments_on_birthday
+      - tests/unit/test_bootstrap_helpers.py::TestAgeInYears::test_age_zero_for_newborn
+      - tests/unit/test_bootstrap_helpers.py::TestBootstrapMetricConfidence::test_cp_is_null
+      - tests/unit/test_bootstrap_helpers.py::TestBootstrapMetricConfidence::test_lt1_hr_is_low
+      - tests/unit/test_bootstrap_helpers.py::TestBootstrapMetricConfidence::test_lt1_pace_is_null
+      - tests/unit/test_bootstrap_helpers.py::TestBootstrapMetricConfidence::test_lt1_power_is_null
+      - tests/unit/test_bootstrap_helpers.py::TestBootstrapMetricConfidence::test_lt2_hr_is_low
+      - tests/unit/test_bootstrap_helpers.py::TestBootstrapMetricConfidence::test_lt2_pace_is_null
+      - tests/unit/test_bootstrap_helpers.py::TestBootstrapMetricConfidence::test_lt2_power_is_null
+      - tests/unit/test_bootstrap_helpers.py::TestBootstrapMetricConfidence::test_only_lt1_hr_and_lt2_hr_are_low_rest_null
+      - tests/unit/test_bootstrap_helpers.py::TestBootstrapSignal::test_dominant_source_is_questionnaire_estimate
+      - tests/unit/test_bootstrap_helpers.py::TestBootstrapSignal::test_prior_weight_is_05
+      - tests/unit/test_bootstrap_helpers.py::TestBootstrapSignal::test_returns_required_keys
+      - tests/unit/test_bootstrap_helpers.py::TestBootstrapSignal::test_uncertainty_is_1
+      - tests/unit/test_bootstrap_helpers.py::TestBootstrapSignal::test_value_passed_through
+      - tests/unit/test_onboarding_schemas.py::TestOnboardingProfileTimezone::test_invalid_timezone_rejected
+      - tests/unit/test_onboarding_schemas.py::TestOnboardingProfileTimezone::test_valid_europe_london_accepted
+      - tests/unit/test_onboarding_schemas.py::TestOnboardingProfileTimezone::test_valid_iana_timezone_accepted
+      - tests/unit/test_onboarding_schemas.py::TestWeeklyScheduleCompleteness::test_extra_day_rejected
+      - tests/unit/test_onboarding_schemas.py::TestWeeklyScheduleCompleteness::test_missing_and_extra_both_reported
+      - tests/unit/test_onboarding_schemas.py::TestWeeklyScheduleCompleteness::test_missing_day_rejected
+      - tests/unit/test_onboarding_schemas.py::TestWeeklyScheduleCompleteness::test_seven_days_accepted
+      - tests/unit/test_onboarding_schemas.py::TestGoalRequiredFieldsPerType::test_race_event_missing_goal_event_date_rejected
+      - tests/unit/test_onboarding_schemas.py::TestGoalRequiredFieldsPerType::test_race_event_missing_goal_event_name_rejected
+      - tests/unit/test_onboarding_schemas.py::TestGoalRequiredFieldsPerType::test_race_event_missing_goal_event_type_rejected
+      - tests/unit/test_onboarding_schemas.py::TestGoalRequiredFieldsPerType::test_race_event_with_all_fields_accepted
+      - tests/unit/test_onboarding_schemas.py::TestGoalRequiredFieldsPerType::test_target_performance_missing_target_distance_rejected
+      - tests/unit/test_onboarding_schemas.py::TestGoalRequiredFieldsPerType::test_target_performance_missing_target_time_rejected
+      - tests/unit/test_onboarding_schemas.py::TestGoalRequiredFieldsPerType::test_target_performance_with_all_fields_accepted
+      - tests/unit/test_onboarding_schemas.py::TestGoalEventDateInFuture::test_future_date_accepted
+      - tests/unit/test_onboarding_schemas.py::TestGoalEventDateInFuture::test_past_date_rejected
+      - tests/unit/test_onboarding_schemas.py::TestGoalEventDateInFuture::test_today_rejected
+      - tests/unit/test_onboarding_schemas.py::TestOnboardingFieldBounds::test_fitness_level_six_rejected
+      - tests/unit/test_onboarding_schemas.py::TestOnboardingFieldBounds::test_fitness_level_zero_rejected
+      - tests/unit/test_onboarding_schemas.py::TestOnboardingFieldBounds::test_height_cm_above_300_rejected
+      - tests/unit/test_onboarding_schemas.py::TestOnboardingFieldBounds::test_height_cm_below_50_rejected
+      - tests/unit/test_onboarding_schemas.py::TestOnboardingFieldBounds::test_weekly_volume_hours_above_80_rejected
+      - tests/unit/test_onboarding_schemas.py::TestOnboardingFieldBounds::test_weekly_volume_km_above_500_rejected
+      - tests/unit/test_onboarding_schemas.py::TestOnboardingFieldBounds::test_years_structured_training_above_80_rejected
+      - tests/unit/test_onboarding_schemas.py::TestOnboardingFieldBounds::test_years_structured_training_zero_accepted
+      - tests/unit/test_onboarding_schemas.py::TestProfileImmutability::test_empty_patch_accepted
+      - tests/unit/test_onboarding_schemas.py::TestProfileImmutability::test_patch_date_of_birth_rejected
+      - tests/unit/test_onboarding_schemas.py::TestProfileImmutability::test_patch_height_cm_accepted
+      - tests/unit/test_onboarding_schemas.py::TestProfileImmutability::test_patch_multiple_immutable_rejected
+      - tests/unit/test_onboarding_schemas.py::TestProfileImmutability::test_patch_sex_rejected
+      - tests/unit/test_onboarding_schemas.py::TestProfileImmutability::test_patch_timezone_rejected
+      - tests/unit/test_onboarding_schemas.py::TestProfileImmutability::test_patch_unknown_field_rejected
+      - tests/unit/test_structural_risk_flag.py::TestStructuralRiskFlag::test_cycling_is_true
+      - tests/unit/test_structural_risk_flag.py::TestStructuralRiskFlag::test_cycling_primary_is_true
+      - tests/unit/test_structural_risk_flag.py::TestStructuralRiskFlag::test_gym_fitness_is_true
+      - tests/unit/test_structural_risk_flag.py::TestStructuralRiskFlag::test_none_sport_background_is_true
+      - tests/unit/test_structural_risk_flag.py::TestStructuralRiskFlag::test_only_running_primary_returns_false
+      - tests/unit/test_structural_risk_flag.py::TestStructuralRiskFlag::test_running_primary_is_false
+      - tests/unit/test_structural_risk_flag.py::TestStructuralRiskFlag::test_swimming_is_true
+      - tests/unit/test_structural_risk_flag.py::TestStructuralRiskFlag::test_swimming_primary_is_true
+      - tests/unit/test_structural_risk_flag.py::TestStructuralRiskFlag::test_team_sport_is_true
+      - tests/unit/test_structural_risk_flag.py::TestStructuralRiskFlag::test_triathlon_is_true
+      - tests/unit/test_data_tier.py::TestInferDataTier::test_tier1_chest_strap_rr_with_running_power
+      - tests/unit/test_data_tier.py::TestInferDataTier::test_tier2_running_power_with_no_rr_hr_variant
+      - tests/unit/test_data_tier.py::TestInferDataTier::test_tier2_running_power_with_non_rr_hr
+      - tests/unit/test_data_tier.py::TestInferDataTier::test_tier3_chest_strap_rr_no_power
+      - tests/unit/test_data_tier.py::TestInferDataTier::test_tier4_chest_strap_no_rr_no_power
+      - tests/unit/test_data_tier.py::TestInferDataTier::test_tier4_wrist_optical_no_power
+      - tests/unit/test_data_tier.py::TestInferDataTier::test_tier5_no_hr_no_power
+      - tests/unit/test_data_tier.py::TestInferDataTier::test_tier6_unhandled_combination_falls_back
+      - tests/unit/test_goal_type_whitelist.py::TestGoalTypeWhitelist::test_fitness_improvement_rejected
+      - tests/unit/test_goal_type_whitelist.py::TestGoalTypeWhitelist::test_maintenance_rejected
+      - tests/unit/test_goal_type_whitelist.py::TestGoalTypeWhitelist::test_race_event_accepted
+      - tests/unit/test_goal_type_whitelist.py::TestGoalTypeWhitelist::test_recovery_rejected
+      - tests/unit/test_goal_type_whitelist.py::TestGoalTypeWhitelist::test_target_performance_accepted
     integration:
+      - tests/integration/test_profile_preferences_patch.py::TestProfilePatchMutable::test_patch_height_cm_updates_profile
+      - tests/integration/test_profile_preferences_patch.py::TestProfilePatchMutable::test_patch_location_lat_lng_updates_profile
+      - tests/integration/test_profile_preferences_patch.py::TestProfilePatchMutable::test_patch_no_args_is_noop
+      - tests/integration/test_profile_preferences_patch.py::TestProfilePatchMutable::test_patch_training_window_updates_profile
+      - tests/integration/test_profile_preferences_patch.py::TestProfilePatchImmutability::test_patch_schema_rejects_date_of_birth
+      - tests/integration/test_profile_preferences_patch.py::TestProfilePatchImmutability::test_patch_schema_rejects_sex
+      - tests/integration/test_profile_preferences_patch.py::TestProfilePatchImmutability::test_patch_schema_rejects_timezone
+      - tests/integration/test_profile_preferences_patch.py::TestProfilePatchImmutability::test_patch_schema_rejects_unknown_field
+      - tests/integration/test_profile_preferences_patch.py::TestPreferencesPatchMerge::test_patch_idempotent_re_applying_same_patch
+      - tests/integration/test_profile_preferences_patch.py::TestPreferencesPatchMerge::test_patch_saturday_available_flips_only_saturday
+      - tests/integration/test_profile_preferences_patch.py::TestPreferencesPatchMerge::test_patch_schema_rejects_unknown_field
+      - tests/integration/test_profile_preferences_patch.py::TestPreferencesPatchMerge::test_patch_top_level_field_overwrites
+      - tests/integration/test_profile_preferences_patch.py::TestPreferencesPatchMerge::test_patch_unknown_key_silently_ignored
+      - tests/integration/test_profile_preferences_patch.py::TestPreferencesPatchSchema::test_patch_schema_accepts_partial_weekday
+      - tests/integration/test_profile_preferences_patch.py::TestPreferencesPatchSchema::test_patch_schema_empty_weekly_schedule_accepted
+      - tests/integration/test_profile_preferences_patch.py::TestPreferencesPatchSchema::test_patch_schema_rejects_non_canonical_weekday
       - tests/integration/test_auth_db.py::TestEmailUniqueness::test_duplicate_email_rejected_with_integrity_error
       - tests/integration/test_auth_db.py::TestEmailUniqueness::test_case_insensitive_email_uniqueness
       - tests/integration/test_system_event_db.py::TestSystemEventAthleteIdNotNull::test_null_athlete_id_raises_integrity_error
@@ -80,12 +167,62 @@ selection:
       - tests/integration/test_coaching_workout_db.py::TestWorkoutStepDescriptionCheck::test_empty_description_raises_integrity_error
       - tests/integration/test_coaching_workout_db.py::TestWorkoutStepDurationSecondsCheck::test_negative_duration_raises_integrity_error
       - tests/integration/test_coaching_workout_db.py::TestWorkoutStepDurationSecondsCheck::test_null_duration_succeeds
+      - tests/integration/test_onboarding_service.py::TestOnboardingAtomicCreate::test_complete_onboarding_creates_all_entities
+      - tests/integration/test_onboarding_service.py::TestOnboardingAtomicCreate::test_data_tier_persisted_on_twin_state
+      - tests/integration/test_onboarding_service.py::TestOnboardingAtomicCreate::test_onboarding_complete_flag_flipped
+      - tests/integration/test_onboarding_service.py::TestOnboardingAtomicCreate::test_profile_enriched_with_timezone_and_height
+      - tests/integration/test_onboarding_service.py::TestOnboardingAtomicCreate::test_structural_risk_flag_set_from_sport_background_running
+      - tests/integration/test_onboarding_service.py::TestOnboardingAtomicCreate::test_structural_risk_flag_set_from_sport_background_triathlon
+      - tests/integration/test_onboarding_service.py::TestOnboardingAtomicCreate::test_training_goal_persisted_active
+      - tests/integration/test_onboarding_service.py::TestOnboardingTwinBootstrapValues::test_fitness_bootstrap_zeroed
+      - tests/integration/test_onboarding_service.py::TestOnboardingTwinBootstrapValues::test_fitness_time_constants_population_default
+      - tests/integration/test_onboarding_service.py::TestOnboardingTwinBootstrapValues::test_physiology_cp_and_vo2max_null
+      - tests/integration/test_onboarding_service.py::TestOnboardingTwinBootstrapValues::test_physiology_lt1_lt2_questionnaire_source
+      - tests/integration/test_onboarding_service.py::TestOnboardingTwinBootstrapValues::test_physiology_max_hr_bootstrapped_from_age
+      - tests/integration/test_onboarding_service.py::TestOnboardingTwinBootstrapValues::test_twin_metric_confidence_only_lt1_lt2_hr_low
+      - tests/integration/test_onboarding_service.py::TestOnboardingTwinBootstrapValues::test_twin_state_bootstrap_trigger_and_confidence
+      - tests/integration/test_onboarding_service.py::TestOnboardingTwinBootstrapValues::test_twin_state_lt1_lt2_positive_and_lt1_lt_lt2_lt_max_hr
+      - tests/integration/test_onboarding_service.py::TestOnboardingFailurePaths::test_athlete_not_found_raises_404
+      - tests/integration/test_onboarding_service.py::TestOnboardingFailurePaths::test_re_onboarding_raises_409
+      - tests/integration/test_onboarding_service.py::TestOnboardingFailurePaths::test_second_active_goal_raises_conflict
+      - tests/integration/test_onboarding_service.py::TestOnboardingEventsPublished::test_both_events_persisted_in_same_transaction
+      - tests/integration/test_onboarding_service.py::TestOnboardingEventsPublished::test_generate_plan_defer_failure_does_not_break_onboarding
+      - tests/integration/test_onboarding_service.py::TestOnboardingEventsPublished::test_onboarding_completed_event_published
+      - tests/integration/test_onboarding_service.py::TestOnboardingEventsPublished::test_onboarding_completed_outbox_row_pending
+      - tests/integration/test_onboarding_service.py::TestOnboardingEventsPublished::test_twin_model_ready_event_published
+      - tests/integration/test_onboarding_rollback.py::TestOnboardingMidTransactionRollback::test_failure_after_fitness_insert_rolls_back
+      - tests/integration/test_onboarding_rollback.py::TestOnboardingMidTransactionRollback::test_failure_after_physiology_insert_rolls_back_all
+      - tests/integration/test_onboarding_rollback.py::TestOnboardingMidTransactionRollback::test_failure_keeps_profile_state_unchanged
     api:
       - tests/api/test_require_self.py::TestRequireSelf::test_authenticated_own_jwt_succeeds
       - tests/api/test_require_self.py::TestRequireSelf::test_authenticated_different_athlete_jwt_returns_403
       - tests/api/test_require_self.py::TestRequireSelf::test_expired_access_token_returns_401
       - tests/api/test_require_self.py::TestRequireSelf::test_missing_authorization_header_returns_401
-    behaviour: []
+      - tests/api/test_onboarding_endpoints.py::TestPostOnboardingEndpoint::test_post_onboarding_201_returns_response
+      - tests/api/test_onboarding_endpoints.py::TestPostOnboardingEndpoint::test_post_onboarding_403_when_path_id_mismatches_jwt
+      - tests/api/test_onboarding_endpoints.py::TestPostOnboardingEndpoint::test_post_onboarding_404_when_athlete_missing
+      - tests/api/test_onboarding_endpoints.py::TestPostOnboardingEndpoint::test_post_onboarding_409_when_already_complete
+      - tests/api/test_onboarding_endpoints.py::TestPostOnboardingEndpoint::test_post_onboarding_422_when_goal_type_invalid
+      - tests/api/test_onboarding_endpoints.py::TestPostOnboardingEndpoint::test_post_onboarding_422_when_timezone_invalid
+      - tests/api/test_onboarding_endpoints.py::TestGetOnboardingStatusEndpoint::test_get_status_after_onboarding_returns_true
+      - tests/api/test_onboarding_endpoints.py::TestGetOnboardingStatusEndpoint::test_get_status_before_onboarding_returns_false
+      - tests/api/test_onboarding_endpoints.py::TestGetPreferencesEndpoint::test_get_preferences_404_before_onboarding
+      - tests/api/test_onboarding_endpoints.py::TestGetPreferencesEndpoint::test_get_preferences_returns_after_onboarding
+      - tests/api/test_onboarding_endpoints.py::TestGetProfileEndpoint::test_get_profile_403_on_cross_athlete
+      - tests/api/test_onboarding_endpoints.py::TestGetProfileEndpoint::test_get_profile_returns_registered_profile
+      - tests/api/test_onboarding_endpoints.py::TestPatchPreferencesEndpoint::test_patch_preferences_merges_day_level
+      - tests/api/test_onboarding_endpoints.py::TestPatchPreferencesEndpoint::test_patch_preferences_rejects_unknown_field
+      - tests/api/test_onboarding_endpoints.py::TestPatchPreferencesEndpoint::test_patch_preferences_updates_top_level
+      - tests/api/test_onboarding_endpoints.py::TestPatchProfileEndpoint::test_patch_profile_rejects_immutable_date_of_birth
+      - tests/api/test_onboarding_endpoints.py::TestPatchProfileEndpoint::test_patch_profile_rejects_immutable_timezone
+      - tests/api/test_onboarding_endpoints.py::TestPatchProfileEndpoint::test_patch_profile_rejects_unknown_field
+      - tests/api/test_onboarding_endpoints.py::TestPatchProfileEndpoint::test_patch_profile_updates_height
+      - tests/api/test_onboarding_endpoints.py::TestGetTwinEndpoints::test_get_twin_404_before_onboarding
+      - tests/api/test_onboarding_endpoints.py::TestGetTwinEndpoints::test_get_twin_history_returns_after_onboarding
+      - tests/api/test_onboarding_endpoints.py::TestGetTwinEndpoints::test_get_twin_returns_bootstrap_state
+    behaviour:
+      - tests/behaviour/test_onboarding_journey.py::TestOnboardingJourney::test_cross_athlete_403_blocks_every_endpoint
+      - tests/behaviour/test_onboarding_journey.py::TestOnboardingJourney::test_full_journey_register_to_get_twin
   regression:
     unit: []
     integration: []

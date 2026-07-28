@@ -15,9 +15,7 @@ async def discard_refresh_token_ips(
 ) -> int:
     async with AsyncSessionLocal() as session:
         repository = RefreshTokenRepository(session)
-        discarded = await repository.discard_old_ips(
-            retention_days=retention_days
-        )
+        discarded = await repository.discard_old_ips(retention_days=retention_days)
         await session.commit()
     logger.info(
         "refresh_token_ip_discard.completed",

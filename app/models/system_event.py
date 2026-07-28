@@ -62,9 +62,7 @@ class SystemEvent(Base):
     )
     event_type: Mapped[str] = mapped_column(String(96), nullable=False)
     version: Mapped[str] = mapped_column(String(16), nullable=False, default="v1")
-    athlete_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), nullable=False
-    )
+    athlete_id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     payload: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
     produced_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -181,8 +179,6 @@ class SystemEventOutbox(Base):
         Index(
             "ix_system_event_outbox_pending_failed",
             "created_at",
-            postgresql_where=(
-                "status IN ('pending', 'failed')"
-            ),
+            postgresql_where=("status IN ('pending', 'failed')"),
         ),
     )

@@ -120,9 +120,7 @@ async def get_coach_messages(
         athlete_id, message_type=message_type, limit=limit, offset=offset
     )
 
-    total = await coaching_messages.get_all_count(
-        athlete_id, message_type=message_type
-    )
+    total = await coaching_messages.get_all_count(athlete_id, message_type=message_type)
 
     return MessagesListResponse(
         messages=[CoachingMessageResponse.model_validate(m) for m in messages],

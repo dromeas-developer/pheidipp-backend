@@ -84,9 +84,7 @@ class TrainingPlanRepository:
         )
         return result.scalar_one_or_none()
 
-    async def get_by_id(
-        self, plan_id: uuid.UUID
-    ) -> Optional[TrainingPlan]:
+    async def get_by_id(self, plan_id: uuid.UUID) -> Optional[TrainingPlan]:
         result = await self.session.execute(
             select(TrainingPlan).where(TrainingPlan.id == plan_id)
         )

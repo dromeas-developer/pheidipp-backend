@@ -13,32 +13,33 @@ from dataclasses import dataclass
 @dataclass
 class PDFConfig:
     """Configuration for PDF generation."""
+
     page_margin: str = "0.5in"  # Page margins (top, right, bottom, left)
-    body_padding: str = "0"      # Body padding (in addition to page margin)
-    base_font_size: str = "11pt" # Base font size for body text
-    line_height: float = 1.4     # Line height multiplier
-    
+    body_padding: str = "0"  # Body padding (in addition to page margin)
+    base_font_size: str = "11pt"  # Base font size for body text
+    line_height: float = 1.4  # Line height multiplier
+
     # Heading 1 styling
-    h1_size: str = "18pt"        # Heading 1 font size
+    h1_size: str = "18pt"  # Heading 1 font size
     h1_margin_top: str = "20px"  # Heading 1 top margin
     h1_margin_bottom: str = "15px"  # Heading 1 bottom margin
     h1_padding_bottom: str = "10px"  # Heading 1 padding bottom
-    
+
     # Heading 2 styling
-    h2_size: str = "15pt"        # Heading 2 font size
+    h2_size: str = "15pt"  # Heading 2 font size
     h2_margin_top: str = "18px"  # Heading 2 top margin
     h2_margin_bottom: str = "12px"  # Heading 2 bottom margin
-    
+
     # Heading 3 styling
-    h3_size: str = "13pt"        # Heading 3 font size
+    h3_size: str = "13pt"  # Heading 3 font size
     h3_margin_top: str = "15px"  # Heading 3 top margin
-    h3_margin_bottom: str = "8px"   # Heading 3 bottom margin
+    h3_margin_bottom: str = "8px"  # Heading 3 bottom margin
 
 
 def md_to_pdf(md_file: str, pdf_file: str = None, config: PDFConfig = None) -> None:
     """
     Convert a markdown file to PDF.
-    
+
     Args:
         md_file: Path to the markdown file
         pdf_file: Path for output PDF (defaults to same name with .pdf extension)
@@ -47,22 +48,24 @@ def md_to_pdf(md_file: str, pdf_file: str = None, config: PDFConfig = None) -> N
     if config is None:
         config = PDFConfig()
     md_path = Path(md_file)
-    
+
     if not md_path.exists():
         print(f"Error: {md_file} not found")
         return
-    
+
     if pdf_file is None:
-        pdf_file = md_path.with_suffix('.pdf')
-    
+        pdf_file = md_path.with_suffix(".pdf")
+
     try:
         # Read markdown content
-        with open(md_path, 'r', encoding='utf-8') as f:
+        with open(md_path, "r", encoding="utf-8") as f:
             md_content = f.read()
-        
+
         # Convert markdown to HTML
-        html_content = markdown(md_content, extensions=['tables', 'fenced_code', 'codehilite'])
-        
+        html_content = markdown(
+            md_content, extensions=["tables", "fenced_code", "codehilite"]
+        )
+
         # Create styled HTML document
         html_string = f"""
         <!DOCTYPE html>
@@ -209,11 +212,11 @@ def md_to_pdf(md_file: str, pdf_file: str = None, config: PDFConfig = None) -> N
         </body>
         </html>
         """
-        
+
         # Generate PDF
         HTML(string=html_string).write_pdf(pdf_file)
         print(f"✓ Successfully generated: {pdf_file}")
-        
+
     except Exception as e:
         print(f"Error converting {md_file}: {e}")
 
@@ -221,11 +224,11 @@ def md_to_pdf(md_file: str, pdf_file: str = None, config: PDFConfig = None) -> N
 if __name__ == "__main__":
     # Default configuration (compact with smaller margins and fonts)
     default_config = PDFConfig()
-    
+
     # Convert both combined documentation files
     md_to_pdf("VISION_COMBINED.md", config=default_config)
     md_to_pdf("ARCHITECTURE_COMBINED.md", config=default_config)
-    
+
     # Example: Custom config for more compact PDFs
     # compact_config = PDFConfig(
     #     page_margin="0.4in",

@@ -68,7 +68,9 @@ class TrainingPlan(Base):
     # test pack (``fk_training_plans_twin_state``).
     twin_state_id: Mapped[uuid.UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),
-        ForeignKey("twin_states.id", ondelete="SET NULL", name="fk_training_plans_twin_state"),
+        ForeignKey(
+            "twin_states.id", ondelete="SET NULL", name="fk_training_plans_twin_state"
+        ),
         nullable=True,
     )
 
@@ -116,7 +118,9 @@ class TrainingPlan(Base):
     # Both are JSONB so the architecture shape can be enforced at the
     # application layer without database migration churn.
     # ------------------------------------------------------------------
-    strategic_rationale: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    strategic_rationale: Mapped[dict[str, Any] | None] = mapped_column(
+        JSONB, nullable=True
+    )
     checkpoint_schedule: Mapped[list[dict[str, Any]]] = mapped_column(
         JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb")
     )

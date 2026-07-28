@@ -431,3 +431,11 @@ Avoid:
 * vague capability descriptions ("improve performance", "add support for X")
 * implementation details — that belongs in the architect's plan
 * generic roadmap prose
+
+---
+
+## Output
+
+Write sub-phase documents via `write`. The response text is a single-line
+confirmation: which documents were created or modified. The documents are
+the output — no prose summary.

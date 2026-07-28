@@ -219,7 +219,7 @@ One paragraph — what this test layer verifies and what boundaries it respects.
   `__init__.py`, `__pycache__/`, `conftest.py`, and test helper files
   (files starting with `_` like `_factories.py` or `_assertions.py`)
 * The `Covers` column: `ClassName: comma-separated capability list`.
-  Derive from the test pack's capability descriptions if available; from
+  Derive from the manifest's capability descriptions if available; from
   test file names and function names otherwise
 
 ## Mock Boundaries
@@ -249,18 +249,17 @@ One paragraph — what this test layer verifies and what boundaries it respects.
   project root
 
 **From p-test-architect** (tests/ READMEs):
-* **Test pack path** — `docs/testing/<plan_id>_test_pack.md`
+* **Manifest path** — the sub-phase file (`tests/test-manifest/phase-N-Mx.yaml`)
+  for file-to-function mappings and capability descriptions
 * **File list** — the test files created or modified, as a
   space-separated or newline-separated list of paths relative to the
   project root
-* **Manifest path** — the sub-phase file (`tests/test-manifest/phase-N-Mx.yaml`)
-  for capability descriptions (optional but preferred — use if provided)
 
 ### Baseline Mode
 * **Folder list** — one or more folders under `app/` or `tests/` to
   baseline (e.g. `app/services/ tests/unit/ tests/integration/`). For
   `tests/` folders, the test-folder README variant applies
-* No BRD or test pack is provided in this mode
+* No BRD or manifest is provided in this mode
 * Baseline Mode writes READMEs ONLY — never edits source files
 
 ### Cleanup Mode
@@ -293,8 +292,8 @@ processing large batches across multiple files.
 
 Determine which mode applies from the prompt:
 * A BRD path → Incremental (p-coder)
-* A test pack path → Incremental (p-test-architect)
-* The word "baseline" and no BRD/test pack → Baseline (READMEs only)
+* A manifest path → Incremental (p-test-architect)
+* The word "baseline" and no BRD/manifest → Baseline (READMEs only)
 * The word "cleanup" → Cleanup (comment stripping only)
 * The word "summarize" → Summarize (move docs to READMEs, compact docstrings)
 
@@ -304,11 +303,11 @@ Modes never combine. A single invocation runs exactly one mode.
 
 Invoked by `p-coder` or `p-test-architect` at the end of every batch
 implementation or test generation. Determine the caller from what was
-provided: a BRD path → p-coder; a test pack path → p-test-architect.
+provided: a BRD path → p-coder; a manifest path → p-test-architect.
 
 **Procedure (p-coder — app/ READMEs):**
 
-1. **Read the BRD** via `get_files` to understand what was implemented
+1. **Read the BRD** via `pheidipp-codebase-context_get_files` to understand what was implemented
    and which architectural context it introduced.
 
  2. **Identify affected folders.** From the file list, extract the
@@ -322,13 +321,13 @@ provided: a BRD path → p-coder; a test pack path → p-test-architect.
 
 3. **For each affected folder:**
    a. Check whether a `README.md` already exists in that folder via
-      `find_files` with pattern `<folder>/README.md`. Batch these
-      checks — one `find_files` call with all folder paths.
-   b. Read every existing README via `get_files` in one batched call.
+      `pheidipp-codebase-context_find_files` with pattern `<folder>/README.md`. Batch these
+      checks — one `pheidipp-codebase-context_find_files` call with all folder paths.
+   b. Read every existing README via `pheidipp-codebase-context_get_files` in one batched call.
    c. Read every file in the folder that you haven't already seen from
       the BRD — you need to populate the `## Contents` table accurately.
-      Use `get_files` for folders with few files; use
-      `search_symbols` for large folders to get class/function names
+      Use `pheidipp-codebase-context_get_files` for folders with few files; use
+      `pheidipp-codebase-context_search_symbols` for large folders to get class/function names
       efficiently.
    d. Update the README:
       - Add new files to `## Contents` under the appropriate domain group.
@@ -344,31 +343,26 @@ provided: a BRD path → p-coder; a test pack path → p-test-architect.
       populated from the files in that folder.
    f. Write or edit via `edit` (existing) or `write` (new).
 
-4. **Return a summary** naming which READMEs were created or updated and
-   which files were added to each `## Contents` table. No prose beyond
-   the summary.
+ 4. **Return a single-line confirmation.** Follow the Output format above — one line, no prose.
 
 **Procedure (p-test-architect — tests/ READMEs):**
 
-1. **Read the test pack** via `get_files` to understand what was tested
-   and the capability descriptions for each test file.
+ 1. **Read the manifest** (sub-phase file) via `pheidipp-codebase-context_get_files`. The manifest's
+    capability inventory maps capabilities to test types and file scopes —
+    use it to populate accurate `Covers` descriptions.
 
-2. **Read the manifest** (sub-phase file) via `get_files` if provided.
-   The manifest's capability inventory maps capabilities to test types
-   and file scopes — use it to populate accurate `Covers` descriptions.
-
-3. **Identify affected directories.** From the file list, extract the
+ 2. **Identify affected directories.** From the file list, extract the
    unique parent directories under `tests/` (e.g. `tests/unit/`,
    `tests/integration/`). Ignore top-level `tests/` files (conftest.py,
    payloads.py) — those don't get per-file README coverage.
 
-4. **For each affected test directory:**
-   a. Check whether a `README.md` already exists via `find_files`.
-      Batch checks across all directories.
-   b. Read existing READMEs via `get_files` in one batched call.
-   c. For each new or modified test file, derive its `Covers`
-      description from the test pack's capability list (preferred) or
-      from the test file's function names (fallback).
+ 3. **For each affected test directory:**
+    a. Check whether a `README.md` already exists via `pheidipp-codebase-context_find_files`.
+       Batch checks across all directories.
+    b. Read existing READMEs via `pheidipp-codebase-context_get_files` in one batched call.
+    c. For each new or modified test file, derive its `Covers`
+       description from the manifest's capability descriptions (preferred)
+       or from the test file's function names (fallback).
    d. Update or create the README following the test-folder README
       variant format above.
    e. `## Mock Boundaries` should reference `tests/MOCKING_CONTRACT.md`
@@ -376,8 +370,7 @@ provided: a BRD path → p-coder; a test pack path → p-test-architect.
       patterns only (e.g. "unit tests mock the session, not the
       repository").
 
-5. **Return a summary** naming which test-directory READMEs were created
-   or updated and which test files were added.
+ 4. **Return a single-line confirmation.** Follow the Output format above.
 
 **Discovery constraint (both):** you may only open files in the folders
 named by the file list or the provided document's scope. Do not explore
@@ -395,12 +388,12 @@ folders that have none.
 **Procedure:**
 
 1. **For each folder in the list — use the prompt's format, not existing READMEs:**
-   a. List all `.py` files via `find_files` with pattern `<folder>/*.py`.
+   a. List all `.py` files via `pheidipp-codebase-context_find_files` with pattern `<folder>/*.py`.
       Exclude `__init__.py` and `__pycache__/`.
       Do NOT search for or read READMEs in other folders — the format is
       defined in this prompt's README Format section, not in what other
       folders happened to write.
-   b. Read every `.py` file via `get_files` in one batched call.
+   b. Read every `.py` file via `pheidipp-codebase-context_get_files` in one batched call.
    c. Build the `## Contents` table — group files by domain or concept,
       then alphabetical within each group. Derive a one-line
       responsibility from each file's class/function names and module
@@ -413,8 +406,7 @@ folders that have none.
       in `## Architecture Notes`.
    f. Write the README via `write` to `<folder>/README.md`.
 
-2. **Return a summary** listing: folders baselined and READMEs created.
-   No source files were edited in this mode.
+ 2. **Return a single-line confirmation.** Follow the Output format above.
 
 ---
 
@@ -434,7 +426,7 @@ invocation.
 **Procedure:**
 
 1. **For each `.py` file** in every named folder, apply these removals.
-   Use `find_files` with pattern `<folder>/*.py` to list files. Exclude
+   Use `pheidipp-codebase-context_find_files` with pattern `<folder>/*.py` to list files. Exclude
    `__init__.py` and `__pycache__/`.
 
    **These rules are heuristics, not a formal grammar.** When a match
@@ -468,9 +460,7 @@ invocation.
    time. After editing a file, do not re-read it unless the next edit
    targets an overlapping region.
 
-3. **Return a summary** listing: folders cleaned, total comment lines
-   removed per folder, and any files or patterns skipped due to
-    ambiguous matches. No READMEs were touched in this mode.
+ 3. **Return a single-line confirmation.** Follow the Output format above.
 
 ---
 
@@ -496,7 +486,7 @@ rewrite full Contents tables.
 **Procedure:**
 
 1. **For each `.py` file** in every named folder, scan for bloated inline
-   documentation. Use `find_files` with pattern `<folder>/*.py` to list
+   documentation. Use `pheidipp-codebase-context_find_files` with pattern `<folder>/*.py` to list
    files. Exclude `__init__.py` and `__pycache__/`.
 
 2. **Identify extractable content.** For each file, look for:
@@ -549,9 +539,7 @@ rewrite full Contents tables.
      when the signature says `str`)
    - A raise condition that isn't obvious from the error class name
 
-5. **Return a summary** listing: folders processed, README sections
-   updated, total docstring lines compacted per file, and any files
-   skipped because their docstrings were already compact.
+ 5. **Return a single-line confirmation.** Follow the Output format above.
 
 ## Success Criteria
 
@@ -595,29 +583,12 @@ rewrite full Contents tables.
 
 ## Output
 
-* Updated or created `README.md` files — never in response text
-  (Incremental, Baseline, and Summarize Modes)
-* Edited source files with comments stripped — never in response text
-  (Cleanup Mode)
-* Edited source files with compacted docstrings — never in response text
-  (Summarize Mode)
-* Final response: summary only — folders touched, READMEs created/updated,
-  comment lines stripped (Cleanup only), docstring lines compacted
-  (Summarize only), files skipped (if any)
+Write files via tools only — never in response text. The response text is a
+single-line confirmation. One line, no prose, no sections:
 
-### Output Format (NON-NEGOTIABLE)
+* Incremental / Baseline / Summarize: `✅ <N> READMEs updated, <M> created in <folders>.`
+* Cleanup: `✅ Stripped <N> comment lines from <M> files in <folder>. Skipped <K> ambiguous.`
+* Failure / nothing done: `⚠️ No changes — <reason>.`
 
-The output is plain Markdown — no annotation, no citation markers, no
-grounding tokens. This applies to every `write` and `edit` call, and to
-your final response summary.
-
-**Specifically banned:**
-* `<co>...</co>` and `</co:N:[M]>` — Cohere citation/grounding markers
-* `<citation ...>` or `<cite>` tags of any kind
-* `[N]` or `[N:M]` superscript-style reference markers
-* Any XML/HTML tag that is not part of the README content you intend to write
-
-If your model is configured to emit citation markers, disable grounding
-mode for this invocation. The README files are documentation, not search
-results — they must be clean Markdown ready for human and agent
-consumption with no tooling artifacts.
+If your model emits citation markers, suppress them — the response is
+not a document.

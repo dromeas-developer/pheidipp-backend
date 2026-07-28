@@ -234,9 +234,7 @@ class ThresholdDetectionService:
         activity_repository: ActivityRepository,
         athlete_physiology_repository: AthletePhysiologyRepository,
         physiology_measurement_repository: PhysiologyMeasurementRepository,
-        planned_session_repository: Optional[
-            PlannedSessionRepository
-        ] = None,
+        planned_session_repository: Optional[PlannedSessionRepository] = None,
     ) -> None:
         # NOTE: the `session` parameter is retained because the
         # worker constructs the service with `session=session` and
@@ -331,17 +329,13 @@ class ThresholdDetectionService:
             return []
 
         # Download and deserialise the cleaned stream.
-        cleaned_bytes = await self.object_storage.download_fit(
-            raw_stream.fit_file_key
-        )
+        cleaned_bytes = await self.object_storage.download_fit(raw_stream.fit_file_key)
         stream = _parse_cleaned_stream(cleaned_bytes)
 
         # Signal selection — route to applicable algorithms.
         observations: List[ThresholdObservation] = []
         if activity.has_rr_intervals and stream.available_channels.rr_intervals:
-            observations.extend(
-                _rr_inflection(stream, activity)
-            )
+            observations.extend(_rr_inflection(stream, activity))
         if activity.has_hr:
             observations.extend(_hr_deflection(stream, activity))
             if activity.has_power and stream.available_channels.power:
@@ -425,8 +419,12 @@ def _hr_deflection(
         intensity_non_null = [v for v in intensity_values if v is not None]
         if not intensity_non_null:
             continue
-        bin_means.append((sum(intensity_non_null) / len(intensity_non_null),
-                          sum(hr_non_null) / len(hr_non_null)))
+        bin_means.append(
+            (
+                sum(intensity_non_null) / len(intensity_non_null),
+                sum(hr_non_null) / len(hr_non_null),
+            )
+        )
 
     if len(bin_means) < MIN_INTENSITY_STEPS:
         return []
@@ -567,8 +565,7 @@ def _rr_inflection(
     reflects RMSSD signal quality (higher when the RMSSD
     time-series is well-defined and the inflection is clear).
     """
-    rr_series = [(r.t, r.rr_ms) for r in stream.time_series
-                 if r.rr_ms is not None]
+    rr_series = [(r.t, r.rr_ms) for r in stream.time_series if r.rr_ms is not None]
     if not rr_series:
         return []
 
@@ -583,9 +580,7 @@ def _rr_inflection(
         return []
 
     # Segment into intensity bins and compute mean RMSSD per bin.
-    bins = _segment_into_intensity_bins_from_series(
-        intensity_series, rmssd_series
-    )
+    bins = _segment_into_intensity_bins_from_series(intensity_series, rmssd_series)
     if len(bins) < 2:
         return []
 
@@ -605,8 +600,10 @@ def _rr_inflection(
         if not rmssd_non_null or not intensity_non_null:
             continue
         bin_rmssd.append(
-            (sum(intensity_non_null) / len(intensity_non_null),
-             sum(rmssd_non_null) / len(rmssd_non_null))
+            (
+                sum(intensity_non_null) / len(intensity_non_null),
+                sum(rmssd_non_null) / len(rmssd_non_null),
+            )
         )
 
     if len(bin_rmssd) < 2:
@@ -713,8 +710,11 @@ def _power_hr_ratio(
     # Compute power/HR ratio per second.
     ratios: List[Tuple[int, float]] = []
     for record in stream.time_series:
-        if record.power_w is not None and record.hr_bpm is not None \
-                and record.hr_bpm > 0:
+        if (
+            record.power_w is not None
+            and record.hr_bpm is not None
+            and record.hr_bpm > 0
+        ):
             ratios.append((record.t, record.power_w / record.hr_bpm))
 
     if len(ratios) < MIN_INTENSITY_STEPS * RMSSD_WINDOW_S:
@@ -733,8 +733,10 @@ def _power_hr_ratio(
         if not ratio_non_null or not intensity_non_null:
             continue
         bin_ratios.append(
-            (sum(intensity_non_null) / len(intensity_non_null),
-             sum(ratio_non_null) / len(ratio_non_null))
+            (
+                sum(intensity_non_null) / len(intensity_non_null),
+                sum(ratio_non_null) / len(ratio_non_null),
+            )
         )
 
     if len(bin_ratios) < MIN_INTENSITY_STEPS:
@@ -752,7 +754,7 @@ def _power_hr_ratio(
     # Detect sustained decline: the ratio in the highest-intensity
     # bins must be below baseline by more than
     # RATIO_DECLINE_THRESHOLD.
-    high_bins = bin_ratios[-max(2, len(bin_ratios) // 3):]
+    high_bins = bin_ratios[-max(2, len(bin_ratios) // 3) :]
     high_ratio = sum(r for _, r in high_bins) / len(high_bins)
     decline_fraction = (baseline_ratio - high_ratio) / baseline_ratio
 
@@ -868,9 +870,7 @@ async def _natural_training_analysis(
     for candidate in recent_activities:
         if candidate.planned_session_id is None:
             continue
-        planned = await service.planned_sessions.get_by_id(
-            candidate.planned_session_id
-        )
+        planned = await service.planned_sessions.get_by_id(candidate.planned_session_id)
         if planned is None:
             continue
         if planned.session_type not in (
@@ -882,9 +882,7 @@ async def _natural_training_analysis(
         # Download the cleaned stream. If the stream is missing
         # (cleaning not yet complete for this activity) skip
         # silently — natural training analysis fails open.
-        raw_stream = await service.raw_streams.get_by_activity_id(
-            candidate.id
-        )
+        raw_stream = await service.raw_streams.get_by_activity_id(candidate.id)
         if raw_stream is None:
             continue
         if not candidate.has_hr:
@@ -914,9 +912,7 @@ async def _natural_training_analysis(
     # Confidence weight: tighter spread → higher confidence.
     # Map [0, 5] bpm spread → [1.0, 0.0] confidence.
     spread = max(abs(hr - median_hr) for hr in sorted_hrs)
-    confidence_weight = max(
-        0.0, min(1.0, 1.0 - spread / EASY_RUN_HR_TOLERANCE_BPM)
-    )
+    confidence_weight = max(0.0, min(1.0, 1.0 - spread / EASY_RUN_HR_TOLERANCE_BPM))
 
     return [
         ThresholdObservation(
@@ -932,9 +928,7 @@ async def _natural_training_analysis(
     ]
 
 
-def _hr_drift(
-    stream: CleanedStream, activity: Activity
-) -> List[ThresholdObservation]:
+def _hr_drift(stream: CleanedStream, activity: Activity) -> List[ThresholdObservation]:
     """LT1 method 4 — HR drift (steady-state stability).
 
     Implements the algorithm specified in
@@ -989,32 +983,37 @@ def _hr_drift(
 
     start_t, end_t = segment
     hr_in_segment = [
-        r.hr_bpm for r in stream.time_series
+        r.hr_bpm
+        for r in stream.time_series
         if r.t >= start_t and r.t <= end_t and r.hr_bpm is not None
     ]
     if len(hr_in_segment) < HR_DRIFT_START_S + HR_DRIFT_END_S:
         return []
 
-    hr_start = sum(
-        r.hr_bpm for r in stream.time_series
-        if r.t >= start_t
-        and r.t < start_t + HR_DRIFT_START_S
-        and r.hr_bpm is not None
-    ) / HR_DRIFT_START_S
-    hr_end = sum(
-        r.hr_bpm for r in stream.time_series
-        if r.t > end_t - HR_DRIFT_END_S
-        and r.t <= end_t
-        and r.hr_bpm is not None
-    ) / HR_DRIFT_END_S
+    hr_start = (
+        sum(
+            r.hr_bpm
+            for r in stream.time_series
+            if r.t >= start_t
+            and r.t < start_t + HR_DRIFT_START_S
+            and r.hr_bpm is not None
+        )
+        / HR_DRIFT_START_S
+    )
+    hr_end = (
+        sum(
+            r.hr_bpm
+            for r in stream.time_series
+            if r.t > end_t - HR_DRIFT_END_S and r.t <= end_t and r.hr_bpm is not None
+        )
+        / HR_DRIFT_END_S
+    )
     drift = hr_end - hr_start
 
     if drift >= HR_DRIFT_ABOVE_LT1_BPM:
         # Above LT1 — segment mean HR is a lower bound.
         mean_hr = (hr_start + hr_end) / 2.0
-        confidence_weight = max(
-            0.0, min(1.0, (drift - HR_DRIFT_ABOVE_LT1_BPM) / 5.0)
-        )
+        confidence_weight = max(0.0, min(1.0, (drift - HR_DRIFT_ABOVE_LT1_BPM) / 5.0))
         return [
             ThresholdObservation(
                 parameter=PhysiologyParameter.LT1_HR,
@@ -1030,9 +1029,7 @@ def _hr_drift(
     if drift <= HR_DRIFT_BELOW_LT1_BPM:
         # Below LT1 — segment mean HR is an upper bound.
         mean_hr = (hr_start + hr_end) / 2.0
-        confidence_weight = max(
-            0.0, min(1.0, (HR_DRIFT_BELOW_LT1_BPM - drift) / 2.0)
-        )
+        confidence_weight = max(0.0, min(1.0, (HR_DRIFT_BELOW_LT1_BPM - drift) / 2.0))
         return [
             ThresholdObservation(
                 parameter=PhysiologyParameter.LT1_HR,
@@ -1126,9 +1123,7 @@ def _hr_recovery(
             continue
         if v is not None and v < hard_effort_threshold:
             drop_window.append(t)
-            if len(drop_window) >= 10 and (
-                drop_window[-1] - drop_window[0] >= 9
-            ):
+            if len(drop_window) >= 10 and (drop_window[-1] - drop_window[0] >= 9):
                 cessation_t = drop_window[0]
                 break
         else:
@@ -1148,10 +1143,7 @@ def _hr_recovery(
         None,
     )
     hr_at_2min = next(
-        (
-            v for t, v in reversed(smoothed)
-            if t <= recovery_end_t and v is not None
-        ),
+        (v for t, v in reversed(smoothed) if t <= recovery_end_t and v is not None),
         None,
     )
     if hr_at_cessation is None or hr_at_2min is None:
@@ -1254,10 +1246,10 @@ def _find_steady_state_segment(
 
         # Score = combined CV of pace and grade. Lower is better.
         pace_cv = _coefficient_of_variation(
-            [v for _, v in pace_series[i:i + window_size] if v is not None]
+            [v for _, v in pace_series[i : i + window_size] if v is not None]
         )
         grade_cv = _coefficient_of_variation(
-            [v for _, v in grade_series[i:i + window_size] if v is not None]
+            [v for _, v in grade_series[i : i + window_size] if v is not None]
         )
         # When pace or grade is missing, ignore that dimension.
         pace_score = pace_cv if pace_cv is not None else 0.0
@@ -1368,7 +1360,10 @@ def _segment_into_intensity_bins_from_series(
 
     step_size = intensity_range / 10.0
 
-    bins: dict[float, tuple[list[tuple[int, Optional[float]]], list[tuple[int, Optional[float]]]]] = {}
+    bins: dict[
+        float,
+        tuple[list[tuple[int, Optional[float]]], list[tuple[int, Optional[float]]]],
+    ] = {}
     for (t_i, i_val), (t_v, v_val) in zip(intensity_series, value_series):
         if i_val is None:
             continue
@@ -1441,7 +1436,7 @@ def _linear_regression(
     sum_xy = sum(p[0] * p[1] for p in points)
     sum_x2 = sum(p[0] ** 2 for p in points)
 
-    denominator = n * sum_x2 - sum_x ** 2
+    denominator = n * sum_x2 - sum_x**2
     if denominator == 0:
         return 0.0, sum_y / n, 0.0
 
@@ -1479,8 +1474,7 @@ def _compute_rmssd_rolling(
     for i in range(1, len(rr_series)):
         t_current = rr_series[i][0]
         # Advance window start to maintain window_s width.
-        while (rr_series[window_start_idx][0]
-               < t_current - window_s):
+        while rr_series[window_start_idx][0] < t_current - window_s:
             window_start_idx += 1
             if window_start_idx >= i:
                 break
@@ -1490,16 +1484,15 @@ def _compute_rmssd_rolling(
             continue
 
         # Compute successive differences within the window.
-        window = rr_series[window_start_idx:i + 1]
+        window = rr_series[window_start_idx : i + 1]
         if len(window) < 2:
             result.append((t_current, None))
             continue
 
-        successive_diffs = [window[j + 1][1] - window[j][1]
-                            for j in range(len(window) - 1)]
-        rmssd = math.sqrt(
-            sum(d ** 2 for d in successive_diffs) / len(successive_diffs)
-        )
+        successive_diffs = [
+            window[j + 1][1] - window[j][1] for j in range(len(window) - 1)
+        ]
+        rmssd = math.sqrt(sum(d**2 for d in successive_diffs) / len(successive_diffs))
         result.append((t_current, rmssd))
 
     return result
@@ -1530,9 +1523,7 @@ def _compute_bin_durations(stream: CleanedStream) -> List[int]:
     return [len(intensity_values) for intensity_values, _ in bins]
 
 
-def _hr_at_intensity(
-    stream: CleanedStream, target_intensity: float
-) -> Optional[float]:
+def _hr_at_intensity(stream: CleanedStream, target_intensity: float) -> Optional[float]:
     """Return the mean HR at a given intensity level.
 
     Used by the RR inflection algorithm to map an inflection

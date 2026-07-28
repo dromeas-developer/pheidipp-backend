@@ -9,7 +9,9 @@ from app.utils.email_utils import normalize_email
 
 
 class TestEmailUniqueness:
-    async def test_duplicate_email_rejected_with_integrity_error(self, db_session: AsyncSession):
+    async def test_duplicate_email_rejected_with_integrity_error(
+        self, db_session: AsyncSession
+    ):
         email = "dup@example.com"
         athlete1 = Athlete(id=uuid.uuid4(), email=email)
         db_session.add(athlete1)

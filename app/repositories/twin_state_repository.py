@@ -25,9 +25,7 @@ class TwinStateRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def get_latest(
-        self, athlete_id: uuid.UUID
-    ) -> Optional[TwinState]:
+    async def get_latest(self, athlete_id: uuid.UUID) -> Optional[TwinState]:
         """Return the most recent ``TwinState`` for *athlete_id*, or ``None``.
 
         Uses the ``idx_twin_states_latest`` composite index on
@@ -42,17 +40,13 @@ class TwinStateRepository:
         )
         return result.scalar_one_or_none()
 
-    async def get_by_id(
-        self, twin_state_id: uuid.UUID
-    ) -> Optional[TwinState]:
+    async def get_by_id(self, twin_state_id: uuid.UUID) -> Optional[TwinState]:
         result = await self.session.execute(
             select(TwinState).where(TwinState.id == twin_state_id)
         )
         return result.scalar_one_or_none()
 
-    async def get_by_activity(
-        self, activity_id: uuid.UUID
-    ) -> Optional[TwinState]:
+    async def get_by_activity(self, activity_id: uuid.UUID) -> Optional[TwinState]:
         """Return the most recent TwinState recorded for *activity_id*.
 
         After the ``uq_twin_states_athlete_activity`` unique index was

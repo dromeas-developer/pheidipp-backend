@@ -18,6 +18,15 @@ collaborator services, and repositories.
 |---|---|
 | `test_model_repository_contracts.py` | TestActivityModelColumns (no avg_hr/summary/lap columns), TestTwinStateRepositoryContract (6 methods: insert, get_latest, get_by_id, get_by_activity, get_by_activity_and_trigger, get_history; no update/delete), TestCoachingMessageRepositoryContract (6 methods: insert, get_by_athlete_id, get_by_athlete_and_type, get_existing_first_message, get_by_activity_and_type, get_all_count; no update/delete), TestSystemEventRepositoryContract (only add method; no read/update/delete) |
 
+### Onboarding & Twin Bootstrap
+| File | Covers |
+|---|---|
+| `test_bootstrap_helpers.py` | TestAgeInYears (birthday-based year computation), TestBootstrapSignal (prior_weight=0.5, uncertainty=1.0, dominant_source=questionnaire_estimate), TestBootstrapMetricConfidence (only lt1_hr/lt2_hr low, all other keys null) |
+| `test_data_tier.py` | TestInferDataTier (6-tier inference from hr_source×power_source cartesian product, Tier 1-6 including T6 fallback) |
+| `test_goal_type_whitelist.py` | TestGoalTypeWhitelist (race_event + target_performance accepted, fitness_improvement/maintenance/recovery rejected with exact error) |
+| `test_onboarding_schemas.py` | TestOnboardingProfileTimezone (IANA timezone validation), TestWeeklyScheduleCompleteness (7-day completeness + extra-day rejection), TestGoalRequiredFieldsPerType (race_event/target_performance required fields), TestGoalEventDateInFuture (past/today rejected, future accepted), TestOnboardingFieldBounds (years_structured_training 0-80, fitness_level 1-5, weekly_volume_hours/km, height_cm), TestProfileImmutability (date_of_birth/sex/timezone rejected, extra="forbid") |
+| `test_structural_risk_flag.py` | TestStructuralRiskFlag (sport_background != RUNNING_PRIMARY truth table across all 9 SportBackground enum members) |
+
 ### Utilities & Security
 | File | Covers |
 |---|---|

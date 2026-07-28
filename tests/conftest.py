@@ -6,7 +6,12 @@ import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
 import app.models  # noqa: F401  # type: ignore[reportUnusedImport]
 from app.db.base import Base
@@ -19,7 +24,9 @@ def _get_test_database_url() -> str:
     test_url = os.environ.get("TEST_DATABASE_URL")
     if test_url:
         return test_url
-    base = os.environ.get("DATABASE_URL", "postgresql+asyncpg://pheidipp:pheidipp@localhost:5432/pheidipp")
+    base = os.environ.get(
+        "DATABASE_URL", "postgresql+asyncpg://pheidipp:pheidipp@localhost:5432/pheidipp"
+    )
     if base.endswith("/pheidipp"):
         return base.replace("/pheidipp", "/test_pheidipp")
     return base
@@ -37,13 +44,18 @@ def test_engine() -> Generator[AsyncEngine, None, None]:
 @pytest.fixture(scope="function")
 def test_session_local(test_engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
     """async_sessionmaker bound to the per-test engine."""
-    return async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False, autoflush=False)
+    return async_sessionmaker(
+        test_engine, class_=AsyncSession, expire_on_commit=False, autoflush=False
+    )
 
 
 @pytest_asyncio.fixture(scope="function")
-async def db_session(test_session_local: async_sessionmaker[AsyncSession]) -> AsyncGenerator[AsyncSession, None]:
+async def db_session(
+    test_session_local: async_sessionmaker[AsyncSession],
+) -> AsyncGenerator[AsyncSession, None]:
     """Isolated AsyncSession with auto-rollback and post-test truncation."""
     session = test_session_local()
+    session.sync_session.expire_on_commit = False
     try:
         yield session
     finally:
@@ -59,7 +71,9 @@ async def db_session(test_session_local: async_sessionmaker[AsyncSession]) -> As
         try:
             tables = Base.metadata.sorted_tables
             for table in reversed(tables):
-                await cleanup_session.execute(text(f"TRUNCATE TABLE {table.name} CASCADE"))
+                await cleanup_session.execute(
+                    text(f"TRUNCATE TABLE {table.name} CASCADE")
+                )
             await cleanup_session.commit()
         finally:
             try:
@@ -73,7 +87,9 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     """httpx.AsyncClient wired to FastAPI app with db_session override."""
     app.dependency_overrides[get_db] = lambda: db_session
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://testserver/api/v1") as ac:
+    async with AsyncClient(
+        transport=transport, base_url="http://testserver/api/v1"
+    ) as ac:
         yield ac
     app.dependency_overrides.clear()
 

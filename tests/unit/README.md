@@ -27,6 +27,11 @@ collaborator services, and repositories.
 | `test_onboarding_schemas.py` | TestOnboardingProfileTimezone (IANA timezone validation), TestWeeklyScheduleCompleteness (7-day completeness + extra-day rejection), TestGoalRequiredFieldsPerType (race_event/target_performance required fields), TestGoalEventDateInFuture (past/today rejected, future accepted), TestOnboardingFieldBounds (years_structured_training 0-80, fitness_level 1-5, weekly_volume_hours/km, height_cm), TestProfileImmutability (date_of_birth/sex/timezone rejected, extra="forbid") |
 | `test_structural_risk_flag.py` | TestStructuralRiskFlag (sport_background != RUNNING_PRIMARY truth table across all 9 SportBackground enum members) |
 
+### Plan Generation
+| File | Covers |
+|---|---|
+| `test_plan_generation_templates.py` | TestAllocateRaceEventPhases: phase allocation (24-week, 16-week, short-plan fallback, label order, specificity values) · TestDeriveExperienceLevel: experience level derivation (novice <2, intermediate 2-5, experienced >5, zero years) · TestEvaluateTrainingLengthGate: training length gate (marathon/5k/ultra thresholds, fitness gate, unknown goal type default) · TestScheduleCheckpoints: checkpoint scheduling (calibration at phase transition, benchmark week 4, progress review every 4 weeks, race simulation 2 weeks before goal, sorted by week number) |
+
 ### Utilities & Security
 | File | Covers |
 |---|---|

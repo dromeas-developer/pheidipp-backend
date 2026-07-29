@@ -42,6 +42,7 @@ the `db_session` fixture.
 ### Training Goal & Plan
 | File | Covers |
 |---|---|
+| `test_plan_generation_service.py` | TestPlanGenerationGoalTypeValidation: generate_plan goal type validation (race_event, target_performance, unsupported type, no active goal, no twin state, no preferences, missing goal event date) · TestPlanSupersession: plan supersession (active plan superseded, superseded not deleted, sessions retain old plan id) · TestTargetPerformanceGapClassification: target performance gap classification (small, medium, large gap) · TestSessionStructureRules: session structure rules (no consecutive quality, long run recovery, threshold sandwiched, full duration) · TestCheckpointScheduling: checkpoint scheduling (calibration, benchmark week 4, progress review, race simulation, sorted) · TestPlanGenerationPurity: plan generation purity (no LLM calls, training_plan_generated event published) |
 | `test_training_goal_plan_db.py` | TrainingGoal (single active per athlete, multiple inactive allowed, fitness_level range, weekly_volume_hours/km negative), WeeklyPlan (unique plan+week), Checkpoint (planned_session_id one-to-one) |
 
 ## Mock Boundaries

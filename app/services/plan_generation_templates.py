@@ -453,7 +453,7 @@ def _has_low_metric_confidence(
 ) -> bool:
     """True if any of the listed twin metric confidences is ``low`` or ``None``."""
     if not metric_confidence:
-        return True
+        return False
     return any(metric_confidence.get(key) in (None, "low") for key in keys)
 
 

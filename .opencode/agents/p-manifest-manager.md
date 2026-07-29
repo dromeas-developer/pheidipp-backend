@@ -4,7 +4,7 @@ description: >-
   (promote-file, release-promote) and by p-test-architect for phase file
   authoring (write-phase). Does not run tests — only writes manifest
   files. Owns the split/collapse algorithm.
-model: opencode-go/deepseek-v4-flash
+model: opencode/deepseek-v4-flash-free
 temperature: 0.1
 mode: subagent
 

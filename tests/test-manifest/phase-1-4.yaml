@@ -1,0 +1,265 @@
+version: "1.0"
+plan_id: GAP-PHASE-1-TESTS
+sub_phase: "1.4"
+generated_at: "2026-07-28T00:00:00"
+last_reviewed_at: "2026-07-28T13:00:00Z"
+prerequisites:
+  migrations: false
+files:
+  tests/unit/test_plan_generation_templates.py:
+    type: unit
+    status: promoted
+    functions:
+      test_24_week_phase_allocation:
+        class: TestAllocateRaceEventPhases
+        implemented: true
+        executable: true
+        passed: true
+      test_16_week_phase_allocation:
+        class: TestAllocateRaceEventPhases
+        implemented: true
+        executable: true
+        passed: true
+      test_short_plan_falls_back_to_taper_and_race_week:
+        class: TestAllocateRaceEventPhases
+        implemented: true
+        executable: true
+        passed: true
+      test_phase_labels_correct_order:
+        class: TestAllocateRaceEventPhases
+        implemented: true
+        executable: true
+        passed: true
+      test_phase_specificity_values:
+        class: TestAllocateRaceEventPhases
+        implemented: true
+        executable: true
+        passed: true
+      test_novice_years_less_than_2:
+        class: TestDeriveExperienceLevel
+        implemented: true
+        executable: true
+        passed: true
+      test_intermediate_boundary_years_2:
+        class: TestDeriveExperienceLevel
+        implemented: true
+        executable: true
+        passed: true
+      test_intermediate_boundary_years_5:
+        class: TestDeriveExperienceLevel
+        implemented: true
+        executable: true
+        passed: true
+      test_experienced_years_greater_than_5:
+        class: TestDeriveExperienceLevel
+        implemented: true
+        executable: true
+        passed: true
+      test_zero_years:
+        class: TestDeriveExperienceLevel
+        implemented: true
+        executable: true
+        passed: true
+      test_marathon_novice_at_threshold:
+        class: TestEvaluateTrainingLengthGate
+        implemented: true
+        executable: true
+        passed: true
+      test_marathon_novice_above_threshold:
+        class: TestEvaluateTrainingLengthGate
+        implemented: true
+        executable: true
+        passed: true
+      test_5k_experienced_at_threshold:
+        class: TestEvaluateTrainingLengthGate
+        implemented: true
+        executable: true
+        passed: true
+      test_5k_experienced_above_threshold:
+        class: TestEvaluateTrainingLengthGate
+        implemented: true
+        executable: true
+        passed: true
+      test_ultra_intermediate_at_threshold:
+        class: TestEvaluateTrainingLengthGate
+        implemented: true
+        executable: true
+        passed: true
+      test_short_goal_with_low_fitness:
+        class: TestEvaluateTrainingLengthGate
+        implemented: true
+        executable: true
+        passed: true
+      test_short_goal_with_adequate_fitness_proceeds:
+        class: TestEvaluateTrainingLengthGate
+        implemented: true
+        executable: true
+        passed: true
+      test_unknown_goal_event_type_uses_default_threshold:
+        class: TestEvaluateTrainingLengthGate
+        implemented: true
+        executable: true
+        passed: true
+      test_calibration_checkpoint_at_phase_transition_with_low_confidence:
+        class: TestScheduleCheckpoints
+        implemented: true
+        executable: true
+        passed: true
+      test_benchmark_checkpoint_at_week_4:
+        class: TestScheduleCheckpoints
+        implemented: true
+        executable: true
+        passed: true
+      test_progress_review_every_4_weeks:
+        class: TestScheduleCheckpoints
+        implemented: true
+        executable: true
+        passed: true
+      test_race_simulation_2_weeks_before_goal:
+        class: TestScheduleCheckpoints
+        implemented: true
+        executable: true
+        passed: true
+      test_checkpoints_sorted_by_week_number:
+        class: TestScheduleCheckpoints
+        implemented: true
+        executable: true
+        passed: true
+  tests/integration/test_plan_generation_service.py:
+    type: integration
+    status: promoted
+    functions:
+      test_race_event_plan_generated_successfully:
+        class: TestPlanGenerationGoalTypeValidation
+        implemented: true
+        executable: true
+        passed: true
+      test_target_performance_plan_generated_successfully:
+        class: TestPlanGenerationGoalTypeValidation
+        implemented: true
+        executable: true
+        passed: true
+      test_unsupported_goal_type_rejected:
+        class: TestPlanGenerationGoalTypeValidation
+        implemented: true
+        executable: true
+        passed: true
+      test_no_active_training_goal:
+        class: TestPlanGenerationGoalTypeValidation
+        implemented: true
+        executable: true
+        passed: true
+      test_no_twin_state:
+        class: TestPlanGenerationGoalTypeValidation
+        implemented: true
+        executable: true
+        passed: true
+      test_no_athlete_preferences:
+        class: TestPlanGenerationGoalTypeValidation
+        implemented: true
+        executable: true
+        passed: true
+      test_race_event_missing_goal_event_date:
+        class: TestPlanGenerationGoalTypeValidation
+        implemented: true
+        executable: true
+        passed: true
+      test_existing_active_plan_superseded:
+        class: TestPlanSupersession
+        implemented: true
+        executable: true
+        passed: true
+      test_superseded_plan_not_deleted:
+        class: TestPlanSupersession
+        implemented: true
+        executable: true
+        passed: true
+      test_planned_session_retains_old_training_plan_id:
+        class: TestPlanSupersession
+        implemented: true
+        executable: true
+        passed: true
+      test_small_gap_classification:
+        class: TestTargetPerformanceGapClassification
+        implemented: true
+        executable: true
+        passed: true
+      test_medium_gap_classification:
+        class: TestTargetPerformanceGapClassification
+        implemented: true
+        executable: true
+        passed: true
+      test_large_gap_classification:
+        class: TestTargetPerformanceGapClassification
+        implemented: true
+        executable: true
+        passed: true
+      test_no_two_consecutive_quality_sessions:
+        class: TestSessionStructureRules
+        implemented: true
+        executable: true
+        passed: true
+      test_long_run_followed_by_rest_or_recovery:
+        class: TestSessionStructureRules
+        implemented: true
+        executable: true
+        passed: true
+      test_threshold_sandwiched_between_easy_days:
+        class: TestSessionStructureRules
+        implemented: true
+        executable: true
+        passed: true
+      test_plan_phases_cover_full_duration_with_weekly_plans:
+        class: TestSessionStructureRules
+        implemented: true
+        executable: true
+        passed: true
+      test_calibration_checkpoint_at_phase_transition_with_low_confidence:
+        class: TestCheckpointScheduling
+        implemented: true
+        executable: true
+        passed: true
+      test_benchmark_checkpoint_at_week_4:
+        class: TestCheckpointScheduling
+        implemented: true
+        executable: true
+        passed: true
+      test_progress_review_checkpoints:
+        class: TestCheckpointScheduling
+        implemented: true
+        executable: true
+        passed: true
+      test_race_simulation_2_weeks_before_goal:
+        class: TestCheckpointScheduling
+        implemented: true
+        executable: true
+        passed: true
+      test_checkpoints_sorted_by_week_number:
+        class: TestCheckpointScheduling
+        implemented: true
+        executable: true
+        passed: true
+      test_no_llm_calls_during_generation:
+        class: TestPlanGenerationPurity
+        implemented: true
+        executable: true
+        passed: true
+      test_training_plan_generated_event_published:
+        class: TestPlanGenerationPurity
+        implemented: true
+        executable: true
+        passed: true
+coverage:
+  events:
+    covered:
+      - training_plan_generated
+  invariants:
+    covered:
+      - "I30: Plan generation is pure Python — no LLM calls, no external APIs"
+      - "I31: Race event phases: 40% base, 30% threshold, 15% race-specific, 2 weeks taper, 1 week race-week"
+      - "I32: No two consecutive quality sessions unless sharing block_id"
+      - "I33: Long run always followed by rest or recovery run"
+      - "I34: Threshold/VO2max sandwiched between easy/rest days"
+      - "I35: Plan supersession atomic — old plan marked superseded, new plan created in same transaction"
+      - "I36: PlannedSession.training_plan_id denormalized from WeeklyPlan"
+      - "I37: Checkpoints: calibration at phase transitions, benchmark at week 4, progress review every 3-4 weeks, race simulation 2 weeks before goal"

@@ -21,6 +21,10 @@
 | *(per-directory fixtures added here as they are created)* | `tests/<layer>/conftest.py` | varies | Layer-specific fixtures |
 | `make_athlete` | `tests/utils/factories.py` | function | Async factory: creates Athlete row with unique email (commits) |
 | `make_athlete_with_profile` | `tests/utils/factories.py` | function | Async factory: creates Athlete + matching AthleteProfile row (commits) |
+| `make_training_goal` | `tests/utils/factories.py` | function | Async factory: creates TrainingGoal row with configurable goal_type, event_type, fitness_level (commits) |
+| `make_twin_state` | `tests/utils/factories.py` | function | Async factory: creates TwinState row with configurable data_tier, confidence, metric_confidence (commits) |
+| `make_athlete_preferences` | `tests/utils/factories.py` | function | Async factory: creates AthletePreferences row with years_structured_training, weekly_schedule (commits) |
+| `WEEKLY_SCHEDULE_TEMPLATE` | `tests/utils/factories.py` | constant | Default weekly schedule dict for AthletePreferences factory |
 | *(assertion helpers added here as they are created)* | `tests/utils/assertions.py` | function | Reusable assertion functions |
 | *(model helpers added here as they are created)* | `tests/utils/model_helpers.py` | function | ORM introspection (no DB required) |
 | *(schema helpers added here as they are created)* | `tests/utils/schema_helpers.py` | function | DB schema introspection (sync psycopg2 engine) |

@@ -76,7 +76,7 @@
 | 35 | No two consecutive quality sessions | Generated plan with `total_weeks=24` | For every pair of consecutive days with sessions, at least one is not in `QUALITY_SESSION_TYPES` {THRESHOLD, VO2MAX, TEMPO, LONG_RUN, MEDIUM_LONG_RUN, HILL_REPEATS, FARTLEK}; unless they share a `block_id` | application-logic | none |
 | 36 | Long run followed by rest or recovery | Generated plan | Every `LONG_RUN` session is followed by a `REST` or `RECOVERY_RUN` session (or no session) on the next day | application-logic | none |
 | 37 | Threshold sandwiched between easy days | Generated plan | Every `THRESHOLD` or `VO2MAX` session has an `EASY_RUN` or `REST` on both adjacent days | application-logic | none |
-| 38 | PlannedSession covers full duration with no gaps | Generated plan from `plan_start` to `goal_event_date` | Every calendar day in the range has either a `PlannedSession` or is a rest day with a `REST` session; no gaps | application-logic | none |
+| 38 | Plan covers full duration with no gaps | Generated plan from `plan_start` to `goal_event_date` | Phase date ranges are non-overlapping, ordered, and cover the full range from `plan_start` to `goal_event_date` without gaps; every week from week 1 to `total_weeks` has a `WeeklyPlan` | application-logic | db-session |
 
 ## Step 8 — Checkpoint Scheduling
 

@@ -5,9 +5,9 @@ temperature: 0.5
 permission:
   task:
     "*": deny
-    p-doc-explorer: allow
-    p-vision-and-architect-author: allow
-    p-index-health-guard: allow
+    s-doc-explorer: allow
+    s-vision-and-architect-author: allow
+    s-index-health-guard: allow
 
   read:       allow
   edit:       deny
@@ -65,7 +65,7 @@ You are a reasoning and synthesis agent. You do NOT:
 * act as a task executor
 
 If implementation planning is required → recommend the Implementation Architect.
-If architecture documentation needs updating → delegate to `p-vision-and-architect-author`
+If architecture documentation needs updating → delegate to `s-vision-and-architect-author`
 via the Delegation Protocol below. Do not recommend — delegate directly.
 
 ---
@@ -84,12 +84,12 @@ You operate in one of three modes. Determine which before doing anything else.
 
 **Advisory Mode** — open-ended architecture review, consistency analysis, or
 tradeoff evaluation. No specific file input; you reason over the documentation
-corpus via `p-doc-explorer`. This is the default mode and the one the bulk of
+corpus via `s-doc-explorer`. This is the default mode and the one the bulk of
 this prompt is written for.
 
 **Architecture Handoff Mode** — you receive a `batch-N-architecture.md` handoff
 file path. Your job is to review it for cross-document consistency, then
-delegate the actual doc update to `p-vision-and-architect-author`. Follow the
+delegate the actual doc update to `s-vision-and-architect-author`. Follow the
 Architecture Documentation Delegation Protocol below.
 
 **Plan Review Mode** — you receive an implementation plan path (a phase folder
@@ -111,7 +111,7 @@ produced by the Implementation Architect alongside a coder BRD.
    document (under `docs/architecture/` or `docs/vision/`) the handoff asks to
    modify, and every specific section/entry change described.
 
-2. **Retrieve context** via `p-doc-explorer` for the concepts affected by the
+2. **Retrieve context** via `s-doc-explorer` for the concepts affected by the
    handoff. This confirms the current state of the documents before the change
    and checks for contradictions across vision, architecture, and release plan.
 
@@ -120,12 +120,12 @@ produced by the Implementation Architect alongside a coder BRD.
    - Introduces an inconsistency with event catalogue entries or invariants
    - Conflicts with release-plan sequencing or phase scope
 
-4. **Delegate to `p-vision-and-architect-author`** via `task`:
+4. **Delegate to `s-vision-and-architect-author`** via `task`:
     ```
     Tool: task
     Input:
     {
-      "subagent_type": "p-vision-and-architect-author",
+      "subagent_type": "s-vision-and-architect-author",
       "description": "Update architecture documents per handoff",
       "prompt": "Update the following architecture documents per the handoff at <handoff path>:\n\n<summary of changes, with any consistency flags noted>"
     }
@@ -165,14 +165,14 @@ constrain retrieval depth when the question requires it.
 
 ## Retrieval Protocol
 
-Invoke `p-doc-explorer` via the `task` tool with a concept list built
+Invoke `s-doc-explorer` via the `task` tool with a concept list built
 from the question or analysis scope:
 
 ```
 Tool: task
 Input:
 {
-  "subagent_type": "p-doc-explorer",
+  "subagent_type": "s-doc-explorer",
   "description": "Retrieve documentation context for architecture review",
   "prompt": "Task: <one-line task description>\n\nConcepts:\n- <concept name>\n- ...\n\nDomains: all"
 }
@@ -198,7 +198,7 @@ concept the plan touches: entities, events, services, agent names, invariants.
 
 ### 2. Retrieve context
 
-Invoke `p-doc-explorer` via `task` with the full concept list from step 1.
+Invoke `s-doc-explorer` via `task` with the full concept list from step 1.
 Its Brief returns the current vision, architecture, and release-plan context
 for every concept.
 

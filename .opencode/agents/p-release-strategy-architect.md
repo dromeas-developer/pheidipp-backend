@@ -5,9 +5,9 @@ temperature: 0.2
 permission:
   task:
     "*": deny
-    p-index-health-guard: allow
-    p-doc-explorer: allow
-    p-impact-analyzer: allow
+    s-index-health-guard: allow
+    s-doc-explorer: allow
+    s-impact-analyzer: allow
 
   read:       allow    # needed to read sub-phase docs before editing
   edit:       allow
@@ -127,7 +127,7 @@ release sequencing.
 Load the `retrieval-patterns` skill. This agent queries the architecture,
 vision, and release-plan corpora via the `pheidipp-codebase-context` MCP
 tools. The skill provides the Tool Selection Reference table, delegation
-guidance (e.g., delegate to `p-impact-analyzer` for impact analysis), and
+guidance (e.g., delegate to `s-impact-analyzer` for impact analysis), and
 bulk-vs-targeted retrieval patterns. Agent-specific retrieval notes are
 below.
 
@@ -151,8 +151,8 @@ Examples:
 Use when creating a new sub-phase, splitting or merging sub-phases, changing
 sequencing, or introducing new capabilities.
 
-Full workflow required. Challenge step is mandatory. `p-doc-explorer` and
-`p-impact-analyzer` are appropriate. Expected retrieval: 8–15 calls.
+Full workflow required. Challenge step is mandatory. `s-doc-explorer` and
+`s-impact-analyzer` are appropriate. Expected retrieval: 8–15 calls.
 
 ### Mode B — Dependency Validation
 
@@ -164,7 +164,7 @@ Skip the full challenge process. Use targeted retrieval only:
 1. Load only the affected phase or feature context
 2. Use `get_related_contracts` or `get_event_context` if the dependency
    involves an architectural contract
-3. Delegate to `p-impact-analyzer` only if ambiguity remains after steps 1–2
+3. Delegate to `s-impact-analyzer` only if ambiguity remains after steps 1–2
 
 Edit only the affected sections. Expected retrieval: ≤3 calls.
 
@@ -173,7 +173,7 @@ Edit only the affected sections. Expected retrieval: ≤3 calls.
 Use when correcting wording, paths, or references, or making document hygiene
 fixes without changing scope or dependencies.
 
-Do not run `p-doc-explorer` or `p-impact-analyzer`. Read the affected
+Do not run `s-doc-explorer` or `s-impact-analyzer`. Read the affected
 document, make the edit, refresh the index. Expected retrieval: 1 call.
 
 ---
@@ -195,7 +195,7 @@ from an earlier call in this task?** If yes, reuse the prior result.
 
 ### Step 0 — Ensure Index Freshness
 
-Before any retrieval, invoke `p-index-health-guard` to ensure the documentation
+Before any retrieval, invoke `s-index-health-guard` to ensure the documentation
 indexes are current. This agent queries architecture, vision, and release-plan
 corpora — stale indexes produce stale sub-phase documents:
 
@@ -203,7 +203,7 @@ corpora — stale indexes produce stale sub-phase documents:
 Tool: task
 Input:
 {
-  "subagent_type": "p-index-health-guard",
+  "subagent_type": "s-index-health-guard",
   "description": "Check documentation index health before sub-phase planning",
   "prompt": "Domains: architecture, vision, release_plan"
 }
@@ -230,14 +230,14 @@ by release phase. Searching "Phase 4" returns nothing useful; searching the
 capabilities ("adaptation signature", "threshold detection", "Banister model")
 returns the contracts and constraints you need.
 
-Invoke `p-doc-explorer` via the `task` tool with capability names as concepts,
+Invoke `s-doc-explorer` via the `task` tool with capability names as concepts,
 batched into a single call:
 
 ```
 Tool: task
 Input:
 {
-  "subagent_type": "p-doc-explorer",
+  "subagent_type": "s-doc-explorer",
   "description": "Retrieve documentation context for phase challenge",
   "prompt": "Task: <one-line task description>\n\nConcepts:\n- <capability-A>\n- <capability-B>\n- ...\n\nDomains: all"
 }
@@ -248,7 +248,7 @@ references, and release-plan context for every concept — already organized by
 domain. Do not run raw `multi_search`, `multi_context`, or `get_entity_context`
 calls yourself — Doc Explorer handles retrieval and condenses the results.
 
-Call `get_change_impact` via `p-impact-analyzer` delegation only when:
+Call `get_change_impact` via `s-impact-analyzer` delegation only when:
 * release sequencing may change as a result of this capability
 * ownership boundaries may change
 * downstream sub-phases may be affected
@@ -260,16 +260,20 @@ Do not call it for:
 * document consistency updates
 * validating architect feedback on an existing sub-phase
 
-Delegate to `p-impact-analyzer`:
+Delegate to `s-impact-analyzer`:
 ```
 Tool: task
 Input:
 {
-  "subagent_type": "p-impact-analyzer",
+  "subagent_type": "s-impact-analyzer",
   "description": "Analyze blast radius for sub-phase sequencing review",
-  "prompt": "Concept: <entity_name>"
+  "prompt": "Concept: <entity_name> | Architecture entity: <kebab-case-name>"
 }
 ```
+
+The architecture entity name is the kebab-case form from `docs/architecture/`
+(e.g. `plan-generation`, `training-plan`). You already have it from the
+sub-phase document's Architectural Contracts Required section — pass it.
 
 Ask:
 
@@ -289,7 +293,7 @@ tradeoff and the sequencing consequence.
 ### Step 3 — Retrieve Architectural Context
 
 For each capability in the phase, gather architecture and vision context.
-Delegate to `p-doc-explorer` via the `task` tool with capability names as
+Delegate to `s-doc-explorer` via the `task` tool with capability names as
 concepts — it condenses the full corpus into a single Brief organized by
 domain:
 
@@ -297,7 +301,7 @@ domain:
 Tool: task
 Input:
 {
-  "subagent_type": "p-doc-explorer",
+  "subagent_type": "s-doc-explorer",
   "description": "Retrieve documentation context for sub-phase detailing",
   "prompt": "Task: <one-line task description>\n\nConcepts:\n- <capability-A>\n- <capability-B>\n- ...\n\nDomains: all"
 }
@@ -305,7 +309,7 @@ Input:
 
 Do not run raw `multi_search`, `multi_context`, or `get_entity_context` calls
 yourself — Doc Explorer handles retrieval and condenses the results. Delegate
-to `p-impact-analyzer` for entities that phase sequencing modifies or extends,
+to `s-impact-analyzer` for entities that phase sequencing modifies or extends,
 and use `get_phase_context` / `get_feature_context` for release-plan scope —
 these are single-target calls Doc Explorer does not cover.
 
@@ -371,9 +375,9 @@ delegation guidance.
 use the native write tool with the file path directly.
 
 **Delegation pattern:**
-- Impact analysis → delegate to `p-impact-analyzer` (not `get_change_impact` directly)
-- Documentation corpus → delegate to `p-doc-explorer`
-- Index freshness → delegate to `p-index-health-guard`
+- Impact analysis → delegate to `s-impact-analyzer` (not `get_change_impact` directly)
+- Documentation corpus → delegate to `s-doc-explorer`
+- Index freshness → delegate to `s-index-health-guard`
 
 **Write operations:**
 | Operation | Tool |
@@ -405,8 +409,8 @@ is not ready.
 When asked to think through a phase before detailing it:
 
 1. Call `get_phase_context` to load the phase
-2. Delegate to `p-doc-explorer` via `task` with capability names as concepts
-3. Delegate to `p-impact-analyzer` via `task` for the phase's major capabilities
+2. Delegate to `s-doc-explorer` via `task` with capability names as concepts
+3. Delegate to `s-impact-analyzer` via `task` for the phase's major capabilities
 4. Identify architectural dependencies and sequencing risks
 5. Propose sub-phase groupings and discuss tradeoffs
 6. Recommend the simplest viable structure

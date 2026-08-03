@@ -8,6 +8,13 @@
     ".opencode/instructions/001-stack-truth.md"
   ],
 
+  // Local plugins — auto-loaded at startup.
+  "plugin": [
+    "openslimedit@latest",
+    "./plugins/opencode-context-cache.mjs",
+    "./plugins/session-stats.ts"
+  ],
+
   // Only show the providers and models you actually use.
   // Prevents OpenRouter/Mistral full catalog from flooding /models.
   "enabled_providers": [
@@ -21,8 +28,16 @@
     "poolside",
     "litellm-proxy"
   ],
-
   "provider": {
+    "opencode-go": {
+      "options": { "setCacheKey": true }
+    },
+    "opencode": {
+      "options": { "setCacheKey": true }
+    },
+    "ollama-cloud": {
+      "options": { "setCacheKey": true }
+    },
     "nvidia": {
       "name": "Nvidia NIM",
       "whitelist": [
@@ -37,12 +52,14 @@
     },
     "openrouter": {
       "name": "OpenRouter",
+      "options": { "setCacheKey": true },
       "whitelist": [
         "inclusionai/ling-3.0-flash:free"
       ]
     },
     "poolside": {
       "name": "Poolside AI",
+      "options": { "setCacheKey": true },
       "whitelist": [
         "poolside/laguna-m.1",
         "poolside/laguna-s-2.1",
@@ -94,5 +111,5 @@
       },
       "enabled": true
     }
-  }
+  },
 }

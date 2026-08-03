@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Shell(agent-browser:*)"
-    ],
-    "deny": [],
-    "defaultMode": "default"
-  }
-}

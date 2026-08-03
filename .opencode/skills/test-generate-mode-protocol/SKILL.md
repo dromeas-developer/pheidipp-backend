@@ -2,10 +2,10 @@
 name: test-generate-mode-protocol
 description: >
   Load this when p-test-architect enters Generate Mode (default). Contains
-  the full Steps 1–9 protocol: Load Inputs → Infrastructure Ingest →
-  Process Routed RCs → Capability Inventory → Load Existing Suite →
-  Update Manifest → Generate Tests Staged Narrow-to-Broad → Self-Check
-  via Collection → Classify Coverage → Finalize (diagnostics + docs).
+  the full Steps 1–8 protocol: Load Inputs → Capability Inventory →
+  Load Existing Suite → Update Manifest → Generate Tests Staged
+  Narrow-to-Broad → Self-Check via Collection → Classify Coverage →
+  Finalize (diagnostics + docs).
   Not needed in Fix Mode (load test-fix-mode-procedure instead). Load
   exactly once at mode entry; do not reload during the session.
 ---
@@ -28,7 +28,7 @@ as one.
 
 Never run `pytest` directly. Never run `run-tests.sh`, `docker-*.sh`,
 `db-*.sh`, or any other script. Never invoke bash for any purpose other
-than the Step 7 self-check. Test execution, environment management, and
+than the Step 6 self-check. Test execution, environment management, and
 database migration belong entirely to DevOps — this allowance does not
 change that boundary.
 
@@ -36,19 +36,19 @@ change that boundary.
 
 ### Step 1 — Load Inputs
 
-Before any retrieval, verify the code index is fresh by invoking `p-index-health-guard`:
+Before any retrieval, verify the code index is fresh by invoking `s-index-health-guard`:
 
 ```
 Tool: task
 Input:
 {
-  "subagent_type": "p-index-health-guard",
+  "subagent_type": "s-index-health-guard",
   "description": "Verify code index is fresh before test generation",
   "prompt": "Domains: code"
 }
 ```
 
-This ensures `p-code-explorer` returns current results for all subsequent delegation calls.
+This ensures `s-code-explorer` returns current results for all subsequent delegation calls.
 
 **Check for missing manifest.** If `tests/test-manifest/index.yaml` does not
 exist, load the `manifest-bootstrap` skill to create the initial infrastructure
@@ -58,7 +58,7 @@ proceeding. The skill contains the creation logic; this prompt does not.
 **Check for missing conftest.py.** If `tests/conftest.py` does not exist
 (manifest exists but was created by an older bootstrap that didn't include
 conftest.py), load the `test-infrastructure` skill for the canonical fixture
-patterns, then delegate to `p-code-explorer` to resolve the production imports
+patterns, then delegate to `s-code-explorer` to resolve the production imports
 (model classes, app factory, session factory, Base metadata) and create the
 file. The skill provides the structural patterns; the explorer provides the
 specific import paths. Write the file yourself — the explorer does not write code.
@@ -73,82 +73,45 @@ Load in this order, in a single batched `get_files` call where possible:
    concrete input/output pair that must become at least one test case,
    classified by Enforcement layer (type-system / database / application-logic)
    and Mock Boundary (none / external-only / db-session). Consume both
-   classifications in Step 6 — they determine what to test and what to
+   classifications in Step 5 — they determine what to test and what to
    mock. If the file does not exist (purely structural batch, no behavioural
    changes), skip — the test architect derives tests from contracts alone.
 3. Validator report for this plan (if available — do not block if missing)
-4. DevOps report from the most recent execution cycle for this plan or
-   sub-phase (if available — do not block if missing; this feeds Step 2)
-5. `tests/test-manifest/index.yaml` and the current sub-phase file
+4. `tests/test-manifest/index.yaml` and the current sub-phase file
    (`tests/test-manifest/phase-N-Mx.yaml`), if they exist. Load prior
    sub-phase files only if this plan extends a test file that a prior
    sub-phase also modified — you need to see the existing function list
    to avoid duplication. If this plan already has file entries in the
    sub-phase file with functions listed, that is the inventory from a
-   prior session's Step 3 — see Step 3 for what to do with it.
- 6. `tests/README.md` and `tests/MOCKING_CONTRACT.md` — accumulated
-    do/don't lessons from real test failures (async session pitfalls,
-    schema-inspection anti-patterns, determinism issues, etc.) and the
-    current fixture/mock boundary rules. These are load-bearing inputs, not
-    background reading: Step 2 depends on the former, Step 6 depends on
-    the latter.
- 7. **Per-folder test READMEs** — `tests/unit/README.md`,
-    `tests/integration/README.md`, `tests/api/README.md`,
-    `tests/behaviour/README.md`, and `tests/smoke/README.md`, if they
-    exist. Load all of them in the same batched call as items 5 and 6.
-    Each README's `## Contents` table lists what test files exist and what
-    they cover — this is the map of the test suite, and it makes Step 4
-    (Load Existing Suite) much cheaper by telling you what's in each
-    directory before you open any test file. If a README doesn't exist for
-    a directory, skip it — the doc-writer hasn't baselined it yet.
+   prior session's Step 2 — see Step 2 for what to do with it.
+5. `tests/README.md` and `tests/MOCKING_CONTRACT.md` — accumulated
+   do/don't lessons from real test failures (async session pitfalls,
+   schema-inspection anti-patterns, determinism issues, etc.) and the
+   current fixture/mock boundary rules. These are load-bearing inputs
+   for Step 5's contract checks.
+6. **Per-folder test READMEs** — `tests/unit/README.md`,
+   `tests/integration/README.md`, `tests/api/README.md`,
+   `tests/behaviour/README.md`, and `tests/smoke/README.md`, if they
+   exist. Load all of them in the same batched call as items 4 and 5.
+   Each README's `## Contents` table lists what test files exist and what
+   they cover — this is the map of the test suite, and it makes Step 3
+   (Load Existing Suite) much cheaper by telling you what's in each
+   directory before you open any test file. If a README doesn't exist for
+   a directory, skip it — the doc-writer hasn't baselined it yet.
 
-Do not load implemented files here. The capability inventory (Step 3) is
+Do not load implemented files here. The capability inventory (Step 2) is
 built entirely from the plan — routes, service methods, repository
 methods, events, invariants, and acceptance criteria are all *described*
 in the plan's own sections. Code files are only needed once you know
 which specific test you're about to write, and different test types need
 different amounts of it — loading everything now, before that's known,
 means carrying the whole plan's implementation surface through every
-step whether or not most of it is ever used. See Step 6 for staged,
+step whether or not most of it is ever used. See Step 5 for staged,
 per-test-type retrieval.
 
 If the implementation plan is missing → STOP and report it.
 
-### Step 2 — Ingest DevOps Infrastructure Fixes (MANDATORY when a DevOps report exists)
-
-Skip only if no DevOps report exists yet. Read the report's
-`## Infrastructure Fixes` section. For each entry, classify as one-off
-(single file, unlikely to recur) or reusable failure class (async
-session scope, mock boundary, schema-inspection anti-pattern, ordering
-assumption, JWT/datetime determinism, etc.).
-
-For every reusable class: append a dated entry to `tests/README.md` in
-the existing do/don't format — symptom, root cause, failed pattern,
-correct pattern.
-
-If the fix crossed a mocking boundary: update `tests/MOCKING_CONTRACT.md`
-directly — README records the lesson, the contract enforces it.
-
-If a class already has ≥2 prior README entries: note it in this session's
-completion confirmation — what the recurring failure class is, why it
-persists, and whether it should move into a shared `conftest.py` fixture.
-
-The goal: the same failure class should not recur more than twice before
-it is either fixed structurally (a fixture) or made impossible to miss
-(the contract).
-
-### Step 2b — Process Routed Test Suite RCs (MANDATORY when the report routes RCs to this agent)
-
-Skip only if no devops report exists, or if the report's `## Routing Summary`
-has no row for `p-test-architect`. If it does: load the
-`test-fix-mode-procedure` skill and run its steps, then continue to Step 3.
-
-This runs during a normal Generate cycle when a devops report happens to be
-available as context — fix stale assertions before generating new tests to
-prevent "drift upon drift." Fix Mode is the dedicated-invocation equivalent
-that skips the full Protocol entirely; both use the same procedure.
-
-### Step 3 — Build Capability Inventory
+### Step 2 — Build Capability Inventory
 
 **Check for an existing inventory first.** If the sub-phase file loaded
 in Step 1 already has file entries for this plan with functions listed,
@@ -159,7 +122,7 @@ Verify the existing inventory against the plan you just loaded: if the
 plan hasn't changed since the file list was recorded, use it as-is. If
 the plan has changed (new steps, changed scope), update only the affected
 file entries — add files the plan gained, remove ones it no longer has,
-leave everything else untouched. Then proceed to Step 4.
+leave everything else untouched. Then proceed to Step 3.
 
 **If no existing inventory exists** (first session on this plan, in any
 Test Mode), build it from the plan alone — no implemented files needed
@@ -174,33 +137,33 @@ yet — extracting everything that needs testing:
 * **RETIRE/REWRITE entries** — if the plan's Testing Requirements section
   lists existing tests to RETIRE (delete — capability no longer exists)
   or REWRITE (update — capability changed), record them in the inventory.
-  RETIRE entries are acted on in Step 4 (Load Existing Suite): the listed
+  RETIRE entries are acted on in Step 3 (Load Existing Suite): the listed
   test files are deleted, not classified KEEP/MODIFY/EXTEND. REWRITE
-  entries are acted on in Step 6: the listed test files are updated to
+  entries are acted on in Step 5: the listed test files are updated to
   match the new behaviour, not regenerated from scratch.
 
 **If the plan doesn't state a detail, the inventory doesn't contain it.**
 Do not open the implementation to fill the gap — not "just to check," not
 to make a capability's description more precise, not to pre-derive an
-exact formula or error condition for use later at Step 6. A capability
+exact formula or error condition for use later at Step 5. A capability
 entry at this step is a name, a one-line description of what it verifies,
 a `test_type`, and a `file_scope` — nothing that required reading code to
 write. If you find yourself wanting to open an `app/` file to answer a
-question at this step, that question belongs to `p-code-explorer` at
-Step 6, not to you here. This is the same rule as Implementation
-Resolution above; Step 3 is where it's most tempting to break, because
+question at this step, that question belongs to `s-code-explorer` at
+Step 5, not to you here. This is the same rule as Implementation
+Resolution above; Step 2 is where it's most tempting to break, because
 "just one look to be accurate" feels harmless — it is not: it is the
 exact behaviour that produced four separate re-reads of the same file
 with advancing line offsets in a session that prompted this rule.
 
-Use `p-contract-verifier` to find invariants for the primary entities in the
+Use `s-contract-verifier` to find invariants for the primary entities in the
 plan and to confirm event payload requirements. Delegate via the `task` tool:
 
 ```
 Tool: task
 Input:
 {
-  "subagent_type": "p-contract-verifier",
+  "subagent_type": "s-contract-verifier",
   "description": "Resolve entity contracts and invariants for test capability inventory",
   "prompt": "Entity: <entity_name>"
 }
@@ -211,7 +174,7 @@ rules. Use this for contract verification instead of direct tool calls.
 
 Build a capability → verification map: for each capability, what must be
 asserted to consider it verified? Tag each capability with two things the
-plan already states, since this is what Step 6 uses to stage retrieval —
+plan already states, since this is what Step 5 uses to stage retrieval —
 you are not inferring anything new here, just carrying forward what the
 plan's own Scope and step descriptions already say:
 
@@ -227,13 +190,13 @@ plan's own Scope and step descriptions already say:
   `test_auth_service.py`).
 
 **Persist the file list immediately, regardless of Test Mode.** Write
-every file this plan will need to the sub-phase file in Step 5a, right now,
-before Step 6 generates anything — whether or not this session's Test Mode
+every file this plan will need to the sub-phase file in Step 4a, right now,
+before Step 5 generates anything — whether or not this session's Test Mode
 will generate functions for it this time. Empty `functions` block for each,
 `status: pending`. This is what makes a later, separate-session request
 cheap: it reads the file list instead of re-deriving it from the plan.
 
-### Step 4 — Load Existing Suite
+### Step 3 — Load Existing Suite
 
 Inspect existing tests to avoid duplication and identify gaps.
 
@@ -265,10 +228,10 @@ only the matching test directory (`tests/unit/` for `unit` mode, and so
 on) — there is no reason to inspect `tests/integration/` while working in
 `unit` mode. In `all` mode, inspect all four directories as before.
 
-### Step 5 — Update Manifest (MANDATORY — runs every execution, in two parts)
+### Step 4 — Update Manifest (MANDATORY — runs every execution, in two parts)
 
 The manifest is authoritative. Both parts delegate YAML writing to
-`p-manifest-manager` (cheap model — deepseek-v4-flash). You provide
+`s-manifest-manager` (cheap model — deepseek-v4-flash). You provide
 structured input; the manager writes the YAML file. You never write
 phase YAML directly — formatting boilerplate on an expensive model
 wastes tokens with zero reasoning value.
@@ -293,21 +256,21 @@ coverage_invariants:
 
 - Each file starts with `<path> <type>` on its own line.
 - Add the keyword `generated` after the type if the file has functions
-  (Step 5b). Omit it for pending files (Step 5a).
+  (Step 4b). Omit it for pending files (Step 4a).
 - Indented lines after a file: `<ClassName>` followed by space-separated
   function names. One line per class.
 - Files separated by `---`.
 
-**Step 5a — runs immediately after Step 3, before Step 6 generates
+**Step 4a — runs immediately after Step 2, before Step 5 generates
 anything.** Persist the file inventory now, regardless of which Test Mode
 this session covers:
 
  * **If the manifest does not exist:** load the `manifest-bootstrap` skill
    to create `tests/test-manifest/index.yaml`, `tests/MOCKING_CONTRACT.md`,
    and `tests/conftest.py`. Then delegate the first phase file to
-   p-manifest-manager.
- * **If the manifest exists:** delegate to p-manifest-manager with the
-   file list from Step 3's inventory — every file this plan will need.
+   s-manifest-manager.
+ * **If the manifest exists:** delegate to s-manifest-manager with the
+   file list from Step 2's inventory — every file this plan will need.
    No `generated` keyword, no function lines — manager writes all files
    with `status: pending` and empty `functions: {}`.
 
@@ -317,20 +280,20 @@ Format the input and invoke:
 Tool: task
 Input:
 {
-  "subagent_type": "p-manifest-manager",
+  "subagent_type": "s-manifest-manager",
   "description": "Write pending phase file for plan <plan-id>",
   "prompt": "write-phase\nplan_id: <plan-id>\nsub_phase: <N.M>\nmigrations: <bool>\nphase: tests/test-manifest/phase-N-Mx.yaml\n---\ntests/unit/test_<service>.py unit\ntests/integration/test_<service>.py integration\ntests/api/test_<endpoint>.py api\n..."
 }
 ```
 
-After the manager writes the file, proceed to Step 6.
+After the manager writes the file, proceed to Step 5.
 
-**Step 5b — runs after Step 6 completes, before Step 7.** Collect the
-function→class mappings from the Step 7 collection output (or, if
+**Step 4b — runs after Step 5 completes, before Step 6.** Collect the
+function→class mappings from the Step 6 collection output (or, if
 collection hasn't run yet, from the test files you just wrote).
-Delegate to p-manifest-manager with the COMPLETE updated state:
+Delegate to s-manifest-manager with the COMPLETE updated state:
 
-- Include ALL files from Step 5a — both the ones this session
+- Include ALL files from Step 4a — both the ones this session
   generated (with `generated` keyword + function lines) and any still
   pending (no `generated`, no functions). The manager writes the
   complete phase file from your input.
@@ -339,9 +302,9 @@ Delegate to p-manifest-manager with the COMPLETE updated state:
   `pytest --collect-only -q <paths>` output — the `::` separators map
   directly: `file.py::ClassName::function_name` → function `function_name`
   under class `ClassName`.
-- Add `coverage_events` and `coverage_invariants` from Step 8's coverage
-  classification (if Step 8 hasn't run yet at this timing, defer coverage
-  to a follow-up invocation after Step 8 completes — but the file list
+- Add `coverage_events` and `coverage_invariants` from Step 7's coverage
+  classification (if Step 7 hasn't run yet at this timing, defer coverage
+  to a follow-up invocation after Step 7 completes — but the file list
   and functions must be written now).
 - Do NOT set `executable` or `passed` — the manager always writes
   `executable: false, passed: false`. Those are DevOps-owned.
@@ -352,7 +315,7 @@ Format and invoke:
 Tool: task
 Input:
 {
-  "subagent_type": "p-manifest-manager",
+  "subagent_type": "s-manifest-manager",
   "description": "Write generated phase file for plan <plan-id>",
   "prompt": "write-phase\nplan_id: <plan-id>\nsub_phase: <N.M>\nmigrations: <bool>\nphase: tests/test-manifest/phase-N-Mx.yaml\n---\ntests/unit/test_<service>.py unit generated\n  Test<ClassName> test_<scenario_a> test_<scenario_b>\n  Test<OtherClass> test_<scenario_c>\ntests/integration/test_<service>.py integration generated\n  Test<ClassName> test_<scenario_d> test_<scenario_e>\ntests/api/test_<endpoint>.py api\n---\ncoverage_events:\n  <event_type>\ncoverage_invariants:\n  <invariant_id>: <invariant description>"
 }
@@ -360,13 +323,13 @@ Input:
 
 You never write to `index.yaml`. DevOps owns selection groups and promotion.
 
-### Step 6 — Generate Tests, Staged Narrow-to-Broad
+### Step 5 — Generate Tests, Staged Narrow-to-Broad
 
 If a Test Mode was named for this invocation, run only the matching stage
 below and stop — do not proceed to the other three. If Test Mode is `all`
 or was not specified, work through every stage in this fixed order: unit
 → integration → api → behaviour. Each stage resolves its own file scope
-from Step 3's tags via the `task` → `p-code-explorer` call shown under
+from Step 2's tags via the `task` → `s-code-explorer` call shown under
 Implementation Resolution above — that section's rule and fallback apply
 here without exception; this step only adds the per-stage grouping logic.
 In `all` mode, if a later stage's group has a file scope already fully
@@ -375,16 +338,16 @@ that brief — don't invoke the Explorer again for the same files. In a
 single-mode session, that carry-forward benefit doesn't apply — you're
 paying only for this one stage's scope, which is the point.
 
-**Stage 1 — Unit.** Group every capability tagged `unit` in Step 3 by
+**Stage 1 — Unit.** Group every capability tagged `unit` in Step 2 by
 file scope — related capabilities sharing the same file(s) go in one
-group. For each group, call `task` with `p-code-explorer` before writing
+group. For each group, call `task` with `s-code-explorer` before writing
 anything — for example:
 
 ```
 Tool: task
 Input:
 {
-  "subagent_type": "p-code-explorer",
+  "subagent_type": "s-code-explorer",
   "description": "Resolve implementation details for unit test generation: app/services/threshold_detection_service.py",
   "prompt": "Mode: Test Architect\n\nGroup: unit — app/services/threshold_detection_service.py\n\nCapabilities:\n- hr_deflection_detects_lt1_lt2: HR deflection algorithm, ≥3 intensity steps, R² ≥ 0.80\n- rr_inflection_requires_min_duration: RR inflection needs ≥8 min per intensity level\n\nCanonical Fixtures (from tests/MOCKING_CONTRACT.md):\n<paste the table>"
 }
@@ -395,10 +358,10 @@ move to the next group — do not call `get_files` on
 `threshold_detection_service.py` or any other `app/` path yourself; the
 brief above is what you write assertions from. If the brief's Tagging
 Check flags a capability as likely `integration` rather than `unit`,
-apply the correction — this is the same signal Step 6 has always used
+apply the correction — this is the same signal Step 5 has always used
 (a unit test wanting a third or fourth file is a mis-tag), just surfaced
 earlier, before you start writing instead of mid-write. Correct
-`type` in the phase file at Step 5b when this happens, not just in
+`type` in the phase file at Step 4b when this happens, not just in
 your own reasoning for this session — a later `integration`-mode session
 needs the corrected tag to know this capability is its responsibility.
 
@@ -408,7 +371,7 @@ Do not write out exact formulas, exact JSONB shapes, or exact error
 conditions in this list. If you find yourself typing something like
 `posterior mean = (current.value * decayed_weight + obs.value *
 obs.weight) / new_total_weight` into a Capabilities entry, stop — that
-level of precision is what you're asking `p-code-explorer` to derive
+level of precision is what you're asking `s-code-explorer` to derive
 and return in its Signatures and behaviour section, not something you
 supply going in. Writing it yourself means you already read the source
 to get it, which is the violation this whole section exists to prevent.
@@ -418,7 +381,7 @@ question.
 
 **Stage 2 — Integration.** Group `integration`-tagged capabilities by
 interaction — the specific service+repository pair, or the specific pair
-of services, involved. Same `task` → `p-code-explorer` call as Stage 1, one
+of services, involved. Same `task` → `s-code-explorer` call as Stage 1, one
 per interaction group, skipping any group whose file scope is already
 fully covered by a Stage 1 brief from this session.
 
@@ -431,7 +394,7 @@ an earlier stage's brief this session.
 behaviour test needs is likely already covered by briefs from the
 narrower stages before it — a behaviour test exercises the same
 underlying code, just across a full journey rather than in isolation.
-Call `p-code-explorer` only for file scope genuinely not covered by an
+Call `s-code-explorer` only for file scope genuinely not covered by an
 earlier brief: files spanning a user journey that no single narrower
 capability already touched.
 
@@ -442,7 +405,7 @@ parameter, and inner function parameter must carry its type annotation.
 One untyped `db_session` parameter cascades to 100+ `reportUnknown*`
 errors in pyright strict mode; annotating at generation time costs one
 line per parameter and eliminates the entire cascade. Skip §7-§8
-(production-specific — those are for p-coder).
+(production-specific — those are for p-coder-batch-mode/p-coder-fix-mode).
 
 Before writing any test, check it against `tests/MOCKING_CONTRACT.md`:
 * If the Testing Brief already named a reusable fixture for this
@@ -462,8 +425,8 @@ Rules (apply across all stages):
 * Extend existing test files before creating new ones
 * Do not create duplicate test files for the same capability
 * Assert behaviour, not implementation — test what the code does, not how
-* Every invariant from Step 3 must have at least one test
-* Every event contract from Step 3 must have at least one ordering test
+* Every invariant from Step 2 must have at least one test
+* Every event contract from Step 2 must have at least one ordering test
 * Every Testing Requirement from the plan must have a corresponding test
 * Negative paths (wrong input, missing data, auth failure) are as important
   as positive paths — the brief's error-branch detail in Test Architect
@@ -523,14 +486,14 @@ is what you mock: the *transport* (session) vs. the *collaborator*
 (repository). Mock the transport; let the collaborator run real.
 
 Extending an existing test file still requires fetching that file yourself
-before editing it — `p-code-explorer` never touches `tests/`, and its brief
+before editing it — `s-code-explorer` never touches `tests/`, and its brief
 covers only the implementation under test, not your own prior test code.
 
-### Step 7 — Self-Check via Collection
+### Step 6 — Self-Check via Collection
 
-Run after all tests from Step 6 are written, before classifying coverage.
+Run after all tests from Step 5 are written, before classifying coverage.
 
-For every test file created or modified in Step 6, run:
+For every test file created or modified in Step 5, run:
 
 ```bash
 bash scripts/pytest.sh --collect-only <path> [<path> ...]
@@ -546,7 +509,7 @@ not a reason to skip this check.
 
 Interpret the result:
 
-* **Collection succeeds** → proceed to Step 8.
+* **Collection succeeds** → proceed to Step 7.
 * **Collection fails with an import error, `NameError`, `AttributeError`,
   fixture-not-found error, or syntax error** → this is exactly the class
   of failure this check exists to catch before DevOps ever sees it. Fix
@@ -558,7 +521,7 @@ Interpret the result:
   report as a limitation. Confirm the command was exactly
   `bash scripts/pytest.sh --collect-only <path>` and retry once. If it
   still fails after that, STOP and report the exact command and error —
-  do not silently skip Step 7 or write a note claiming the check could
+  do not silently skip Step 6 or write a note claiming the check could
   not be run in this environment.
 * **Collection fails with a connection error** (cannot reach a database,
   Redis, or other live service) — after confirming `scripts/pytest.sh`
@@ -574,9 +537,9 @@ even imports. It is not test execution and does not replace DevOps's
 Step 5 execution and remediation. `validation.executable` and
 `validation.passed` remain DevOps-owned regardless of what this finds.
 
-### Step 8 — Classify Coverage
+### Step 7 — Classify Coverage
 
-For each capability in the inventory from Step 3, classify:
+For each capability in the inventory from Step 2, classify:
 
 * **Covered** — at least one test asserts this capability
 * **Partial** — tested but edge cases or negative paths are missing
@@ -586,17 +549,16 @@ Record the classification in the current sub-phase file's `coverage`
 section (events and invariants covered). This is merged into index.yaml
 by DevOps at release promotion.
 
-### Step 9 — Finalize
+### Step 8 — Finalize
 
 Confirm the sub-phase file, `tests/README.md`, and
-`tests/MOCKING_CONTRACT.md` were saved (as applicable). If Step 2
-flagged a recurring infrastructure risk (≥2 prior README entries for the
-same failure class), note it in your completion confirmation — what the
-class is, why it recurs, and whether it should move into a shared
+`tests/MOCKING_CONTRACT.md` were saved (as applicable).
+If a recurring infrastructure risk was previously flagged, note it in your
+completion confirmation — what the class is, why it recurs, and whether it should move into a shared
 `conftest.py` fixture. The manifest is the authoritative record; there is
 no separate test pack file.
 
-**Post-generation diagnostics:** Invoke `p-diagnostics-fixer` via the
+**Post-generation diagnostics:** Invoke `s-diagnostics-fixer` via the
 `task` tool — batch **test files only** (files matching `test_*.py`) in groups
 of up to 5 per invocation, one invocation per group. Do NOT include utility files
 (`tests/utils/*.py`) or infrastructure files (`tests/conftest.py`) in these
@@ -609,7 +571,7 @@ the same test directory together). Invoke groups in order:
 Tool: task
 Input:
 {
-  "subagent_type": "p-diagnostics-fixer",
+  "subagent_type": "s-diagnostics-fixer",
   "description": "Fix diagnostics on generated test files for plan <plan-id>",
   "prompt": "plan_id: <plan-id>\n\nfiles:\n<path/to/test_file1.py>\n<path/to/test_file2.py>\n..."
 }
@@ -637,7 +599,7 @@ triggered at 6+ files for plan-based multi-file mode. If you need to include
 utility files (`tests/utils/*.py`) or infrastructure files, invoke them
 separately in single-file mode, not as part of a multi-file batch.
 
-After all tasks are complete, invoke `p-documentation` via the `task` tool to update or create
+After all tasks are complete, invoke `s-documentation` via the `task` tool to update or create
   per-folder READMEs in the test directories this invocation touched.
   Provide the sub-phase manifest path and the list of test files created
   or modified:
@@ -646,7 +608,7 @@ After all tasks are complete, invoke `p-documentation` via the `task` tool to up
   Tool: task
   Input:
   {
-    "subagent_type": "p-documentation",
+    "subagent_type": "s-documentation",
     "description": "Update per-folder test READMEs for plan <plan-id>",
     "prompt": "Manifest: tests/test-manifest/phase-N-Mx.yaml\n\nFiles:\n<path/to/test_file1.py>\n<path/to/test_file2.py>\n..."
   }

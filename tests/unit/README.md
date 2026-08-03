@@ -32,6 +32,17 @@ collaborator services, and repositories.
 |---|---|
 | `test_plan_generation_templates.py` | TestAllocateRaceEventPhases: phase allocation (24-week, 16-week, short-plan fallback, label order, specificity values) · TestDeriveExperienceLevel: experience level derivation (novice <2, intermediate 2-5, experienced >5, zero years) · TestEvaluateTrainingLengthGate: training length gate (marathon/5k/ultra thresholds, fitness gate, unknown goal type default) · TestScheduleCheckpoints: checkpoint scheduling (calibration at phase transition, benchmark week 4, progress review every 4 weeks, race simulation 2 weeks before goal, sorted by week number) |
 
+### Coaching Agents
+| File | Covers |
+|---|---|
+| `test_first_message_agent.py` | FirstMessageAgent: paragraph count validation (4 accepted, 3/5/1/empty rejected, whitespace trimmed), LiteLLM proxy routing (AsyncOpenAI base_url, no direct provider SDK), logical model identifier format (provider/model) |
+| `test_workout_generation_agent.py` | WorkoutGenerationAgent: coerce int/int-range helpers, target type by data tier (T1-2 power, T3-4 GAP, T5-6 description), session intent mapping (rest→recovery, easy→low_aerobic, long→high_aerobic, threshold→threshold, vo2max→vo2max), step physiological intent (warmup/cooldown/recovery→recovery), output parsing & validation (warmup-work-cooldown sequence, sequential one-indexed steps, first=warmup, last=cooldown, work intent matches session, target type field constraints, empty/null/invalid JSON, session purpose), step target building (power→watts, gap→sec_per_km, description→no primary), target set assembly, two-column target structure (theoretical+adjusted NOT NULL, recovery_modifier=green, twin_state_id version) |
+
+### Context Budget
+| File | Covers |
+|---|---|
+| `test_context_budget_service.py` | ContextBudgetService: token estimation (JSON length / 4, zero for empty, scales with payload, nested structures), max tokens per agent (first_message=5000, workout_generation=3000, post_workout=6000), ContextSection (name/priority/budget, immutable), to_dict serialization, budget enforcement |
+
 ### Utilities & Security
 | File | Covers |
 |---|---|

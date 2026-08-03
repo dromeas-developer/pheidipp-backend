@@ -5,9 +5,9 @@ temperature: 0.1
 permission:
   task:
     "*": deny
-    p-state-explorer: allow
-    p-index-health-guard: allow
-    p-code-structure-explorer: allow
+    s-state-explorer: allow
+    s-index-health-guard: allow
+    s-code-structure-explorer: allow
 
   read:       deny
   grep:       deny
@@ -118,13 +118,13 @@ The task must specify the scope: either a phase number (`phase: 1`) or an
 explicit list of sub-phase IDs (`subphases: [1-1, 1-2a, 1-2b]`). If neither
 is provided, STOP and report the missing input.
 
-Invoke `p-state-explorer` via the `task` tool with the task's scope:
+Invoke `s-state-explorer` via the `task` tool with the task's scope:
 
 ```
 Tool: task
 Input:
 {
-  "subagent_type": "p-state-explorer",
+  "subagent_type": "s-state-explorer",
   "description": "Get codebase registry for consistency validation",
   "prompt": "Domain: <domain or phase scope>\n\nAspects: all"
 }
@@ -234,14 +234,14 @@ must be tracked until drained in Step 5.
 
 ### Step 0 — Load State
 
-Invoke `p-state-explorer` via the `task` tool with the task's scope
+Invoke `s-state-explorer` via the `task` tool with the task's scope
 (phase number or sub-phase ID list):
 
 ```
 Tool: task
 Input:
 {
-  "subagent_type": "p-state-explorer",
+  "subagent_type": "s-state-explorer",
   "description": "Get codebase registry for consistency validation",
   "prompt": "Domain: <phase scope>\n\nAspects: all"
 }
@@ -292,14 +292,14 @@ scope does not exist, note it and continue.
 
 For import tangle detection (Category 2), the State Explorer's Brief does
 not include import structures. Before invoking the structure explorer,
-verify the code index is fresh — `p-code-structure-explorer` uses
+verify the code index is fresh — `s-code-structure-explorer` uses
 index-dependent tools (`search_symbols`, `get_importers`):
 
 ```
 Tool: task
 Input:
 {
-  "subagent_type": "p-index-health-guard",
+  "subagent_type": "s-index-health-guard",
   "description": "Check code index health before import survey",
   "prompt": "Domains: code"
 }
@@ -308,7 +308,7 @@ Input:
 Only the `code` domain needs checking — the consistency validator does
 not use architecture, vision, or release-plan indexes.
 
-Then invoke `p-code-structure-explorer` via the `task` tool for files in
+Then invoke `s-code-structure-explorer` via the `task` tool for files in
 scope that are at risk of import tangles — service files, files that the
 State Explorer flags as having cross-domain references, and any file that
 appears in two or more entity→code-file mappings (indicating it imports
@@ -318,7 +318,7 @@ from multiple domains):
 Tool: task
 Input:
 {
-  "subagent_type": "p-code-structure-explorer",
+  "subagent_type": "s-code-structure-explorer",
   "description": "Analyze module structure for import tangle detection",
   "prompt": "Module: <file path>\n\nAspects: classes, imports"
 }

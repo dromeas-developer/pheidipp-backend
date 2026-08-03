@@ -6,8 +6,8 @@ description: >
   annotations for test fixtures, production function signatures, and
   Pydantic schema fields. Prevents the cascade where one untyped parameter
   causes 100+ reportUnknown* errors in pyright strict mode. Loaded by
-  p-test-architect (Step 6 — before test generation) and p-coder
-  (pre-flight — before any implementation). Not for p-diagnostics-fixer
+  p-test-architect (Step 6 — before test generation) and p-coder-batch-mode/p-coder-fix-mode
+  (pre-flight — before any implementation). Not for s-diagnostics-fixer
   (already knows these patterns) or p-implementation-validator (uses
   type-enforcement-conformance for auditing).
 ---
@@ -16,7 +16,7 @@ description: >
 
 ## Agent Scope
 
-| Section | p-test-architect | p-coder |
+| Section | p-test-architect | p-coder-batch-mode/p-coder-fix-mode |
 |---|---|---|
 | §1 Shared — Cascade Prevention | ✅ Load | ✅ Load |
 | §2 Shared — Import Patterns | ✅ Load | ✅ Load |
@@ -171,7 +171,7 @@ async def failing_defer(self, athlete_id):
 
 ---
 
-## §7 Production-Specific — Function Annotations (p-coder)
+## §7 Production-Specific — Function Annotations (p-coder-batch-mode/p-coder-fix-mode)
 
 ### Public functions and methods
 
@@ -208,7 +208,7 @@ not a typing problem. Use `dict[str, Any]` only for truly dynamic data
 
 ---
 
-## §8 Production-Specific — Pydantic Fields (p-coder)
+## §8 Production-Specific — Pydantic Fields (p-coder-batch-mode/p-coder-fix-mode)
 
 ### Use the narrowest type that matches the contract
 

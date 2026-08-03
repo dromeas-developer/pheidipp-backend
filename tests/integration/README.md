@@ -17,6 +17,12 @@ the `db_session` fixture.
 |---|---|
 | `test_coaching_workout_db.py` | CoachingMessage (first_message singleton, post_workout singleton, post_workout null activity exempt, content empty rejected), GeneratedWorkout (unique plan+date, theoretical_targets not object, adjusted_targets null, recovery_modifier invalid), WorkoutStep (unique workout+step_order, physiological_intent NOT NULL, step_order < 1 rejected, description empty rejected, duration_seconds negative rejected, duration_seconds null accepted) |
 
+### Coaching Agents
+| File | Covers |
+|---|---|
+| `test_first_message_agent.py` | FirstMessageAgent: success path (message generated, row persisted, generation event success=true, outbox event), idempotency (409 on second call, LLM not called, no new generation event), LLM failure handling (timeout, connection error, 429 rate_limit, empty response, invalid output, no silent failures), content shape (exactly four paragraphs), athlete context (sport_background persisted in prompt, different backgrounds produce different contexts), precondition gates (no twin state→unavailable, no active goal→unavailable) |
+| `test_workout_generation_agent.py` | WorkoutGenerationAgent: success path (workout generated, steps persisted with physiological_intent, one-indexed unique orders, non-empty description, outbox event, generation event with agent name), idempotency (existing returned when allow_existing=true, 409 when false, no new generation event), target type by data tier (T1 power, T3 gap, T5 description), two-column target structure (theoretical+adjusted NOT NULL, recovery_modifier=green, twin_state_id version), LLM failure handling (timeout, connection error, invalid JSON), precondition gates (unknown session→404), agent name consistency |
+
 ### Fitness & Physiology
 | File | Covers |
 |---|---|

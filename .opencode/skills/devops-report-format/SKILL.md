@@ -73,7 +73,7 @@ is only one. Do not fall back to a single blanket description here.*
 
 ### RC1 — <short title>
 - **Category:** Implementation | Test Suite | Infrastructure | Specification / Plan Gap | Investigation Required
-- **Owner:** p-coder | p-test-architect | p-devops | p-implementation-architect | Unassigned
+- **Owner:** p-coder-fix-mode | p-test-architect | p-devops | p-implementation-resolver | Unassigned
 - **Confidence:** Confirmed | High | Medium | Low
 - **Evidence:**
   - <specific observation, e.g. "14 failing assertions">
@@ -81,7 +81,7 @@ is only one. Do not fall back to a single blanket description here.*
   - <what you found, e.g. "apply_observations() rereads ORM state every iteration">
   - <the conclusion it supports, e.g. "working_state overwritten instead of accumulated">
 - **Files:**
-  - app: <application source files to modify — p-coder scope; list "none" if no app-code changes are needed>
+  - app: <application source files to modify — p-coder-fix-mode scope; list "none" if no app-code changes are needed>
   - test: <test files to modify — p-test-architect scope; if the test files listed in Evidence are diagnostic only, state that explicitly>
 - **Affected failures:** <test/check name(s) or numeric range — representative sample + total count if >5>
 - **Suggested fix:** <strongly preferred. Include whenever the evidence
@@ -99,10 +99,10 @@ is only one. Do not fall back to a single blanket description here.*
 
 | Owner | Root Causes | Failures |
 |---|---|---|
-| p-coder | RC1, RC2 | 4 |
+| p-coder-fix-mode | RC1, RC2 | 4 |
 | p-test-architect | RC3 | 8 |
 | p-devops | — | — |
-| p-implementation-architect | — | — |
+| p-implementation-resolver | — | — |
 | Unassigned | — | — |
 
 ## Recommended Execution Order

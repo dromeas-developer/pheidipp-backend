@@ -8,7 +8,7 @@ description: >
   directory structure rules, per-directory conftest conventions, and
   factory/builder conventions. Does NOT contain domain-specific fixtures
   or production code imports — those are resolved at generation time via
-  p-code-explorer. Loaded by p-test-architect (primary) when
+  s-code-explorer. Loaded by p-test-architect (primary) when
   tests/conftest.py does not exist or when adding shared infrastructure.
   Also referenced by manifest-bootstrap for initial conftest.py creation.
 location: .opencode/skills/test-infrastructure/SKILL.md
@@ -20,7 +20,7 @@ Load this skill when the agent needs to create, modify, or understand
 `conftest.py` files, `tests/utils/` helpers, or the test directory
 structure. This skill teaches **patterns and structure**, not
 domain-specific code — production imports are resolved at generation time
-by `p-code-explorer`.
+by `s-code-explorer`.
 
 ---
 
@@ -301,7 +301,7 @@ Registration entries follow this format:
 
 - `tests/conftest.py` is created by `manifest-bootstrap` (initial) or by
   p-test-architect (if missing). Load this skill for the patterns; use
-  `p-code-explorer` to resolve production imports (model classes, app
+  `s-code-explorer` to resolve production imports (model classes, app
   factory, session factory, Base metadata).
 - Per-directory `conftest.py` files are created by p-test-architect on
   first need — when a fixture is needed by 2+ test files in that directory.

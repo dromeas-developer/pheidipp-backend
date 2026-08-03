@@ -68,7 +68,9 @@ redesign and infrastructure pattern changes.
 4. **Apply fixes for all triaged RCs.** For Type A: update the assertion
    strings or values to match current model/schema state. For Types B
    and C (with documented patterns): apply the documented pattern exactly
-   as written — do not adapt it. Use `p-code-explorer` via `task` if you
+   as written — do not adapt it. Before editing any test file, load the
+   `type-hygiene-standards` skill for canonical fixture types (§5-§6).
+   Use `s-code-explorer` via `task` if you
    need implementation-file context to confirm the current model state,
    same delegation rule as Step 6 of the full Protocol.
 
@@ -83,7 +85,7 @@ redesign and infrastructure pattern changes.
    (leave `executable` as-is — DevOps will re-verify after your fix
    lands, same flow as a newly generated test).
 
-7. Invoke `p-diagnostics-fixer` via `task` on each test file you modified,
+7. Invoke `s-diagnostics-fixer` via `task` on each test file you modified,
    one invocation per file — same pattern as Step 9 in the full Protocol.
    Modified assertions can carry stale imports, type mismatches from enum
    changes, or unused references.

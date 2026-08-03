@@ -34,7 +34,7 @@ Classify every finding into one of four severities before routing.
 
 ### MINOR — implementation hygiene
 
-Always routes to `p-coder` directly — no Resolution Path assessment needed.
+Always routes to `p-coder-fix-mode` directly — no Resolution Path assessment needed.
 
 - Missing `__init__.py` export
 - Missing type hint
@@ -46,7 +46,7 @@ Always routes to `p-coder` directly — no Resolution Path assessment needed.
 ### DEVIATION — unauthorized scope
 
 Requires architect acknowledgement; may or may not need ADR. Always routes
-to `p-implementation-architect` — see Step 5 (Deviation Detection) in the
+to `p-implementation-resolver` — see Step 5 (Deviation Detection) in the
 validator prompt. This is a judgement about whether unauthorized scope
 should be accepted, not a code-defect question, so the Resolution Path
 test below does not apply to Layer 3 findings.
@@ -54,18 +54,18 @@ test below does not apply to Layer 3 findings.
 ## Resolution Path
 
 Required for every CRITICAL and MAJOR finding. Do not apply to DEVIATION
-or Layer 3 findings — those always route to `p-implementation-architect`.
+or Layer 3 findings — those always route to `p-implementation-resolver`.
 
 Use the canonical test defined in the `no-silent-deviations` skill.
 That skill is the single source of truth for the implementation/architecture
 boundary. Apply its six-bullet test:
 
-- **No to all six** → `Resolution Path: Implementation Fix`, routes to `p-coder`.
-- **Yes to any** → `Resolution Path: Architecture Change Required`, routes to `p-implementation-architect`.
+- **No to all six** → `Resolution Path: Implementation Fix`, routes to `p-coder-fix-mode`.
+- **Yes to any** → `Resolution Path: Architecture Change Required`, routes to `p-implementation-resolver`.
 
 If you are not confident which side of the test a finding falls on, route
-it to `p-implementation-architect`. An unnecessary architect review costs
-less than asking `p-coder` to make an architecture decision it is
+it to `p-implementation-resolver`. An unnecessary architect review costs
+less than asking `p-coder-fix-mode` to make an architecture decision it is
 separately instructed to refuse.
 
 **Root cause taxonomy reference:** For the full root cause category
@@ -77,15 +77,15 @@ definitions, owner mapping, and confidence levels used by `p-devops`
 
 | Finding | Severity | Resolution Path | Route |
 |---|---|---|---|
-| A required file from the plan's CREATE scope was never created | CRITICAL | Implementation Fix — coder has not finished this step; only reclassify if you have specific evidence the omission was deliberate (see Layer 3) | p-coder |
-| A stated invariant ("hashed_password never returned") is violated because the field is present in a response | CRITICAL | Implementation Fix | p-coder |
-| An endpoint returns 404 where the plan explicitly states 403 | CRITICAL | Implementation Fix | p-coder |
-| Business logic sits in the API layer; the plan already names the service that should own it | CRITICAL | Implementation Fix — relocate the code | p-coder |
-| Business logic sits in a service, and the plan does not clearly say which service should own it | CRITICAL | Architecture Change Required | p-implementation-architect |
-| An event contract in the plan lists 5 required payload fields; the code sets 3 | MAJOR | Implementation Fix | p-coder |
-| The plan requires atomicity for an operation the code splits across two transactions | MAJOR | Implementation Fix | p-coder |
-| The plan has no invariant at all for a behaviour the code needs to satisfy | MAJOR (Plan Gap) | Architecture Change Required | p-implementation-architect |
-| A deviation adds a new persistence entity outside the plan's scope | DEVIATION | not applicable — Layer 3 always routes to p-implementation-architect | p-implementation-architect |
+| A required file from the plan's CREATE scope was never created | CRITICAL | Implementation Fix — coder has not finished this step; only reclassify if you have specific evidence the omission was deliberate (see Layer 3) | p-coder-fix-mode |
+| A stated invariant ("hashed_password never returned") is violated because the field is present in a response | CRITICAL | Implementation Fix | p-coder-fix-mode |
+| An endpoint returns 404 where the plan explicitly states 403 | CRITICAL | Implementation Fix | p-coder-fix-mode |
+| Business logic sits in the API layer; the plan already names the service that should own it | CRITICAL | Implementation Fix — relocate the code | p-coder-fix-mode |
+| Business logic sits in a service, and the plan does not clearly say which service should own it | CRITICAL | Architecture Change Required | p-implementation-resolver |
+| An event contract in the plan lists 5 required payload fields; the code sets 3 | MAJOR | Implementation Fix | p-coder-fix-mode |
+| The plan requires atomicity for an operation the code splits across two transactions | MAJOR | Implementation Fix | p-coder-fix-mode |
+| The plan has no invariant at all for a behaviour the code needs to satisfy | MAJOR (Plan Gap) | Architecture Change Required | p-implementation-resolver |
+| A deviation adds a new persistence entity outside the plan's scope | DEVIATION | not applicable — Layer 3 always routes to p-implementation-resolver | p-implementation-resolver |
 
 ---
 
@@ -107,8 +107,8 @@ Plan: docs/implementation/<path-to-plan>.md
 | Step | Description | Severity | Route | Finding |
 |------|-------------|----------|-------|---------|
 | 1 | Persistence models created | ✅ | | |
-| 5 | Registration atomicity | MAJOR | p-coder | Event emitted before transaction commit in register() |
-| 8 | require_self 403 vs 404 | CRITICAL | p-coder | Returns 404 on athlete mismatch |
+| 5 | Registration atomicity | MAJOR | p-coder-fix-mode | Event emitted before transaction commit in register() |
+| 8 | require_self 403 vs 404 | CRITICAL | p-coder-fix-mode | Returns 404 on athlete mismatch |
 
 ---
 
@@ -117,10 +117,10 @@ Plan: docs/implementation/<path-to-plan>.md
 | Contract | Check | Severity | Route | Finding |
 |----------|-------|----------|-------|---------|
 | Invariant: hashed_password never returned | ✅ | | | |
-| Invariant: refresh rotation atomic | MAJOR | p-coder | auth_service.py: insert and revoke in separate transactions |
+| Invariant: refresh rotation atomic | MAJOR | p-coder-fix-mode | auth_service.py: insert and revoke in separate transactions |
 | Event: athlete_registered after commit | ✅ | | | |
-| Event: athlete_logged_in token_type field | MINOR | p-coder | Field present but typed as str not Literal |
-| PLAN GAP: no invariant for ip_address anonymisation | MAJOR | p-implementation-architect | Plan omits this invariant from athlete-auth.md |
+| Event: athlete_logged_in token_type field | MINOR | p-coder-fix-mode | Field present but typed as str not Literal |
+| PLAN GAP: no invariant for ip_address anonymisation | MAJOR | p-implementation-resolver | Plan omits this invariant from athlete-auth.md |
 
 ---
 
@@ -128,7 +128,7 @@ Plan: docs/implementation/<path-to-plan>.md
 
 | Item | What Was Added | Classification | Route | Action |
 |------|---------------|----------------|-------|--------|
-| app/models/event_log.py | New EventLog persistence model | DEVIATION | p-implementation-architect | Architect review — new entity outside plan scope |
+| app/models/event_log.py | New EventLog persistence model | DEVIATION | p-implementation-resolver | Architect review — new entity outside plan scope |
 | requirements.txt: bcrypt | Dependency added | Acceptable | — | Routine, no action needed |
 
 ---
@@ -136,13 +136,13 @@ Plan: docs/implementation/<path-to-plan>.md
 ## Stack-Truth
 
 ### CRITICAL
-- <finding>: <file> — <description> — Route: p-coder | p-implementation-architect
+- <finding>: <file> — <description> — Route: p-coder-fix-mode | p-implementation-resolver
 
 ### MAJOR
-- <finding>: <file> — <description> — Route: p-coder | p-implementation-architect
+- <finding>: <file> — <description> — Route: p-coder-fix-mode | p-implementation-resolver
 
 ### MINOR
-- <finding>: <file> — <description> — Route: p-coder
+- <finding>: <file> — <description> — Route: p-coder-fix-mode
 
 ---
 
@@ -169,24 +169,24 @@ dimensions are yes.
 
 *Every finding with an action attached to it appears exactly once below,
 grouped by owner. A report can — and often will — route some findings to
-`p-coder` and others to `p-implementation-architect` in the same run; that is expected,
+`p-coder-fix-mode` and others to `p-implementation-resolver` in the same run; that is expected,
 not a sign of an inconsistent report.*
 
 | Owner | Findings |
 |---|---|
-| p-coder | Layer 1 Step 5, Layer 1 Step 8, Layer 2 (refresh rotation atomic), Layer 2 (token_type field), Stack-Truth MINOR (…) |
-| p-implementation-architect | Layer 2 (PLAN GAP: ip_address anonymisation), Layer 3 (event_log.py) |
+| p-coder-fix-mode | Layer 1 Step 5, Layer 1 Step 8, Layer 2 (refresh rotation atomic), Layer 2 (token_type field), Stack-Truth MINOR (…) |
+| p-implementation-resolver | Layer 2 (PLAN GAP: ip_address anonymisation), Layer 3 (event_log.py) |
 | p-devops | — |
 
 ## Routing — How To Read The Summary Above
 
 | Finding | Route To |
 |---------|----------|
-| CRITICAL / MAJOR — Resolution Path: Implementation Fix | p-coder + this report |
-| CRITICAL / MAJOR — Resolution Path: Architecture Change Required | p-implementation-architect + this report |
-| MAJOR (plan gap) | p-implementation-architect + this report — plan needs updating; always Architecture Change Required, see Step 7 |
-| DEVIATION / Layer 3 CRITICAL | p-implementation-architect + this report — architect acknowledges or requests ADR |
-| MINOR (hygiene) | p-coder + this report |
+| CRITICAL / MAJOR — Resolution Path: Implementation Fix | p-coder-fix-mode + this report |
+| CRITICAL / MAJOR — Resolution Path: Architecture Change Required | p-implementation-resolver + this report |
+| MAJOR (plan gap) | p-implementation-resolver + this report — plan needs updating; always Architecture Change Required, see Step 7 |
+| DEVIATION / Layer 3 CRITICAL | p-implementation-resolver + this report — architect acknowledges or requests ADR |
+| MINOR (hygiene) | p-coder-fix-mode + this report |
 | Migration incomplete | p-devops + this report |
 | No findings | p-devops |
 ```

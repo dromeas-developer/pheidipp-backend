@@ -9,7 +9,7 @@ description: >
   rather than duplicating it. The conftest.py patterns come from the
   test-infrastructure skill — load that skill before creating conftest.py
   for the canonical fixture patterns, then resolve production imports via
-  p-code-explorer. Loaded by p-test-architect only when
+  s-code-explorer. Loaded by p-test-architect only when
   tests/test-manifest/index.yaml is absent.
 location: .opencode/skills/manifest-bootstrap/SKILL.md
 ---
@@ -39,7 +39,7 @@ structure.
    session-scoped `_prepare_database` schema setup. Load the
    `test-infrastructure` skill for the canonical fixture patterns (engine
    lifecycle, NullPool, truncation, client wiring), then use
-   `p-code-explorer` to resolve the production imports (model classes, app
+   `s-code-explorer` to resolve the production imports (model classes, app
    factory, session factory, Base metadata) and write the file.
 2. **`tests/MOCKING_CONTRACT.md`** — The fixture and mock-boundary contract
    with the initial layer-boundary table and canonical fixtures table
@@ -65,7 +65,7 @@ live in test-infrastructure.
    file is written, as every integration/api/behaviour test depends on
    `db_session` and `client`. Load the `test-infrastructure` skill for the
    canonical fixture patterns (engine lifecycle, NullPool, truncation,
-   client wiring), then delegate to `p-code-explorer` to resolve the
+   client wiring), then delegate to `s-code-explorer` to resolve the
    production imports (model classes from `app.models`, app factory from
    `app.main`, session factory from `app.db.session`, Base metadata from
    `app.db.base`). The skill provides the structural patterns; the explorer

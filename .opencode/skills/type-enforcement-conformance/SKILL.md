@@ -8,7 +8,7 @@ description: >
   rules for Layer 4 (Type-Enforcement Conformance). Loaded by
   p-implementation-validator only. Also used for retrospective audits
   of existing codebases where no plan exists — the codebase itself
-  becomes the "plan" and findings route to p-coder for fixes.
+  becomes the "plan" and findings route to p-coder-fix-mode for fixes.
 ---
 
 # Type-Enforcement Conformance — Layer 4 Audit
@@ -38,7 +38,7 @@ Step 2 (the plan's scope files).
 **Retrospective audit (no plan):** When invoked to audit an existing
 codebase with no plan, the codebase itself is the subject. Every file
 in the requested scope is audited against the rules below. Findings
-route to `p-coder` for fixes — there is no plan to route back to.
+route to `p-coder-fix-mode` for fixes — there is no plan to route back to.
 
 ## Checks
 
@@ -52,7 +52,7 @@ For every function and method in scope, verify visibility is correct:
 | Function/method is private (`_` prefix) but referenced from outside its module (imported or called cross-module) | Should be public | MAJOR |
 | Function/method is private and only used in tests (accessed via `# type: ignore` or direct `_` access) | Design smell — either make it public with a clear contract, or restructure the test to use the public API | MINOR (flag as observation, not a fix) |
 
-**How to detect:** Use `p-code-structure-explorer` to get the module's
+**How to detect:** Use `s-code-structure-explorer` to get the module's
 classes and functions, then `get_importers` to find cross-module references.
 A private symbol referenced from outside its defining module is a MAJOR
 finding. A public symbol with no cross-module references is a MINOR
@@ -72,9 +72,9 @@ verify the type is as strict as the contract implies:
 | Return type annotation missing on a public function | Should be annotated | MINOR |
 | Parameter type annotation missing on a public function | Should be annotated | MINOR |
 
-**How to detect:** Use `p-code-structure-explorer` to get function
+**How to detect:** Use `s-code-structure-explorer` to get function
 signatures (parameters, return types). Cross-reference `str`-typed
-fields against architecture enums via `p-contract-verifier`. Missing
+fields against architecture enums via `s-contract-verifier`. Missing
 annotations are visible directly from the structure report.
 
 ### Check 3 — Enforcement Layer Placement
@@ -89,7 +89,7 @@ stated layer:
 | Type system (Pydantic schema) | Database constraint | Enforcement at wrong layer — too late, invalid data reaches the service | MAJOR |
 | Application logic (service) | Pydantic schema | Enforcement at wrong layer — business rule in the schema, not the service | MAJOR |
 | Database constraint | Service-layer validation | Acceptable — defense in depth, but the DB constraint should also exist | MINOR (flag missing constraint) |
-| Not stated in plan | Any layer | Plan gap — route to p-implementation-architect | MAJOR (Plan Gap) |
+| Not stated in plan | Any layer | Plan gap — route to p-implementation-resolver | MAJOR (Plan Gap) |
 
 **How to detect:** Cross-reference the plan's RC6 enforcement-layer
 classification (if present in the `-tests.md` scenarios or the plan's
@@ -114,7 +114,7 @@ required fields, format checks beyond what Pydantic provides natively):
 | `@field_validator` exists but does not cover a boundary case the contract implies | Incomplete validator | MAJOR |
 | `@field_validator` exists but the validation logic duplicates a check already in the service | Enforcement duplication — remove from service or schema, not both | MINOR |
 
-**How to detect:** Use `p-code-structure-explorer` to find
+**How to detect:** Use `s-code-structure-explorer` to find
 `@field_validator` and `@model_validator` decorators in schema files.
 Cross-reference against the plan's stated validation requirements.
 
@@ -122,9 +122,9 @@ Cross-reference against the plan's stated validation requirements.
 
 | Severity | Route | Resolution Path |
 |---|---|---|
-| MAJOR (visibility, type strictness, enforcement layer, missing validator) | p-coder | Implementation Fix (unless it crosses an architecture boundary — then p-implementation-architect) |
-| MINOR (naming, missing annotation, observation) | p-coder | Direct fix, no Resolution Path needed |
-| MAJOR (Plan Gap — enforcement layer not stated in plan) | p-implementation-architect | Architecture Change Required — plan needs RC6 classification |
+| MAJOR (visibility, type strictness, enforcement layer, missing validator) | p-coder-fix-mode | Implementation Fix (unless it crosses an architecture boundary — then p-implementation-resolver) |
+| MINOR (naming, missing annotation, observation) | p-coder-fix-mode | Direct fix, no Resolution Path needed |
+| MAJOR (Plan Gap — enforcement layer not stated in plan) | p-implementation-resolver | Architecture Change Required — plan needs RC6 classification |
 
 ## Output
 
@@ -137,13 +137,13 @@ them as a new section:
 
 | Check | Item | Severity | Route | Finding |
 |-------|------|----------|-------|---------|
-| Visibility | <symbol> | MAJOR/MINOR | p-coder/p-implementation-architect | <description> |
-| Type Strictness | <field/param> | MAJOR/MINOR | p-coder | <description> |
-| Enforcement Layer | <input> | MAJOR | p-coder/p-implementation-architect | <description> |
-| Custom Validator | <schema> | MAJOR | p-coder | <description> |
+| Visibility | <symbol> | MAJOR/MINOR | p-coder-fix-mode/p-implementation-resolver | <description> |
+| Type Strictness | <field/param> | MAJOR/MINOR | p-coder-fix-mode | <description> |
+| Enforcement Layer | <input> | MAJOR | p-coder-fix-mode/p-implementation-resolver | <description> |
+| Custom Validator | <schema> | MAJOR | p-coder-fix-mode | <description> |
 ```
 
 For retrospective audits (no plan), produce a standalone report at
 `reports/type-enforcement-audit-<scope>.md` using the same table
-structure, with all findings routing to `p-coder` (no plan to route
+structure, with all findings routing to `p-coder-fix-mode` (no plan to route
 back to).

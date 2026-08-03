@@ -22,7 +22,7 @@ stack-truth — reference them by name, not by restating them.
 
 These violations always route through the Resolution Path test (Step 7)
 before final routing — a CRITICAL label does not automatically mean
-`p-implementation-architect`.
+`p-implementation-resolver`.
 
 | Stack-Truth Rule | Stack-Truth Reference |
 |---|---|
@@ -51,7 +51,7 @@ before final routing — a CRITICAL label does not automatically mean
 
 ## MINOR — implementation hygiene
 
-Always routes to `p-coder` directly — no Resolution Path assessment needed.
+Always routes to `p-coder-fix-mode` directly — no Resolution Path assessment needed.
 
 | Stack-Truth Rule | Stack-Truth Reference |
 |---|---|
@@ -70,4 +70,4 @@ Always routes to `p-coder` directly — no Resolution Path assessment needed.
    applicable rule.
 3. Classify each violation using the severity table above.
 4. Feed CRITICAL and MAJOR findings through Step 7's Resolution Path test.
-5. Route MINOR findings directly to `p-coder`.
+5. Route MINOR findings directly to `p-coder-fix-mode`.

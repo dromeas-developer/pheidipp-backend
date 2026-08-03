@@ -4,7 +4,7 @@ description: >
   Load this when an agent needs the Pheidipp platform's service map,
   database architecture, command inventory, check-file rule, or
   TimescaleDB augmentation procedures. Consumed by p-devops (primary),
-  and p-coder. Agents that do not interact with
+  and p-coder-batch-mode/p-coder-fix-mode. Agents that do not interact with
   runtime infrastructure should not load this skill.
 ---
 

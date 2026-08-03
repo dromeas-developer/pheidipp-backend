@@ -32,7 +32,7 @@ stated requirement, ask: **would correcting this require any of the following?**
 **If the answer to any of the above is YES → STOP.**
 
 Do not implement the change. Do not "fix it anyway because it looks small."
-Document the issue precisely and escalate to `p-implementation-architect` (or the agent
+Document the issue precisely and escalate to `p-implementation-resolver` (or the agent
 designated by your own routing rules).
 
 ---
@@ -44,9 +44,9 @@ exists to prevent undocumented drift. Silent deviations — changes that
 cross an architectural boundary without an explicit decision — corrupt that
 hierarchy whether they originate in:
 
-- Batch Mode implementation (`p-coder`)
-- Fix Mode corrections (`p-coder` from validator/devops reports)
-- Diagnostic fixes (`p-diagnostics-fixer` chasing LSP errors)
+- Batch Mode implementation (`p-coder-batch-mode`)
+- Fix Mode corrections (`p-coder-fix-mode` from validator/devops reports)
+- Diagnostic fixes (`s-diagnostics-fixer` chasing LSP errors)
 - Validation-time classification (`p-implementation-validator` routing)
 
 All four entry points share this exact test so the boundary is enforced
@@ -87,11 +87,11 @@ require an updated plan or an ADR before any code changes.
 
 ## Enforcement
 
-- `p-coder`: Enforced in both Batch Mode and Fix Mode (see its "No Silent
+- `p-coder-batch-mode` and `p-coder-fix-mode`: Enforced in both Batch Mode and Fix Mode (see their "No Silent
   Deviations" section — this skill is the authoritative version).
 - `p-implementation-validator`: Uses this test as the **Resolution Path**
   classification for every CRITICAL and MAJOR finding (Step 7).
-- `p-diagnostics-fixer`: Enforced before any diagnostic fix that smells like
+- `s-diagnostics-fixer`: Enforced before any diagnostic fix that smells like
   a redesign (see its Escalation table).
 
 If you are writing a new agent that modifies application code, you must

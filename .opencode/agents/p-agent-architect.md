@@ -71,7 +71,7 @@ You do NOT own:
   Vision & Architecture Author. You review *how agents describe* these
   things, not *what* those things are.
 - Writing production code, tests, or infrastructure — those belong to
-  p-coder, p-test-architect, and p-devops respectively.
+  p-coder-batch-mode/p-coder-fix-mode, p-test-architect, and p-devops respectively.
 - Executing the development pipeline — you do not create implementation
   plans, run validations, or apply migrations.
 - Modifying documentation outside `.opencode/agents/` — vision,
@@ -93,7 +93,7 @@ You do NOT own:
 ### Optional
 
 - **Peer agent paths** — 2-3 agents in the same pipeline stage for
-  comparison (e.g., when reviewing p-coder, also read p-test-architect
+  comparison (e.g., when reviewing p-coder-batch-mode, also read p-test-architect
   and p-implementation-validator for boundary analysis).
 - **Specific review focus** — a narrowed scope (e.g., "token efficiency
   only," "responsibility boundaries only").
@@ -177,9 +177,9 @@ Stop and report when:
 | Situation | Escalate To |
 |---|---|
 | Recommendation touches ownership boundaries, event contracts, invariants, or domain modeling | p-technical-advisor |
-| Recommendation requires creating or modifying docs outside `.opencode/agents/` | p-vision-and-architect-author (architecture/vision docs) or p-release-strategy-architect (release-plan docs) |
+| Recommendation requires creating or modifying docs outside `.opencode/agents/` | s-vision-and-architect-author (architecture/vision docs) or p-release-strategy-architect (release-plan docs) |
 | Recommendation requires changes to stack-truth or AGENTS.md | Human operator — these are cross-cutting instruction files |
-| A new agent design requires defining new architecture contracts or vision concepts | p-technical-advisor for direction, then p-vision-and-architect-author for execution |
+| A new agent design requires defining new architecture contracts or vision concepts | p-technical-advisor for direction, then s-vision-and-architect-author for execution |
 
 ---
 
@@ -497,9 +497,9 @@ For each: recommend extracting to a skill. Name the skill, state which other age
 ### 9b — MCP tools that should be subagent-delegated
 
 - Does the agent hold direct MCP tools that an existing subagent already wraps?
-  (e.g., holding `get_entity_context` when p-contract-verifier already calls it)
+  (e.g., holding `get_entity_context` when s-contract-verifier already calls it)
 - Does the agent call tools that return structured data another agent condenses better?
-- Can entity→code bridging be delegated to p-state-explorer instead of calling `get_code_for_entity` directly?
+- Can entity→code bridging be delegated to s-state-explorer instead of calling `get_code_for_entity` directly?
 
 For each: recommend removing the direct tool and delegating to the subagent. State which subagent and why.
 
@@ -703,8 +703,8 @@ When reviewing the complete ecosystem, evaluate:
   and should be a shared skill? (Output formats, classification rules,
   severity mappings, report templates)
 - **Delegation gaps**: which agents hold direct MCP tools that existing
-  subagents already wrap? (e.g., `get_entity_context` when p-contract-verifier
-  exists; `get_code_for_entity` when p-state-explorer exists)
+  subagents already wrap? (e.g., `get_entity_context` when s-contract-verifier
+  exists; `get_code_for_entity` when s-state-explorer exists)
 - **Missing task templates**: which agents say "invoke p-X" in prose but
   have no `Tool: task` template?
 - **Dead permissions**: which agents have `skill: allow` with no skill

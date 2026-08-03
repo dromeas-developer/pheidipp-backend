@@ -149,14 +149,14 @@ uncommitted work)
 
 ## When Not To Load This Skill
 
-- Open-ended repository exploration (use `p-code-explorer` or
-  `p-state-explorer`)
-- "What already exists" queries (use `p-state-explorer`, which queries
+- Open-ended repository exploration (use `s-code-explorer` or
+  `s-state-explorer`)
+- "What already exists" queries (use `s-state-explorer`, which queries
   the live codebase — its brief is always current)
-- Historical artifact scanning (use `p-history-explorer`)
-- Retrieving entity/service/registration facts (use `p-state-explorer`)
+- Historical artifact scanning (use `s-history-explorer`)
+- Retrieving entity/service/registration facts (use `s-state-explorer`)
 - "Does this specific file exist and what does it contain?" (use
-  `p-code-explorer`)
+  `s-code-explorer`)
 
 ## Non-Responsibilities
 

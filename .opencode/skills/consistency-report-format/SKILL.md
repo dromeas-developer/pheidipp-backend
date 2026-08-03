@@ -35,7 +35,7 @@ remediation or accept as-is:
 ### CODER — findings with a clear, self-contained fix that does not require an
 architectural decision
 
-Routes directly to p-coder; no architect review needed:
+Routes directly to p-coder-fix-mode; no architect review needed:
 - Rename a method or field to match the established name across the codebase
   (the correct name is already obvious from the majority pattern)
 - Extract an identical utility that appears 3+ times and has an unambiguous
@@ -206,8 +206,8 @@ Steps 3-4 was resolved in Step 5.
 
 | Disposition | Count | Route |
 |-------------|-------|-------|
-| CRITICAL | N | → p-implementation-architect immediately; block next sub-phase until resolved |
-| MAJOR | N | → p-implementation-architect to decide: remediation plan, absorb into upcoming sub-phase, or accept with ADR |
-| CODER | N | → p-coder directly with this report; no architect review needed |
+| CRITICAL | N | → p-implementation-resolver immediately; block next sub-phase until resolved |
+| MAJOR | N | → p-implementation-resolver to decide: remediation plan, absorb into upcoming sub-phase, or accept with ADR |
+| CODER | N | → p-coder-fix-mode directly with this report; no architect review needed |
 | OBSERVATION | N | No action; documented above |
 ```

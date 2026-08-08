@@ -1,6 +1,7 @@
 ---
-model: nvidia/z-ai/glm-5.2
+model: opencode-go/glm-5.2
 temperature: 0.1
+reasoningEffort: high
 
 permission:
   task:

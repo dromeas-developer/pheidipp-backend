@@ -6,8 +6,9 @@ description: >-
   depends on it, what it depends on, and what would break if changed.
   Never writes or edits anything.
 mode: subagent
-model: opencode/mimo-v2.5-free
-temperature: 0.4
+model: opencode-go/mimo-v2.5
+temperature: 0.3
+reasoningEffort: high
 
 permission:
   task:

@@ -1,7 +1,9 @@
 ---
 model: ollama-cloud/minimax-m3
-variant: low
 temperature: 0.1
+thinking:
+  type: enabled
+  budget_tokens: 4096
 
 permission:
   task:

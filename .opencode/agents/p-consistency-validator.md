@@ -1,6 +1,7 @@
 ---
-model: nvidia/z-ai/glm-5.2
+model: poolside/poolside/laguna-s-2.1
 temperature: 0.1
+reasoningEffort: high
 
 permission:
   task:

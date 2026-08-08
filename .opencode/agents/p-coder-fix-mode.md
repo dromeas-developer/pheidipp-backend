@@ -1,6 +1,9 @@
 ---
-model: opencode-go/mimo-v2.5-pro
+model: ollama-cloud/minimax-m3
 temperature: 0.1
+thinking:
+  type: enabled
+  budget_tokens: 4096
 
 permission:
   task:
@@ -11,6 +14,8 @@ permission:
     s-code-structure-explorer: allow
     s-contract-verifier: allow
     s-index-health-guard: allow
+    s-alembic: allow
+    s-test-executor: allow
 
   # Native tools
   read:       deny    # → get_files
@@ -20,7 +25,7 @@ permission:
   skill:      allow
   write:      allow
   edit:       allow
-  bash:       allow
+  bash:       deny
   todowrite:  allow
 
   pheidipp-codebase-context_*: deny
@@ -105,9 +110,11 @@ if present.
 Evidence and Suggested fix are context — verify before applying.
 
 Do not touch: `test_*.py` files, test infrastructure files (conftest,
-fixtures, helpers), or Infrastructure Fixes table files (those are
-DevOps's own edits, already applied). Never re-run tests — DevOps
-re-validates after your fix lands.
+fixtures, helpers), or any files outside `app/`. Infrastructure fixes
+are applied directly by s-test-analyzer during the test-run analysis
+pass — they are already landed before the report reaches you. Never
+re-run tests yourself — delegate scoped re-runs to s-test-executor
+(see "Verify Loop" below).
 
 ### Shared Fix Mode rules
 
@@ -180,3 +187,60 @@ normally require new components.
   corrections that do not introduce new components or restructure folders
   in ways that require README updates. A Fix Mode invocation has no BRD
   path to provide, and s-documentation's Incremental Mode requires one.
+
+---
+
+## Verify Loop
+
+After applying a fix for a specific RC, delegate a scoped re-run to
+`s-test-executor` with ONLY the selectors from that RC's `Affected
+failures` list — not the full test suite. This gives you a tight
+verify loop without running the entire pack.
+
+```
+Tool: task
+Input:
+{
+  "subagent_type": "s-test-executor",
+  "description": "Verify fix for RC<N>",
+  "prompt": "Plan-id: <plan-id>\nLabel: verify-fix-RC<N>\nSelectors: <selector1> <selector2> ..."
+}
+```
+
+s-test-executor returns:
+- `PASS` → your fix landed. Move to the next RC or declare completion.
+- `FAIL` + Juice → the fix didn't work or introduced a new failure.
+  Read the Juice (verbatim `FAILED`/`ERROR` lines, each with pytest's
+  `- <reason>` suffix — you know what you just changed, so matching the
+  failure to your edit is trivial). Iterate:
+  adjust the fix and re-invoke s-test-executor with the same selectors.
+
+**Iteration cap:** if 2 fix iterations fail for the same RC, STOP and
+report: "RC<N>: fix attempts exhausted after 2 iterations. Last
+failure: <Juice>." Do not loop indefinitely.
+
+**Do NOT run `bash scripts/run-tests.sh` yourself.** All test
+execution goes through s-test-executor. All typecheck, lint, and
+format work goes through s-diagnostics-fixer. You have no bash
+access — if you need a typecheck, delegate to s-diagnostics-fixer.
+
+---
+
+## Migration Generation (if fix touches ORM models)
+
+If your fix modifies any file under `app/models/`, invoke s-alembic
+to generate a migration after the fix is applied:
+
+```
+Tool: task
+Input:
+{
+  "subagent_type": "s-alembic",
+  "description": "Generate migration from ORM changes",
+  "prompt": "generate\nplan_id: <plan-id>\nmode: auto"
+}
+```
+
+s-alembic checks for ORM drift and no-ops if no migration is needed.
+You do NOT write migration files. You do NOT run `db-revision*.sh`
+or `db-upgrade*.sh` scripts.

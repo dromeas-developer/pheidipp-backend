@@ -1,6 +1,6 @@
 ---
-model: litellm-proxy/nvidia/kimi-k2.6
-temperature: 0.5
+model: opencode-go/kimi-k2.6
+temperature: 0.3
 
 permission:
   task:

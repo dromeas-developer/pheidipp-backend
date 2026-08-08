@@ -1,6 +1,9 @@
 ---
-model: opencode-go/mimo-v2.5-pro
+model: ollama-cloud/minimax-m3
 temperature: 0.1
+thinking:
+  type: enabled
+  budget_tokens: 4096
 
 permission:
   task:
@@ -11,6 +14,7 @@ permission:
     s-code-structure-explorer: allow
     s-contract-verifier: allow
     s-index-health-guard: allow
+    s-alembic: allow
 
   # Native tools
   read:       deny    # → get_files
@@ -20,7 +24,7 @@ permission:
   skill:      allow
   write:      allow
   edit:       allow
-  bash:       allow
+  bash:       deny
   todowrite:  allow
 
   pheidipp-codebase-context_*: deny
@@ -85,10 +89,13 @@ any order." Steps retain their original numbering from the implementation
 plan — do not renumber to 1, 2, 3.
 
 If a step's text involves generating a migration ("generate migration",
-"alembic revision", "db-revision") → execute it: generate the file only,
-do not edit, inspect, or apply it. If a step requires a migration to
-already be applied (e.g. a service inserting into a table not yet created
-in the DB), stop and flag it — DevOps applies migrations, not the coder.
+"alembic revision", "db-revision") → do NOT generate it yourself.
+You write ORM models; s-alembic generates the migration file from
+your models. After all implementation steps are complete, invoke
+s-alembic with `generate` (see "Migration Generation" below). If a
+step requires a migration to already be applied (e.g. a service
+inserting into a table not yet created in the DB), stop and flag it
+— s-alembic applies migrations, not the coder.
 
 You should never see a step in your BRD that belongs to DevOps or
 Test Architect — the Implementation Architect already excluded those
@@ -212,3 +219,30 @@ The doc-writer reads the BRD for architectural context, identifies
 which folders were affected, and updates or creates `README.md` files.
 One invocation covers the entire batch — the doc-writer batches its
 own folder checks and file reads internally. No loop needed.
+
+### Migration Generation
+
+After all implementation steps and diagnostics are complete, ALWAYS
+invoke `s-alembic` with the `generate` operation — even if you don't
+think any models changed. s-alembic checks for ORM drift and no-ops
+if no migration is needed.
+
+```
+Tool: task
+Input:
+{
+  "subagent_type": "s-alembic",
+  "description": "Generate migration from ORM changes",
+  "prompt": "generate\nplan_id: <plan-id>\nmode: auto"
+}
+```
+
+s-alembic will:
+- Check if ORM changes require a migration (via pending-changes check)
+- If yes: autogenerate, apply TimescaleDB hypertable augmentation,
+  upgrade the test DB, and return the migration file path
+- If no: return "No migration needed"
+
+You do NOT write migration files. You do NOT run `db-revision*.sh`
+or `db-upgrade*.sh` scripts. All migration lifecycle work is
+delegated to s-alembic.

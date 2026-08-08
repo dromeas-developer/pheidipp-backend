@@ -6,8 +6,9 @@ description: >-
   p-test-architect, p-devops). Checks index health and refreshes only
   the domains relevant to the caller.
 mode: subagent
-model: openrouter/inclusionai/ling-3.0-flash:free
+model: opencode/longcat-2.0-free
 temperature: 0.1
+reasoningEffort: low
 
 permission:
   task:

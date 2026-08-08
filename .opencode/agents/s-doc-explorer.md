@@ -10,7 +10,8 @@ description: >-
   caller named, and never writes or edits anything.
 mode: subagent
 model: opencode-go/mimo-v2.5
-temperature: 0.5
+temperature: 0.3
+reasoningEffort: medium
 
 permission:
   task:

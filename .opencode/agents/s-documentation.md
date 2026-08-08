@@ -7,7 +7,8 @@ description: >-
   compacts docstrings).
 mode: subagent
 model: poolside/poolside/laguna-s-2.1
-temperature: 0.5
+temperature: 0.3
+reasoningEffort: low
 
 permission:
   task:

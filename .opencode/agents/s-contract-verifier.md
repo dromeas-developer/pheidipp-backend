@@ -6,8 +6,9 @@ description: >-
   entity or event name and verifies its contracts against the architecture.
   Never writes or edits anything.
 mode: subagent
-model: openrouter/inclusionai/ling-3.0-flash:free
+model: opencode/longcat-2.0-free
 temperature: 0.1
+reasoningEffort: medium
 
 permission:
   task:

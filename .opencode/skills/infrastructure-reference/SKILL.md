@@ -3,9 +3,10 @@ name: infrastructure-reference
 description: >
   Load this when an agent needs the Pheidipp platform's service map,
   database architecture, command inventory, check-file rule, or
-  TimescaleDB augmentation procedures. Consumed by p-devops (primary),
-  and p-coder-batch-mode/p-coder-fix-mode. Agents that do not interact with
-  runtime infrastructure should not load this skill.
+  TimescaleDB augmentation procedures. Consumed by s-alembic (primary
+  — owns the migration lifecycle), s-devops-ops (docker management),
+  and p-devops (operational reference). Coder agents no longer load
+  this skill — migration generation is delegated to s-alembic.
 ---
 
 # Infrastructure Reference
@@ -104,6 +105,9 @@ bash scripts/run-tests.sh [paths...]      # run pytest inside api container agai
 - Overrides `DATABASE_URL` with `TEST_DATABASE_URL` for the pytest run
 - Runs `docker compose exec -e DATABASE_URL="$DATABASE_URL" api bash -c "pytest <paths> -v"`
 - Pass test paths as space-separated arguments: `bash scripts/run-tests.sh tests/unit/ tests/integration/test_auth.py`
+- Paths may be bare files, class-qualified (`tests/unit/test_foo.py::TestBar`),
+  or function-qualified (`tests/unit/test_foo.py::TestBar::test_baz`) pytest
+  node IDs — the script passes them through to pytest unchanged
 - No arguments = runs the full `tests/` directory
 
 **How `db-upgrade-test.sh` works:**

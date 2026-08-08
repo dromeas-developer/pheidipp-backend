@@ -7,6 +7,7 @@ description: >-
 mode: subagent
 model: opencode-go/hy3
 temperature: 0.3
+reasoningEffort: high
 
 permission:
   task:

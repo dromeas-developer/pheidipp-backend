@@ -6,6 +6,7 @@ description: >-
   files. Owns the split/collapse algorithm.
 model: opencode-go/deepseek-v4-flash
 temperature: 0.1
+reasoningEffort: low
 mode: subagent
 
 permission:
@@ -41,13 +42,11 @@ You receive a confirmed instruction and execute it mechanically.
 The manifest schema is defined in `tests/test-manifest/SCHEMA.md`.
 Read it on every invocation if needed. Key facts:
 
-- Phase files: `files.<filename>.type`, `.status`, `.functions.<name>`
-- Each function has: `{class?, implemented, executable, passed}` (inline YAML map)
-- The optional `class` field records the test class name for class-based tests
-- Index: `selection.<scope>.<type_group>` — list of pytest selectors
-- Selectors: `filename.py` (whole file), `filename.py::function_name` (module-level),
-  or `filename.py::ClassName::function_name` (class-based)
-- Coverage: `coverage.events.covered`, `coverage.invariants.covered`
+- Phase files: `files.<filename>.type`, `.status`, `.classes`, `.module_level`
+- Classes map: `<ClassName>: [<function_name>, ...]`
+- Module-level functions: `module_level: [<function_name>, ...]`
+- Index selectors: `file.py` (file-level), `file.py::ClassName` (class-level, release side), or `{ path: file.py, exclude: [ClassName, ...] }` (regression side of partial promotion)
+- No per-function status tracking — status is file-level only
 
 ---
 
@@ -64,16 +63,11 @@ same — write the complete phase file from the provided input.
 write-phase
 plan_id: <string>
 sub_phase: <string>
-migrations: <bool>
 phase: tests/test-manifest/phase-N-Mx.yaml
 ---
 <file_path> <type> [generated]
   <ClassName> <fn1> <fn2> <fn3> ...
 ---
-coverage_events:
-  <event_name>
-coverage_invariants:
-  <invariant_text>
 ```
 
 **Rules for the file block:**
@@ -81,36 +75,23 @@ coverage_invariants:
 - Each file starts with `<path> <type>` on its own line. `<type>` is one of
   `unit`, `integration`, `api`, `behaviour`.
 - If the keyword `generated` appears after the type, the file's status is
-  `generated` and its functions (from the lines below) are populated. If
-  `generated` is absent, the file's status is `pending` and its functions
-  block is empty `{}`.
+  `generated` and its classes/functions are populated. If `generated` is absent,
+  the file's status is `pending` and its classes block is empty.
 - After each file line, zero or more indented class lines:
   `  <ClassName> <fn1> <fn2> ...`. Class name without quotes, followed by
-  space-separated function names. These become function entries with
-  `{ class: <ClassName>, implemented: true, executable: false, passed: false }`.
+  space-separated function names. These become entries under `classes:`.
 - Files are separated by `---`.
-
-**Rules for coverage:**
-
-- `coverage_events:` followed by lines with event type names.
-- `coverage_invariants:` followed by lines with invariant descriptions.
-- If no coverage, omit the section entirely (the test-architect won't
-  include it).
 
 **Procedure:**
 
-1. Build the header: `version: "1.0"`, `plan_id`, `sub_phase`, timestamps
-   (current ISO 8601 for both `generated_at` and `last_reviewed_at`),
-   `prerequisites.migrations` from input.
+1. Build the header: `version: "1.0"`, `plan_id`, `sub_phase`.
 2. For each file in the input:
    - Set `type` from the input.
    - If `generated` is present: `status: generated`. For each class+functions
-     line, write `fn: { class: ClassName, implemented: true, executable: false, passed: false }`.
-   - If `generated` is absent: `status: pending`, `functions: {}`.
-3. Write `coverage.events.covered` and `coverage.invariants.covered` from
-   the input (empty lists if no entries).
-4. Write the complete file via `write` to the phase path.
-5. Return a single-line confirmation: `✅ Written <phase-path>: <N> files (<M> generated, <K> pending).`
+     line, write `ClassName: [fn1, fn2, ...]` under `classes:`.
+   - If `generated` is absent: `status: pending`, empty `classes: {}`.
+3. Write the complete file via `write` to the phase path.
+4. Return a single-line confirmation: `✅ Written <phase-path>: <N> files (<M> generated, <K> pending).`
 
 **Example input from p-test-architect:**
 
@@ -118,7 +99,6 @@ coverage_invariants:
 write-phase
 plan_id: <plan-id>
 sub_phase: <N.M>
-migrations: <bool>
 phase: tests/test-manifest/phase-N-Mx.yaml
 ---
 tests/unit/test_<service>.py unit generated
@@ -130,17 +110,11 @@ tests/integration/test_<service>.py integration generated
 ---
 tests/api/test_<endpoint>.py api
 ---
-coverage_events:
-  <event_type_a>
-  <event_type_b>
-coverage_invariants:
-  <invariant_id>: <invariant description>
 ```
 
 **Result:** `tests/api/test_<endpoint>.py` gets `status: pending` with
-empty functions (no `generated` keyword). All other files get `status:
-generated` with their functions populated. Coverage section populated as
-specified.
+empty classes (no `generated` keyword). All other files get `status:
+generated` with their classes populated.
 
 **No reading of existing files.** You receive the complete state from the
 test-architect. Write exactly what you're given — do not read the existing
@@ -152,9 +126,8 @@ sessions if this is a multi-session update.
 
 ## Operation: promote-file
 
-**When:** DevOps has run feature scope on a phase file and ALL functions
-in a file passed. DevOps sets per-function `executable`/`passed`, then
-invokes this operation for the file-level promotion.
+**When:** DevOps has run feature scope on a phase file and ALL tests
+in a file passed. DevOps invokes this operation for file-level promotion.
 
 **Input:** (provided in the prompt by DevOps)
 ```
@@ -165,49 +138,41 @@ index: <path to index.yaml>
 
 **Procedure:**
 
-1. Read `phase.yaml`. Find `files.<filename>`. Confirm every function has
-   `passed: true`. If any function is `passed: false`, STOP and report
-   "cannot promote — not all functions passed."
+1. Read `phase.yaml`. Find `files.<filename>`. Confirm `status: generated`
+   (not already promoted, not pending).
 
 2. Set `files.<filename>.status` to `promoted` in the phase file.
-   Update `last_reviewed_at`.
 
 3. Read `index.yaml`. Find the type group this file belongs under in
    `selection.release` (e.g., `selection.release.unit` for a unit file).
 
-4. **Split check.** Check `selection.regression` for this filename:
-   - **If it appears as a whole filename** (no `::`): a split is needed.
-     Read ALL `phase-*.yaml` files that list this filename. Collect the
-     full known function list. Identify OLD functions (from phase files
-     where this file has `status: promoted` AND the file existed in
-     regression before this promotion). In `selection.regression`: replace
-     the whole filename with `file::function` entries for every OLD function.
-   - **If it appears as `file::function` entries**: already split — no
-     action needed.
-   - **If it does not appear at all**: first sub-phase — no action needed.
+4. **Determine new classes for this file.** Read the phase file to get
+   the class list for this file. These are the classes being promoted.
 
- 5. Add the NEW functions (from the current phase file) to `selection.release`
-    as selectors under the correct type group. Always add as `::function` in
-    release — never whole filenames. Construct the selector using the
-    `class` field when present:
-    - With `class`: `filename.py::ClassName::function_name`
-    - Without `class`: `filename.py::function_name`
+5. **Check if file exists in regression.** Search `selection.regression`
+   for this filename:
+   - **If NOT in regression:** first promotion — add `filename.py` to
+     `selection.release` (file-level selector).
+   - **If in regression as `{ path: filename.py, exclude: [...] }`:**
+     already partially promoted — add new classes as `filename.py::ClassName`
+     to release, update exclude list to include new classes.
+   - **If in regression as `filename.py` (file-level, no exclude):**
+     split needed — replace `filename.py` in regression with
+     `{ path: filename.py, exclude: [<new classes>] }`, add new classes
+     as `filename.py::ClassName` to release.
 
- 6. Update `index.yaml` `last_reviewed_at`.
-
- 7. Return a single-line confirmation: `✅ Promoted <file>: <N> functions to selection.release. Split: <yes/no>.`
+6. Return a single-line confirmation: `✅ Promoted <file>: <N> classes to selection.release.`
 
 ---
 
 ## Operation: release-promote
 
 **When:** DevOps has run release scope on `selection.release` and ALL tests
-passed. DevOps invokes this operation for the release-level promotion.
+passed. DevOps invokes this operation for release-level promotion.
 
 **Input:**
 ```
 index: <path to index.yaml>
-phases: <comma-separated list of phase.yaml paths that contributed to selection.release>
 ```
 
 **Procedure:**
@@ -215,28 +180,29 @@ phases: <comma-separated list of phase.yaml paths that contributed to selection.
 1. Read `index.yaml`. Confirm `selection.release` is non-empty. If empty,
    STOP and report "nothing to promote."
 
-2. Move all entries from `selection.release` to `selection.regression`.
-   For each type group, append release entries to the corresponding
-   regression group.
+2. **Collect release classes per file.** For each entry in `selection.release`,
+   extract the filename and class name from `filename.py::ClassName` selectors.
+   Group by filename to get: `{ filename: [ClassA, ClassB, ...] }`.
 
- 3. **Collapse check.** For every file that now has entries in
-    `selection.regression`:
-    - Read ALL `phase-*.yaml` files that list this filename. Collect the
-      complete known function list (including `class` fields).
-    - Check each function's `status` in its phase file.
-    - If EVERY known function has `status: promoted` AND is covered by
-      `selection.regression` entries: collapse all `file::function`
-      (or `file::ClassName::function`) entries for this file into just
-      the filename.
-    - If any function is still `pending` or `generated` in another
-      sub-phase: leave the entries intact (preserving class-qualified
-      selectors where applicable).
+3. **Merge into regression.** For each file with released classes:
+   - **If regression has `{ path: filename.py, exclude: [...] }`:** update
+     the exclude list to include the newly released classes.
+   - **If regression has `filename.py` (file-level, no exclude):** replace
+     with `{ path: filename.py, exclude: [<released classes>] }`.
+   - **If regression has `filename.py::ClassName` entries:** merge —
+     convert class entries to exclude format.
+   - **If not in regression:** add `{ path: filename.py, exclude: [<released classes>] }`.
 
-4. Clear `selection.release` (set each type group to `[]`).
+4. **Collapse check.** For every file in `selection.regression` that has
+   an exclude list:
+   - Read ALL phase files to collect the complete class list for this file
+   - If the exclude list covers ALL classes (every class is excluded):
+     collapse to `filename.py` (no exclude needed — all classes are in
+     regression, file-level selector is sufficient)
 
-5. Update `index.yaml` `last_reviewed_at`.
+5. Clear `selection.release` (set each type group to `[]`).
 
- 6. Return a single-line confirmation: `✅ Promoted release → regression. Collapsed <N> files. selection.release cleared.`
+6. Return a single-line confirmation: `✅ Promoted release → regression. Collapsed <N> files.`
 
 ---
 
@@ -248,7 +214,7 @@ Input:
 {
   "subagent_type": "s-manifest-manager",
   "description": "Promote file to release selection group",
-  "prompt": "promote-file\nphase: tests/test-manifest/phase-2-3p2.yaml\nfile: test_physiology_update_service_bayesian.py\nindex: tests/test-manifest/index.yaml"
+  "prompt": "promote-file\nphase: tests/test-manifest/phase-1-5.yaml\nfile: tests/unit/test_context_budget_service.py\nindex: tests/test-manifest/index.yaml"
 }
 ```
 
@@ -258,6 +224,6 @@ Input:
 {
   "subagent_type": "s-manifest-manager",
   "description": "Promote release selection to regression group",
-  "prompt": "release-promote\nindex: tests/test-manifest/index.yaml\nphases: phase-2-1.yaml, phase-2-2.yaml, phase-2-3p1.yaml, phase-2-3p2.yaml, phase-2-3p3.yaml"
+  "prompt": "release-promote\nindex: tests/test-manifest/index.yaml"
 }
 ```

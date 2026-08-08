@@ -236,22 +236,20 @@ structured input; the manager writes the YAML file. You never write
 phase YAML directly — formatting boilerplate on an expensive model
 wastes tokens with zero reasoning value.
 
+**What you control:** file list, classes, function names, file status.
+**What the manager writes:** the YAML file with correct structure.
+
 The input format is compact and line-based:
 
 ```
 write-phase
 plan_id: <string>
 sub_phase: <string>
-migrations: <bool>
 phase: tests/test-manifest/phase-N-Mx.yaml
 ---
 <file_path> <type> [generated]
   <ClassName> <fn1> <fn2> ...
 ---
-coverage_events:
-  <event_name>
-coverage_invariants:
-  <invariant_text>
 ```
 
 - Each file starts with `<path> <type>` on its own line.
@@ -272,7 +270,7 @@ this session covers:
  * **If the manifest exists:** delegate to s-manifest-manager with the
    file list from Step 2's inventory — every file this plan will need.
    No `generated` keyword, no function lines — manager writes all files
-   with `status: pending` and empty `functions: {}`.
+   with `status: pending` and empty `classes: {}`.
 
 Format the input and invoke:
 
@@ -282,7 +280,7 @@ Input:
 {
   "subagent_type": "s-manifest-manager",
   "description": "Write pending phase file for plan <plan-id>",
-  "prompt": "write-phase\nplan_id: <plan-id>\nsub_phase: <N.M>\nmigrations: <bool>\nphase: tests/test-manifest/phase-N-Mx.yaml\n---\ntests/unit/test_<service>.py unit\ntests/integration/test_<service>.py integration\ntests/api/test_<endpoint>.py api\n..."
+  "prompt": "write-phase\nplan_id: <plan-id>\nsub_phase: <N.M>\nphase: tests/test-manifest/phase-N-Mx.yaml\n---\ntests/unit/test_<service>.py unit\ntests/integration/test_<service>.py integration\ntests/api/test_<endpoint>.py api\n..."
 }
 ```
 
@@ -302,12 +300,6 @@ Delegate to s-manifest-manager with the COMPLETE updated state:
   `pytest --collect-only -q <paths>` output — the `::` separators map
   directly: `file.py::ClassName::function_name` → function `function_name`
   under class `ClassName`.
-- Add `coverage_events` and `coverage_invariants` from Step 7's coverage
-  classification (if Step 7 hasn't run yet at this timing, defer coverage
-  to a follow-up invocation after Step 7 completes — but the file list
-  and functions must be written now).
-- Do NOT set `executable` or `passed` — the manager always writes
-  `executable: false, passed: false`. Those are DevOps-owned.
 
 Format and invoke:
 
@@ -317,7 +309,7 @@ Input:
 {
   "subagent_type": "s-manifest-manager",
   "description": "Write generated phase file for plan <plan-id>",
-  "prompt": "write-phase\nplan_id: <plan-id>\nsub_phase: <N.M>\nmigrations: <bool>\nphase: tests/test-manifest/phase-N-Mx.yaml\n---\ntests/unit/test_<service>.py unit generated\n  Test<ClassName> test_<scenario_a> test_<scenario_b>\n  Test<OtherClass> test_<scenario_c>\ntests/integration/test_<service>.py integration generated\n  Test<ClassName> test_<scenario_d> test_<scenario_e>\ntests/api/test_<endpoint>.py api\n---\ncoverage_events:\n  <event_type>\ncoverage_invariants:\n  <invariant_id>: <invariant description>"
+  "prompt": "write-phase\nplan_id: <plan-id>\nsub_phase: <N.M>\nphase: tests/test-manifest/phase-N-Mx.yaml\n---\ntests/unit/test_<service>.py unit generated\n  Test<ClassName> test_<scenario_a> test_<scenario_b>\n  Test<OtherClass> test_<scenario_c>\ntests/integration/test_<service>.py integration generated\n  Test<ClassName> test_<scenario_d> test_<scenario_e>\ntests/api/test_<endpoint>.py api\n---"
 }
 ```
 
@@ -545,9 +537,8 @@ For each capability in the inventory from Step 2, classify:
 * **Partial** — tested but edge cases or negative paths are missing
 * **Missing** — no test exists for this capability
 
-Record the classification in the current sub-phase file's `coverage`
-section (events and invariants covered). This is merged into index.yaml
-by DevOps at release promotion.
+Record the classification in your session notes. Coverage tracking is
+done in the implementation plan (BRD), not in the manifest.
 
 ### Step 8 — Finalize
 

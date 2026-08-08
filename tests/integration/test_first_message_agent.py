@@ -123,15 +123,9 @@ async def _build_full_setup(
     Returns (athlete_id, twin_state_id). Mirrors the post-onboarding
     state so FirstMessageAgent preconditions are met.
     """
-    athlete_id = uuid.uuid4()
-
-    db_session.add(
-        type("Athlete", (), {"id": athlete_id, "onboarding_complete": True})()
-    )
-    db_session.expunge_all()
-
     from app.models.athlete import Athlete
 
+    athlete_id = uuid.uuid4()
     athlete = Athlete(
         id=athlete_id,
         email=f"test-{athlete_id}@example.com",
@@ -697,6 +691,37 @@ class TestFirstMessagePreconditionGates:
         db_session.add(athlete)
         await db_session.commit()
         await db_session.refresh(athlete)
+
+        # TwinState is the precondition gate for active_goal; insert one
+        # with a non-active goal so the agent reaches the active-goal gate.
+        completed_goal = TrainingGoal(
+            athlete_id=athlete.id,
+            goal_type=GoalType.RACE_EVENT,
+            goal_event_type=GoalEventType.MARATHON,
+            goal_event_date=date.today() + timedelta(weeks=20),
+            goal_event_name="Completed goal",
+            weekly_volume_hours=5.0,
+            weekly_volume_km=30.0,
+            fitness_level=3,
+            status=TrainingGoalStatus.COMPLETED,
+        )
+        db_session.add(completed_goal)
+        await db_session.flush()
+
+        twin_for_completed = TwinState(
+            athlete_id=athlete.id,
+            training_goal_id=completed_goal.id,
+            data_tier=DataTier.TIER_3,
+            confidence_level=TwinConfidenceLevel.LOW,
+            trigger=TwinTrigger.QUESTIONNAIRE,
+            model_version="v1-questionnaire-bootstrap",
+            fitness=0.0,
+            fatigue=0.0,
+            form=0.0,
+            readiness_level=RecoveryModifierLevel.GREEN,
+        )
+        db_session.add(twin_for_completed)
+        await db_session.commit()
 
         agent = await _build_first_message_agent(db_session)
         monkeypatch.setattr(

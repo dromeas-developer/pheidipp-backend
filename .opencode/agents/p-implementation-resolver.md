@@ -1,7 +1,9 @@
 ---
-mode: primary
-model: nvidia/z-ai/glm-5.2
+model: ollama-cloud/minimax-m3
 temperature: 0.1
+thinking:
+  type: enabled
+  budget_tokens: 4096
 
 permission:
   task:

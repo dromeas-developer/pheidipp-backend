@@ -134,18 +134,12 @@ After reading SCHEMA.md for the structure, populate these initial values:
 
 **index.yaml:**
 - `version: "1.0"`
-- `last_reviewed_at: <current ISO 8601>`
 - All `selection.*.unit/integration/behaviour/api` groups: `[]` (empty)
 
 **phase-N-Mx.yaml:**
 - `version: "1.0"`
 - `plan_id: <from the batch BRD>`
-- `generated_at: <current ISO 8601>`
-- `last_reviewed_at: <current ISO 8601>`
-- `prerequisites.migrations: <bool from plan's stated requirements>`
 - `files: {}` (empty — populated by Step 5a)
-- `coverage.events.covered: []`
-- `coverage.invariants.covered: []`
 
 ### Key Rules
 - All selection groups start empty — DevOps populates them via promotion

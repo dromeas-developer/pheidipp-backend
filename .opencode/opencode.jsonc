@@ -12,7 +12,21 @@
   "plugin": [
     "openslimedit@latest",
     "./plugins/opencode-context-cache.mjs",
-    "./plugins/session-stats.ts"
+    "./plugins/session-stats.ts",
+    [
+      "@renjfk/opencode-model-fallback",
+      {
+        "mappings": {
+          "ollama-cloud/minimax-m3": "opencode-go/minimax-m3",
+          "opencode/deepseek-v4-flash-free": "opencode-go/deepseek-v4-flash",
+          "opencode/mimo-2.5-free": "opencode-go/mimo-2.5",
+          "nvidia/z-ai/glm-5.2": "litellm-proxy/nvidia/glm-5.2",
+          "litellm-proxy/nvidia/glm-5.2": "opencode-go/glm-5.2"
+        },
+        "cooldown_seconds": 300,
+        "notify_on_fallback": true
+      }
+    ]
   ],
 
   // Only show the providers and models you actually use.
@@ -30,13 +44,17 @@
   ],
   "provider": {
     "opencode-go": {
-      "options": { "setCacheKey": true }
+      "models": {
+        "deepseek-v4-flash": { "options": { "setCacheKey": true } },
+        "glm-5.2": { "options": { "contextCache": true } },
+        "minimax-m3": { "options": { "setCacheKey": true } }
+      }
     },
     "opencode": {
-      "options": { "setCacheKey": true }
+      "options": { "contextCache": true }
     },
     "ollama-cloud": {
-      "options": { "setCacheKey": true }
+      "options": { "contextCache": true }
     },
     "nvidia": {
       "name": "Nvidia NIM",
@@ -59,7 +77,7 @@
     },
     "poolside": {
       "name": "Poolside AI",
-      "options": { "setCacheKey": true },
+      "options": { "contextCache": true },
       "whitelist": [
         "poolside/laguna-m.1",
         "poolside/laguna-s-2.1",
@@ -69,9 +87,7 @@
     "litellm-proxy": {
       "npm": "@ai-sdk/openai-compatible",
       "name": "LiteLLM Proxy",
-      "options": {
-        "baseURL": "http://localhost:4000/v1"
-      },
+      "options": { "baseURL": "http://localhost:4000/v1" },
       "models": {
         "nvidia/deepseek-v4-pro":             { "name": "Deepseek v4-pro (nvidia cloud)" },
         "nvidia/deepseek-v4-flash":           { "name": "Deepseek v4-flash (nvidia cloud)" },
@@ -111,5 +127,5 @@
       },
       "enabled": true
     }
-  },
+  }
 }

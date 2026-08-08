@@ -81,9 +81,9 @@ redesign and infrastructure pattern changes.
    fixes live there.
 
 6. Update the sub-phase manifest for the corrected tests. For each
-   file with corrected functions: flip `passed: false` on those functions
-   (leave `executable` as-is — DevOps will re-verify after your fix
-   lands, same flow as a newly generated test).
+   file with corrected functions: update the `classes:` block with the
+   corrected function names. The manifest tracks file-level status only
+   — no per-function `passed` or `executable` fields.
 
 7. Invoke `s-diagnostics-fixer` via `task` on each test file you modified,
    one invocation per file — same pattern as Step 9 in the full Protocol.

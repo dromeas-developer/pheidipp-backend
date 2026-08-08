@@ -7,8 +7,9 @@ description: >-
   points, and fixture matches, plus a Verification/Confidence header.
   Never writes or edits anything.
 mode: subagent
-model: deepseek-v4-flash-free
+model: opencode-go/deepseek-v4-flash
 temperature: 0.1
+reasoningEffort: low
 
 permission:
   task:

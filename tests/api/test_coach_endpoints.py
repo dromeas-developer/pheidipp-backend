@@ -126,11 +126,14 @@ class TestGetCoachMessages:
     ) -> None:
         athlete_id, twin_id = await _seed_athlete_with_first_message(db_session)
 
+        # Use MessageType.WELLNESS_ALERT (not FIRST_MESSAGE) so multiple
+        # rows per athlete don't violate the partial unique index
+        # ``uq_coaching_messages_athlete_first_message``.
         for hours_ago in (3, 2, 1):
             msg = CoachingMessage(
                 athlete_id=athlete_id,
                 twin_state_id=twin_id,
-                message_type=MessageType.FIRST_MESSAGE,
+                message_type=MessageType.WELLNESS_ALERT,
                 content=f"Message {hours_ago}h ago",
                 prompt_version="v1",
                 generated_at=datetime.now(timezone.utc) - timedelta(hours=hours_ago),
@@ -157,11 +160,14 @@ class TestGetCoachMessages:
     ) -> None:
         athlete_id, twin_id = await _seed_athlete_with_first_message(db_session)
 
+        # Use MessageType.WELLNESS_ALERT (not FIRST_MESSAGE) so multiple
+        # rows per athlete don't violate the partial unique index
+        # ``uq_coaching_messages_athlete_first_message``.
         for i in range(10):
             msg = CoachingMessage(
                 athlete_id=athlete_id,
                 twin_state_id=twin_id,
-                message_type=MessageType.FIRST_MESSAGE,
+                message_type=MessageType.WELLNESS_ALERT,
                 content=f"Message {i}",
                 prompt_version="v1",
                 generated_at=datetime.now(timezone.utc) - timedelta(minutes=i),
@@ -185,13 +191,17 @@ class TestGetCoachMessages:
     ) -> None:
         athlete_id, twin_id = await _seed_athlete_with_first_message(db_session)
 
+        # Filter test uses POST_WORKOUT + WELLNESS_ALERT (not FIRST_MESSAGE)
+        # so multiple rows per athlete do not violate
+        # ``uq_coaching_messages_athlete_first_message``. POST_WORKOUT
+        # without ``activity_id`` is exempt from its partial unique index.
         for i in range(3):
             db_session.add(
                 CoachingMessage(
                     athlete_id=athlete_id,
                     twin_state_id=twin_id,
-                    message_type=MessageType.FIRST_MESSAGE,
-                    content=f"first {i}",
+                    message_type=MessageType.POST_WORKOUT,
+                    content=f"post {i}",
                     prompt_version="v1",
                 )
             )
@@ -209,7 +219,7 @@ class TestGetCoachMessages:
 
         response = await client.get(
             f"/athletes/{athlete_id}/coach/messages",
-            params={"message_type": "first_message"},
+            params={"message_type": "post_workout"},
             headers=await _auth_header(athlete_id),
         )
 
@@ -217,7 +227,7 @@ class TestGetCoachMessages:
         data = response.json()
         assert data["total"] == 3
         assert all(
-            m["message_type"] == "first_message" for m in data["messages"]
+            m["message_type"] == "post_workout" for m in data["messages"]
         )
 
     async def test_empty_messages_returns_empty_list_with_zero_total(
@@ -321,8 +331,10 @@ class TestPostFirstMessageEndpoint:
         )
 
         assert response.status_code == 409
+        # FastAPI wraps HTTPException(detail={...}) under a top-level
+        # ``detail`` key, so the conflict body lives at data["detail"].
         data = response.json()
-        assert data["existing_message_id"] == str(existing.id)
+        assert data["detail"]["existing_message_id"] == str(existing.id)
 
     async def test_cross_athlete_first_message_returns_403(
         self, db_session: AsyncSession, client: AsyncClient

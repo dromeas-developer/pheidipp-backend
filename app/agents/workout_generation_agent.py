@@ -634,20 +634,17 @@ class WorkoutGenerationAgent:
                         f"step {step_order} populated {field_name} "
                         f"but target_type={target_type!r} forbids it"
                     )
-                if value is None and field_name in allowed_numeric_fields:
-                    # Numeric field allowed by target_type but LLM did
-                    # not populate — for power/gap this is acceptable
-                    # only if the step has a non-null description. The
-                    # architecture's "numeric target may be null per
-                    # confidence" rule allows emission of qualitative
-                    # ranges for Tier 5-6 athletes only; power/gap
-                    # tiers must always carry numerics.
-                    if target_type in {"power", "gap"}:
-                        raise WorkoutGenerationContractError(
-                            f"step {step_order} target_type="
-                            f"{target_type!r} requires "
-                            f"{field_name} but LLM emitted null"
-                        )
+                if (
+                    value is None
+                    and field_name in allowed_numeric_fields
+                    and step_type == StepType.WORK
+                    and target_type in {"power", "gap"}
+                ):
+                    raise WorkoutGenerationContractError(
+                        f"step {step_order} target_type="
+                        f"{target_type!r} requires "
+                        f"{field_name} but LLM emitted null"
+                    )
 
             # Normalize the kept numeric field into the WorkoutTarget
             # shape used in ``WorkoutStep.target``.

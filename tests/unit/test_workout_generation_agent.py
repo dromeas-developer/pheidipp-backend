@@ -261,6 +261,86 @@ class TestParseAndValidateOutput:
             }
         )
 
+    def _easy_run_payload(self) -> str:
+        import json
+
+        return json.dumps(
+            {
+                "steps": [
+                    {
+                        "step_order": 1,
+                        "step_type": "warmup",
+                        "physiological_intent": "recovery",
+                        "target_duration_seconds": 600,
+                        "target_hr_zone": None,
+                        "target_power_watts": None,
+                        "target_gap_sec_per_km": None,
+                        "description": "Easy warmup",
+                    },
+                    {
+                        "step_order": 2,
+                        "step_type": "work",
+                        "physiological_intent": "low_aerobic",
+                        "target_duration_seconds": 1800,
+                        "target_hr_zone": None,
+                        "target_power_watts": None,
+                        "target_gap_sec_per_km": {"min": 300, "max": 330},
+                        "description": "Steady easy run",
+                    },
+                    {
+                        "step_order": 3,
+                        "step_type": "cooldown",
+                        "physiological_intent": "recovery",
+                        "target_duration_seconds": 600,
+                        "target_hr_zone": None,
+                        "target_power_watts": None,
+                        "target_gap_sec_per_km": None,
+                        "description": "Easy cooldown",
+                    },
+                ]
+            }
+        )
+
+    def _test_session_payload(self) -> str:
+        import json
+
+        return json.dumps(
+            {
+                "steps": [
+                    {
+                        "step_order": 1,
+                        "step_type": "warmup",
+                        "physiological_intent": "recovery",
+                        "target_duration_seconds": 900,
+                        "target_hr_zone": None,
+                        "target_power_watts": None,
+                        "target_gap_sec_per_km": None,
+                        "description": "Test warmup",
+                    },
+                    {
+                        "step_order": 2,
+                        "step_type": "work",
+                        "physiological_intent": "vo2max",
+                        "target_duration_seconds": 360,
+                        "target_hr_zone": None,
+                        "target_power_watts": None,
+                        "target_gap_sec_per_km": {"min": 210, "max": 220},
+                        "description": "Calibration 1k",
+                    },
+                    {
+                        "step_order": 3,
+                        "step_type": "cooldown",
+                        "physiological_intent": "recovery",
+                        "target_duration_seconds": 600,
+                        "target_hr_zone": None,
+                        "target_power_watts": None,
+                        "target_gap_sec_per_km": None,
+                        "description": "Easy cooldown",
+                    },
+                ]
+            }
+        )
+
     async def test_threshold_session_produces_warmup_work_cooldown_sequence(self):
         agent = self._build_agent()
         context = self._make_context(target_type="gap")
@@ -823,7 +903,7 @@ class TestParseAndValidateOutput:
         planned_session = self._make_planned_session_stub(SessionType.EASY_RUN)
 
         parsed = agent._parse_and_validate_output(
-            generated_content=self._threshold_payload(),
+            generated_content=self._easy_run_payload(),
             planned_session=planned_session,
             context=context,
         )
@@ -835,7 +915,7 @@ class TestParseAndValidateOutput:
         planned_session = self._make_planned_session_stub(SessionType.TEST_SESSION)
 
         parsed = agent._parse_and_validate_output(
-            generated_content=self._threshold_payload(),
+            generated_content=self._test_session_payload(),
             planned_session=planned_session,
             context=context,
         )
@@ -985,7 +1065,7 @@ class TestProxyRouting:
         client = instance._build_llm_client()
 
         assert isinstance(client, AsyncOpenAI)
-        assert client.base_url == settings.LITELLM_BASE_URL
+        assert str(client.base_url).rstrip("/") == settings.LITELLM_BASE_URL.rstrip("/")
         assert client.api_key == settings.LITELLM_API_KEY
 
     def test_no_direct_provider_sdk_imports(self):

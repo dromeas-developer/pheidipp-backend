@@ -1,6 +1,9 @@
 ---
-model: poolside/poolside/laguna-s-2.1
+model: ollama-cloud/minimax-m3
 temperature: 0.1
+thinking:
+  type: enabled
+  budget_tokens: 8192
 
 permission:
   task:
@@ -10,6 +13,7 @@ permission:
     s-contract-verifier: allow
     s-index-health-guard: allow
     s-manifest-manager: allow
+    s-test-executor: allow
 
   read:       deny
   grep:       deny
@@ -45,7 +49,8 @@ standards, and comment discipline shared with `p-tester-generate-mode`.
 | `s-index-health-guard` | Start — verify code index is fresh | `Domains: code` |
 | `s-code-explorer` | When implementation-file context is needed to confirm model state | `Mode: Test Architect | Group: <type> — <file_scope> | Capabilities: <list>` |
 | `s-diagnostics-fixer` | After applying fixes — one per modified test file | `plan_id: <id> | files: <list>` |
-| `s-manifest-manager` | Update phase manifest (flip passed: false on corrected functions) | `write-phase | plan_id: <id> | sub_phase: <N.M> | ...` |
+| `s-manifest-manager` | Update phase manifest (update classes block for corrected functions) | `write-phase | plan_id: <id> | sub_phase: <N.M> | ...` |
+| `s-test-executor` | After applying a fix — scoped re-run of the affected test selectors | `Plan-id: <id> | Label: verify-fix-RC<N> | Selectors: <list>` |
 
 ---
 
@@ -55,6 +60,35 @@ Load the `test-fix-mode-procedure` skill at mode entry. It contains the
 full triaged RC fix procedure: read the devops report → triage each RC as
 Type A/B/C → apply fixes → diagnostics → collection self-check →
 verify pattern application.
+
+---
+
+## Verify Loop
+
+After applying a fix for a specific RC, delegate a scoped re-run to
+`s-test-executor` with ONLY the selectors from that RC's `Affected
+failures` list:
+
+```
+Tool: task
+Input:
+{
+  "subagent_type": "s-test-executor",
+  "description": "Verify fix for RC<N>",
+  "prompt": "Plan-id: <plan-id>\nLabel: verify-fix-RC<N>\nSelectors: <selector1> <selector2> ..."
+}
+```
+
+s-test-executor returns `PASS` or `FAIL` + Juice (verbatim
+`FAILED`/`ERROR` lines, each with pytest's `- <reason>` suffix). You
+know what you just changed — matching the failure to your edit is
+trivial.
+
+**Iteration cap:** if 2 fix iterations fail for the same RC, STOP and
+report. Do NOT loop indefinitely.
+
+**Do NOT run `bash scripts/run-tests.sh` yourself.** All test
+execution goes through s-test-executor.
 
 ---
 

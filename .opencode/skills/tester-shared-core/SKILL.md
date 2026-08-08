@@ -193,13 +193,10 @@ that file for the authoritative schema definition.
 `s-manifest-manager`. You never write phase YAML directly. Key rules:
 
 - Files are top-level keys under `files:`. Each file has `type`, `status`,
-  and a `functions` block. Each function carries `{class?, implemented, executable, passed}`.
+  and a `classes` block mapping class names to function lists.
 - `status` is per-file: `pending` → `generated` (you) → `promoted` (DevOps).
-- Set `implemented: true` on functions you generate. Never set `executable`
-  or `passed` — those are DevOps-owned.
-- Write `coverage.events` and `coverage.invariants` for this sub-phase.
-- Never write `description`, `protects`, `impacts`, `file_scope`, `plan`,
-  `owned_by_plan`, `execution_prerequisites`, `history`, or `execution_groups`
+- Write `classes:` with function lists for files you generate.
+- Never write `coverage`, `implemented`, `executable`, or `passed` per function
   — these fields no longer exist in the schema.
 
 **You never write to `index.yaml`.** DevOps owns selection groups and

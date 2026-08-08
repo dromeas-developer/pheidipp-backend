@@ -70,7 +70,7 @@ class TestProxyRouting:
         client = instance._build_llm_client()
 
         assert isinstance(client, AsyncOpenAI)
-        assert client.base_url == settings.LITELLM_BASE_URL
+        assert str(client.base_url).rstrip("/") == settings.LITELLM_BASE_URL.rstrip("/")
         assert client.api_key == settings.LITELLM_API_KEY
 
     def test_no_direct_provider_sdk_imports(self):

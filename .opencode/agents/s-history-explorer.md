@@ -12,8 +12,9 @@ description: >-
   decisions, and never writes or edits anything. Pattern detection is
   the caller's responsibility.
 mode: subagent
-model: openrouter/inclusionai/ling-3.0-flash:free
+model: opencode/longcat-2.0-free
 temperature: 0.1
+reasoningEffort: low
 
 permission:
   task:

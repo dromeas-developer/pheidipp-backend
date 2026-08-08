@@ -1,6 +1,6 @@
 ---
-model: poolside/poolside/laguna-m.1
-temperature: 0.2
+model: opencode-go/kimi-k2.6
+temperature: 0.3
 
 permission:
   task:

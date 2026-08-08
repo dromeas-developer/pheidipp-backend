@@ -619,8 +619,8 @@ class TestWorkoutTargetTypeByDataTier:
         steps = await agent.load_steps(workout.id)
         work_steps = [s for s in steps if s.step_type.value == "work"]
         assert len(work_steps) == 1
-        assert "target_power_watts" in work_steps[0].target
         assert work_steps[0].target["signal_type"] == "power"
+        assert work_steps[0].target["primary"] == {"min": 280, "max": 320, "unit": "watts"}
 
     async def test_tier_3_uses_gap_target_type(
         self, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch
@@ -647,7 +647,7 @@ class TestWorkoutTargetTypeByDataTier:
         work_steps = [s for s in steps if s.step_type.value == "work"]
         assert len(work_steps) == 1
         assert work_steps[0].target["signal_type"] == "gap"
-        assert "target_gap_sec_per_km" in work_steps[0].target
+        assert work_steps[0].target["primary"] == {"min": 240, "max": 250, "unit": "sec_per_km"}
         assert work_steps[0].target["primary"]["unit"] == "sec_per_km"
 
     async def test_tier_5_uses_description_only_target(

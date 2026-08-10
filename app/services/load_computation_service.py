@@ -73,7 +73,12 @@ class LoadComputationService:
 
     def compute_aerobic_load(self, inputs: LoadComputationInputs) -> LoadScores:
         """Return three-dimension LoadScores."""
-        if not inputs.parsed_fit.hr_records:
+        has_power_path = (
+            inputs.data_tier in [DataTier.TIER_1, DataTier.TIER_2]
+            and inputs.parsed_fit.has_power
+            and inputs.parsed_fit.power_records
+        )
+        if not inputs.parsed_fit.hr_records and not has_power_path:
             raise MissingHeartRateError(
                 "cannot compute aerobic load: parsed FIT has no HR records"
             )
@@ -93,7 +98,11 @@ class LoadComputationService:
             and inputs.parsed_fit.has_power
             and inputs.parsed_fit.power_records
         ):
-            cp = inputs.cp_estimate or self._estimate_cp_from_population(inputs)
+            cp = (
+                inputs.cp_estimate
+                if inputs.cp_estimate is not None
+                else self._estimate_cp_from_population(inputs)
+            )
             return self._compute_power_aerobic_load(
                 power_records=inputs.parsed_fit.power_records,
                 cp=cp,

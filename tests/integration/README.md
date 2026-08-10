@@ -21,6 +21,7 @@ the `db_session` fixture.
 | File | Covers |
 |---|---|
 | `test_first_message_agent.py` | FirstMessageAgent: success path (message generated, row persisted, generation event success=true, outbox event), idempotency (409 on second call, LLM not called, no new generation event), LLM failure handling (timeout, connection error, 429 rate_limit, empty response, invalid output, no silent failures), content shape (exactly four paragraphs), athlete context (sport_background persisted in prompt, different backgrounds produce different contexts), precondition gates (no twin state→unavailable, no active goal→unavailable) |
+| `test_post_workout_agent.py` | PostWorkoutAgent: success path (message generated, coaching message persisted, generation event success=true, outbox event), idempotency (second call returns existing, no new generation event), paragraph structure (3 accepted, wrong count writes failure event), LLM failure (writes failure event, no coaching message), LiteLLM proxy routing |
 | `test_workout_generation_agent.py` | WorkoutGenerationAgent: success path (workout generated, steps persisted with physiological_intent, one-indexed unique orders, non-empty description, outbox event, generation event with agent name), idempotency (existing returned when allow_existing=true, 409 when false, no new generation event), target type by data tier (T1 power, T3 gap, T5 description), two-column target structure (theoretical+adjusted NOT NULL, recovery_modifier=green, twin_state_id version), LLM failure handling (timeout, connection error, invalid JSON), precondition gates (unknown session→404), agent name consistency |
 
 ### Fitness & Physiology
@@ -39,6 +40,27 @@ the `db_session` fixture.
 | File | Covers |
 |---|---|
 | `test_profile_preferences_activity_db.py` | AthleteProfile (unique athlete_id), AthletePreferences (unique athlete_id, years_structured_training negative), Activity (external_id dedup, null external_id manual-entry exempt) |
+
+### Activity Ingestion
+| File | Covers |
+|---|---|
+| `test_activity_ingestion_db.py` | Activity ingestion: external_id deduplication (duplicate raises IntegrityError, different source allowed, null external_id manual entry exempt), load scores null at creation, fit_file_key set at creation, no avg columns on model |
+| `test_activity_ingestion_service_defer.py` | TestDeferSignalClean (async dispatcher awaited not called sync, task_dispatcher seam accepts async fake, defer failure swallowed-and-logged via log_event) |
+
+### Twin Recalibration
+| File | Covers |
+|---|---|
+| `test_twin_recalibration_service.py` | TwinRecalibrationService: recalibrate (inserts new twin state with activity sync trigger, updates fitness aggregate, preserves latest thresholds/confidence, existing state unchanged, no athlete update via update method), missing dependencies (no active goal raises, no fitness row raises) |
+
+### Worker
+| File | Covers |
+|---|---|
+| `test_procrastinate_worker_defer.py` | TestProcrastinateAppOpens (async PsycopgConnector, open_async succeeds, procrastinate_jobs table exists), TestSignalCleanDefer (signal_clean enqueues threshold_detection via defer_async), TestGeneratePlanDefer (generate_plan enqueues generate_first_message via defer_async) |
+
+### Compliance
+| File | Covers |
+|---|---|
+| `test_compliance_service.py` | ComplianceService: actual vs planned comparison (under execution shorter descriptor, over execution longer descriptor, within tolerance match, session type match for fit upload), no planned session (zero delta, session type match true, athlete notes preserved) |
 
 ### System Events
 | File | Covers |

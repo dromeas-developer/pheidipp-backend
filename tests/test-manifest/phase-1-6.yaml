@@ -1,0 +1,70 @@
+version: "1.0"
+plan_id: GAP-PHASE-1-TESTS
+sub_phase: 1.6
+files:
+  tests/unit/test_fit_parser_service.py:
+    type: unit
+    status: promoted
+    classes:
+      TestParseReturnsRawRecords: [test_hr_records_returned_as_per_sample_values, test_hr_records_are_per_sample_not_averaged, test_power_records_returned_as_per_sample_values, test_total_distance_and_ascent_returned]
+      TestParseRunsOffLoop: [test_parse_delegates_to_executor]
+      TestParseExtractsSport: [test_sport_type_running_detected, test_unknown_sport_when_fit_omits_sport]
+      TestParseFailures: [test_corrupt_bytes_raise_fit_parse_error, test_unsupported_fit_raises_fit_parse_error, test_no_partial_result_on_failure]
+      TestParseEmpty: [test_empty_hr_records_raise_fit_parse_empty, test_fit_parse_empty_subclasses_fit_parse_error]
+  tests/unit/test_load_computation_service.py:
+    type: unit
+    status: promoted
+    classes:
+      TestAerobicLoadHrReserve: [test_lt1_intensity_produces_around_100_units_for_one_hour, test_hr_reserve_formula_applied_to_raw_samples_not_averaged, test_output_monotonic_with_hrr_pct, test_hrr_pct_zero_contributes_zero]
+      TestAerobicLoadHrReserveErrors: [test_empty_hr_records_raises_missing_heart_rate_error]
+      TestAerobicLoadPower: [test_power_at_cp_yields_unit_load_for_one_hour, test_half_intensity_yields_one_sixteenth, test_missing_cp_uses_population_estimate, test_cp_zero_raises_missing_critical_power_error]
+      TestStructuralLoad: [test_full_formula_with_gradient_and_density, test_risk_flag_lowers_density_coefficient, test_density_capped_at_15, test_no_gps_returns_null_structural_load, test_zero_distance_returns_null_structural_load, test_no_ascent_yields_zero_gradient_cost]
+      TestNeuromuscularLoad: [test_tier_5_returns_null, test_tier_6_returns_null, test_tier_1_with_varied_power_produces_load, test_no_power_records_returns_null]
+      TestComputeReturnsLoadScores: [test_returns_three_load_fields]
+  tests/unit/test_calibration_eligibility_service.py:
+    type: unit
+    status: promoted
+    classes:
+      TestCalibrationEligibilityGate: [test_all_conditions_met_returns_true, test_non_running_sport_returns_false, test_no_hr_returns_false, test_manual_entry_source_returns_false, test_duration_below_1200_returns_false, test_duration_at_1200_boundary_returns_true, test_duration_above_1200_returns_true, test_hr_dropout_above_20_percent_returns_false, test_hr_dropout_at_20_percent_boundary_returns_true, test_hr_dropout_below_20_percent_returns_true, test_gps_loss_returns_false, test_sensor_malfunction_returns_false, test_null_quality_flags_evaluates_as_eligible]
+  tests/unit/test_twin_recalibration_service.py:
+    type: unit
+    status: promoted
+    classes:
+      TestBanisterUpdate: [test_load_50_applies_one_day_decay, test_zero_days_no_decay, test_zero_load_pure_decay, test_negative_load_clamped_to_zero, test_form_equals_fitness_minus_fatigue_after_update, test_mutates_row_aggregate_in_place]
+      TestReadTimeConstants: [test_none_time_constants_returns_population_defaults, test_existing_time_constants_passed_through, test_missing_keys_default_to_population_values]
+      TestMaxConfidenceLevel: [test_higher_rank_wins, test_lower_rank_does_not_decrease, test_equal_keeps_first]
+      TestMaxConfidenceLevelString: [test_previous_none_returns_computed, test_computed_none_returns_previous, test_both_none_returns_none, test_higher_rank_wins, test_high_never_drops_to_medium, test_low_can_upgrade_to_medium]
+      TestConfidenceLevelDerivation: [test_min_weight_3_returns_low, test_min_weight_4_returns_medium, test_min_weight_8_returns_high, test_no_data_for_lt1_returns_low, test_no_data_for_both_returns_low, test_lt1_below_threshold_lt2_above_returns_low]
+  tests/integration/test_activity_ingestion_db.py:
+    type: integration
+    status: promoted
+    classes:
+      TestActivityDeduplication: [test_duplicate_external_id_raises_integrity_error, test_same_external_id_different_source_allowed, test_manual_entry_with_null_external_id_exempt_from_dedup]
+      TestActivityLoadScoresNullAtCreation: [test_load_scores_default_to_null, test_fit_file_key_set_at_creation, test_no_avg_columns_on_model]
+  tests/integration/test_post_workout_agent.py:
+    type: integration
+    status: promoted
+    classes:
+      TestPostWorkoutSuccess: [test_post_workout_message_generated, test_coaching_message_persisted, test_generation_event_written_with_success_true, test_coaching_message_generated_event_in_outbox]
+      TestPostWorkoutIdempotency: [test_second_call_returns_existing, test_second_call_does_not_create_new_generation_event]
+      TestPostWorkoutParagraphStructure: [test_three_paragraphs_accepted, test_wrong_paragraph_count_writes_failure_event]
+      TestPostWorkoutLlmFailure: [test_llm_failure_writes_failure_event, test_llm_failure_creates_no_coaching_message]
+      TestPostWorkoutProxyRouting: [test_routes_through_litellm_proxy]
+  tests/integration/test_twin_recalibration_service.py:
+    type: integration
+    status: promoted
+    classes:
+      TestRecalibrateAppendsNewState: [test_recalibrate_inserts_new_twin_state_with_activity_sync_trigger, test_recalibrate_updates_fitness_aggregate, test_recalibrate_preserves_latest_thresholds, test_recalibrate_preserves_latest_confidence_level, test_existing_twin_state_unchanged_after_recalibrate, test_no_athlete_update_via_update_method_in_recalibrate]
+      TestRecalibrateMissingDependencies: [test_no_active_goal_raises, test_no_fitness_row_raises]
+  tests/integration/test_compliance_service.py:
+    type: integration
+    status: promoted
+    classes:
+      TestComplianceComparesActualToPlanned: [test_under_execution_shows_shorter_descriptor, test_over_execution_shows_longer_descriptor, test_within_tolerance_shows_match, test_session_type_match_for_fit_upload]
+      TestComplianceWithoutPlannedSession: [test_no_planned_session_returns_zero_delta, test_no_planned_session_session_type_match_true, test_no_planned_session_preserves_athlete_notes]
+  tests/api/test_activity_upload.py:
+    type: api
+    status: promoted
+    classes:
+      TestActivityUploadEndpoint: [test_valid_upload_returns_202, test_fit_file_key_non_null, test_oversize_returns_413, test_empty_file_returns_422, test_object_storage_failure_returns_503, test_cross_athlete_returns_403, test_no_avg_fields_in_response]
+      TestPostAnalyseEndpoint: [test_first_call_creates_message, test_second_call_returns_existing]

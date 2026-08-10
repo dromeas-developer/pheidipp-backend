@@ -1,6 +1,11 @@
 version: "1.0"
 selection:
   release:
+    unit: []
+    integration: []
+    api: []
+    behaviour: []
+  regression:
     unit:
       - tests/unit/test_auth_service.py
       - tests/unit/test_auth_schemas.py
@@ -16,6 +21,12 @@ selection:
       - tests/unit/test_context_budget_service.py
       - tests/unit/test_workout_generation_agent.py
       - tests/unit/test_first_message_agent.py
+      - tests/unit/test_fit_parser_service.py
+      - tests/unit/test_load_computation_service.py
+      - tests/unit/test_calibration_eligibility_service.py
+      - tests/unit/test_twin_recalibration_service.py
+      - tests/unit/test_worker_app.py
+      - tests/unit/test_alembic_env.py
     integration:
       - tests/integration/test_auth_db.py
       - tests/integration/test_profile_preferences_activity_db.py
@@ -29,15 +40,17 @@ selection:
       - tests/integration/test_plan_generation_service.py
       - tests/integration/test_first_message_agent.py
       - tests/integration/test_workout_generation_agent.py
+      - tests/integration/test_activity_ingestion_db.py
+      - tests/integration/test_post_workout_agent.py
+      - tests/integration/test_twin_recalibration_service.py
+      - tests/integration/test_compliance_service.py
+      - tests/integration/test_procrastinate_worker_defer.py
+      - tests/integration/test_activity_ingestion_service_defer.py
     api:
       - tests/api/test_require_self.py
       - tests/api/test_onboarding_endpoints.py
       - tests/api/test_coach_endpoints.py
+      - tests/api/test_activity_upload.py
     behaviour:
       - tests/behaviour/test_onboarding_journey.py
-  regression:
-    unit: []
-    integration: []
-    api: []
-    behaviour: []
   smoke: []

@@ -9,7 +9,7 @@ description: >-
   model — diagnostics fixing is mechanical, not architectural. Does not
   run tests, migrations, or builds.
 mode: subagent
-model: opencode-go/deepseek-v4-flash
+model: opencode/deepseek-v4-flash-free
 temperature: 0.1
 reasoningEffort: low
 

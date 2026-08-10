@@ -3,7 +3,7 @@ model: ollama-cloud/minimax-m3
 temperature: 0.1
 thinking:
   type: enabled
-  budget_tokens: 8192
+  budget_tokens: 4096
 
 permission:
   task:
@@ -14,6 +14,8 @@ permission:
     s-index-health-guard: allow
     s-manifest-manager: allow
     s-test-executor: allow
+    s-devops-ops: allow
+    s-web-researcher: allow
 
   read:       deny
   grep:       deny
@@ -40,6 +42,18 @@ the role, command execution rules, implementation resolution protocol,
 owned artifacts, manifest schema, fixture & mocking contract, test writing
 standards, and comment discipline shared with `p-tester-generate-mode`.
 
+Load the `test-execution-protocol` skill at session start. It contains
+the s-test-executor delegation protocol (sequential execution, scoped
+selectors, iteration cap, Juice interpretation) shared with
+p-coder-fix-mode, p-infra-fixer, and p-test-runner.
+
+Load the `fix-loop-protocol` skill at session start. It contains the
+shared fix-session wrapper: services-check pre-flight (s-devops-ops),
+verify-loop composition with `test-execution-protocol`, the
+`## Test Fixes Applied` report-append template, and the structured
+return-summary template. Both `test-execution-protocol` and
+`fix-loop-protocol` are load-bearing for Fix Mode.
+
 ---
 
 ## Subagent Delegation
@@ -65,9 +79,19 @@ verify pattern application.
 
 ## Verify Loop
 
-After applying a fix for a specific RC, delegate a scoped re-run to
-`s-test-executor` with ONLY the selectors from that RC's `Affected
-failures` list:
+The services-check pre-flight and the verify-loop wrapper are owned by
+the `fix-loop-protocol` skill (§1 services-check, §2 verify-loop
+wrapper). The s-test-executor delegation mechanics are owned by
+`test-execution-protocol`. Do not restate either here.
+
+**Services check:** run the `fix-loop-protocol` §1 services-check
+pre-flight before the first `s-test-executor` invocation. Use
+`p-tester-fix-mode` as the `<AgentName>` in the STOP message.
+
+**Scoped re-run:** after applying a fix for a specific RC, delegate a
+scoped re-run to `s-test-executor` with ONLY the selectors from that
+RC's `Affected failures` list. Process RCs sequentially: fix RC1 →
+verify RC1 → fix RC2 → verify RC2 → ...
 
 ```
 Tool: task
@@ -79,20 +103,33 @@ Input:
 }
 ```
 
-s-test-executor returns `PASS` or `FAIL` + Juice (verbatim
-`FAILED`/`ERROR` lines, each with pytest's `- <reason>` suffix). You
-know what you just changed — matching the failure to your edit is
-trivial.
-
-**Iteration cap:** if 2 fix iterations fail for the same RC, STOP and
-report. Do NOT loop indefinitely.
-
-**Do NOT run `bash scripts/run-tests.sh` yourself.** All test
-execution goes through s-test-executor.
-
 ---
 
-## Output
+## Report Append and Return
 
-Write test fixes and manifest updates via tools only — never in response
-text. Final response: completion confirmation only.
+After all fixes are applied, the verify loop is complete, and
+diagnostics have run (per `test-fix-mode-procedure` Step 7), append a
+`## Test Fixes Applied` section to the report you read at session start
+(`reports/<plan-id>_devops.md`) and return a structured summary. Both
+steps are owned by the `fix-loop-protocol` skill (§4 report-append,
+§5 structured return).
+
+**Section name:** `## Test Fixes Applied`
+
+**Sub-category:** for each finding, record the Type A/B/C classification
+from `test-fix-mode-procedure` Step 3. This distinguishes assertion
+drift (Type A) from test flow redesign (Type B) from infrastructure
+pattern change (Type C) in the audit trail.
+
+**Agent role label** for the return summary: `Test`
+
+Follow the `fix-loop-protocol` §4 template for the append (one row per
+finding, with Verify disposition: PASS / syntax valid / capped / STOP)
+and §5 template for the return summary (per-finding dispositions, not a
+flat "completion confirmation only"). The operator reads both the
+on-disk section and your response to decide whether to re-invoke
+`p-test-runner`.
+
+Write test fixes and manifest updates via tools only — never in
+response text. The structured return summary is the only response
+content; everything else is tool output.

@@ -132,17 +132,13 @@ Invoke `s-index-health-guard` with `Domains: code`.
 Invoke `s-devops-ops` with operation `services-check`.
 STOP if any service is not running.
 
-### 2. Test DB migration
+### 2. Test DB migration + pending-changes check
 
-Invoke `s-alembic` with operation `apply-test`.
-STOP if migration fails.
+Invoke `s-alembic` with operation `apply-test`. This migrates the
+test DB to head AND verifies no ORM changes are missing a migration.
+STOP if migration fails or pending ORM drift is detected.
 
-### 3. Pending changes check
-
-Invoke `s-alembic` with operation `pending-changes-check`.
-STOP if the check fails (migration doesn't capture all ORM changes).
-
-### 4. Build selectors
+### 3. Build selectors
 
 If the caller provided explicit selectors (fix agents, test pack) →
 use them. Otherwise read the manifest and build selectors per the
@@ -159,7 +155,7 @@ If the manifest file doesn't exist → STOP. Report
 
 ## Execution Protocol
 
-### 5. Run tests
+### 4. Run tests
 
 Delegate to `s-test-executor` with the selectors:
 
@@ -173,12 +169,18 @@ Input:
 }
 ```
 
-s-test-executor runs `scripts/run-tests.sh` and returns:
-- `PASS` + counts → write the PASS report (Step 8) and return to caller.
-- `FAIL` + Juice (verbatim FAILED/ERROR lines, each with the
-  exception reason) → proceed to Step 6.
+**Sequential execution:** The s-test-executor delegation protocol
+(sequential execution, Juice interpretation) is in the
+`test-execution-protocol` skill. p-test-runner builds one selector
+set per invocation and makes one call — do not split it into
+parallel packs.
 
-### 6. Delegate to analyzer (FAIL only)
+s-test-executor runs `scripts/run-tests.sh` and returns:
+- `PASS` + counts → write the PASS report (Step 7) and return to caller.
+- `FAIL` + Juice (verbatim FAILED/ERROR lines, each with the
+  exception reason) → proceed to Step 5.
+
+### 5. Delegate to analyzer (FAIL only)
 
 Send the Juice to `s-test-analyzer`:
 
@@ -188,41 +190,36 @@ Input:
 {
   "subagent_type": "s-test-analyzer",
   "description": "Classify test failures for plan <plan-id>",
-  "prompt": "Classify these test failures into root causes.\n\nRun: <total> total, <passed> passed, <failed> failed, <errors> errored\n\nRaw pytest output is NOT included — do NOT read it unless you raise Investigation Required. Use MCP tools (get_files, get_function_context, get_class_context, etc.) on production code and test files to gather evidence.\n\nProblem test node IDs (extracted mechanically — NOT categorized, NOT diagnosed). Each line is verbatim pytest output: the status keyword (FAILED or ERROR) and the `- <reason>` suffix (exception class+message) are mechanical hints — do NOT re-derive or trim them. ERROR leans Infrastructure (setup/teardown/collection):\n\n<Juice lines>\n\nCategorize each into Root Causes per your taxonomy. Write the analysis report to reports/<plan-id>_devops.md and reply with a short RC bullet summary + Direct Fixes Applied block."
+  "prompt": "Classify these test failures into root causes.\n\nRun: <total> total, <passed> passed, <failed> failed, <errors> errored\n\nRaw pytest output is NOT included — do NOT read it unless you raise Investigation Required. Use MCP tools (get_files, get_function_context, get_class_context, etc.) on production code and test files to gather evidence.\n\nProblem test node IDs (extracted mechanically — NOT categorized, NOT diagnosed). Each line is verbatim pytest output: the status keyword (FAILED or ERROR) and the `- <reason>` suffix (exception class+message) are mechanical hints — do NOT re-derive or trim them. ERROR leans Infrastructure (setup/teardown/collection):\n\n<Juice lines>\n\nCategorize each into Root Causes per your taxonomy. Write the analysis report to reports/<plan-id>_devops.md and reply with a short RC bullet summary. You are analysis-only — do NOT apply fixes; the operator routes Infrastructure RCs to p-infra-fixer."
 }
 ```
 
 s-test-analyzer:
 - Classifies failures into RCs (Implementation / Test Suite /
   Infrastructure / Plan Gap / Investigation Required).
-- Applies Infrastructure-category fixes directly (edit/write on
-  conftest, factory helpers, env files).
 - Writes the report to `reports/<plan-id>_devops.md` via `write`.
-- Returns a short RC summary + `Direct Fixes Applied` block.
+- Returns a short RC summary.
+- Does NOT apply fixes — all fix execution is owned by the routed
+  agent (p-infra-fixer for Infrastructure RCs, p-coder-fix-mode for
+  Implementation, p-tester-fix-mode for Test Suite,
+  p-implementation-resolver for Plan Gap). The operator invokes the
+  relevant fixer(s) after reading the report.
 
-### 7. Re-run after infra fixes (if applicable)
+### 6. Return FAIL to caller
 
-If the analyzer's reply includes a `Direct Fixes Applied` block with
-one or more fixes → re-delegate to `s-test-executor` with the SAME
-selectors:
+Return FAIL to the caller with the report path. The operator reads
+the report and invokes the appropriate fixer(s):
+- Infrastructure RCs → `p-infra-fixer`
+- Implementation RCs → `p-coder-fix-mode`
+- Test Suite RCs → `p-tester-fix-mode`
+- Plan Gap RCs → `p-implementation-resolver`
 
-```
-Tool: task
-Input:
-{
-  "subagent_type": "s-test-executor",
-  "description": "Re-run tests for plan <plan-id> after infra fixes",
-  "prompt": "Plan-id: <plan-id>\nLabel: re-run-after-infra\nSelectors: <same selectors>"
-}
-```
+After fixes are applied, the operator re-invokes p-test-runner to
+verify. Do NOT delegate to the analyzer a second time for the same
+plan-id — the report on disk is the authoritative artifact for the
+operator to route from.
 
-Use the second result as authoritative.
-- If PASS → return PASS to caller.
-- If still FAIL → return FAIL to caller with the report path.
-
-Do NOT delegate to the analyzer a second time for the same plan-id.
-
-### 8. Return
+### 7. Return
 
 **PASS:**
 
@@ -266,8 +263,9 @@ Root Causes:
 
 The operator decides what to do with the FAIL result:
 - The report at `reports/<plan-id>_devops.md` is on disk. Fix-owner
-  agents (p-coder-fix-mode, p-tester-fix-mode, p-implementation-resolver)
-  read it in their own sessions and apply fixes.
+  agents (p-coder-fix-mode, p-tester-fix-mode, p-infra-fixer,
+  p-implementation-resolver) read it in their own sessions and apply
+  fixes.
 - After fixes, the operator re-invokes p-test-runner for re-runs
   (or fix agents use s-test-executor for scoped verify loops).
 - Once p-test-runner returns PASS, the operator invokes p-devops
@@ -280,6 +278,11 @@ The operator decides what to do with the FAIL result:
 Load the `todowrite-discipline` skill. Protocol source: the Pre-Flight
 steps + Execution Steps above. Surfaced work: subagent calls,
 selector construction, manifest reads.
+
+Load the `test-execution-protocol` skill at session start. It contains
+the s-test-executor delegation protocol (sequential execution, scoped
+selectors, iteration cap, Juice interpretation) shared with
+p-coder-fix-mode, p-tester-fix-mode, and p-infra-fixer.
 
 ---
 
@@ -296,8 +299,7 @@ selector construction, manifest reads.
 
 Stop and report when:
 - Services are not running (s-devops-ops returns STOP)
-- Test DB migration fails (s-alembic returns STOP)
-- Pending-changes check fails (s-alembic returns STOP)
+- Test DB migration or pending-changes check fails (s-alembic returns STOP)
 - Manifest file is missing
 - s-test-executor returns STOP (not PASS or FAIL — a hard error)
 - s-test-analyzer returns STOP

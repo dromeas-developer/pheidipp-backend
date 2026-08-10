@@ -10,7 +10,7 @@
 # filter in alembic/env.py) to ignore procrastinate_* objects entirely.
 #
 # In production the schema is auto-installed when the worker starts
-# (``procrastinate --app=app.worker.app worker`` opens the app, which
+# (``procrastinate --app=app.worker.app.app worker`` opens the app, which
 # calls ``schema_manager.apply_schema()``).  This script exists for:
 #
 #   1. Explicit bootstrap in deployment pipelines — run after Alembic
@@ -33,11 +33,36 @@ source scripts/common.sh
 ensure_project_root
 ensure_venv
 
+# The procrastinate console-script (``.venv/bin/procrastinate``) does not
+# include the project root on ``sys.path`` at launch — its entrypoint sets
+# ``sys.path[0]`` to ``.venv/bin/``.  Export ``PYTHONPATH`` so the CLI's
+# ``importlib`` call resolves the top-level ``app`` package.  When this
+# script runs inside the docker worker container, ``PYTHONPATH`` is
+# already set to ``/app`` by ``docker-compose.yml`` and is preserved by
+# the ``${PYTHONPATH:-...}`` defaulting below.
+export PYTHONPATH="${PYTHONPATH:-$(pwd)}"
+
 echo "Installing procrastinate schema..."
 
-# The --schema --install flags create the procrastinate internal tables,
-# enums, and functions if they do not already exist.  The command is
-# idempotent — it uses CREATE IF NOT EXISTS internally.
-procrastinate --app=app.worker.app schema --install
+# In Procrastinate 3.x the schema subcommand takes ``--apply`` (a flag)
+# that runs ``SchemaManager.apply_schema()`` against the DB configured
+# by ``PROCRASTINATE_DATABASE_URL``.  The 2.x ``schema --install``
+# subcommand does not exist in 3.x.
+#
+# CRITICAL — this command is NOT idempotent and is NOT safe to re-run
+# against a DB with any pre-existing procrastinate objects.
+# ``apply_schema`` emits plain ``CREATE TYPE`` / ``CREATE TABLE``
+# (no ``IF NOT EXISTS`` guards), so it will fail with
+# ``type "procrastinate_job_status" already exists`` (or similar) on any
+# DB that has procrastinate objects from any prior install — including
+# the 3.x schema itself, or a leftover 2.x schema.
+#
+# The drop-then-reinstall pattern used by ``tests/conftest.py:320-370``
+# is the canonical approach for a fresh state.  For prod (``pheidipp``)
+# the operator must drop legacy procrastinate objects MANUALLY before
+# running this script, or accept that this script is for fresh DBs
+# only.  See ``reports/phase-1-7-batch-1_devops.md`` for the operator
+# runbook in the current promotion-gate scenario.
+procrastinate --app=app.worker.app.app schema --apply
 
 echo "Procrastinate schema installed successfully."

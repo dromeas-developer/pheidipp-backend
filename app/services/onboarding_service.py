@@ -507,13 +507,16 @@ class OnboardingService:
         the onboarding commit already succeeded; a queue outage
         here does not invalidate the published ``twin_model_ready``
         event in the outbox — a future publisher pass or manual
-        retry is the recovery path.
+        retry is the recovery path. The defer itself is
+        ``defer_async`` per ADR-014 (the shared procrastinate app
+        uses ``PsycopgConnector``); the await is valid because
+        this method is ``async def``.
         """
         dispatcher: Any
         try:
             from app.worker.app import generate_plan
 
-            dispatcher = cast(Callable[..., Any], generate_plan.defer)
+            dispatcher = cast(Callable[..., Any], generate_plan.defer_async)
         except Exception as exc:
             log_event(
                 event="generate_plan.enqueue.failure",
@@ -524,7 +527,7 @@ class OnboardingService:
             return
 
         try:
-            dispatcher(athlete_id=str(athlete_id))
+            await dispatcher(athlete_id=str(athlete_id))
         except Exception as exc:
             log_event(
                 event="generate_plan.enqueue.failure",

@@ -65,7 +65,7 @@ def run_migrations_offline() -> None:
     """
     url = config.get_main_option("sqlalchemy.url")
     if not url:
-        url = str(settings.POSTGRES_DSN).replace(
+        url = str(settings.DATABASE_URL).replace(
             "postgresql+asyncpg", "postgresql+psycopg2"
         )
     context.configure(

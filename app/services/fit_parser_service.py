@@ -79,7 +79,7 @@ class FitParserService:
         except UpstreamFitParseError as exc:
             log_event(event="fit_parse.failed", outcome="failed")
             raise FitParseError(f"FIT file is corrupt or unsupported: {exc}") from exc
-        except (ValueError, OSError) as exc:
+        except Exception as exc:
             log_event(event="fit_parse.failed", outcome="failed")
             raise FitParseError(f"FIT file could not be parsed: {exc}") from exc
 

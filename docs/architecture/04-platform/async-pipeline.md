@@ -7,14 +7,13 @@
 ## Infrastructure
 
 ```typescript
-// Queue backend: PostgreSQL (via procrastinate 2.x)
+// Queue backend: PostgreSQL (via procrastinate 3.x)
 // Worker framework: Procrastinate (async Python)
-// Connector: Psycopg2Connector (sync-compatible, built on psycopg2)
-// Version constraint: procrastinate>=2.0,<3.0
-//   - Procrastinate 2.x and 3.x both use connector-based API (keyword-only constructor).
-//   - Pinned to 2.x to use Psycopg2Connector (psycopg2-based) rather than 3.x's PsycopgConnector (psycopg3-based).
-//   - Worker tasks run in separate process; sync connector acceptable for current scale.
-// Migration path: Redis/Celery is planned replacement if queue contention appears
+// Connector: PsycopgConnector (async-capable, built on psycopg3)
+// Version constraint: procrastinate>=3.0,<4.0
+//   - Pinned to 3.x to use PsycopgConnector (psycopg3-based, async-capable) which is required for the procrastinate CLI worker. The 2.x Psycopg2Connector (sync-only) cannot run a worker at any entrypoint — procrastinate 2.x's BaseConnector defines all async methods to raise SyncConnectorConfigurationError unconditionally.
+//   - Worker tasks run in separate process; async connector required for the procrastinate CLI worker.
+// Migration path: Redis/Celery remains the longer-term migration path if queue contention appears, but the queue is no longer pinned to 2.x + psycopg2. See ADR-014 for the connector migration decision.
 // Task visibility: task_id returned from async-triggering API endpoints (202 Accepted)
 ```
 

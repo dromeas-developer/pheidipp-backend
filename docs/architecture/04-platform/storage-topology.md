@@ -57,7 +57,7 @@ models/hmm/athlete_{id}_v1.pkl                            → per-athlete HMM mo
 
 **Why object storage for cleaned streams:** Cleaned time-series data is large (typically 5-50MB per session) and rarely accessed (only during segmentation and reprocessing). Storing in PostgreSQL BYTEA would balloon the DB size; object storage is cheaper and more appropriate for large binary data. Early-stage uses MinIO; production migration to AWS S3 is transparent to application code.
 
-**Why PostgreSQL for the task queue (not Redis in early stage):** PostgreSQL-backed queues (`procrastinate 2.x`) are viable for early scale. While Redis provides lower-latency queue operations, the operational simplicity of a two-system stack (PostgreSQL + MinIO) outweighs the latency benefit at current scale. Procrastinate is treated as a transitional queue: if task volume grows, the intended migration is to Redis/Celery, not to Procrastinate 3.x. This justifies keeping the simpler 2.x URL-based configuration rather than adopting the psycopg3 connector required by 3.x.
+**Why PostgreSQL for the task queue (not Redis in early stage):** PostgreSQL-backed queues (`procrastinate 3.x`) are viable for early scale. While Redis provides lower-latency queue operations, the operational simplicity of a two-system stack (PostgreSQL + MinIO) outweighs the latency benefit at current scale. Procrastinate is pinned to 3.x with PsycopgConnector (psycopg3-based, async-capable) — the 2.x Psycopg2Connector (sync-only) cannot run the procrastinate CLI worker at any entrypoint. See ADR-014 for the connector migration decision. Redis/Celery remains the longer-term migration path if queue contention appears.
 
 ## Index Strategy
 

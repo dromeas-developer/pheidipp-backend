@@ -155,20 +155,20 @@ class ActivityIngestionService:
             calibration_eligibility or CalibrationEligibilityService()
         )
         self.events = events or self._build_default_publisher(session)
-        # ``task_dispatcher`` is the procrastinate ``App.tasks[…].defer``
-        # callable bound to ``signal_clean``; it MUST expose a
-        # ``defer(**kwargs)`` sync callable. When ``None`` (production)
-        # the service lazily resolves the live procrastinate app's
-        # ``tasks["signal_clean"].defer`` so this module stays
+        # ``task_dispatcher`` is the procrastinate ``App.tasks[…].defer_async``
+        # callable bound to ``signal_clean``; it MUST be an async
+        # callable with signature ``async (**kwargs) -> int`` per
+        # ADR-014. When ``None`` (production) the service lazily
+        # resolves the live procrastinate app's
+        # ``tasks["signal_clean"].defer_async`` so this module stays
         # importable even if the worker module is unavailable in a
         # trimmed test runtime.
         #
-        # ``defer`` (sync) is used because the shared procrastinate
-        # app is configured with ``Psycopg2Connector`` (sync-only);
-        # ``defer_async`` would unconditionally raise
-        # ``SyncConnectorConfigurationError``. The defer operation
-        # is a lightweight single-row INSERT into ``procrastinate_jobs``
-        # — negligible blocking time from an async ingestion path.
+        # The shared procrastinate app is configured with
+        # ``PsycopgConnector`` (psycopg3, async-capable) per ADR-014;
+        # ``defer`` (sync) is unavailable on async connectors, so the
+        # seam contract is async. Test fakes injected through this
+        # seam MUST be ``async def __call__``.
         self._task_dispatcher = task_dispatcher
 
     # ------------------------------------------------------------------
@@ -837,7 +837,7 @@ class ActivityIngestionService:
         """Defer the ``signal_clean`` procrastinate task for *activity_id*.
 
         The dispatcher is the live ``procrastinate_app.tasks[
-        "signal_clean"].defer`` callable when no test
+        "signal_clean"].defer_async`` callable when no test
         fake was injected; the default is resolved lazily on
         the first call so the module remains importable in
         environments where the worker module is unavailable
@@ -847,7 +847,7 @@ class ActivityIngestionService:
 
         The defer MUST NOT block on the task result; defer is
         a free operation and the worker picks the queued job up
-        off its own schedule. Failures raised by ``defer``
+        off its own schedule. Failures raised by ``defer_async``
         itself (queue backend outage, etc.) are swallowed after
         logging so the ingestion commit path can still succeed.
         """
@@ -855,10 +855,10 @@ class ActivityIngestionService:
         if dispatcher is None:
             from app.worker.app import signal_clean
 
-            dispatcher = cast(Callable[..., Any], signal_clean.defer)
+            dispatcher = cast(Callable[..., Any], signal_clean.defer_async)
 
         try:
-            dispatcher(activity_id=str(activity_id))
+            await dispatcher(activity_id=str(activity_id))
         except Exception as exc:  # pragma: no cover — defensive swallow
             log_event(
                 event="activity.signal_clean.enqueue.failure",

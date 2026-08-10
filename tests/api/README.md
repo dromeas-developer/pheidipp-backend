@@ -22,6 +22,11 @@ the full stack from HTTP client through services and repositories is exercised v
 |---|---|
 | `test_coach_endpoints.py` | TestGetCoachMessages (messages ordered by generated_at desc, limit/offset pagination, message type filter, empty list with zero total, cross-athlete 403), TestPostFirstMessageEndpoint (201 on first post, 409 on second, cross-athlete 403) |
 
+### Activity Upload
+| File | Covers |
+|---|---|
+| `test_activity_upload.py` | TestActivityUploadEndpoint (202 valid upload, fit_file_key non-null, 413 oversize, 422 empty file, 503 storage failure, 403 cross-athlete, no avg fields in response), TestPostAnalyseEndpoint (first call creates message, second call returns existing), TestFitIngestDefer (fit upload enqueues fit_ingest via defer_async with athlete_id and activity_id kwargs) |
+
 ## Mock Boundaries
 - External APIs, message bus, and agents are mocked; DB (test_pheidipp), services, repositories, and the FastAPI app are real — see `tests/MOCKING_CONTRACT.md` for the authoritative layer table
 - Uses the `client` fixture from `tests/conftest.py` (wraps `db_session`, wires `app.dependency_overrides[get_db]`)

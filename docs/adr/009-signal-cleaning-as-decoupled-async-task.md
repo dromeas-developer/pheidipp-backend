@@ -63,3 +63,5 @@ await self.signal_cleaning.clean(activity)  # if this raises, the
 
 ## Cross-References
 [ADR-004: Transactional Outbox For Event Persistence](./004-transactional-outbox-for-event-persistence.md) — the outbox pattern already used by `EventPublisher` is the model for "commit domain row + side effect in the same transaction"; ADR-009 applies the same principle to `RawSensorStream` + cleaned-stream upload.
+
+The `signal_clean` defer context changes from sync `defer()` to `await defer_async()` per ADR-014. The decoupling principle (separate task, own session, failure isolation) is unchanged; only the defer call shape changes. ADR-010's sync-only constraint on the `task_dispatcher` seam is superseded by ADR-014's async seam.

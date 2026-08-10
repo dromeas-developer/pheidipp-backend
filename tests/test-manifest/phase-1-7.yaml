@@ -1,0 +1,96 @@
+version: "1.0"
+plan_id: phase-1-7-batch-1
+sub_phase: 1.7
+files:
+  tests/unit/test_worker_app.py:
+    type: unit
+    status: promoted
+    classes:
+      TestWorkerAppConnector:
+        - test_app_connector_is_psycopg_connector
+        - test_app_does_not_use_psycopg2_connector
+        - test_app_connector_uses_conninfo_keyword
+        - test_app_connector_receives_get_procrastinate_dsn
+      TestWorkerAppTaskRegistration:
+        - test_signal_clean_task_is_registered
+        - test_threshold_detection_task_is_registered
+        - test_generate_plan_task_is_registered
+        - test_generate_first_message_task_is_registered
+  tests/unit/test_alembic_env.py:
+    type: unit
+    status: promoted
+    classes:
+      TestAlembicEnv:
+        - test_env_py_references_settings_database_url
+        - test_env_py_does_not_reference_postgres_dsn
+  tests/integration/test_procrastinate_worker_defer.py:
+    type: integration
+    status: promoted
+    classes:
+      TestProcrastinateAppOpens:
+        - test_procrastinate_app_connector_is_async
+        - test_procrastinate_app_open_async_succeeds
+        - test_procrastinate_jobs_table_exists
+      TestSignalCleanDefer:
+        - test_signal_clean_enqueues_threshold_detection_via_defer_async
+      TestGeneratePlanDefer:
+        - test_generate_plan_enqueues_generate_first_message_via_defer_async
+  tests/integration/test_activity_ingestion_service_defer.py:
+    type: integration
+    status: promoted
+    classes:
+      TestDeferSignalClean:
+        - test_defer_signal_clean_uses_async_dispatcher
+        - test_task_dispatcher_seam_accepts_async_fake
+        - test_defer_signal_clean_swallows_defer_failure
+  tests/integration/test_onboarding_service.py:
+    type: integration
+    status: promoted
+    classes:
+      TestOnboardingAtomicCreate:
+        - test_complete_onboarding_creates_all_entities
+        - test_onboarding_complete_flag_flipped
+        - test_data_tier_persisted_on_twin_state
+        - test_profile_enriched_with_timezone_and_height
+        - test_structural_risk_flag_set_from_sport_background_running
+        - test_structural_risk_flag_set_from_sport_background_triathlon
+        - test_training_goal_persisted_active
+      TestOnboardingTwinBootstrapValues:
+        - test_twin_state_bootstrap_trigger_and_confidence
+        - test_twin_state_lt1_lt2_positive_and_lt1_lt_lt2_lt_max_hr
+        - test_twin_metric_confidence_only_lt1_lt2_hr_low
+        - test_physiology_max_hr_bootstrapped_from_age
+        - test_physiology_lt1_lt2_questionnaire_source
+        - test_physiology_cp_and_vo2max_null
+        - test_fitness_bootstrap_zeroed
+        - test_fitness_time_constants_population_default
+      TestOnboardingFailurePaths:
+        - test_re_onboarding_raises_409
+        - test_athlete_not_found_raises_404
+        - test_second_active_goal_raises_conflict
+      TestOnboardingEventsPublished:
+        - test_onboarding_completed_event_published
+        - test_onboarding_completed_outbox_row_pending
+        - test_twin_model_ready_event_published
+        - test_both_events_persisted_in_same_transaction
+        - test_generate_plan_defer_failure_does_not_break_onboarding
+      TestDeferGeneratePlan:
+        - test_defer_generate_plan_uses_async_defer_async
+        - test_defer_generate_plan_swallows_defer_failure_with_log_event
+  tests/api/test_activity_upload.py:
+    type: api
+    status: promoted
+    classes:
+      TestActivityUploadEndpoint:
+        - test_valid_upload_returns_202
+        - test_fit_file_key_non_null
+        - test_oversize_returns_413
+        - test_empty_file_returns_422
+        - test_object_storage_failure_returns_503
+        - test_cross_athlete_returns_403
+        - test_no_avg_fields_in_response
+      TestPostAnalyseEndpoint:
+        - test_first_call_creates_message
+        - test_second_call_returns_existing
+      TestFitIngestDefer:
+        - test_fit_upload_enqueues_fit_ingest_via_defer_async

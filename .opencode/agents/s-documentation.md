@@ -6,7 +6,7 @@ description: >-
   comment noise), Summarize (moves bloated inline docs to READMEs,
   compacts docstrings).
 mode: subagent
-model: poolside/poolside/laguna-s-2.1
+model: opencode/longcat-2.0-free
 temperature: 0.3
 reasoningEffort: low
 

@@ -1,5 +1,5 @@
 ---
-model: opencode-go/glm-5.2
+model: nvidia/z-ai/glm-5.2
 temperature: 0.1
 reasoningEffort: high
 
@@ -12,6 +12,7 @@ permission:
     s-code-structure-explorer: allow
     s-contract-verifier: allow
     s-index-health-guard: allow
+    s-web-researcher: allow
 
   # Native tools
   read:       allow

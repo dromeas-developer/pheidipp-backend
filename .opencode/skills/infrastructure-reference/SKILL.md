@@ -4,9 +4,11 @@ description: >
   Load this when an agent needs the Pheidipp platform's service map,
   database architecture, command inventory, check-file rule, or
   TimescaleDB augmentation procedures. Consumed by s-alembic (primary
-  — owns the migration lifecycle), s-devops-ops (docker management),
-  and p-devops (operational reference). Coder agents no longer load
-  this skill — migration generation is delegated to s-alembic.
+  — owns the migration lifecycle), s-devops-ops (docker lifecycle),
+  s-infra-config-editor (config file authoring — needs the service
+  map to know what services should exist), and p-devops (operational
+  reference). Coder agents no longer load this skill — migration
+  generation is delegated to s-alembic.
 ---
 
 # Infrastructure Reference

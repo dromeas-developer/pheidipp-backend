@@ -71,6 +71,9 @@ Business-logic layer — the single owner of domain rules, multi-step workflows,
 - `EventPublisher` must be called in the same transaction as the producing domain writes (ADR-004 atomicity). All service methods that produce events inject `EventPublisher` via constructor.
 - `PlanGenerationService` is pure Python — no LLM, no external API calls. Templates live in `plan_generation_templates.py` for isolated unit testing.
 - `OutboxPublisherService` is a deliberate exception to the "caller provides the session" pattern — it opens its own `AsyncSession` internally per ADR-013 `SessionOwnership`, because the publish-side outbox transition is an independent transaction that must not participate in the caller's (worker's) transaction scope.
+- Services that enqueue background work do so through a lazily-resolved async dispatcher, never a module-level import of the worker: `ActivityIngestionService._defer_signal_clean` and `OnboardingService._defer_generate_plan` import `app.worker.app` inside the method and bind `<task>.defer_async`. This keeps both modules importable in trimmed runtimes where the worker is absent.
+- The `task_dispatcher` constructor seam on `ActivityIngestionService` is an **async** callable — `async (**kwargs) -> int` per ADR-014, since sync `defer()` is unavailable on the async `PsycopgConnector`. Test fakes injected through this seam must be `async def __call__`.
+- Defer failures are swallowed and logged, never raised: a queue-backend outage must not roll back an already-committed ingestion or onboarding transaction. Recovery is a later publisher pass or manual retry, not a rollback.
 - `ObjectStorageClient` is constructed once per process via `get_object_storage_client()` and reused — the underlying `boto3.client` is thread-safe.
 - Several services accept repositories via TYPE_CHECKING imports to avoid circular import chains (e.g., `ContextBudgetService`, agents).
 
@@ -79,3 +82,4 @@ Business-logic layer — the single owner of domain rules, multi-step workflows,
 - [ADR-005: Refresh Token IP Retention](../../docs/architecture/adr/ADR-005-refresh-token-ip-retention.md) — `RefreshTokenRepository` IP sweep
 - [ADR-007: LLM Provider Gateway](../../docs/architecture/adr/ADR-007-llm-provider-gateway.md) — LiteLLM proxy access pattern in all agent services
 - [ADR-013: Outbox Publisher Service Ownership](../../docs/architecture/adr/ADR-013-outbox-publisher-service-ownership.md) — `OutboxPublisherService` owns the publish-side transaction; worker tasks must not construct repositories
+- [ADR-014: Procrastinate 3.x / psycopg3 Async Connector](../../docs/adr/014-procrastinate-3-psycopg3-async-connector.md) — supersedes ADR-010; defines the async `task_dispatcher` seam contract

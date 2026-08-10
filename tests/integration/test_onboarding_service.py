@@ -1,5 +1,6 @@
 import uuid
 from typing import Any
+from unittest.mock import AsyncMock
 
 import pytest
 from sqlalchemy import select
@@ -385,3 +386,77 @@ class TestOnboardingEventsPublished:
         refreshed = await db_session.get(Athlete, athlete.id)
         assert refreshed is not None
         assert refreshed.onboarding_complete is True
+
+
+class TestDeferGeneratePlan:
+    async def test_defer_generate_plan_uses_async_defer_async(
+        self, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+    ):
+        from app.worker import app as worker_app
+        from app.services.onboarding_service import OnboardingService
+
+        defer_mock = AsyncMock(return_value=42)
+        monkeypatch.setattr(worker_app.generate_plan, "defer_async", defer_mock)
+
+        athlete, _ = await make_athlete_with_profile(db_session)
+        service = OnboardingService(db_session)
+
+        await service._defer_generate_plan(athlete.id)
+
+        defer_mock.assert_awaited_once_with(athlete_id=str(athlete.id))
+
+    async def test_defer_generate_plan_swallows_defer_failure_with_log_event(
+        self,
+        db_session: AsyncSession,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        from app.services import onboarding_service as onboarding_module
+
+        log_event_calls: list[dict[str, Any]] = []
+
+        def _mock_log_event(**kwargs: Any) -> None:
+            log_event_calls.append(kwargs)
+
+        monkeypatch.setattr(onboarding_module, "log_event", _mock_log_event)
+
+        async def failing_defer(
+            self: OnboardingService, athlete_id: uuid.UUID
+        ) -> None:
+            raise RuntimeError("procrastinate defer failed")
+
+        monkeypatch.setattr(
+            onboarding_module.OnboardingService,
+            "_defer_generate_plan",
+            failing_defer,
+        )
+
+        athlete, _ = await _run_full_onboarding(db_session)
+
+        refreshed = await db_session.get(Athlete, athlete.id)
+        assert refreshed is not None
+        assert refreshed.onboarding_complete is True
+
+        failure_logs = [
+            call
+            for call in log_event_calls
+            if call.get("event") == "generate_plan.defer.failure"
+        ]
+        assert len(failure_logs) == 1
+        assert failure_logs[0].get("outcome") == "failed"
+        assert "procrastinate defer failed" in str(failure_logs[0].get("error"))
+
+        outbox_rows = (
+            (
+                await db_session.execute(
+                    select(SystemEventOutbox)
+                    .join(
+                        SystemEvent, SystemEventOutbox.event_id == SystemEvent.event_id
+                    )
+                    .where(SystemEvent.event_type == "twin_model_ready")
+                )
+            )
+            .scalars()
+            .all()
+        )
+        assert len(outbox_rows) == 1
+        assert outbox_rows[0].status == EventPublicationStatus.PENDING

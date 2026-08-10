@@ -2,7 +2,7 @@ import uuid
 from datetime import date, datetime, timedelta, timezone
 
 import jwt
-import pytest
+import pytest_asyncio
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,7 +12,7 @@ from app.models.athlete import Athlete
 from app.models.athlete_profile import AthleteProfile
 
 
-@pytest.fixture
+@pytest_asyncio.fixture(loop_scope="session")
 async def athlete_with_profile(db_session: AsyncSession) -> uuid.UUID:
     athlete_id = uuid.uuid4()
     athlete = Athlete(id=athlete_id, email=f"test-{athlete_id}@example.com")

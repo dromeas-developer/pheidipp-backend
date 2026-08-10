@@ -62,6 +62,24 @@ services:
     command: ["--config", "/app/config.yaml", "--port", "4000", "--host", "0.0.0.0"]
     restart: unless-stopped
 
+  worker:
+    build: .
+    container_name: pheidipp_worker
+    depends_on:
+      - db
+      - minio
+      - litellm
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/pheidipp
+      PROCRASTINATE_DATABASE_URL: postgresql+psycopg2://postgres:postgres@db:5432/pheidipp
+      RUNNING_IN_DOCKER: "true"
+      PYTHONPATH: "/app"
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+    command: procrastinate --app=app.worker.app.app worker
+
 volumes:
   postgres_data:
   minio_data:

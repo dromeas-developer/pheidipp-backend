@@ -48,7 +48,7 @@ from app.services.activity_ingestion_service import (
 )
 from app.services.compliance_service import ComplianceService
 from app.core.prompt_registry import PromptRegistry
-from app.worker.app import app as procrastinate_app
+from app.worker.app import fit_ingest
 
 
 # Maximum upload size (bytes). 10MB matches the
@@ -140,19 +140,21 @@ async def post_upload_activity(
     await session.commit()
 
     # Enqueue the heavy ingestion pipeline. Procrastinate's
-    # ``defer`` returns the job id as an ``int`` (not a
+    # ``defer_async`` returns the job id as an ``int`` (not a
     # ``Job`` object). We promote it to a ``UUID`` here so the
     # response schema's ``task_id: UUID`` field is satisfied.
     # The conversion is lossless and reversible:
     # ``UUID(int=job_id << 96).int >> 96 == job_id``.
     #
-    # ``defer`` (sync) is used because the shared procrastinate
-    # app is configured with ``Psycopg2Connector`` (sync-only);
-    # ``defer_async`` would unconditionally raise
-    # ``SyncConnectorConfigurationError``. The defer operation
-    # is a lightweight single-row INSERT into ``procrastinate_jobs``
-    # — negligible blocking time from an async endpoint.
-    job = procrastinate_app.tasks["fit_ingest"].defer(  # type: ignore
+    # ``defer_async`` is used because the shared procrastinate
+    # app is configured with ``PsycopgConnector`` (psycopg3,
+    # async-capable) per ADR-014; ``defer`` (sync) is unavailable
+    # on async connectors. The defer operation is a lightweight
+    # single-row INSERT into ``procrastinate_jobs`` driven by
+    # the connector's own connection pool — independent of the
+    # caller's transaction, so the after-commit ordering
+    # preserves the durability invariant.
+    job = await fit_ingest.defer_async(
         athlete_id=str(athlete_id),
         activity_id=str(activity.id),
     )

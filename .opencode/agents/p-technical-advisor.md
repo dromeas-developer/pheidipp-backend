@@ -8,6 +8,7 @@ permission:
     s-doc-explorer: allow
     s-vision-and-architect-author: allow
     s-index-health-guard: allow
+    s-web-researcher: allow
 
   read:       allow
   edit:       deny
@@ -16,7 +17,7 @@ permission:
   grep:       deny
   glob:       deny
   todowrite:  allow
-  webfetch:   allow
+  webfetch:   deny
   skill:      allow
 
   # Architecture retrieval
@@ -160,6 +161,23 @@ checks, architecture pressure-testing, release sequencing review. Retrieval is
 the work here, not a side effect. Use as many calls as the analysis genuinely
 requires. Batch aggressively to minimise round-trips, but do not artificially
 constrain retrieval depth when the question requires it.
+
+When you need external knowledge — library behavior, version-specific changes,
+known issues — delegate to `s-web-researcher` via `task`:
+
+```
+Tool: task
+Input:
+{
+  "subagent_type": "s-web-researcher",
+  "description": "Research <topic>",
+  "prompt": "Research question: <question>\nContext: <why you're asking>\nVersion info: <relevant library versions>"
+}
+```
+
+`s-web-researcher` returns a factual brief with source URLs. You decide what
+to do with the facts — the subagent does not make recommendations. Do NOT use
+`webfetch` directly — all web research goes through `s-web-researcher`.
 
 ---
 

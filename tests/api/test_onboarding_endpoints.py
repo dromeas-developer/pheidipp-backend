@@ -2,6 +2,7 @@ import uuid
 from datetime import date, timedelta
 
 import pytest
+import pytest_asyncio
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -80,7 +81,7 @@ async def _auth_header(athlete_id: uuid.UUID) -> dict[str, str]:
     return {"Authorization": f"Bearer {await _issue_token(athlete_id)}"}
 
 
-@pytest.fixture
+@pytest_asyncio.fixture(loop_scope="session")
 async def athlete_with_profile(db_session: AsyncSession) -> uuid.UUID:
     athlete, _ = await make_athlete_with_profile(db_session)
     return athlete.id

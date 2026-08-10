@@ -6,7 +6,7 @@ import uuid
 from typing import TypedDict
 
 import procrastinate
-from procrastinate.contrib.psycopg2 import Psycopg2Connector
+from procrastinate import PsycopgConnector
 
 from app.config import get_procrastinate_dsn
 from app.core.logging_utils import log_event
@@ -62,7 +62,7 @@ class OutboxPublisherResult(TypedDict):
 # SQLAlchemy ``+driver`` suffixes are stripped inside
 # ``get_procrastinate_dsn`` so the call site doesn't have to know
 # the converter exists. See app.config for the rationale.
-app = procrastinate.App(connector=Psycopg2Connector(dsn=get_procrastinate_dsn()))
+app = procrastinate.App(connector=PsycopgConnector(conninfo=get_procrastinate_dsn()))
 
 
 # Use ``async_task`` for all tasks so they integrate with the async
@@ -194,10 +194,12 @@ async def signal_clean(*, activity_id: str) -> SignalCleanResult:
         # ``threshold_detection`` loads the activity itself to
         # extract ``athlete_id``, so the defer only needs
         # ``activity_id`` — the ``signal_clean`` task signature
-        # does not need to change.
+        # does not need to change. ``defer_async`` is used per
+        # ADR-014 (async connector); the await is valid because
+        # the enclosing task is ``async def``.
         if result.created:
             try:
-                threshold_detection.defer(
+                await threshold_detection.defer_async(
                     activity_id=activity_id,
                 )
             except Exception as exc:  # pragma: no cover — defensive swallow
@@ -360,10 +362,10 @@ async def generate_plan(*, athlete_id: str) -> GeneratePlanResult:
         # ``_persist_full_plan``; the worker does not commit again
         # here. The defer of the first-message task happens after
         # the service call returns so the plan is durably written
-        # before we wire the next hop. ``defer`` is sync per the
-        # shared ``Psycopg2Connector`` configuration — the
-        # ``generate_first_message`` task itself is ``async``.
-        generate_first_message.defer(athlete_id=str(athlete_uuid))
+        # before we wire the next hop. ``defer_async`` is used per
+        # ADR-014 (async connector); the ``generate_first_message``
+        # task itself is ``async def``.
+        await generate_first_message.defer_async(athlete_id=str(athlete_uuid))
 
         return {
             "training_plan_id": str(result.plan.id),

@@ -14,16 +14,18 @@
     "./plugins/opencode-context-cache.mjs",
     "./plugins/session-stats.ts",
     [
-      "@renjfk/opencode-model-fallback",
+      "./plugins/opencode-model-fallback/index.js",
       {
         "mappings": {
           "ollama-cloud/minimax-m3": "opencode-go/minimax-m3",
           "opencode/deepseek-v4-flash-free": "opencode-go/deepseek-v4-flash",
-          "opencode/mimo-2.5-free": "opencode-go/mimo-2.5",
+          "opencode/mimo-v2.5-free": "opencode-go/mimo-v2.5",
           "nvidia/z-ai/glm-5.2": "litellm-proxy/nvidia/glm-5.2",
           "litellm-proxy/nvidia/glm-5.2": "opencode-go/glm-5.2"
         },
-        "cooldown_seconds": 300,
+        "retry_on_errors": [429, 402],
+        "retryable_error_patterns": ["rate.?limit", "usage.?limit", "quota.?limit", "weekly.?limit", "daily.?limit", "upgrade for higher limits"],
+        "cooldown_seconds": 3600,
         "notify_on_fallback": true
       }
     ]
@@ -43,19 +45,16 @@
     "litellm-proxy"
   ],
   "provider": {
-    "opencode-go": {
-      "models": {
-        "deepseek-v4-flash": { "options": { "setCacheKey": true } },
-        "glm-5.2": { "options": { "contextCache": true } },
-        "minimax-m3": { "options": { "setCacheKey": true } }
-      }
-    },
-    "opencode": {
-      "options": { "contextCache": true }
-    },
     "ollama-cloud": {
       "options": { "contextCache": true }
     },
+    "opencode-go": {
+      "models": {
+        "deepseek-v4-flash": { "options": { "setCacheKey": true } },
+        "minimax-m3": { "options": { "setCacheKey": true } }
+      }
+    },
+    "opencode": { "options": { "contextCache": true } },
     "nvidia": {
       "name": "Nvidia NIM",
       "whitelist": [
@@ -77,7 +76,7 @@
     },
     "poolside": {
       "name": "Poolside AI",
-      "options": { "contextCache": true },
+      "options": { "setCacheKey": true },
       "whitelist": [
         "poolside/laguna-m.1",
         "poolside/laguna-s-2.1",

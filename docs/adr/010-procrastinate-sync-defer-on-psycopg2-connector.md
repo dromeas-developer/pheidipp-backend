@@ -1,9 +1,9 @@
 ---
 id: ADR-010
-status: accepted
+status: superseded
 tags: [async-pipeline, procrastinate, connector, task-queue, testing]
 supersedes: ~
-superseded-by: ~
+superseded-by: ADR-014
 ---
 
 # ADR 010: Procrastinate Sync `defer` On Psycopg2Connector

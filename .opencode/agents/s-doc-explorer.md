@@ -9,7 +9,7 @@ description: >-
   open-ended discovery, does not decide relevance beyond what the
   caller named, and never writes or edits anything.
 mode: subagent
-model: opencode-go/mimo-v2.5
+model: opencode/mimo-v2.5-free
 temperature: 0.3
 reasoningEffort: medium
 

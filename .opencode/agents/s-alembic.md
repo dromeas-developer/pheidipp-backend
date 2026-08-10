@@ -8,7 +8,7 @@ description: >-
   and apply-prod (migrate pheidipp). The coder never writes migration
   files directly — this subagent owns that end-to-end.
 mode: subagent
-model: poolside/poolside/laguna-s-2.1
+model: opencode/longcat-2.0-free
 temperature: 0.0
 reasoningEffort: low
 
@@ -117,7 +117,7 @@ mode: auto | explicit
    Test DB upgraded to: <revision_id>
    ```
 
-### `apply-test` — Migrate Test Database
+### `apply-test` — Migrate Test Database + Verify No Pending ORM Drift
 
 **When:** Invoked by p-test-runner as a precondition before running
 tests.
@@ -126,7 +126,15 @@ tests.
 1. Delete any stale `_check.py` files.
 2. Run `bash scripts/db-upgrade-test.sh`.
 3. Confirm exit code 0.
-4. Return: `Test DB at head: <revision_id>` or `STOP: <error>`.
+4. Run `bash scripts/db-revision-test.sh "check"` to detect pending
+   ORM changes not captured by any migration.
+5. Read the produced `_check.py` via `get_files`.
+6. Delete the `_check.py` file.
+7. If the `_check.py` is non-empty → return:
+   `STOP: pending ORM drift detected. Migration does not capture all
+   model changes. Missing: <summary of the diff>.`
+8. If the `_check.py` is empty → return:
+   `Test DB at head: <revision_id>. No pending ORM drift.`
 
 ### `pending-changes-check` — Verify Migration Captures ORM
 

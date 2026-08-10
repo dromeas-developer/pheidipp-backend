@@ -27,6 +27,26 @@ collaborator services, and repositories.
 | `test_onboarding_schemas.py` | TestOnboardingProfileTimezone (IANA timezone validation), TestWeeklyScheduleCompleteness (7-day completeness + extra-day rejection), TestGoalRequiredFieldsPerType (race_event/target_performance required fields), TestGoalEventDateInFuture (past/today rejected, future accepted), TestOnboardingFieldBounds (years_structured_training 0-80, fitness_level 1-5, weekly_volume_hours/km, height_cm), TestProfileImmutability (date_of_birth/sex/timezone rejected, extra="forbid") |
 | `test_structural_risk_flag.py` | TestStructuralRiskFlag (sport_background != RUNNING_PRIMARY truth table across all 9 SportBackground enum members) |
 
+### Calibration
+| File | Covers |
+|---|---|
+| `test_calibration_eligibility_service.py` | CalibrationEligibilityService: eligibility gate (running sport, hr present, auto source, duration ≥1200s, hr dropout ≤20%, no gps loss, no sensor malfunction, null quality flags eligible) |
+
+### Twin Recalibration
+| File | Covers |
+|---|---|
+| `test_twin_recalibration_service.py` | TwinRecalibrationService: Banister update (load 50 applies one-day decay, zero days no decay, zero load pure decay, negative clamped to zero, form=fitness-fatigue, in-place mutation), time constants (none→population defaults, existing passed through, missing keys default), max confidence level (higher rank wins, monotonic, equal keeps first), confidence level string (previous none→computed, computed none→previous, both none→none, high never drops to medium, low upgrades to medium), confidence derivation (weight 3→low, 4→medium, 8→high, no lt1 data→low, no data for both→low, lt1 below threshold lt2 above→low) |
+
+### FIT Parsing
+| File | Covers |
+|---|---|
+| `test_fit_parser_service.py` | FitParserService: raw record extraction (hr/power per-sample values, total distance/ascent), sport type detection (running detected, unknown when omitted), parse failures (corrupt bytes, unsupported fit, no partial result), empty records (empty hr raises FitParseEmpty which subclasses FitParseError), parse delegates to executor |
+
+### Load Computation
+| File | Covers |
+|---|---|
+| `test_load_computation_service.py` | LoadComputationService: aerobic load (hr reserve formula on raw samples, lt1 intensity ~100 units/hour, monotonic with hrr_pct, zero contributes zero, empty hr raises MissingHeartRateError), aerobic load power (power at cp = unit load/hour, half intensity = 1/16, missing cp uses population estimate, cp zero raises MissingCriticalPowerError), structural load (gradient+density formula, risk flag lowers density, density capped at 15, null on no gps/zero distance, zero ascent = zero gradient cost), neuromuscular load (T5/T6 null, T1 produces load, no power records null), returns three load fields (aerobic, structural, neuromuscular) |
+
 ### Plan Generation
 | File | Covers |
 |---|---|
@@ -48,6 +68,12 @@ collaborator services, and repositories.
 |---|---|
 | `test_ip_utils.py` | truncate_ip (IPv4 /24 CIDR, IPv6 /64 CIDR, None/empty/invalid/non-string) |
 | `test_token_security.py` | safe_extra forbidden-key filtering (token_hash, hashed_password, ip_address, unknown keys), RefreshTokenRepository.discard_old_ips (7-day cutoff, zero-row case) |
+
+### Worker
+| File | Covers |
+|---|---|
+| `test_alembic_env.py` | TestAlembicEnv (env.py references settings.DATABASE_URL, does not reference POSTGRES_DSN) |
+| `test_worker_app.py` | TestWorkerAppConnector (PsycopgConnector type, not Psycopg2Connector, conninfo keyword, receives get_procrastinate_dsn), TestWorkerAppTaskRegistration (signal_clean, threshold_detection, generate_plan, generate_first_message tasks registered) |
 
 ## Mock Boundaries
 - DB session (AsyncSession) is mocked; no `db_session` fixture needed — see `tests/MOCKING_CONTRACT.md` for the authoritative layer table

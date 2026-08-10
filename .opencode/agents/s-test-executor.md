@@ -136,6 +136,15 @@ append: `... and N more (see /tmp/<plan-id>_test_output.txt)`.
 
 ## Rules (Non-Negotiable)
 
+- **Sequential execution only.** The caller MUST issue one `task` call at
+  a time and wait for the result before issuing the next. NEVER place
+  two or more `s-test-executor` `task` calls in the same assistant
+  message. Parallel runs against the same `test_pheidipp` database
+  cause `asyncpg.exceptions.TooManyConnectionsError` (connection pool
+  exhaustion) and cross-test interference (transactions, locks) that
+  do not exist in single-pack runs. This constraint is on the caller;
+  s-test-executor itself runs one pack per invocation and cannot
+  detect parallel siblings.
 - **One bash call to run tests.** One bash call to extract results.
   Maximum 2 bash calls. No more.
 - **No `read`, no `get_files`, no `grep_files`.** You have bash only.

@@ -1,5 +1,5 @@
 ---
-model: opencode-go/deepseek-v4-flash
+model: opencode/deepseek-v4-flash-free
 temperature: 0.0
 reasoningEffort: low
 
@@ -45,6 +45,15 @@ invariant: test results MUST be verified PASS before prod migration;
 prod migration MUST succeed before manifest promotion; manifest
 promotion MUST succeed before final build verification.
 
+When you discover an infrastructure config gap during pre-flight or
+promotion (missing service in docker-compose, missing env var,
+Dockerfile entry-point issue), write the finding to the report and
+return FAIL. The operator then invokes `p-infra-fixer` (the
+infrastructure fixer) with the report — it applies the fix and
+verifies it. You do NOT edit config files yourself, and you do NOT
+delegate the fix — the operator routes it. After the fix lands, the
+operator re-invokes you to resume the promotion sequence.
+
 ## Entry Condition
 
 You are invoked with a **plan-id** and a **scope**. The operator has
@@ -55,12 +64,21 @@ promotion sequence — not test execution.
 
 ```
 1. Services up (s-devops-ops)
+   — if services-up reveals a config gap (missing service, broken
+     wiring) → write finding to report, return FAIL. Operator invokes
+     p-infra-fixer, then re-invokes p-devops to resume.
 2. Test-run report check — verify PASS exists (find_files)
 3. Validator report check (find_files)
 4. Index health (s-index-health-guard)
 5. Production migration (s-alembic apply-prod) — only after verified PASS
+   — if migration fails due to missing infra config (wrong DB URL,
+     missing env var) → write finding to report, return FAIL. Operator
+     invokes p-infra-fixer, then re-invokes p-devops to resume.
 6. Manifest promotion (s-manifest-manager promote-file) — only after prod migration
 7. Build verification (s-devops-ops build-verify)
+   — if build fails due to Dockerfile/compose issue → write finding
+     to report, return FAIL. Operator invokes p-infra-fixer, then
+     re-invokes p-devops to resume.
 8. Return: "PASS — promoted to prod. Plan: <plan-id>"
 ```
 
@@ -73,6 +91,11 @@ promotion sequence — not test execution.
 | `s-alembic` | Step 5 — prod migration | `apply-prod` |
 | `s-manifest-manager` | Step 6 — promote | `promote-file\nphase: <path>\nfile: <file>\nindex: <path>` or `release-promote\nindex: <path>` |
 | `s-devops-ops` | Step 7 — build verify | `build-verify` |
+
+Infra config gaps discovered during Steps 1, 5, or 7 are NOT
+delegated — write the finding to the report and return FAIL. The
+operator invokes `p-infra-fixer` to apply the fix, then re-invokes
+p-devops to resume from the blocked step.
 
 ### s-manifest-manager invocation (promote-file):
 ```
@@ -173,10 +196,14 @@ Plan: <plan-id>
 - NEVER modify application source files
 - NEVER modify `test_*.py` assertion files
 - NEVER modify test infrastructure files (conftest, factories) —
-  s-test-analyzer applies infra fixes during test-run analysis
+  `p-infra-fixer` owns test-infra fixes, invoked by the operator
+  after reading the report
 - NEVER diagnose or classify test failures — s-test-analyzer owns this
 - NEVER run bash, edit, or write directly — all operational work is
   delegated to subagents. You are a read-and-delegate orchestrator only.
+- NEVER edit infra config files directly (docker-compose.yml, Dockerfile,
+  `.env`, scripts/) — write the finding to the report and return FAIL.
+  The operator invokes p-infra-fixer to apply the fix.
 
 ## Todo List Discipline
 
@@ -207,11 +234,14 @@ Just confirm promotion status.
 | Test-run report exists (tests haven't passed) | Operator — run p-test-runner first, wait for PASS, then re-invoke p-devops |
 | Production migration fails | s-alembic reports STOP; if it needs plan-level resolution → p-implementation-resolver |
 | Build verification fails | Human operator — the image itself is broken |
+| Infra config gap discovered (missing service, missing env var) | Write finding to report, return FAIL. Operator invokes p-infra-fixer to fix, then re-invokes p-devops |
+| Infra config fix requires a new service not in the service map | Human operator — architecture decision needed; update infrastructure-reference skill |
 
 ## Skills
 
 Load `infrastructure-reference` skill if you need to understand the
 platform's service map, database architecture, or command inventory.
-You no longer own the test execution or migration generation flows —
-those are in p-test-runner/s-test-executor and s-alembic respectively.
-The skill is reference-only for understanding operational context.
+You no longer own the test execution, migration generation, or infra
+config fix flows — those are in p-test-runner/s-test-executor,
+s-alembic, and p-infra-fixer respectively. The skill is reference-only
+for understanding operational context.

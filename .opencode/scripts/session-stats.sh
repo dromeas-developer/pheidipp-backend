@@ -40,6 +40,19 @@ WITH RECURSIVE children(id) AS (
 SELECT '\"' || id || '\"' FROM children;
 " | paste -sd, -)
 
+# Compact one-line summary mode (used by the session-stats plugin toast).
+if [ "${2:-}" = "--summary" ]; then
+  sqlite3 "$DB" "
+  SELECT
+    'Messages: ' || (SELECT COUNT(*) FROM message WHERE session_id IN ($SESSION_IDS)) ||
+    ' | Input: ' || COALESCE(SUM(tokens_input), 0) ||
+    ' | Output: ' || COALESCE(SUM(tokens_output), 0) ||
+    ' | Cost: \$' || printf('%.4f', COALESCE(SUM(cost), 0))
+  FROM session WHERE id IN ($SESSION_IDS);
+  "
+  exit 0
+fi
+
 echo "=== Session Summary ==="
 sqlite3 -header -column "$DB" "
 SELECT
@@ -60,27 +73,9 @@ FROM session WHERE id IN ($SESSION_IDS);
 echo ""
 echo "=== Agent Breakdown ==="
 sqlite3 -header -column "$DB" "
-WITH agent_models AS (
-  SELECT
-    json_extract(m.data, '$.agent') AS agent,
-    json_extract(m.data, '$.modelID') AS model
-  FROM message m
-  WHERE m.session_id IN ($SESSION_IDS)
-    AND json_extract(m.data, '$.role') = 'assistant'
-  GROUP BY agent, model
-),
-agent_model_counts AS (
-  SELECT agent, COUNT(*) AS model_count
-  FROM agent_models
-  GROUP BY agent
-)
 SELECT
   COALESCE(json_extract(m.data, '$.agent'), 'unknown') AS 'Agent',
-  CASE
-    WHEN mc.model_count = 1
-    THEN (SELECT model FROM agent_models WHERE agent = json_extract(m.data, '$.agent') LIMIT 1)
-    ELSE mc.model_count || ' models'
-  END AS 'Model',
+  COALESCE(json_extract(m.data, '$.providerID'), '?') || '/' || COALESCE(json_extract(m.data, '$.modelID'), '?') AS 'Provider/Model',
   COUNT(*) AS 'Msgs',
   SUM(json_extract(m.data, '$.tokens.input')) AS 'Input',
   SUM(json_extract(m.data, '$.tokens.output')) AS 'Output',
@@ -91,57 +86,8 @@ SELECT
     ELSE '0.0%'
   END AS 'Cache Hit %'
 FROM message m
-JOIN agent_model_counts mc ON mc.agent = json_extract(m.data, '$.agent')
 WHERE m.session_id IN ($SESSION_IDS)
   AND json_extract(m.data, '$.role') = 'assistant'
-GROUP BY json_extract(m.data, '$.agent')
-ORDER BY SUM(json_extract(m.data, '$.tokens.input')) DESC;
+GROUP BY json_extract(m.data, '$.agent'), json_extract(m.data, '$.providerID'), json_extract(m.data, '$.modelID')
+ORDER BY json_extract(m.data, '$.agent'), SUM(json_extract(m.data, '$.tokens.input')) DESC;
 "
-
-MULTI_MODEL_COUNT=$(sqlite3 "$DB" "
-SELECT COUNT(DISTINCT json_extract(data, '$.agent'))
-FROM message
-WHERE session_id IN ($SESSION_IDS)
-  AND json_extract(data, '$.role') = 'assistant'
-  AND json_extract(data, '$.agent') IN (
-    SELECT json_extract(data, '$.agent')
-    FROM message
-    WHERE session_id IN ($SESSION_IDS)
-      AND json_extract(data, '$.role') = 'assistant'
-    GROUP BY json_extract(data, '$.agent')
-    HAVING COUNT(DISTINCT json_extract(data, '$.modelID')) > 1
-  );
-")
-
-if [ "$MULTI_MODEL_COUNT" -gt 0 ]; then
-  echo ""
-  echo "=== Model Breakdown (multi-model agents only) ==="
-  sqlite3 -header -column "$DB" "
-  SELECT
-    COALESCE(json_extract(m.data, '$.agent'), 'unknown') AS 'Agent',
-    COALESCE(json_extract(m.data, '$.modelID'), 'unknown') AS 'Model',
-    COALESCE(json_extract(m.data, '$.providerID'), 'unknown') AS 'Provider',
-    COUNT(*) AS 'Msgs',
-    SUM(json_extract(m.data, '$.tokens.input')) AS 'Input',
-    SUM(json_extract(m.data, '$.tokens.output')) AS 'Output',
-    SUM(json_extract(m.data, '$.tokens.reasoning')) AS 'Reasoning',
-    SUM(json_extract(m.data, '$.tokens.cache.read')) AS 'Cache Read',
-    CASE WHEN (SUM(json_extract(m.data, '$.tokens.cache.read')) + SUM(json_extract(m.data, '$.tokens.input'))) > 0
-      THEN printf('%.1f%%', CAST(SUM(json_extract(m.data, '$.tokens.cache.read')) AS REAL) / (SUM(json_extract(m.data, '$.tokens.cache.read')) + SUM(json_extract(m.data, '$.tokens.input'))) * 100)
-      ELSE '0.0%'
-    END AS 'Cache Hit %'
-  FROM message m
-  WHERE m.session_id IN ($SESSION_IDS)
-    AND json_extract(m.data, '$.role') = 'assistant'
-    AND json_extract(m.data, '$.agent') IN (
-      SELECT json_extract(data, '$.agent')
-      FROM message
-      WHERE session_id IN ($SESSION_IDS)
-        AND json_extract(data, '$.role') = 'assistant'
-      GROUP BY json_extract(data, '$.agent')
-      HAVING COUNT(DISTINCT json_extract(data, '$.modelID')) > 1
-    )
-  GROUP BY json_extract(m.data, '$.agent'), json_extract(m.data, '$.modelID'), json_extract(m.data, '$.providerID')
-  ORDER BY json_extract(m.data, '$.agent'), SUM(json_extract(m.data, '$.tokens.input')) DESC;
-  "
-fi
